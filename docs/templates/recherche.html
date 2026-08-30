@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Search · McGivrer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b1220;
+    --bg-2:#0e1729;
+    --grid:#1b2a47;
+    --panel:#0f1a30;
+    --line:#25375c;
+    --ink:#e8edf5;
+    --muted:#8ea0c4;
+    --muted-2:#5d6f92;
+    --amber:#ffb454;
+    --amber-dim:#a97a3d;
+    --cyan:#5eead4;
+    --radius:2px;
+  }
+
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+
+  body{
+    margin:0;
+    background:
+      linear-gradient(var(--bg-2) 1px, transparent 1px) 0 0/100% 32px,
+      linear-gradient(90deg, var(--bg-2) 1px, transparent 1px) 0 0/32px 100%,
+      var(--bg);
+    background-color:var(--bg);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    background-image:
+      linear-gradient(rgba(94,234,212,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(94,234,212,0.035) 1px, transparent 1px);
+    background-size:32px 32px;
+    pointer-events:none;
+    z-index:0;
+  }
+
+  .wrap{ position:relative; z-index:1; max-width:900px; margin:0 auto; padding:28px 24px 80px; }
+
+  a{color:inherit;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  a:focus-visible, .search-input:focus-visible, .search-btn:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
+
+  @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:.25;} }
+
+  /* ---------- Top ticker (shared chrome) ---------- */
+  .ticker{
+    position:sticky; top:0; z-index:2; height:34px; overflow:hidden;
+    background:#080d18; border-bottom:1px solid var(--line);
+    display:flex; align-items:center;
+  }
+  .ticker-label{
+    flex:none; height:100%; display:flex; align-items:center; padding:0 14px;
+    background:var(--amber); color:#0b1220;
+    font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700;
+    letter-spacing:0.1em; text-transform:uppercase; white-space:nowrap;
+  }
+  .ticker-viewport{
+    flex:1; overflow:hidden; height:100%; display:flex; align-items:center;
+    -webkit-mask-image:linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+    mask-image:linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+  }
+  .ticker-track{ display:flex; width:max-content; animation:ticker-scroll 34s linear infinite; }
+  .ticker:hover .ticker-track{ animation-play-state:paused; }
+  .ticker-group{ display:flex; align-items:center; gap:0; }
+  .ticker-item{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--muted); white-space:nowrap; padding:0 22px; }
+  .ticker-item .date{ color:var(--cyan); margin-right:8px; }
+  .ticker-item .sep{ color:var(--amber-dim); margin-left:22px; }
+  @keyframes ticker-scroll{ from{ transform:translateX(0); } to{ transform:translateX(-50%); } }
+  @media (prefers-reduced-motion: reduce){
+    .ticker-track{ animation:none; }
+    .ticker-group:nth-child(2){ display:none; }
+    .ticker-viewport{ overflow-x:auto; }
+  }
+
+  /* ---------- Compact site header (shared chrome, secondary pages) ---------- */
+  .site-header{
+    border:1px solid var(--line);
+    background:linear-gradient(180deg, rgba(94,234,212,0.03), transparent 60%), var(--panel);
+    position:relative;
+    margin-bottom:40px;
+  }
+  .site-header::before, .site-header::after{
+    content:""; position:absolute; width:12px; height:12px; border:1.5px solid var(--amber);
+  }
+  .site-header::before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }
+  .site-header::after{ top:-1px; right:-1px; border-left:none; border-bottom:none; }
+  .site-header-top{
+    display:flex; justify-content:space-between; align-items:center; padding:10px 18px;
+    border-bottom:1px solid var(--line);
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.12em;
+    text-transform:uppercase; color:var(--muted-2);
+  }
+  .site-header-top .live{ color:var(--cyan); }
+  .site-header-top .live::before{ content:"●"; margin-right:6px; animation:blink 1.8s infinite; }
+  .site-header-main{
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px;
+    padding:16px 20px;
+  }
+  .site-brand{ font-family:'JetBrains Mono',monospace; font-weight:800; font-size:20px; color:var(--ink); text-decoration:none; }
+  .site-brand .cursor{ display:inline-block; width:0.4ch; background:var(--amber); margin-left:3px; animation:blink 1s steps(1) infinite; }
+  .site-nav{ display:flex; gap:4px; flex-wrap:wrap; }
+  .site-nav a{ font-family:'JetBrains Mono',monospace; font-size:12.5px; padding:7px 12px; text-decoration:none; color:var(--muted); border:1px solid transparent; }
+  .site-nav a:hover{ color:var(--ink); border-color:var(--line); }
+  .site-nav a.active{ color:var(--amber); border-color:var(--line); background:rgba(255,180,84,0.06); }
+
+  @media (prefers-reduced-motion: reduce){
+    .site-header-top .live::before, .site-brand .cursor{ animation:none; opacity:1; }
+  }
+
+  /* ---------- Tags (shared chrome) ---------- */
+  .tags{ display:flex; flex-wrap:wrap; gap:8px; }
+  .tag{
+    font-family:'JetBrains Mono',monospace; font-size:12px; padding:5px 10px;
+    border:1px solid var(--line); color:var(--cyan); background:rgba(94,234,212,0.04);
+  }
+
+  /* ---------- Search ---------- */
+  .search-head{ margin-bottom:28px; }
+  .search-head h1{ font-family:'JetBrains Mono',monospace; font-size:clamp(26px,4vw,36px); margin:0 0 16px; color:var(--ink); }
+  .search-form{ display:flex; border:1px solid var(--line); background:var(--panel); }
+  .search-input{
+    flex:1; background:transparent; border:none; padding:14px 16px; color:var(--ink);
+    font-family:'JetBrains Mono',monospace; font-size:14px; outline:none; min-width:0;
+  }
+  .search-input::placeholder{ color:var(--muted-2); }
+  .search-btn{
+    border:none; border-left:1px solid var(--line); background:var(--amber); color:#0b1220;
+    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:12.5px;
+    letter-spacing:0.08em; text-transform:uppercase; padding:0 22px; cursor:pointer;
+  }
+  .search-btn:hover{ background:#ffc678; }
+  .search-meta{ margin-top:14px; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--muted-2); }
+  .search-meta mark, .result-row mark{ background:rgba(255,180,84,0.25); color:var(--amber); padding:0 2px; }
+
+  .search-results{ border:1px solid var(--line); background:var(--panel); margin-top:24px; }
+  .result-row{ display:grid; grid-template-columns:110px 1fr; gap:16px; padding:18px 20px; border-bottom:1px solid var(--line); }
+  .result-row:last-child{ border-bottom:none; }
+  .result-date{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--cyan); padding-top:2px; }
+  .result-row h2{ margin:0 0 6px; font-size:16px; font-family:'JetBrains Mono',monospace; }
+  .result-row h2 a{ color:var(--ink); text-decoration:none; }
+  .result-row h2 a:hover{ color:var(--amber); }
+  .result-row p{ margin:0 0 10px; color:var(--muted); font-size:13.5px; line-height:1.6; }
+  @media (max-width:560px){ .result-row{ grid-template-columns:1fr; } }
+
+  .search-empty{ margin-top:24px; padding:32px 20px; border:1px dashed var(--line); text-align:center; color:var(--muted); }
+  .search-empty p{ margin:0 0 8px; }
+  .search-empty p:first-child{ color:var(--ink); font-family:'JetBrains Mono',monospace; }
+  .search-empty a{ color:var(--cyan); }
+  .search-empty a:hover{ color:var(--amber); }
+
+  footer.site-footer{
+    border-top:1px solid var(--line); padding-top:24px; margin-top:56px;
+    display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px;
+    font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--muted-2);
+  }
+
+  /* ---------- CRT overlay (shared chrome) ---------- */
+  #crt{ position:fixed; inset:0; width:100vw; height:100vh; z-index:45; pointer-events:none; mix-blend-mode:overlay; }
+</style>
+</head>
+<body>
+<canvas id="crt" aria-hidden="true"></canvas>
+
+<div class="ticker" role="marquee" aria-label="Latest updates ticker">
+  <span class="ticker-label">Latest</span>
+  <div class="ticker-viewport">
+    <div class="ticker-track" id="ticker-track"></div>
+  </div>
+</div>
+
+<script type="application/json" id="site-latest">
+[
+  {"date":"2026-08-30","title":"3D City","excerpt":"A 3D version of ASCII City, with vehicle models and new missions."},
+  {"date":"2026-08-29","title":"Oceans data display","excerpt":"Winds, temperatures and surface currents shown on a 3D globe."},
+  {"date":"2026-08-23","title":"ASCII CITY","excerpt":"A GTA-like game with an ASCII rendering touch."}
+]
+</script>
+
+<div class="wrap">
+
+  <header class="site-header">
+    <div class="site-header-top">
+      <span>DOC — SEARCH / REV. 2026</span>
+      <span class="live">ONLINE</span>
+    </div>
+    <div class="site-header-main">
+      <a class="site-brand" href="../../index.html">McGivrer<span class="cursor">&nbsp;</span></a>
+      <nav class="site-nav">
+        <a href="../../index.html">Home</a>
+        <a href="archive.html">Archive</a>
+        <a href="recherche.html" class="active">Search</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="search-head">
+    <h1>Search</h1>
+    <form class="search-form" role="search" onsubmit="return false;">
+      <input type="search" class="search-input mono" placeholder="Search articles, tags, technologies…" value="java">
+      <button type="submit" class="search-btn">Search</button>
+    </form>
+    <p class="search-meta">2 results for “<mark>java</mark>”</p>
+  </section>
+
+  <div class="search-results">
+    <article class="result-row">
+      <div class="result-date">2026-08-30</div>
+      <div>
+        <h2><a href="article.html">3D City</a></h2>
+        <p>A 3D version of ASCII City, built in plain <mark>Java</mark> with a hand-written
+        rasterizer — this time with vehicle models and new missions.</p>
+        <div class="tags"><span class="tag">Java</span><span class="tag">Game dev</span></div>
+      </div>
+    </article>
+    <article class="result-row">
+      <div class="result-date">2025-04-29</div>
+      <div>
+        <h2><a href="#">Java build mini!</a></h2>
+        <p>A mini script for quickly building small <mark>Java</mark> projects, no external
+        dependencies required.</p>
+        <div class="tags"><span class="tag">Java</span><span class="tag">Tooling</span></div>
+      </div>
+    </article>
+  </div>
+
+  <!-- Empty-state example — shown instead of .search-results when a query has no matches. -->
+  <div class="search-empty" hidden>
+    <p>No results for “xyz”.</p>
+    <p>Try a different keyword, or browse the <a href="archive.html">full archive</a>.</p>
+  </div>
+
+  <footer class="site-footer">
+    <span>© 2026 Frédéric Delorme — mcgivrer</span>
+    <span>Strasbourg, France</span>
+  </footer>
+
+</div>
+
+<script>
+(function(){
+  var track = document.getElementById('ticker-track');
+  var dataEl = document.getElementById('site-latest');
+  if(!track || !dataEl) return;
+  var items;
+  try{ items = JSON.parse(dataEl.textContent); }catch(e){ return; }
+
+  function buildGroup(hidden){
+    var group = document.createElement('div');
+    group.className = 'ticker-group';
+    if(hidden) group.setAttribute('aria-hidden', 'true');
+    items.forEach(function(item){
+      var itemSpan = document.createElement('span');
+      itemSpan.className = 'ticker-item';
+      var dateSpan = document.createElement('span');
+      dateSpan.className = 'date';
+      dateSpan.textContent = item.date;
+      itemSpan.appendChild(dateSpan);
+      itemSpan.appendChild(document.createTextNode(item.title + ' — ' + item.excerpt));
+      group.appendChild(itemSpan);
+      var sep = document.createElement('span');
+      sep.className = 'ticker-item sep';
+      sep.textContent = '//';
+      group.appendChild(sep);
+    });
+    return group;
+  }
+
+  track.appendChild(buildGroup(false));
+  track.appendChild(buildGroup(true));
+})();
+</script>
+
+<script>
+(function(){
+  var canvas = document.getElementById('crt');
+  var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+  if(!gl){ canvas.remove(); return; }
+
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  function resize(){
+    canvas.width = Math.floor(window.innerWidth * dpr);
+    canvas.height = Math.floor(window.innerHeight * dpr);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  var vsSource = 'attribute vec2 aPos;' + 'void main(){ gl_Position = vec4(aPos, 0.0, 1.0); }';
+  var fsSource =
+    'precision highp float;' +
+    'uniform vec2 uRes; uniform float uTime;' +
+    'float rand(vec2 co){ return fract(sin(dot(co.xy, vec2(12.9898,78.233))) * 43758.5453); }' +
+    'void main(){' +
+    '  vec2 uv = gl_FragCoord.xy / uRes.xy;' +
+    '  vec3 col = vec3(0.5);' +
+    '  float scan = sin(uv.y * uRes.y * 1.0) * 0.5 + 0.5;' +
+    '  col -= scan * 0.045;' +
+    '  vec2 c = uv - 0.5;' +
+    '  float vig = dot(c, c) * 1.1;' +
+    '  col -= vig * 0.22;' +
+    '  float n = rand(uv * uRes.xy + uTime * 60.0);' +
+    '  col += (n - 0.5) * 0.035;' +
+    '  gl_FragColor = vec4(col, 1.0);' +
+    '}';
+
+  function compile(type, src){ var s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return s; }
+  var prog = gl.createProgram();
+  gl.attachShader(prog, compile(gl.VERTEX_SHADER, vsSource));
+  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fsSource));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+
+  var buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+  var aPos = gl.getAttribLocation(prog, 'aPos');
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+  var uRes = gl.getUniformLocation(prog, 'uRes');
+  var uTime = gl.getUniformLocation(prog, 'uTime');
+
+  function drawStatic(){
+    gl.uniform2f(uRes, canvas.width, canvas.height);
+    gl.uniform1f(uTime, 0.0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+  if(reduceMotion){ drawStatic(); return; }
+
+  function frame(t){
+    gl.uniform2f(uRes, canvas.width, canvas.height);
+    gl.uniform1f(uTime, t * 0.001);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

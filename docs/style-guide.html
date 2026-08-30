@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Style guide reference · McGivrer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b1220; --bg-2:#0e1729; --panel:#0f1a30; --line:#25375c;
+    --ink:#e8edf5; --muted:#8ea0c4; --muted-2:#5d6f92;
+    --amber:#ffb454; --amber-dim:#a97a3d; --cyan:#5eead4;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:'Inter',sans-serif; padding:40px 32px 80px;
+  }
+  .mono{font-family:'JetBrains Mono',monospace;}
+  h1{ font-family:'JetBrains Mono',monospace; font-size:28px; margin:0 0 6px; }
+  .lead{ color:var(--muted); margin:0 0 48px; font-size:14.5px; }
+  h2.block-title{
+    font-family:'JetBrains Mono',monospace; font-size:14px; letter-spacing:0.1em;
+    text-transform:uppercase; color:var(--amber-dim); margin:0 0 18px;
+    border-bottom:1px solid var(--line); padding-bottom:10px;
+  }
+  section{ margin-bottom:52px; }
+
+  /* Colors */
+  .swatch-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+  .swatch{ border:1px solid var(--line); background:var(--panel); overflow:hidden; }
+  .swatch-fill{ height:64px; }
+  .swatch-meta{ padding:10px 12px; font-family:'JetBrains Mono',monospace; font-size:11.5px; }
+  .swatch-meta .name{ color:var(--ink); display:block; margin-bottom:3px; }
+  .swatch-meta .hex{ color:var(--muted-2); }
+
+  /* Typography */
+  .type-row{ display:flex; align-items:baseline; gap:18px; padding:14px 0; border-bottom:1px solid var(--line); }
+  .type-row:last-child{ border-bottom:none; }
+  .type-label{ width:190px; flex:none; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted-2); }
+  .t-h1{ font-family:'JetBrains Mono',monospace; font-weight:800; font-size:40px; }
+  .t-h2{ font-family:'JetBrains Mono',monospace; font-weight:700; font-size:22px; }
+  .t-body{ font-size:16px; color:var(--muted); }
+  .t-mono{ font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--cyan); }
+  .t-eyebrow{ font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--amber); letter-spacing:0.08em; }
+
+  /* Components */
+  .comp-row{ display:flex; flex-wrap:wrap; gap:14px; align-items:center; margin-bottom:20px; }
+  .tags{ display:flex; flex-wrap:wrap; gap:8px; }
+  .tag{ font-family:'JetBrains Mono',monospace; font-size:12px; padding:5px 10px; border:1px solid var(--line); color:var(--cyan); background:rgba(94,234,212,0.04); }
+  .filter-chip{ font-family:'JetBrains Mono',monospace; font-size:12px; padding:6px 12px; border:1px solid var(--line); background:transparent; color:var(--muted); }
+  .filter-chip.active{ border-color:var(--amber); color:var(--amber); background:rgba(255,180,84,0.06); }
+  .btn-primary{
+    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:12.5px; letter-spacing:0.08em;
+    text-transform:uppercase; padding:10px 20px; background:var(--amber); color:#0b1220; border:none;
+  }
+  .btn-ghost{
+    font-family:'JetBrains Mono',monospace; font-size:12.5px; padding:10px 20px;
+    background:transparent; color:var(--muted); border:1px solid var(--line);
+  }
+  .section-head-demo{ display:flex; align-items:baseline; gap:12px; margin-bottom:0; }
+  .section-num{ font-family:'JetBrains Mono',monospace; color:var(--amber-dim); font-size:13px; }
+  .section-title{ font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:700; margin:0; }
+  .section-rule{ flex:1; height:1px; background:linear-gradient(90deg, var(--line), transparent); }
+
+  .card-demo{ border:1px solid var(--line); background:var(--panel); padding:18px 20px; width:260px; }
+  .card-demo .k{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted-2); letter-spacing:0.1em; text-transform:uppercase; margin-bottom:10px; }
+
+  /* Spacing scale */
+  .space-row{ display:flex; align-items:center; gap:16px; margin-bottom:10px; }
+  .space-box{ background:var(--cyan); height:14px; }
+  .space-label{ font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--muted-2); width:60px; }
+</style>
+</head>
+<body>
+
+<h1>McGivrer — visual style reference</h1>
+<p class="lead">Tokens and components extracted from index.html. Used to keep article, archive and search pages visually consistent with the homepage.</p>
+
+<section>
+  <h2 class="block-title">01 — Color tokens</h2>
+  <div class="swatch-grid">
+    <div class="swatch"><div class="swatch-fill" style="background:#0b1220;"></div><div class="swatch-meta"><span class="name">--bg</span><span class="hex">#0b1220</span></div></div>
+    <div class="swatch"><div class="swatch-fill" style="background:#0e1729;"></div><div class="swatch-meta"><span class="name">--bg-2</span><span class="hex">#0e1729</span></div></div>
+    <div class="swatch"><div class="swatch-fill" style="background:#0f1a30;"></div><div class="swatch-meta"><span class="name">--panel</span><span class="hex">#0f1a30</span></div></div>
+    <div class="swatch"><div class="swatch-fill" style="background:#25375c;"></div><div class="swatch-meta"><span class="name">--line</span><span class="hex">#25375c</span></div></div>
+    <div class="swatch"><div class="swatch-fill" style="background:#e8edf5;"></div><div class="swatch-meta"><span class="name">--ink</span><span class="hex">#e8edf5</span></div></div>
+    <div class="swatch"><div class="swatch-fill" style="background:#8ea0c4;"></div><div class="swatch-meta"><span class="name">--muted</span><span class="hex">#8ea0c4</span></div></div>
+    <div class="swatch"><div class="swatch-fill" style="background:#5d6f92;"></div><div class="swatch-meta"><span class="name">--muted-2</span><span class="hex">#5d6f92</span></div></div>
+    <div class="swatch"><div class="swatch-fill" style="background:#ffb454;"></div><div class="swatch-meta"><span class="name">--amber</span><span class="hex">#ffb454</span></div></div>
+    <div class="swatch"><div class="swatch-fill" style="background:#a97a3d;"></div><div class="swatch-meta"><span class="name">--amber-dim</span><span class="hex">#a97a3d</span></div></div>
+    <div class="swatch"><div class="swatch-fill" style="background:#5eead4;"></div><div class="swatch-meta"><span class="name">--cyan</span><span class="hex">#5eead4</span></div></div>
+  </div>
+</section>
+
+<section>
+  <h2 class="block-title">02 — Typography</h2>
+  <div class="type-row"><div class="type-label">H1 · JetBrains Mono 800</div><div class="t-h1">Aa 0123</div></div>
+  <div class="type-row"><div class="type-label">H2 · JetBrains Mono 700</div><div class="t-h2">Section title</div></div>
+  <div class="type-row"><div class="type-label">Eyebrow · JetBrains Mono 400</div><div class="t-eyebrow">// category label</div></div>
+  <div class="type-row"><div class="type-label">Body · Inter 400</div><div class="t-body">Body copy uses Inter at 15.5–16px with a 1.75–1.8 line height for long-form reading.</div></div>
+  <div class="type-row"><div class="type-label">Mono / data · JetBrains Mono</div><div class="t-mono">2026-08-30 · $ build.sh --release</div></div>
+</section>
+
+<section>
+  <h2 class="block-title">03 — Components</h2>
+
+  <div class="comp-row">
+    <div class="tags">
+      <span class="tag">Java</span><span class="tag">Architecture</span><span class="tag">Cloud-native</span>
+    </div>
+  </div>
+
+  <div class="comp-row">
+    <span class="filter-chip active">All</span>
+    <span class="filter-chip">Game dev</span>
+    <span class="filter-chip">Architecture</span>
+  </div>
+
+  <div class="comp-row">
+    <button class="btn-primary">Search</button>
+    <button class="btn-ghost">← Prev</button>
+  </div>
+
+  <div class="comp-row" style="width:100%;">
+    <div class="section-head-demo" style="width:100%;">
+      <span class="section-num">01</span>
+      <h3 class="section-title">Section title</h3>
+      <div class="section-rule"></div>
+    </div>
+  </div>
+
+  <div class="comp-row">
+    <div class="card-demo">
+      <div class="k">Panel label</div>
+      <div class="tags"><span class="tag">Tag</span><span class="tag">Tag</span></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2 class="block-title">04 — Spacing scale (base unit 4px)</h2>
+  <div class="space-row"><div class="space-label">8px</div><div class="space-box" style="width:8px;"></div></div>
+  <div class="space-row"><div class="space-label">14px</div><div class="space-box" style="width:14px;"></div></div>
+  <div class="space-row"><div class="space-label">20px</div><div class="space-box" style="width:20px;"></div></div>
+  <div class="space-row"><div class="space-label">28px</div><div class="space-box" style="width:28px;"></div></div>
+  <div class="space-row"><div class="space-label">40px</div><div class="space-box" style="width:40px;"></div></div>
+  <div class="space-row"><div class="space-label">56px</div><div class="space-box" style="width:56px;"></div></div>
+</section>
+
+</body>
+</html>

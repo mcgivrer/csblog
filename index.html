@@ -968,12 +968,15 @@
 
     'precision mediump float;' +
     'varying float vAlpha; varying float vKind;' +
-    'uniform vec3 uRim; uniform vec3 uPulse;' +
+    'uniform vec3 uRim; uniform vec3 uPulse; uniform vec3 uSource; uniform vec3 uTarget;' +
     'void main(){' +
     '  vec2 c = gl_PointCoord * 2.0 - 1.0;' +
     '  float d = length(c);' +
     '  if(d > 1.0) discard;' +
-    '  vec3 rim = mix(uRim, uPulse, vKind);' +
+    '  vec3 rim = uRim;' +
+    '  if(vKind > 2.5) rim = uTarget;' +
+    '  else if(vKind > 1.5) rim = uSource;' +
+    '  else if(vKind > 0.5) rim = uPulse;' +
     '  vec3 core = vec3(0.91,0.93,0.96);' +
     '  vec3 col = mix(rim, core, smoothstep(1.0, 0.25, d));' +
     '  float edge = 1.0 - smoothstep(0.6, 1.0, d);' +
@@ -988,7 +991,9 @@
   };
   var pointUniforms = {
     rim: gl.getUniformLocation(pointProgram, 'uRim'),
-    pulse: gl.getUniformLocation(pointProgram, 'uPulse')
+    pulse: gl.getUniformLocation(pointProgram, 'uPulse'),
+    source: gl.getUniformLocation(pointProgram, 'uSource'),
+    target: gl.getUniformLocation(pointProgram, 'uTarget')
   };
   var pointBuffer = gl.createBuffer();
 
@@ -1009,6 +1014,11 @@
   var wireUniforms = { color: gl.getUniformLocation(wireProgram, 'uColor') };
   var wireGlowBuffer = gl.createBuffer();
   var wireCoreBuffer = gl.createBuffer();
+  var wireGlowActiveBuffer = gl.createBuffer();
+  var wireCoreActiveBuffer = gl.createBuffer();
+  var ACTIVE_WIRE_COLOR = [1.0, 0.71, 0.33]; // amber — a discharge travelling the synapse
+  var SOURCE_NODE_COLOR = [0.22, 1.0, 0.55]; // green — the neuron emitting the spike
+  var TARGET_NODE_COLOR = [1.0, 0.32, 0.32]; // red — the neuron receiving it
 
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
@@ -1099,25 +1109,36 @@
   function render(t, angleY, angleX, glitching){
     var proj = nodes.map(function(n){ return project(n, t, angleY, angleX); });
 
-    var glowData = [], coreData = [];
+    // Edges currently carrying a discharge (highlighted amber), and the
+    // source/target neuron of each such discharge (highlighted green/red).
+    var activeEdgeSet = {};
+    var nodeRole = {};
+    pulses.forEach(function(p){
+      if(p.t >= 1) return;
+      activeEdgeSet[p.edgeIdx] = true;
+      nodeRole[p.edge.a] = 2; // source
+      nodeRole[p.edge.b] = 3; // target
+    });
+
+    var glowData = [], coreData = [], glowDataActive = [], coreDataActive = [];
     edges.forEach(function(e, idx){
       var pa = proj[e.a], pb = proj[e.b];
       var avgPersp = (pa.persp + pb.persp) / 2;
       var twangDt = t - edgeTwang[idx];
       var pts = buildWireStrip(pa, pb, twangDt, avgPersp);
-      appendStrip(glowData, pts,
+      var glow = activeEdgeSet[idx] ? glowDataActive : glowData;
+      var core = activeEdgeSet[idx] ? coreDataActive : coreData;
+      appendStrip(glow, pts,
         function(p){ return Math.max(1.2, cw * 0.006 * p.persp); },
         function(p){ return Math.min(0.5, 0.10 + p.persp * 0.14); }
       );
-      appendStrip(coreData, pts,
+      appendStrip(core, pts,
         function(p){ return Math.max(0.5, cw * 0.0016 * p.persp); },
         function(p){ return Math.min(0.85, 0.28 + p.persp * 0.22); }
       );
     });
 
     var glitchC = glitching ? [1.0, 0.37, 0.43] : [0.37, 0.92, 0.83];
-    gl.useProgram(wireProgram);
-    gl.uniform3fv(wireUniforms.color, glitchC);
     if(glowData.length){
       gl.bindBuffer(gl.ARRAY_BUFFER, wireGlowBuffer);
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(glowData), gl.STREAM_DRAW);
@@ -1125,6 +1146,14 @@
     if(coreData.length){
       gl.bindBuffer(gl.ARRAY_BUFFER, wireCoreBuffer);
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(coreData), gl.STREAM_DRAW);
+    }
+    if(glowDataActive.length){
+      gl.bindBuffer(gl.ARRAY_BUFFER, wireGlowActiveBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(glowDataActive), gl.STREAM_DRAW);
+    }
+    if(coreDataActive.length){
+      gl.bindBuffer(gl.ARRAY_BUFFER, wireCoreActiveBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(coreDataActive), gl.STREAM_DRAW);
     }
 
     // pulses travelling along their edge
@@ -1134,7 +1163,7 @@
       var p = proj[i];
       var c = toClip(p.x, p.y);
       var fade = Math.max(0.35, Math.min(1, p.persp));
-      pointData.push(c[0], c[1], baseRadius * 2 * p.persp, fade, 0);
+      pointData.push(c[0], c[1], baseRadius * 2 * p.persp, fade, nodeRole[i] || 0);
     });
     pulses.forEach(function(p){
       p.t += p.speed;
@@ -1154,13 +1183,21 @@
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     gl.useProgram(wireProgram);
+    gl.enableVertexAttribArray(wireAttrs.pos);
+    gl.enableVertexAttribArray(wireAttrs.alpha);
     gl.uniform3fv(wireUniforms.color, glitchC);
     [ [wireGlowBuffer, glowData], [wireCoreBuffer, coreData] ].forEach(function(pair){
       if(!pair[1].length) return;
       gl.bindBuffer(gl.ARRAY_BUFFER, pair[0]);
-      gl.enableVertexAttribArray(wireAttrs.pos);
       gl.vertexAttribPointer(wireAttrs.pos, 2, gl.FLOAT, false, 16, 0);
-      gl.enableVertexAttribArray(wireAttrs.alpha);
+      gl.vertexAttribPointer(wireAttrs.alpha, 1, gl.FLOAT, false, 16, 8);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, pair[1].length / 4);
+    });
+    gl.uniform3fv(wireUniforms.color, ACTIVE_WIRE_COLOR);
+    [ [wireGlowActiveBuffer, glowDataActive], [wireCoreActiveBuffer, coreDataActive] ].forEach(function(pair){
+      if(!pair[1].length) return;
+      gl.bindBuffer(gl.ARRAY_BUFFER, pair[0]);
+      gl.vertexAttribPointer(wireAttrs.pos, 2, gl.FLOAT, false, 16, 0);
       gl.vertexAttribPointer(wireAttrs.alpha, 1, gl.FLOAT, false, 16, 8);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, pair[1].length / 4);
     });
@@ -1168,6 +1205,8 @@
     gl.useProgram(pointProgram);
     gl.uniform3fv(pointUniforms.rim, glitching ? [0.37, 0.92, 0.83] : [1.0, 0.71, 0.33]);
     gl.uniform3fv(pointUniforms.pulse, glitching ? [1.0, 0.25, 0.55] : [0.22, 1.0, 0.55]);
+    gl.uniform3fv(pointUniforms.source, SOURCE_NODE_COLOR);
+    gl.uniform3fv(pointUniforms.target, TARGET_NODE_COLOR);
     gl.bindBuffer(gl.ARRAY_BUFFER, pointBuffer);
     gl.enableVertexAttribArray(pointAttrs.pos);
     gl.vertexAttribPointer(pointAttrs.pos, 2, gl.FLOAT, false, 20, 0);
@@ -1189,7 +1228,7 @@
   function frame(t){
     if(t - lastSpawn > 220 + Math.random() * 260){
       var idx = Math.floor(Math.random() * edges.length);
-      pulses.push({ edge: edges[idx], t: 0, speed: 0.012 + Math.random() * 0.012 });
+      pulses.push({ edge: edges[idx], edgeIdx: idx, t: 0, speed: 0.012 + Math.random() * 0.012 });
       edgeTwang[idx] = t;
       window.__neuralSignal.spikes.push(t);
       lastSpawn = t;
