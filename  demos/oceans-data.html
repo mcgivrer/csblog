@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ocean Circulation — Currents, Temperature, Wind</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#05070d;
+    --panel:rgba(11,17,28,0.72);
+    --panel-border:#1f2b3d;
+    --text:#e6edf3;
+    --text-dim:#7c8ba1;
+    --cur:#2dd4bf;
+    --cur-bright:#a5f3ec;
+    --wind:#baf7c0;
+    --wind-bright:#eafff0;
+    --temp-cold:#3b82c4;
+    --temp-warm:#e5484d;
+    --accent-line:#1f2b3d;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;width:100%;height:100%;background:var(--bg);overflow:hidden;
+    font-family:'Inter',system-ui,sans-serif;color:var(--text);}
+  #globe-canvas{position:fixed;inset:0;display:block;cursor:grab;}
+  #globe-canvas:active{cursor:grabbing;}
+
+  .mono{font-family:'Space Mono',monospace;}
+
+  #hud{
+    position:fixed;top:18px;left:18px;width:296px;max-width:calc(100vw - 36px);
+    background:var(--panel);border:1px solid var(--panel-border);border-radius:10px;
+    backdrop-filter:blur(10px);padding:16px 16px 14px;z-index:10;
+    box-shadow:0 12px 40px rgba(0,0,0,0.45);
+  }
+  #hud h1{
+    font-family:'Space Mono',monospace;font-size:13px;letter-spacing:0.14em;
+    text-transform:uppercase;margin:0 0 2px;color:var(--text);font-weight:700;
+  }
+  #hud .subtitle{font-size:11px;color:var(--text-dim);margin:0 0 14px;line-height:1.5;}
+
+  .layer-row{
+    display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--accent-line);
+  }
+  .layer-row:first-of-type{border-top:none;}
+  .swatch{width:10px;height:10px;border-radius:2px;flex:0 0 auto;}
+  .swatch.cur{background:var(--cur);box-shadow:0 0 8px var(--cur);}
+  .swatch.wind{background:var(--wind);box-shadow:0 0 8px var(--wind);}
+  .swatch.temp{background:linear-gradient(90deg,var(--temp-cold),var(--temp-warm));}
+  .layer-row label{flex:1;font-size:12.5px;font-weight:500;cursor:pointer;user-select:none;}
+  .layer-row .count{font-family:'Space Mono',monospace;font-size:10px;color:var(--text-dim);}
+  .switch{position:relative;width:32px;height:18px;flex:0 0 auto;}
+  .switch input{opacity:0;width:0;height:0;}
+  .switch .track{position:absolute;inset:0;background:#1f2b3d;border-radius:20px;transition:.15s;}
+  .switch .thumb{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+    background:#7c8ba1;transition:.15s;}
+  .switch input:checked + .track{background:#12332f;}
+  .switch input:checked + .track .thumb{}
+  .switch input:checked ~ .thumb{transform:translateX(14px);background:var(--cur-bright);}
+
+  #legend-temp{margin-top:6px;display:none;}
+  #legend-temp.show{display:block;}
+  .grad-bar{height:6px;border-radius:3px;background:linear-gradient(90deg,#2255a4,#3b82c4,#4dbf9a,#e8c547,#e5484d);}
+  .grad-labels{display:flex;justify-content:space-between;font-family:'Space Mono',monospace;
+    font-size:9px;color:var(--text-dim);margin-top:4px;}
+
+  #status{
+    margin-top:14px;padding-top:12px;border-top:1px solid var(--accent-line);
+    font-family:'Space Mono',monospace;font-size:10px;color:var(--text-dim);line-height:1.7;
+  }
+  #status .row{display:flex;justify-content:space-between;}
+  #status .val{color:var(--text);}
+  #refresh-btn{
+    margin-top:12px;width:100%;padding:8px;background:transparent;border:1px solid var(--panel-border);
+    border-radius:6px;color:var(--text);font-family:'Space Mono',monospace;font-size:10.5px;
+    letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;transition:.15s;
+  }
+  #refresh-btn:hover{border-color:var(--cur);color:var(--cur-bright);}
+  #refresh-btn:disabled{opacity:0.4;cursor:default;}
+
+  #loading{
+    position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;background:var(--bg);gap:14px;transition:opacity .5s;
+  }
+  #loading.hide{opacity:0;pointer-events:none;}
+  #loading .ring{width:34px;height:34px;border-radius:50%;border:2px solid #1f2b3d;
+    border-top-color:var(--cur);animation:spin 0.9s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  #loading .label{font-family:'Space Mono',monospace;font-size:11px;color:var(--text-dim);letter-spacing:0.08em;}
+  #loading .pct{font-family:'Space Mono',monospace;font-size:11px;color:var(--cur-bright);}
+
+  #footer-note{
+    position:fixed;bottom:14px;left:18px;font-family:'Space Mono',monospace;font-size:9.5px;
+    color:var(--text-dim);z-index:10;max-width:400px;line-height:1.5;
+  }
+  #footer-note a{color:var(--text-dim);}
+
+  #error-toast{
+    position:fixed;bottom:18px;right:18px;max-width:320px;background:rgba(60,20,20,0.85);
+    border:1px solid #7a2e2e;border-radius:8px;padding:10px 14px;font-size:11.5px;color:#ffd9d9;
+    z-index:15;display:none;line-height:1.5;
+  }
+  #error-toast.show{display:block;}
+
+  @media (max-width:640px){
+    #hud{width:calc(100vw - 28px);}
+    #footer-note{display:none;}
+  }
+</style>
+</head>
+<body>
+
+<canvas id="globe-canvas"></canvas>
+
+<div id="hud">
+  <h1>Ocean Circulation</h1>
+  <p class="subtitle">Surface currents, temperature &amp; wind — live data.</p>
+
+  <div class="layer-row">
+    <span class="swatch cur"></span>
+    <label for="toggle-currents">Ocean currents</label>
+    <span class="count mono" id="count-currents">—</span>
+    <label class="switch">
+      <input type="checkbox" id="toggle-currents" checked>
+      <span class="track"></span><span class="thumb"></span>
+    </label>
+  </div>
+  <div class="layer-row">
+    <span class="swatch temp"></span>
+    <label for="toggle-temp">Temperature (SST)</label>
+    <span class="count mono" id="count-temp">—</span>
+    <label class="switch">
+      <input type="checkbox" id="toggle-temp">
+      <span class="track"></span><span class="thumb"></span>
+    </label>
+  </div>
+  <div class="layer-row">
+    <span class="swatch wind"></span>
+    <label for="toggle-wind">Wind at 10 m</label>
+    <span class="count mono" id="count-wind">—</span>
+    <label class="switch">
+      <input type="checkbox" id="toggle-wind">
+      <span class="track"></span><span class="thumb"></span>
+    </label>
+  </div>
+
+  <div class="layer-row">
+    <label for="density-select" style="flex:1;">Vector density</label>
+    <select id="density-select" class="mono" style="background:#0d1420;color:var(--text);
+      border:1px solid var(--panel-border);border-radius:4px;font-size:10.5px;padding:3px 6px;">
+      <option value="1">Raw grid</option>
+      <option value="2">Interpolated ×4</option>
+      <option value="3" selected>Interpolated ×9</option>
+      <option value="4">Interpolated ×16</option>
+    </select>
+  </div>
+  <p class="subtitle" style="margin:6px 0 0;">Beyond the raw grid, in-between vectors are obtained by bilinear interpolation — a visual smoothing, not extra measured data.</p>
+
+  <div id="legend-temp">
+    <div class="grad-bar"></div>
+    <div class="grad-labels"><span id="temp-min">-2°C</span><span id="temp-max">32°C</span></div>
+  </div>
+
+  <div id="status">
+    <div class="row"><span>Avg. current speed</span><span class="val" id="stat-cur">—</span></div>
+    <div class="row"><span>Avg. SST</span><span class="val" id="stat-temp">—</span></div>
+    <div class="row"><span>Avg. wind</span><span class="val" id="stat-wind">—</span></div>
+    <div class="row"><span>Last updated</span><span class="val" id="stat-time">—</span></div>
+  </div>
+
+  <button id="refresh-btn">↻ Refresh data</button>
+</div>
+
+<div id="footer-note">
+  Data: Open‑Meteo Marine API (Copernicus Marine / MeteoFrance model) &amp; Open‑Meteo Forecast API.
+  Drag to rotate the globe, scroll to zoom.
+</div>
+
+<div id="error-toast"></div>
+
+<div id="loading">
+  <div class="ring"></div>
+  <div class="label">LOADING OCEAN DATA</div>
+  <div class="pct" id="loading-pct">0 %</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------------------------------------------------------------
+   * CONFIG
+   * ------------------------------------------------------------------- */
+  const RADIUS = 5;
+  const LAT_STEP = 9;      // grid spacing in degrees
+  const LON_STEP = 9;
+  const BATCH_SIZE = 90;   // points per API call
+  const CONCURRENCY = 5;   // parallel batches
+  const MARINE_URL = 'https://marine-api.open-meteo.com/v1/marine';
+  const FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
+  const LAT_MIN = -81, LON_MIN = -180;
+  const NLAT = Math.round((-LAT_MIN - LAT_MIN)/LAT_STEP) + 1; // number of distinct grid latitudes
+  const NLON = Math.round(360/LON_STEP);                       // number of distinct grid longitudes (wraps)
+
+  // Layer meshes — declared here (before the render loop) since animate() reads them
+  // on every frame to drive the flow animation.
+  let currentsMesh=null, windMesh=null, tempMesh=null;
+
+  /* ---------------------------------------------------------------------
+   * THREE.JS SCENE SETUP
+   * ------------------------------------------------------------------- */
+  const canvas = document.getElementById('globe-canvas');
+  const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
+  camera.position.set(0, 0, 13);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.15);
+  sun.position.set(6, 3, 5);
+  scene.add(sun);
+
+  // starfield
+  (function addStars(){
+    const N = 2600;
+    const pos = new Float32Array(N*3);
+    for(let i=0;i<N;i++){
+      const r = 60 + Math.random()*140;
+      const theta = Math.random()*Math.PI*2;
+      const phi = Math.acos(2*Math.random()-1);
+      pos[i*3]   = r*Math.sin(phi)*Math.cos(theta);
+      pos[i*3+1] = r*Math.sin(phi)*Math.sin(theta);
+      pos[i*3+2] = r*Math.cos(phi);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+    const mat = new THREE.PointsMaterial({color:0xffffff, size:0.55, sizeAttenuation:true, opacity:0.7, transparent:true});
+    scene.add(new THREE.Points(geo, mat));
+  })();
+
+  const globeGroup = new THREE.Group();
+  scene.add(globeGroup);
+
+  // Earth sphere with texture (graceful fallback if it fails to load)
+  const loader = new THREE.TextureLoader();
+  loader.crossOrigin = 'anonymous';
+  const earthGeo = new THREE.SphereGeometry(RADIUS, 96, 96);
+  const earthMat = new THREE.MeshPhongMaterial({color:0x0d3350, shininess:6});
+  const earthMesh = new THREE.Mesh(earthGeo, earthMat);
+  globeGroup.add(earthMesh);
+
+  loader.load('https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg',
+    (tex)=>{ earthMat.map = tex; earthMat.color.set(0xffffff); earthMat.needsUpdate = true; },
+    undefined, ()=>{ /* keep flat fallback color */ });
+  loader.load('https://threejs.org/examples/textures/planets/earth_specular_2048.jpg',
+    (tex)=>{ earthMat.specularMap = tex; earthMat.specular = new THREE.Color(0x333333); earthMat.needsUpdate = true; },
+    undefined, ()=>{});
+  loader.load('https://threejs.org/examples/textures/planets/earth_normal_2048.jpg',
+    (tex)=>{ earthMat.normalMap = tex; earthMat.needsUpdate = true; },
+    undefined, ()=>{});
+
+  // thin cloud shell
+  loader.load('https://threejs.org/examples/textures/planets/earth_clouds_1024.png',
+    (tex)=>{
+      const cloudGeo = new THREE.SphereGeometry(RADIUS*1.012, 64, 64);
+      const cloudMat = new THREE.MeshPhongMaterial({map:tex, transparent:true, opacity:0.35, depthWrite:false});
+      globeGroup.add(new THREE.Mesh(cloudGeo, cloudMat));
+    }, undefined, ()=>{});
+
+  // fake atmosphere glow
+  (function addAtmosphere(){
+    const geo = new THREE.SphereGeometry(RADIUS*1.045, 64, 64);
+    const mat = new THREE.MeshBasicMaterial({color:0x4fd1ff, transparent:true, opacity:0.06, side:THREE.BackSide});
+    globeGroup.add(new THREE.Mesh(geo, mat));
+  })();
+
+  /* ---------------------------------------------------------------------
+   * MANUAL ORBIT CONTROLS (drag to rotate, wheel to zoom)
+   * ------------------------------------------------------------------- */
+  let dragging = false, lastX=0, lastY=0, idleTimer=null, autoRotate=true;
+  let rotX = 0.15, rotY = 0.4;
+
+  function onDown(x,y){ dragging=true; lastX=x; lastY=y; autoRotate=false; clearTimeout(idleTimer); }
+  function onMove(x,y){
+    if(!dragging) return;
+    const dx = x-lastX, dy = y-lastY;
+    rotY += dx*0.005; rotX += dy*0.005;
+    rotX = Math.max(-1.4, Math.min(1.4, rotX));
+    lastX = x; lastY = y;
+  }
+  function onUp(){ dragging=false; idleTimer=setTimeout(()=>autoRotate=true, 3500); }
+
+  canvas.addEventListener('mousedown', e=>onDown(e.clientX,e.clientY));
+  window.addEventListener('mousemove', e=>onMove(e.clientX,e.clientY));
+  window.addEventListener('mouseup', onUp);
+  canvas.addEventListener('touchstart', e=>{const t=e.touches[0]; onDown(t.clientX,t.clientY);}, {passive:true});
+  canvas.addEventListener('touchmove', e=>{const t=e.touches[0]; onMove(t.clientX,t.clientY);}, {passive:true});
+  canvas.addEventListener('touchend', onUp);
+  canvas.addEventListener('wheel', e=>{
+    e.preventDefault();
+    camera.position.z = Math.max(7.5, Math.min(24, camera.position.z + e.deltaY*0.01));
+  }, {passive:false});
+
+  window.addEventListener('resize', ()=>{
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  const clockStart = performance.now();
+  function animate(){
+    requestAnimationFrame(animate);
+    if(autoRotate && !dragging) rotY += 0.0009;
+    globeGroup.rotation.set(rotX, rotY, 0);
+    const elapsed = (performance.now() - clockStart) / 1000;
+    if(currentsMesh) currentsMesh.material.uniforms.uTime.value = elapsed;
+    if(windMesh) windMesh.material.uniforms.uTime.value = elapsed;
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  /* ---------------------------------------------------------------------
+   * GEO MATH
+   * ------------------------------------------------------------------- */
+  function latLonToVector3(lat, lon, r){
+    const phi = (90-lat)*(Math.PI/180);
+    const theta = (lon+180)*(Math.PI/180);
+    return new THREE.Vector3(
+      -r*Math.sin(phi)*Math.cos(theta),
+       r*Math.cos(phi),
+       r*Math.sin(phi)*Math.sin(theta)
+    );
+  }
+  function localAxes(lat, lon){
+    const phi = (90-lat)*(Math.PI/180);
+    const theta = (lon+180)*(Math.PI/180);
+    const north = new THREE.Vector3(
+      Math.cos(phi)*Math.cos(theta), Math.sin(phi), -Math.cos(phi)*Math.sin(theta)
+    ).normalize();
+    const east = new THREE.Vector3(
+      Math.sin(phi)*Math.sin(theta), 0, Math.sin(phi)*Math.cos(theta)
+    ).normalize();
+    return {north, east};
+  }
+  function buildGrid(latStep, lonStep){
+    const pts = [];
+    for(let lat=-81; lat<=81; lat+=latStep){
+      for(let lon=-180; lon<180; lon+=lonStep){
+        pts.push({lat: Math.round(lat*100)/100, lon: Math.round(lon*100)/100});
+      }
+    }
+    return pts;
+  }
+  const grid = buildGrid(LAT_STEP, LON_STEP);
+
+  /* ---------------------------------------------------------------------
+   * VECTOR <-> COMPONENT HELPERS + BILINEAR INTERPOLATION
+   * (used to densify the vector field client-side, without extra API calls)
+   * ------------------------------------------------------------------- */
+  function toUV(speed, dirDeg, offsetDeg){
+    if(!isFinite(speed) || !isFinite(dirDeg)) return {u:NaN, v:NaN};
+    const b = (dirDeg + offsetDeg) * Math.PI/180;
+    return {u: speed*Math.sin(b), v: speed*Math.cos(b)}; // u=east comp., v=north comp.
+  }
+  function fromUV(u, v){
+    if(!isFinite(u) || !isFinite(v)) return {speed:NaN, dirDeg:NaN};
+    const speed = Math.sqrt(u*u + v*v);
+    let d = Math.atan2(u, v) * 180/Math.PI;
+    if(d < 0) d += 360;
+    return {speed, dirDeg:d};
+  }
+
+  // Bilinear-sample a scalar field stored as a flat NLAT*NLON array at a fractional (lat,lon).
+  // Longitude wraps around; latitude clamps at the poles. Returns NaN if any of the 4
+  // surrounding grid cells is missing (land / no data) so nothing is fabricated over gaps.
+  function sampleBilinear(field, lat, lon){
+    const latPos = (lat - LAT_MIN) / LAT_STEP;
+    let latIdx0 = Math.floor(latPos);
+    latIdx0 = Math.max(0, Math.min(NLAT-1, latIdx0));
+    const latIdx1 = Math.min(NLAT-1, latIdx0+1);
+    const t = Math.max(0, Math.min(1, latPos - latIdx0));
+
+    let lonPos = (lon - LON_MIN) / LON_STEP;
+    lonPos = ((lonPos % NLON) + NLON) % NLON;
+    const lonIdx0 = Math.floor(lonPos);
+    const lonIdx1 = (lonIdx0 + 1) % NLON;
+    const s = lonPos - lonIdx0;
+
+    const v00 = field[latIdx0*NLON + lonIdx0];
+    const v01 = field[latIdx0*NLON + lonIdx1];
+    const v10 = field[latIdx1*NLON + lonIdx0];
+    const v11 = field[latIdx1*NLON + lonIdx1];
+    if(!isFinite(v00) || !isFinite(v01) || !isFinite(v10) || !isFinite(v11)) return NaN;
+
+    const top = v00*(1-s) + v01*s;
+    const bottom = v10*(1-s) + v11*s;
+    return top*(1-t) + bottom*t;
+  }
+
+  // Build a denser set of {lat, lon, speed, dirDeg} vectors from the coarse u/v fields.
+  function densifyVectors(uField, vField, factor){
+    const out = [];
+    if(factor <= 1){
+      for(let li=0; li<NLAT; li++){
+        for(let lj=0; lj<NLON; lj++){
+          const idx = li*NLON+lj;
+          const {speed, dirDeg} = fromUV(uField[idx], vField[idx]);
+          if(isFinite(speed)) out.push({lat: LAT_MIN+li*LAT_STEP, lon: LON_MIN+lj*LON_STEP, speed, dirDeg});
+        }
+      }
+      return out;
+    }
+    const fineLatStep = LAT_STEP/factor, fineLonStep = LON_STEP/factor;
+    const latSteps = (NLAT-1)*factor;
+    const lonSteps = NLON*factor;
+    for(let i=0;i<=latSteps;i++){
+      const lat = LAT_MIN + i*fineLatStep;
+      for(let j=0;j<lonSteps;j++){
+        const lon = LON_MIN + j*fineLonStep;
+        const u = sampleBilinear(uField, lat, lon);
+        const v = sampleBilinear(vField, lat, lon);
+        const {speed, dirDeg} = fromUV(u, v);
+        if(isFinite(speed)) out.push({lat, lon, speed, dirDeg});
+      }
+    }
+    return out;
+  }
+
+  // Same idea for a scalar field (temperature).
+  function densifyScalar(field, factor, key){
+    const out = [];
+    if(factor <= 1){
+      for(let li=0; li<NLAT; li++){
+        for(let lj=0; lj<NLON; lj++){
+          const idx = li*NLON+lj;
+          const val = field[idx];
+          if(isFinite(val)){ const e={lat: LAT_MIN+li*LAT_STEP, lon: LON_MIN+lj*LON_STEP}; e[key]=val; out.push(e); }
+        }
+      }
+      return out;
+    }
+    const fineLatStep = LAT_STEP/factor, fineLonStep = LON_STEP/factor;
+    const latSteps = (NLAT-1)*factor;
+    const lonSteps = NLON*factor;
+    for(let i=0;i<=latSteps;i++){
+      const lat = LAT_MIN + i*fineLatStep;
+      for(let j=0;j<lonSteps;j++){
+        const lon = LON_MIN + j*fineLonStep;
+        const val = sampleBilinear(field, lat, lon);
+        if(isFinite(val)){ const e={lat, lon}; e[key]=val; out.push(e); }
+      }
+    }
+    return out;
+  }
+
+  /* ---------------------------------------------------------------------
+   * DATA FETCHING (Open-Meteo, batched, limited concurrency)
+   * ------------------------------------------------------------------- */
+  function chunk(arr, size){
+    const out=[];
+    for(let i=0;i<arr.length;i+=size) out.push(arr.slice(i,i+size));
+    return out;
+  }
+
+  async function fetchBatch(baseUrl, points, params){
+    const lat = points.map(p=>p.lat).join(',');
+    const lon = points.map(p=>p.lon).join(',');
+    const url = `${baseUrl}?latitude=${lat}&longitude=${lon}&${params}`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    return Array.isArray(data) ? data : [data];
+  }
+
+  async function runBatched(points, baseUrl, params, onProgress){
+    const batches = chunk(points, BATCH_SIZE);
+    const results = new Array(batches.length);
+    let done = 0, failed = 0;
+    let cursor = 0;
+
+    async function worker(){
+      while(cursor < batches.length){
+        const idx = cursor++;
+        try{
+          results[idx] = await fetchBatch(baseUrl, batches[idx], params);
+        }catch(e){
+          results[idx] = batches[idx].map(()=>null); // keep alignment, skip on failure
+          failed++;
+        }
+        done++;
+        onProgress(done, batches.length);
+      }
+    }
+    const workers = Array.from({length:Math.min(CONCURRENCY, batches.length)}, worker);
+    await Promise.all(workers);
+    if(failed) showError(`${failed} request batch(es) failed (network or API) — affected points omitted.`);
+    return results.flat();
+  }
+
+  function showError(msg){
+    const el = document.getElementById('error-toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(()=>el.classList.remove('show'), 6000);
+  }
+
+  /* ---------------------------------------------------------------------
+   * VECTOR / POINT LAYER BUILDERS
+   * ------------------------------------------------------------------- */
+
+  // Shared GLSL for the animated "flow" shader: a soft pulse of light travels from the
+  // base to the tip of every vector, looping. Faster currents/winds pulse faster
+  // (aSpeedNorm, 0..1, controls the local animation speed) so the motion itself
+  // communicates intensity, not just the color/length.
+  const FLOW_VERTEX_SHADER = `
+    attribute vec3 color;
+    attribute float aDist;
+    attribute float aSpeedNorm;
+    varying vec3 vColor;
+    varying float vDist;
+    varying float vSpeedNorm;
+    void main(){
+      vColor = color;
+      vDist = aDist;
+      vSpeedNorm = aSpeedNorm;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `;
+  const FLOW_FRAGMENT_SHADER = `
+    precision mediump float;
+    varying vec3 vColor;
+    varying float vDist;
+    varying float vSpeedNorm;
+    uniform float uTime;
+    uniform float uCycle;
+    uniform float uSpeedScale;
+    uniform float uOpacity;
+    void main(){
+      float speedFactor = 0.25 + vSpeedNorm * 0.9;
+      float phase = fract((vDist - uTime * uSpeedScale * speedFactor) / uCycle);
+      float pulse = smoothstep(0.0, 0.5, phase) * (1.0 - smoothstep(0.5, 1.0, phase));
+      float intensity = 0.40 + 0.75 * pulse;
+      gl_FragColor = vec4(vColor * intensity, uOpacity);
+    }
+  `;
+  function makeFlowMaterial(cycle, speedScale, opacity){
+    return new THREE.ShaderMaterial({
+      uniforms: { uTime:{value:0}, uCycle:{value:cycle}, uSpeedScale:{value:speedScale}, uOpacity:{value:opacity} },
+      vertexShader: FLOW_VERTEX_SHADER,
+      fragmentShader: FLOW_FRAGMENT_SHADER,
+      transparent: true
+    });
+  }
+
+  function makeArrowLayer(entries, colorLow, colorHigh, minLen, maxLen, angleOffsetDeg, cycle, speedScale){
+    // entries: [{lat, lon, speed, dirDeg}]
+    if(!entries.length) return null;
+    const speeds = entries.map(e=>e.speed).filter(s=>isFinite(s));
+    const sMax = Math.max(0.01, ...speeds);
+    const positions = [];
+    const colors = [];
+    const dists = [];    // distance along the vector, from base (0) to tip (len) — drives the flow animation
+    const speedNorms = []; // per-vertex normalized speed (0..1), controls local animation speed
+    const cLow = new THREE.Color(colorLow), cHigh = new THREE.Color(colorHigh);
+
+    entries.forEach(e=>{
+      if(!isFinite(e.speed) || !isFinite(e.dirDeg)) return;
+      const t = Math.min(1, e.speed / sMax);
+      const len = minLen + t*(maxLen-minLen);
+      const base = latLonToVector3(e.lat, e.lon, RADIUS*1.004);
+      const {north, east} = localAxes(e.lat, e.lon);
+      const bearing = (e.dirDeg + angleOffsetDeg) * Math.PI/180;
+      const dir = north.clone().multiplyScalar(Math.cos(bearing))
+                    .add(east.clone().multiplyScalar(Math.sin(bearing))).normalize();
+      const tip = base.clone().addScaledVector(dir, len);
+      const col = cLow.clone().lerp(cHigh, t);
+      const arr = [col.r,col.g,col.b];
+
+      positions.push(base.x,base.y,base.z, tip.x,tip.y,tip.z);
+      colors.push(...arr, ...arr);
+      dists.push(0, len);
+      speedNorms.push(t, t);
+
+      const normal = base.clone().normalize();
+      const barbLen = len*0.32;
+      const leftDir = dir.clone().applyAxisAngle(normal, 150*Math.PI/180);
+      const rightDir = dir.clone().applyAxisAngle(normal, -150*Math.PI/180);
+      const leftPt = tip.clone().addScaledVector(leftDir, barbLen);
+      const rightPt = tip.clone().addScaledVector(rightDir, barbLen);
+      positions.push(tip.x,tip.y,tip.z, leftPt.x,leftPt.y,leftPt.z);
+      colors.push(...arr, ...arr);
+      dists.push(len, len); // barbs flash in sync with the pulse arriving at the tip
+      speedNorms.push(t, t);
+      positions.push(tip.x,tip.y,tip.z, rightPt.x,rightPt.y,rightPt.z);
+      colors.push(...arr, ...arr);
+      dists.push(len, len);
+      speedNorms.push(t, t);
+    });
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions,3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(colors,3));
+    geo.setAttribute('aDist', new THREE.Float32BufferAttribute(dists,1));
+    geo.setAttribute('aSpeedNorm', new THREE.Float32BufferAttribute(speedNorms,1));
+    const mat = makeFlowMaterial(cycle, speedScale, 0.92);
+    return new THREE.LineSegments(geo, mat);
+  }
+
+  function tempColor(t){
+    // t in [0,1]: cold -> warm
+    const stops = [
+      [0.0, 0x2255a4], [0.35, 0x3b82c4], [0.55, 0x4dbf9a], [0.75, 0xe8c547], [1.0, 0xe5484d]
+    ];
+    for(let i=0;i<stops.length-1;i++){
+      const [t0,c0]=stops[i], [t1,c1]=stops[i+1];
+      if(t>=t0 && t<=t1){
+        const f = (t-t0)/(t1-t0);
+        const a=new THREE.Color(c0), b=new THREE.Color(c1);
+        return a.lerp(b,f);
+      }
+    }
+    return new THREE.Color(stops[stops.length-1][1]);
+  }
+
+  // Resample the coarse temperature field onto a regular fine lat/lon grid, keeping the
+  // full 2D shape (NaN preserved) so adjacent cells can be stitched into mesh faces.
+  // factor=1 reads the raw grid directly (no bilinear blur, exact coastal cells kept).
+  function sampleScalarGrid(field, factor){
+    if(factor <= 1){
+      const lats = new Float64Array(NLAT), lons = new Float64Array(NLON);
+      for(let i=0;i<NLAT;i++) lats[i] = LAT_MIN + i*LAT_STEP;
+      for(let j=0;j<NLON;j++) lons[j] = LON_MIN + j*LON_STEP;
+      return {nLat:NLAT, nLon:NLON, lats, lons, values:field};
+    }
+    const nLat = (NLAT-1)*factor + 1;
+    const nLon = NLON*factor;
+    const lats = new Float64Array(nLat), lons = new Float64Array(nLon);
+    for(let i=0;i<nLat;i++) lats[i] = LAT_MIN + i*(LAT_STEP/factor);
+    for(let j=0;j<nLon;j++) lons[j] = LON_MIN + j*(LON_STEP/factor);
+    const values = new Float64Array(nLat*nLon);
+    for(let i=0;i<nLat;i++){
+      for(let j=0;j<nLon;j++){
+        values[i*nLon+j] = sampleBilinear(field, lats[i], lons[j]);
+      }
+    }
+    return {nLat, nLon, lats, lons, values};
+  }
+
+  // Build a triangulated, semi-transparent surface draped on the globe from a lat/lon
+  // scalar grid. Each 4-point cell becomes 2 triangles with vertex-interpolated color;
+  // a cell is skipped (leaving a hole) if any of its 4 corners has no data (land/gap).
+  function buildTempMesh(gridData){
+    const {nLat, nLon, lats, lons, values} = gridData;
+    const tMin = -2, tMax = 32;
+    const positions = [], colors = [], indices = [];
+    const vertIndex = new Int32Array(nLat*nLon).fill(-1);
+    let vCount = 0;
+
+    function ensureVertex(i, j){
+      const idx = i*nLon + j;
+      if(vertIndex[idx] === -1){
+        const p = latLonToVector3(lats[i], lons[j], RADIUS*1.006);
+        const t = Math.max(0, Math.min(1, (values[idx]-tMin)/(tMax-tMin)));
+        const col = tempColor(t);
+        positions.push(p.x, p.y, p.z);
+        colors.push(col.r, col.g, col.b);
+        vertIndex[idx] = vCount++;
+      }
+      return vertIndex[idx];
+    }
+
+    for(let i=0;i<nLat-1;i++){
+      for(let j=0;j<nLon;j++){
+        const j1 = (j+1) % nLon; // wraps the seam at ±180°
+        const v00 = values[i*nLon+j],     v01 = values[i*nLon+j1];
+        const v10 = values[(i+1)*nLon+j], v11 = values[(i+1)*nLon+j1];
+        if(!isFinite(v00) || !isFinite(v01) || !isFinite(v10) || !isFinite(v11)) continue;
+        const a = ensureVertex(i,j), b = ensureVertex(i,j1);
+        const c = ensureVertex(i+1,j), d = ensureVertex(i+1,j1);
+        indices.push(a,b,c,  b,d,c);
+      }
+    }
+    if(!indices.length) return null;
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions,3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(colors,3));
+    geo.setIndex(indices);
+    const mat = new THREE.MeshBasicMaterial({
+      vertexColors:true, transparent:true, opacity:0.55, side:THREE.DoubleSide, depthWrite:false
+    });
+    return new THREE.Mesh(geo, mat);
+  }
+
+  /* ---------------------------------------------------------------------
+   * UI WIRING
+   * ------------------------------------------------------------------- */
+  const el = id=>document.getElementById(id);
+  el('toggle-currents').addEventListener('change', e=>{ if(currentsMesh) currentsMesh.visible = e.target.checked; });
+  el('toggle-wind').addEventListener('change', e=>{ if(windMesh) windMesh.visible = e.target.checked; });
+  el('toggle-temp').addEventListener('change', e=>{
+    if(tempMesh) tempMesh.visible = e.target.checked;
+    el('legend-temp').classList.toggle('show', e.target.checked);
+  });
+  el('refresh-btn').addEventListener('click', ()=>loadAll());
+  el('density-select').addEventListener('change', ()=>{ if(lastData) rebuildMeshes(lastData); });
+
+  function fmt(n, unit, digits){
+    if(!isFinite(n)) return '—';
+    return n.toFixed(digits===undefined?1:digits) + ' ' + unit;
+  }
+  function mean(arr){
+    const v = arr.filter(isFinite);
+    if(!v.length) return NaN;
+    return v.reduce((a,b)=>a+b,0)/v.length;
+  }
+
+  function setLoading(pct, show){
+    const l = el('loading');
+    if(show===false){ l.classList.add('hide'); return; }
+    l.classList.remove('hide');
+    el('loading-pct').textContent = Math.round(pct)+' %';
+  }
+
+  /* ---------------------------------------------------------------------
+   * MESH (RE)BUILD — reads the last-fetched coarse grids, densifies them
+   * to the currently-selected factor, and (re)draws the three layers.
+   * Called after every fetch and whenever the density selector changes
+   * (no network call needed for the latter).
+   * ------------------------------------------------------------------- */
+  function rebuildMeshes(data){
+    const factor = parseInt(el('density-select').value, 10) || 1;
+
+    const currentEntries = densifyVectors(data.curU, data.curV, factor);
+    const windEntries = densifyVectors(data.windU, data.windV, factor);
+    const tempEntries = densifyScalar(data.tempArr, factor, 'temp'); // used for stats/count only
+    const tempGrid = sampleScalarGrid(data.tempArr, factor);
+
+    [currentsMesh, windMesh, tempMesh].forEach(m=>{ if(m){ globeGroup.remove(m); m.geometry.dispose(); m.material.dispose(); } });
+
+    // offsets already baked into u/v during fetch (0 for currents, 180 for wind) -> 0 here
+    currentsMesh = makeArrowLayer(currentEntries, '#0f766e', '#a5f3ec', 0.035, 0.30, 0, 0.11, 0.45);
+    windMesh = makeArrowLayer(windEntries, '#3f7a4a', '#eafff0', 0.035, 0.38, 0, 0.14, 0.6);
+    tempMesh = buildTempMesh(tempGrid);
+
+    if(currentsMesh){ currentsMesh.visible = el('toggle-currents').checked; globeGroup.add(currentsMesh); }
+    if(windMesh){ windMesh.visible = el('toggle-wind').checked; globeGroup.add(windMesh); }
+    if(tempMesh){ tempMesh.visible = el('toggle-temp').checked; globeGroup.add(tempMesh); }
+
+    el('count-currents').textContent = currentEntries.length;
+    el('count-temp').textContent = tempEntries.length;
+    el('count-wind').textContent = windEntries.length;
+
+    el('stat-cur').textContent = fmt(mean(currentEntries.map(e=>e.speed)), 'm/s', 2);
+    el('stat-temp').textContent = fmt(mean(tempEntries.map(e=>e.temp)), '°C', 1);
+    el('stat-wind').textContent = fmt(mean(windEntries.map(e=>e.speed)), 'm/s', 1);
+  }
+
+  let loading = false;
+  let lastData = null; // {curU, curV, windU, windV, tempArr} — coarse grids from the last fetch
+
+  async function loadAll(){
+    if(loading) return;
+    loading = true;
+    el('refresh-btn').disabled = true;
+    setLoading(0, true);
+
+    let marineProgress = 0, windProgress = 0;
+    const totalSteps = 2;
+
+    try{
+      const marineParams = 'current=ocean_current_velocity,ocean_current_direction,sea_surface_temperature&wind_speed_unit=ms&forecast_days=1';
+      const windParams = 'current=wind_speed_10m,wind_direction_10m&wind_speed_unit=ms&forecast_days=1';
+
+      const marineDataPromise = runBatched(grid, MARINE_URL, marineParams, (d,t)=>{
+        marineProgress = d/t;
+        setLoading(((marineProgress+windProgress)/totalSteps)*100, true);
+      });
+      const windDataPromise = runBatched(grid, FORECAST_URL, windParams, (d,t)=>{
+        windProgress = d/t;
+        setLoading(((marineProgress+windProgress)/totalSteps)*100, true);
+      });
+
+      const [marineData, windData] = await Promise.all([marineDataPromise, windDataPromise]);
+
+      // Coarse grids, indexed as flat NLAT*NLON arrays (same order as `grid`).
+      // Current direction: oceanographic convention (flows TOWARD) -> offset 0.
+      // Wind direction from Open-Meteo: meteorological convention (blows FROM) -> offset 180°.
+      const curU = new Float64Array(NLAT*NLON).fill(NaN);
+      const curV = new Float64Array(NLAT*NLON).fill(NaN);
+      const windU = new Float64Array(NLAT*NLON).fill(NaN);
+      const windV = new Float64Array(NLAT*NLON).fill(NaN);
+      const tempArr = new Float64Array(NLAT*NLON).fill(NaN);
+
+      grid.forEach((pt, i)=>{
+        const m = marineData[i];
+        if(m && m.current){
+          const spd = m.current.ocean_current_velocity;
+          const dir = m.current.ocean_current_direction;
+          const sst = m.current.sea_surface_temperature;
+          const {u, v} = toUV(spd, dir, 0);
+          curU[i] = u; curV[i] = v;
+          if(isFinite(sst)) tempArr[i] = sst;
+        }
+        const w = windData[i];
+        if(w && w.current){
+          const spd = w.current.wind_speed_10m;
+          const dir = w.current.wind_direction_10m;
+          const {u, v} = toUV(spd, dir, 180);
+          windU[i] = u; windV[i] = v;
+        }
+      });
+
+      lastData = {curU, curV, windU, windV, tempArr};
+      rebuildMeshes(lastData);
+      el('stat-time').textContent = new Date().toLocaleTimeString('en-US');
+
+    }catch(e){
+      console.error(e);
+      showError('Could not load live data (' + e.message + ').');
+    }finally{
+      loading = false;
+      el('refresh-btn').disabled = false;
+      setLoading(0, false);
+    }
+  }
+
+  loadAll();
+
+})();
+</script>
+</body>
+</html>
