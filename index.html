@@ -316,6 +316,14 @@
     text-transform:uppercase;
     margin-bottom:12px;
   }
+  .mini-globe-wrap{
+    width:120px;
+    aspect-ratio:1/1;
+    margin:0 auto 16px;
+  }
+  #mini-globe{width:100%; height:100%; display:block; cursor:grab; touch-action:none;}
+  #mini-globe:active{cursor:grabbing;}
+
   .tags{display:flex; flex-wrap:wrap; gap:8px;}
   .tag{
     font-family:'JetBrains Mono',monospace;
@@ -535,36 +543,7 @@
 <div class="ticker" role="marquee" aria-label="Latest updates ticker">
   <span class="ticker-label">Latest</span>
   <div class="ticker-viewport">
-    <div class="ticker-track">
-      <div class="ticker-group">
-        <span class="ticker-item"><span class="date">2026-08-29</span>Oceans data display — winds, temperatures &amp; surface currents in 3D</span>
-        <span class="ticker-item sep">//</span>
-        <span class="ticker-item"><span class="date">2026-08-23</span>ASCII CITY — a GTA-like game with an ASCII rendering touch</span>
-        <span class="ticker-item sep">//</span>
-        <span class="ticker-item"><span class="date">2026-04-13</span>Humble Git Survival Guide (1.0.6) updated</span>
-        <span class="ticker-item sep">//</span>
-        <span class="ticker-item"><span class="date">2026-03-10</span>MarkNote — a Markdown note editor with tag &amp; graph exploration</span>
-        <span class="ticker-item sep">//</span>
-        <span class="ticker-item"><span class="date">2026-02-08</span>Bloggy — a static site generator built from Markdown</span>
-        <span class="ticker-item sep">//</span>
-        <span class="ticker-item"><span class="date">2025-04-29</span>Java build mini! — a mini script for small Java projects</span>
-        <span class="ticker-item sep">//</span>
-      </div>
-      <div class="ticker-group" aria-hidden="true">
-        <span class="ticker-item"><span class="date">2026-08-29</span>Oceans data display — winds, temperatures &amp; surface currents in 3D</span>
-        <span class="ticker-item sep">//</span>
-        <span class="ticker-item"><span class="date">2026-08-23</span>ASCII CITY — a GTA-like game with an ASCII rendering touch</span>
-        <span class="ticker-item sep">//</span>
-        <span class="ticker-item"><span class="date">2026-04-13</span>Humble Git Survival Guide (1.0.6) updated</span>
-        <span class="ticker-item sep">//</span>
-        <span class="ticker-item"><span class="date">2026-03-10</span>MarkNote — a Markdown note editor with tag &amp; graph exploration</span>
-        <span class="ticker-item sep">//</span>
-        <span class="ticker-item"><span class="date">2026-02-08</span>Bloggy — a static site generator built from Markdown</span>
-        <span class="ticker-item sep">//</span>
-        <span class="ticker-item"><span class="date">2025-04-29</span>Java build mini! — a mini script for small Java projects</span>
-        <span class="ticker-item sep">//</span>
-      </div>
-    </div>
+    <div class="ticker-track" id="ticker-track"></div>
   </div>
 </div>
 
@@ -638,6 +617,9 @@
       </div>
       <div class="stack-panel">
         <div class="k">Playground</div>
+        <div class="mini-globe-wrap">
+          <canvas id="mini-globe" aria-hidden="true"></canvas>
+        </div>
         <div class="tags">
           <span class="tag">Java</span>
           <span class="tag">Architecture</span>
@@ -660,6 +642,10 @@
       <div class="section-rule"></div>
     </div>
     <div class="log">
+      <div class="log-row">
+        <div class="log-date">2026-08-30</div>
+        <div class="log-desc"><a href="demos/3d-city.html" target="_blank" rel="noopener">3D City</a> — this is a 3D version of the ASCII City, this time with some vehicules models and new missions.</div>
+      </div>
       <div class="log-row">
         <div class="log-date">2026-08-29</div>
         <div class="log-desc"><a href="demos/oceans-data.html" target="_blank" rel="noopener">Oceans data display</a> — Showing winds, temperatures, and surface currents all over the world, displayed in a beautiful 3D world.</div>
@@ -693,6 +679,49 @@
   </footer>
 
 </div>
+
+<script>
+(function(){
+  // Builds the top ticker from the "Latest updates" log rows below, so news
+  // items are authored once (in #log) instead of being copy-pasted here too.
+  var track = document.getElementById('ticker-track');
+  var rows = document.querySelectorAll('#log .log-row');
+  if(!track || !rows.length) return;
+
+  var items = Array.prototype.map.call(rows, function(row){
+    var date = row.querySelector('.log-date');
+    var desc = row.querySelector('.log-desc');
+    return {
+      date: date ? date.textContent.trim() : '',
+      text: desc ? desc.textContent.replace(/\s+/g, ' ').trim() : ''
+    };
+  });
+
+  function buildGroup(hidden){
+    var group = document.createElement('div');
+    group.className = 'ticker-group';
+    if(hidden) group.setAttribute('aria-hidden', 'true');
+    items.forEach(function(item){
+      var itemSpan = document.createElement('span');
+      itemSpan.className = 'ticker-item';
+      var dateSpan = document.createElement('span');
+      dateSpan.className = 'date';
+      dateSpan.textContent = item.date;
+      itemSpan.appendChild(dateSpan);
+      itemSpan.appendChild(document.createTextNode(item.text));
+      group.appendChild(itemSpan);
+      var sep = document.createElement('span');
+      sep.className = 'ticker-item sep';
+      sep.textContent = '//';
+      group.appendChild(sep);
+    });
+    return group;
+  }
+
+  track.appendChild(buildGroup(false));
+  track.appendChild(buildGroup(true));
+})();
+</script>
 
 <script>
 (function(){
@@ -1258,6 +1287,99 @@
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
+})();
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  "use strict";
+  var canvas = document.getElementById('mini-globe');
+  if(!canvas || typeof THREE === 'undefined') return;
+
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var renderer = new THREE.WebGLRenderer({canvas:canvas, antialias:true, alpha:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+  camera.position.set(0, 0, 3.1);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+  var sun = new THREE.DirectionalLight(0xffffff, 1.1);
+  sun.position.set(3, 2, 3);
+  scene.add(sun);
+
+  var globe = new THREE.Group();
+  scene.add(globe);
+
+  var earthGeo = new THREE.SphereGeometry(1, 48, 48);
+  var earthMat = new THREE.MeshPhongMaterial({color:0x0d3350, shininess:6});
+  var earthMesh = new THREE.Mesh(earthGeo, earthMat);
+  globe.add(earthMesh);
+
+  var loader = new THREE.TextureLoader();
+  loader.crossOrigin = 'anonymous';
+  loader.load('https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg',
+    function(tex){ earthMat.map = tex; earthMat.color.set(0xffffff); earthMat.needsUpdate = true; },
+    undefined, function(){ /* keep flat fallback color */ });
+  loader.load('https://threejs.org/examples/textures/planets/earth_specular_2048.jpg',
+    function(tex){ earthMat.specularMap = tex; earthMat.specular = new THREE.Color(0x333333); earthMat.needsUpdate = true; },
+    undefined, function(){});
+
+  loader.load('https://threejs.org/examples/textures/planets/earth_clouds_1024.png',
+    function(tex){
+      var cloudGeo = new THREE.SphereGeometry(1.012, 32, 32);
+      var cloudMat = new THREE.MeshPhongMaterial({map:tex, transparent:true, opacity:0.35, depthWrite:false});
+      globe.add(new THREE.Mesh(cloudGeo, cloudMat));
+    }, undefined, function(){});
+
+  var atmoGeo = new THREE.SphereGeometry(1.05, 32, 32);
+  var atmoMat = new THREE.MeshBasicMaterial({color:0x5eead4, transparent:true, opacity:0.12, side:THREE.BackSide});
+  globe.add(new THREE.Mesh(atmoGeo, atmoMat));
+
+  function resize(){
+    var size = canvas.clientWidth || 120;
+    renderer.setSize(size, size, false);
+    camera.aspect = 1;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // Drag to orient (mouse + touch), auto-rotation resumes after a short idle delay.
+  var dragging = false, lastX = 0, lastY = 0, idleTimer = null, autoRotate = !reduceMotion;
+  var rotX = 0.35, rotY = 0;
+
+  function onDown(x, y){ dragging = true; lastX = x; lastY = y; autoRotate = false; clearTimeout(idleTimer); }
+  function onMove(x, y){
+    if(!dragging) return;
+    var dx = x - lastX, dy = y - lastY;
+    rotY += dx * 0.008; rotX += dy * 0.008;
+    rotX = Math.max(-1.4, Math.min(1.4, rotX));
+    lastX = x; lastY = y;
+  }
+  function onUp(){
+    if(!dragging) return;
+    dragging = false;
+    if(!reduceMotion) idleTimer = setTimeout(function(){ autoRotate = true; }, 2500);
+  }
+
+  canvas.addEventListener('mousedown', function(e){ onDown(e.clientX, e.clientY); });
+  window.addEventListener('mousemove', function(e){ onMove(e.clientX, e.clientY); });
+  window.addEventListener('mouseup', onUp);
+  canvas.addEventListener('touchstart', function(e){ var t = e.touches[0]; onDown(t.clientX, t.clientY); }, {passive:true});
+  canvas.addEventListener('touchmove', function(e){ var t = e.touches[0]; onMove(t.clientX, t.clientY); }, {passive:true});
+  canvas.addEventListener('touchend', onUp);
+
+  function animate(){
+    requestAnimationFrame(animate);
+    if(autoRotate && !dragging) rotY += 0.004;
+    globe.rotation.set(rotX, rotY, 0);
+    renderer.render(scene, camera);
+  }
+  animate();
 })();
 </script>
 </body>
