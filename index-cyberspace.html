@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="matrix">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>cyberspace://mcgivrer — feed</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root[data-theme="matrix"]{
+    --bg:#020604; --panel:#050e08; --fg:#39ff6e; --dim:#1f7a3f;
+    --accent:#a8ffca; --border:#1f7a3f; --danger:#ff5566;
+  }
+  :root[data-theme="amber"]{
+    --bg:#0c0700; --panel:#160d00; --fg:#ffb000; --dim:#8a5a00;
+    --accent:#ffd27a; --border:#8a5a00; --danger:#ff5566;
+  }
+  :root[data-theme="c64"]{
+    --bg:#2c2cad; --panel:#3737c9; --fg:#c6c6ff; --dim:#8a8ae0;
+    --accent:#ffffff; --border:#8a8ae0; --danger:#ffb0b0;
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--fg);
+    font-family:'Share Tech Mono', 'Courier New', monospace;
+    font-size:14px;
+    line-height:1.5;
+  }
+  body::before{
+    content:"";
+    position:fixed; inset:0;
+    background:repeating-linear-gradient(0deg, rgba(0,0,0,0.18) 0 1px, transparent 1px 3px);
+    pointer-events:none;
+    z-index:50;
+  }
+  a{ color:var(--accent); text-decoration:none; }
+  a:hover{ text-decoration:underline; }
+
+  .topbar{
+    border-bottom:1px solid var(--border);
+    padding:10px 16px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  .logo{
+    font-family:'VT323', monospace;
+    font-size:26px;
+    color:var(--fg);
+    letter-spacing:1px;
+  }
+  .logo .path{ color:var(--dim); }
+  .tabs{ display:flex; gap:4px; }
+  .tab{
+    border:1px solid var(--border);
+    padding:5px 12px;
+    color:var(--dim);
+    background:transparent;
+    font-family:'Share Tech Mono', monospace;
+    font-size:12px;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    cursor:default;
+  }
+  .tab.active{ color:var(--bg); background:var(--fg); border-color:var(--fg); }
+
+  .theme-picker{ display:flex; gap:6px; align-items:center; }
+  .theme-picker span{ color:var(--dim); font-size:11px; text-transform:uppercase; }
+  .swatch{
+    border:1px solid var(--border);
+    background:transparent;
+    color:var(--fg);
+    font-family:'Share Tech Mono', monospace;
+    font-size:11px;
+    padding:4px 8px;
+    cursor:pointer;
+  }
+  .swatch:hover{ background:var(--fg); color:var(--bg); }
+
+  .boot-line{
+    padding:8px 16px;
+    color:var(--dim);
+    font-size:12px;
+    border-bottom:1px dashed var(--border);
+  }
+  .cursor{
+    display:inline-block;
+    width:8px; height:14px;
+    background:var(--fg);
+    vertical-align:middle;
+    margin-left:2px;
+    animation:blink 1s steps(1) infinite;
+  }
+  @keyframes blink{ 50%{ opacity:0; } }
+
+  .layout{
+    max-width:920px;
+    margin:0 auto;
+    display:grid;
+    grid-template-columns:220px 1fr;
+    gap:0;
+  }
+  @media (max-width:760px){
+    .layout{ grid-template-columns:1fr; }
+  }
+
+  .sidebar{
+    border-right:1px solid var(--border);
+    padding:16px;
+  }
+  @media (max-width:760px){
+    .sidebar{ border-right:none; border-bottom:1px solid var(--border); }
+  }
+
+  .profile-box{
+    border:1px solid var(--border);
+    padding:10px;
+    margin-bottom:16px;
+  }
+  .avatar-ascii{
+    font-size:9px;
+    line-height:1.1;
+    color:var(--fg);
+    white-space:pre;
+    margin-bottom:6px;
+    overflow:hidden;
+  }
+  .handle{ color:var(--accent); font-weight:bold; }
+  .tagline{ color:var(--dim); font-size:12px; margin:4px 0 8px; }
+  .stat-row{ display:flex; justify-content:space-between; font-size:11px; color:var(--dim); border-top:1px dashed var(--border); padding-top:6px; }
+  .stat-row b{ color:var(--fg); }
+
+  .box-title{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    color:var(--dim);
+    margin:0 0 8px;
+    border-bottom:1px solid var(--border);
+    padding-bottom:4px;
+  }
+  .channel-list{ list-style:none; padding:0; margin:0 0 16px; font-size:13px; }
+  .channel-list li{ padding:3px 0; display:flex; justify-content:space-between; }
+  .channel-list li span.n{ color:var(--dim); }
+
+  .ring-box{
+    border:1px dashed var(--border);
+    padding:8px;
+    font-size:11px;
+    color:var(--dim);
+    text-align:center;
+  }
+  .ring-box a{ display:block; margin-top:4px; }
+
+  .feed{ padding:16px; }
+
+  .composer{
+    border:1px solid var(--border);
+    padding:10px;
+    margin-bottom:18px;
+    color:var(--dim);
+    font-size:13px;
+  }
+  .composer .prompt{ color:var(--fg); }
+
+  .post{
+    border:1px solid var(--border);
+    margin-bottom:16px;
+    background:var(--panel);
+  }
+  .post-head{
+    display:flex;
+    justify-content:space-between;
+    padding:8px 12px;
+    border-bottom:1px dashed var(--border);
+    font-size:12px;
+  }
+  .post-head .who{ color:var(--accent); }
+  .post-head .when{ color:var(--dim); }
+  .post-body{ padding:12px; font-size:13.5px; }
+  .post-body a{ word-break:break-word; }
+  .post-foot{
+    display:flex;
+    gap:14px;
+    padding:6px 12px;
+    border-top:1px dashed var(--border);
+    font-size:11px;
+    color:var(--dim);
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+  }
+  .pinned{
+    border-color:var(--fg);
+  }
+  .pinned .post-head{ background:rgba(127,255,170,0.05); }
+  .pin-tag{
+    color:var(--bg);
+    background:var(--fg);
+    font-size:10px;
+    padding:1px 6px;
+    margin-right:8px;
+    text-transform:uppercase;
+  }
+
+  .footer{
+    max-width:920px;
+    margin:0 auto;
+    border-top:1px solid var(--border);
+    padding:14px 16px;
+    font-size:11px;
+    color:var(--dim);
+    text-align:center;
+  }
+  .footer a{ margin:0 6px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">cyberspace<span class="path">://</span>mcgivrer</div>
+  <div class="tabs">
+    <div class="tab active">general</div>
+    <div class="tab">following</div>
+    <div class="tab">friends</div>
+  </div>
+  <div class="theme-picker">
+    <span>theme:</span>
+    <button class="swatch" onclick="document.documentElement.setAttribute('data-theme','matrix')">matrix</button>
+    <button class="swatch" onclick="document.documentElement.setAttribute('data-theme','amber')">vt320</button>
+    <button class="swatch" onclick="document.documentElement.setAttribute('data-theme','c64')">c64</button>
+  </div>
+</div>
+
+<div class="boot-line">
+  guest@cyberspace:~$ tail -f /feed/mcgivrer<span class="cursor"></span>
+</div>
+
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="profile-box">
+      <div class="avatar-ascii">  ___
+ /o o \
+|  ^  |
+ \___/
+[mcgivrer]</div>
+      <div class="handle">@mcgivrer</div>
+      <div class="tagline">CTO · platform architect · game dev by night</div>
+      <div class="stat-row"><span>posts</span><b>143</b></div>
+      <div class="stat-row"><span>following</span><b>37</b></div>
+      <div class="stat-row"><span>status</span><b>online</b></div>
+    </div>
+
+    <div class="box-title">stack</div>
+    <ul class="channel-list">
+      <li>Java</li>
+      <li>Architecture</li>
+      <li>Cloud-native</li>
+      <li>Game dev</li>
+      <li>Applied AI</li>
+    </ul>
+
+    <div class="box-title">channels</div>
+    <ul class="channel-list">
+      <li>#general <span class="n">14</span></li>
+      <li>#java <span class="n">6</span></li>
+      <li>#gamedev <span class="n">9</span></li>
+      <li>#architecture <span class="n">3</span></li>
+      <li>#ai-transfo <span class="n">21</span></li>
+    </ul>
+
+    <div class="box-title">webring</div>
+    <div class="ring-box">
+      member of<br><b>cyberspace.online</b> ring
+      <a href="https://pages.cyberspace.online/ring?from=mcgivrer&amp;dir=prev">&lt;&lt; prev</a>
+      <a href="https://pages.cyberspace.online/random">random</a>
+      <a href="https://pages.cyberspace.online/ring?from=mcgivrer&amp;dir=next">next &gt;&gt;</a>
+    </div>
+  </aside>
+
+  <main class="feed">
+
+    <div class="composer">
+      <span class="prompt">mcgivrer@feed:~$</span> what's on your mind... <span class="cursor"></span>
+    </div>
+
+    <article class="post pinned">
+      <div class="post-head">
+        <span class="who"><span class="pin-tag">pinned</span>@mcgivrer</span>
+        <span class="when">since 2026</span>
+      </div>
+      <div class="post-body">
+        Hey, it's Frédéric. Chief Technology Officer at a tech company — I guide teams through
+        AI-driven transformation: organizational redesign, explicit methodologies, home-grown
+        tooling. A former developer turned platform architect, 25+ years across industry, banking,
+        public sector, medical/pharma. By night: small Java games, zero dependencies, just the JDK
+        &amp; curiosity.
+        <br><br>
+        📝 <a href="https://mcgivrer.wordpress.com" target="_blank">blog</a> ·
+        💾 <a href="https://github.com/mcgivrer" target="_blank">github</a> ·
+        💼 <a href="https://www.linkedin.com/in/fredericdelorme/?locale=fr" target="_blank">linkedin</a> ·
+        🐦 <a href="https://twitter.com/McGivrer" target="_blank">x/twitter</a> ·
+        🎮 <a href="https://github.com/SnapGames" target="_blank">snapgames</a>
+      </div>
+      <div class="post-foot"><span>[ reply ]</span><span>[ poke ]</span><span>[ cybermail ]</span></div>
+    </article>
+
+    <article class="post">
+      <div class="post-head"><span class="who">@mcgivrer</span><span class="when">2026-08-30</span></div>
+      <div class="post-body">
+        🚗 <a href="demos/3d-city.html" target="_blank">3D City</a> — the 3D sequel to ASCII City,
+        now with vehicle models and new missions. #gamedev #java
+      </div>
+      <div class="post-foot"><span>[ reply ]</span><span>[ poke ]</span><span>[ cybermail ]</span></div>
+    </article>
+
+    <article class="post">
+      <div class="post-head"><span class="who">@mcgivrer</span><span class="when">2026-08-29</span></div>
+      <div class="post-body">
+        🌊 shipped <a href="demos/oceans-data.html" target="_blank">Oceans data display</a> —
+        winds, temperatures &amp; surface currents rendered in 3D. #java #gamedev
+      </div>
+      <div class="post-foot"><span>[ reply ]</span><span>[ poke ]</span><span>[ cybermail ]</span></div>
+    </article>
+
+    <article class="post">
+      <div class="post-head"><span class="who">@mcgivrer</span><span class="when">2026-08-23</span></div>
+      <div class="post-body">
+        🏙️ <a href="demos/ascii-city.html" target="_blank">ASCII CITY</a> is live — a GTA-like
+        game with an ASCII rendering touch. Have fun! #gamedev #ascii
+      </div>
+      <div class="post-foot"><span>[ reply ]</span><span>[ poke ]</span><span>[ cybermail ]</span></div>
+    </article>
+
+    <article class="post">
+      <div class="post-head"><span class="who">@mcgivrer</span><span class="when">2026-04-13</span></div>
+      <div class="post-body">
+        📗 updated the <a href="https://gist.github.com/mcgivrer/81f67eddf93b0a9d46cac5f1ff4e45c6" target="_blank">Humble Git Survival Guide</a>
+        to 1.0.6 — added a tip for listing all local &amp; remote branches. #java
+      </div>
+      <div class="post-foot"><span>[ reply ]</span><span>[ poke ]</span><span>[ cybermail ]</span></div>
+    </article>
+
+    <article class="post">
+      <div class="post-head"><span class="who">@mcgivrer</span><span class="when">2026-03-10</span></div>
+      <div class="post-body">
+        🗒️ <a href="https://github.com/mcgivrer/MarkNote" target="_blank">MarkNote</a> — a Markdown
+        note editor with tag organization &amp; graph-based exploration of linked notes.
+      </div>
+      <div class="post-foot"><span>[ reply ]</span><span>[ poke ]</span><span>[ cybermail ]</span></div>
+    </article>
+
+    <article class="post">
+      <div class="post-head"><span class="who">@mcgivrer</span><span class="when">2026-02-08</span></div>
+      <div class="post-body">
+        🌐 <a href="https://github.com/mcgivrer/bloggy" target="_blank">Bloggy</a> — a static site
+        generator built from Markdown, with PlantUML, templates &amp; category management.
+      </div>
+      <div class="post-foot"><span>[ reply ]</span><span>[ poke ]</span><span>[ cybermail ]</span></div>
+    </article>
+
+    <article class="post">
+      <div class="post-head"><span class="who">@mcgivrer</span><span class="when">2025-04-29</span></div>
+      <div class="post-body">
+        ☕ <a href="https://mcgivrer.wordpress.com/2025/04/29/java-build-mini/" target="_blank">Java build mini!</a>
+        — a mini script for quickly building small Java projects, zero dependencies.
+      </div>
+      <div class="post-foot"><span>[ reply ]</span><span>[ poke ]</span><span>[ cybermail ]</span></div>
+    </article>
+
+  </main>
+</div>
+
+<div class="footer">
+  © 2026 Frédéric Delorme — mcgivrer · Strasbourg, France<br>
+  fan-styled homage to the <a href="https://cyberspace.online" target="_blank">cyberspace.online</a> look — not affiliated.
+  <a href="https://pages.cyberspace.online/ring?from=mcgivrer&amp;dir=prev">&lt;&lt; prev</a>
+  <a href="https://pages.cyberspace.online/random">random</a>
+  <a href="https://pages.cyberspace.online/ring?from=mcgivrer&amp;dir=next">next &gt;&gt;</a>
+</div>
+
+</body>
+</html>
