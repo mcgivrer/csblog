@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>~*~ McGivrer's HomePage ~*~ Under Construction! ~*~</title>
+<meta name="generator" content="Notepad, straight up, no IDE needed">
+<style>
+  body{
+    margin:0;
+    background-color:#000033;
+    background-image:
+      radial-gradient(circle, #ffffff 1px, transparent 1px),
+      radial-gradient(circle, #ffffff 1px, transparent 1px);
+    background-size:60px 60px;
+    background-position:0 0, 30px 30px;
+    color:#00ff00;
+    font-family:'Comic Sans MS', 'Comic Sans', cursive, sans-serif;
+    font-size:14px;
+  }
+  a{ color:#ffff00; }
+  a:visited{ color:#ff66ff; }
+  a:hover{ color:#00ffff; background-color:#ff00ff; }
+
+  .page{
+    max-width:760px;
+    margin:0 auto;
+    padding:10px;
+  }
+
+  .marqueebar{
+    background:#ff0000;
+    color:#ffff00;
+    font-weight:bold;
+    font-family:'Courier New', monospace;
+    padding:4px 0;
+    border-top:3px double #ffff00;
+    border-bottom:3px double #ffff00;
+  }
+
+  table.mainbox{
+    width:100%;
+    border-collapse:collapse;
+    border:6px ridge #c0c0c0;
+    background:#000066;
+  }
+  table.mainbox td{ padding:10px; }
+
+  .titlecell{
+    background:#000000;
+    text-align:center;
+    border-bottom:4px solid #ff00ff;
+  }
+  .titlecell h1{
+    margin:6px 0 0;
+    font-size:34px;
+    letter-spacing:1px;
+  }
+  .rainbow-text span:nth-child(1){color:#ff0000;}
+  .rainbow-text span:nth-child(2){color:#ff9900;}
+  .rainbow-text span:nth-child(3){color:#ffff00;}
+  .rainbow-text span:nth-child(4){color:#33ff33;}
+  .rainbow-text span:nth-child(5){color:#3399ff;}
+  .rainbow-text span:nth-child(6){color:#9933ff;}
+  .rainbow-text span:nth-child(7){color:#ff33cc;}
+
+  .subtitle{
+    color:#00ffff;
+    font-size:13px;
+    margin:4px 0 8px;
+  }
+
+  .navbar{
+    background:#330066;
+    border-top:2px solid #ff00ff;
+    border-bottom:2px solid #ff00ff;
+    text-align:center;
+    font-weight:bold;
+    padding:6px;
+  }
+  .navbar a{ margin:0 8px; }
+
+  .sidecell{
+    width:150px;
+    background:#000000;
+    vertical-align:top;
+    border-right:4px double #00ffff;
+  }
+  .sidecell img.avatar{
+    width:100%;
+    border:3px solid #ffff00;
+  }
+  .webring-badge{
+    margin-top:10px;
+    border:2px dashed #00ff00;
+    padding:6px;
+    font-size:10px;
+    text-align:center;
+    background:#001a00;
+  }
+  .under-construction{
+    margin-top:10px;
+    height:26px;
+    background-image:repeating-linear-gradient(45deg, #ffff00, #ffff00 10px, #000000 10px, #000000 20px);
+    border:2px solid #000;
+    animation:barberpole 1.2s linear infinite;
+    text-align:center;
+    font-family:'Courier New', monospace;
+    font-weight:bold;
+    font-size:10px;
+    color:#000;
+    line-height:26px;
+    overflow:hidden;
+  }
+  @keyframes barberpole{
+    from{ background-position:0 0; }
+    to{ background-position:40px 0; }
+  }
+
+  .contentcell{
+    background:#000022;
+    vertical-align:top;
+  }
+
+  fieldset.retro{
+    border:3px groove #ff00ff;
+    margin-bottom:16px;
+  }
+  fieldset.retro legend{
+    background:#000000;
+    color:#ffff00;
+    padding:2px 8px;
+    font-weight:bold;
+    border:2px solid #ffff00;
+  }
+
+  hr.rainbow{
+    height:4px;
+    border:0;
+    background:linear-gradient(90deg,#ff0000,#ff9900,#ffff00,#33ff33,#3399ff,#9933ff,#ff33cc);
+  }
+
+  .blink{
+    animation:blinker 1s step-start infinite;
+  }
+  @keyframes blinker{ 50%{ opacity:0; } }
+
+  ul.linklist{ list-style:none; padding-left:0; margin:6px 0; }
+  ul.linklist li{ margin:6px 0; }
+  ul.linklist .newtag{
+    color:#ff0000;
+    font-weight:bold;
+    font-size:10px;
+    margin-left:6px;
+  }
+
+  table.updates{
+    width:100%;
+    border-collapse:collapse;
+    background:#000000;
+    border:2px solid #00ffff;
+  }
+  table.updates td, table.updates th{
+    border:1px solid #006666;
+    padding:4px 6px;
+    font-size:12px;
+  }
+  table.updates th{
+    background:#003333;
+    color:#00ffff;
+  }
+  table.updates tr:nth-child(odd) td{ background:#001111; }
+
+  .counter{
+    display:inline-block;
+    background:#000000;
+    color:#00ff00;
+    font-family:'Courier New', monospace;
+    letter-spacing:3px;
+    padding:4px 8px;
+    border:2px inset #666;
+    font-size:16px;
+  }
+
+  .badgebar{
+    text-align:center;
+    margin-top:14px;
+  }
+  .badge{
+    display:inline-block;
+    border:2px outset #999;
+    background:#c0c0c0;
+    color:#000;
+    font-family:'Courier New', monospace;
+    font-size:10px;
+    padding:4px 8px;
+    margin:2px;
+  }
+
+  .guestbook{
+    text-align:center;
+    margin-top:12px;
+  }
+  .gb-btn{
+    display:inline-block;
+    background:#ff0000;
+    color:#ffff00;
+    font-weight:bold;
+    padding:6px 14px;
+    border:3px outset #ffcc00;
+    text-decoration:none;
+    font-family:'Comic Sans MS', cursive;
+  }
+  .gb-btn:hover{ background:#ffff00; color:#ff0000; }
+
+  .footer{
+    text-align:center;
+    background:#000000;
+    color:#00ff00;
+    font-size:11px;
+    padding:10px;
+    border-top:4px solid #ff00ff;
+  }
+  .footer a{ margin:0 6px; }
+</style>
+</head>
+<body>
+
+<marquee class="marqueebar" scrolldelay="70">
+  🚧 WELCOME TO MY HOMEPAGE 🚧 BEST VIEWED IN NETSCAPE NAVIGATOR 4.0 AT 800x600 🚧 PLEASE SIGN MY GUESTBOOK 🚧 THIS SITE IS A PROUD MEMBER OF THE CYBERSPACE.ONLINE WEBRING 🚧
+</marquee>
+
+<div class="page">
+<table class="mainbox" cellspacing="0" cellpadding="0">
+  <tr>
+    <td colspan="2" class="titlecell">
+      <h1 class="rainbow-text">
+        <span>M</span><span>c</span><span>G</span><span>i</span><span>v</span><span>r</span><span>e</span><span>r</span>
+      </h1>
+      <div class="subtitle">*~*~* Software Architect &amp; CTO — Personal HomePage *~*~*</div>
+      <div><span class="blink">★ NOW WITH 100% MORE JAVA ★</span></div>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" class="navbar">
+      [ <a href="#about">HOME</a> ]
+      [ <a href="#links">LINKS</a> ]
+      [ <a href="#updates">WHAT'S NEW</a> ]
+      [ <a href="#guestbook">GUESTBOOK</a> ]
+      [ <a href="#ring">WEBRING</a> ]
+    </td>
+  </tr>
+  <tr>
+    <td class="sidecell">
+      <center>
+        <img class="avatar" src="https://avatars.githubusercontent.com/mcgivrer" alt="mcgivrer" width="130">
+        <div style="color:#ffff00; font-size:11px; margin-top:4px;">mcgivrer</div>
+      </center>
+      <div class="under-construction">UNDER CONSTRUCTION</div>
+      <div class="webring-badge">
+        🔗 CYBERSPACE.ONLINE<br>WEBRING MEMBER<br>SINCE 2026
+      </div>
+      <div class="badgebar">
+        <span class="badge">HTML 3.2</span>
+        <span class="badge">800x600</span>
+        <span class="badge">56K MODEM<br>FRIENDLY</span>
+        <span class="badge">NO FRAMES!</span>
+      </div>
+    </td>
+    <td class="contentcell">
+
+      <a name="about"></a>
+      <fieldset class="retro">
+        <legend>~ ABOUT ME ~</legend>
+        <p>
+          Hiya and welcome, traveler of the information superhighway! My name's
+          <b>Frédéric Delorme</b>, a.k.a. <b>mcgivrer</b>. I'm a Chief Technology
+          Officer, guiding teams through the AI revolution with organization,
+          method &amp; home-grown tooling. A former developer turned platform
+          architect, 25+ years across industry, banking, public sector and
+          medical/pharma. By night I hack on little Java games, just me and
+          the JDK, no fancy dependencies!
+        </p>
+        <p>
+          🌍 Strasbourg, France &nbsp; | &nbsp; ☕ Java since forever &nbsp; |
+          &nbsp; 🕹️ Retro gamedev enthusiast
+        </p>
+      </fieldset>
+
+      <hr class="rainbow">
+
+      <a name="links"></a>
+      <fieldset class="retro">
+        <legend>~ MY FAVORITE LINKS ~</legend>
+        <ul class="linklist">
+          <li>📝 <a href="https://mcgivrer.wordpress.com" target="_blank">My Blog - "McGivrer: Exploring Software"</a></li>
+          <li>💾 <a href="https://github.com/mcgivrer" target="_blank">My GitHub Page</a> <span class="newtag">*NEW*</span></li>
+          <li>💼 <a href="https://www.linkedin.com/in/fredericdelorme/?locale=fr" target="_blank">My LinkedIn Profile</a></li>
+          <li>🐦 <a href="https://twitter.com/McGivrer" target="_blank">Follow me on X (Twitter)</a></li>
+          <li>🎮 <a href="https://github.com/SnapGames" target="_blank">SnapGames - our GameDev Crew</a></li>
+          <li>📖 <a href="https://github.com/mcgivrer/mcgivrer" target="_blank">My GitHub README - "McGivrer's Universe"</a></li>
+        </ul>
+      </fieldset>
+
+      <hr class="rainbow">
+
+      <a name="updates"></a>
+      <fieldset class="retro">
+        <legend>~ WHAT'S NEW?! ~</legend>
+        <marquee behavior="alternate" scrollamount="4" style="color:#00ffff; font-family:'Courier New',monospace; font-size:11px;">
+          3D City is here, drive around in full 3D! *** Oceans Data Display goes 3D! *** ASCII CITY is live, drive around! *** Git Survival Guide updated to 1.0.6 ***
+        </marquee>
+        <table class="updates">
+          <tr><th>Date</th><th>Update</th></tr>
+          <tr><td>08/30/26</td><td>🚗 3D City — the 3D sequel to ASCII City, now with vehicle models &amp; missions <span class="newtag">*NEW*</span></td></tr>
+          <tr><td>08/29/26</td><td>🌊 Oceans data display — winds, temps &amp; currents in 3D</td></tr>
+          <tr><td>08/23/26</td><td>🏙️ ASCII CITY — a GTA-like game, ASCII style</td></tr>
+          <tr><td>04/13/26</td><td>📗 Humble Git Survival Guide updated (v1.0.6)</td></tr>
+          <tr><td>03/10/26</td><td>🗒️ MarkNote — Markdown notes with tags &amp; graph view</td></tr>
+          <tr><td>02/08/26</td><td>🌐 Bloggy — static site generator from Markdown</td></tr>
+          <tr><td>04/29/25</td><td>☕ Java build mini! — tiny build script, zero deps</td></tr>
+        </table>
+      </fieldset>
+
+      <hr class="rainbow">
+
+      <a name="guestbook"></a>
+      <div class="guestbook">
+        <p>You are visitor number:</p>
+        <div class="counter">003741</div>
+        <p style="margin-top:10px;">
+          <a class="gb-btn" href="https://mcgivrer.wordpress.com" target="_blank">✍️ SIGN MY GUESTBOOK</a>
+          &nbsp;
+          <a class="gb-btn" href="https://mcgivrer.wordpress.com" target="_blank">📖 VIEW GUESTBOOK</a>
+        </p>
+      </div>
+
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <a name="ring"></a>
+      <div class="footer">
+        <hr class="rainbow" style="margin-bottom:8px;">
+        🔗 This site is a proud member of the <b>Cyberspace.online WebRing</b> 🔗<br>
+        [ <a href="https://pages.cyberspace.online/ring?from=mcgivrer&amp;dir=prev">&lt;&lt; PREV SITE</a> ]
+        [ <a href="https://pages.cyberspace.online/random">🎲 RANDOM SITE</a> ]
+        [ <a href="https://pages.cyberspace.online/ring?from=mcgivrer&amp;dir=next">NEXT SITE &gt;&gt;</a> ]
+        <br><br>
+        © 1998-2026 Frédéric "mcgivrer" Delorme — Strasbourg, France<br>
+        Made with 💾 Notepad and lots of ☕ coffee — <span class="blink">Page best viewed at 800x600!</span><br>
+        <span style="color:#888;">Last updated: 09/01/2026</span>
+      </div>
+    </td>
+  </tr>
+</table>
+</div>
+
+</body>
+</html>
