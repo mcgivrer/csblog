@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cyberdeck — McGivrer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b1220;
+    --bg-2:#0e1729;
+    --grid:#1b2a47;
+    --panel:#0f1a30;
+    --line:#25375c;
+    --ink:#e8edf5;
+    --muted:#8ea0c4;
+    --muted-2:#5d6f92;
+    --amber:#ffb454;
+    --amber-dim:#a97a3d;
+    --cyan:#5eead4;
+  }
+
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+
+  body{
+    margin:0;
+    background:
+      linear-gradient(var(--bg-2) 1px, transparent 1px) 0 0/100% 32px,
+      linear-gradient(90deg, var(--bg-2) 1px, transparent 1px) 0 0/32px 100%,
+      var(--bg);
+    background-color:var(--bg);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    background-image:
+      linear-gradient(rgba(94,234,212,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(94,234,212,0.035) 1px, transparent 1px);
+    background-size:32px 32px;
+    pointer-events:none;
+    z-index:0;
+  }
+
+  .wrap{
+    position:relative;
+    z-index:1;
+    max-width:960px;
+    margin:0 auto;
+    padding:28px 24px 80px;
+  }
+
+  a{color:inherit;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+
+  .backlink{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    color:var(--muted-2);
+    text-decoration:none;
+    margin-bottom:20px;
+  }
+  .backlink:hover{ color:var(--amber); }
+
+  /* ---------- Title block ---------- */
+  .titleblock{
+    border:1px solid var(--line);
+    background:linear-gradient(180deg, rgba(94,234,212,0.03), transparent 40%), var(--panel);
+    position:relative;
+    margin-bottom:56px;
+  }
+  .titleblock::before,
+  .titleblock::after,
+  .tb-corner-br::before,
+  .tb-corner-br::after{
+    content:"";
+    position:absolute;
+    width:14px;
+    height:14px;
+    border:1.5px solid var(--amber);
+  }
+  .titleblock::before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }
+  .titleblock::after{ top:-1px; right:-1px; border-left:none; border-bottom:none; }
+  .tb-corner-br{ position:absolute; inset:0; pointer-events:none; }
+  .tb-corner-br::before{ bottom:-1px; left:-1px; border-right:none; border-top:none; }
+  .tb-corner-br::after{ bottom:-1px; right:-1px; border-left:none; border-top:none; }
+
+  .tb-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:12px 20px;
+    border-bottom:1px solid var(--line);
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--muted-2);
+  }
+  .tb-top span.live{color:var(--cyan);}
+  .tb-top span.live::before{
+    content:"●";
+    margin-right:6px;
+    animation:blink 1.8s infinite;
+  }
+  @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:.25;} }
+
+  .tb-main{ padding:36px 32px 28px; }
+
+  .eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:13px;
+    color:var(--amber);
+    letter-spacing:0.08em;
+    margin:0 0 14px;
+  }
+  .eyebrow::before{ content:"// "; color:var(--muted-2); }
+
+  h1{
+    font-family:'JetBrains Mono',monospace;
+    font-weight:800;
+    font-size:clamp(30px, 5.5vw, 46px);
+    line-height:1.05;
+    margin:0 0 14px;
+    color:var(--ink);
+  }
+
+  .role-line{
+    font-size:16px;
+    color:var(--muted);
+    max-width:64ch;
+    line-height:1.7;
+    margin:0;
+  }
+  .role-line strong{color:var(--ink); font-weight:600;}
+
+  .tb-fields{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(150px,1fr));
+    border-top:1px solid var(--line);
+  }
+  .tb-field{
+    padding:14px 20px;
+    border-right:1px solid var(--line);
+    border-bottom:1px solid var(--line);
+  }
+  .tb-field:last-child{border-right:none;}
+  .tb-field .k{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--muted-2);
+    margin-bottom:5px;
+  }
+  .tb-field .v{
+    font-size:14px;
+    color:var(--ink);
+    font-weight:500;
+  }
+
+  /* ---------- Section shell ---------- */
+  section{ margin-bottom:56px; }
+  .section-head{
+    display:flex;
+    align-items:baseline;
+    gap:12px;
+    margin-bottom:22px;
+  }
+  .section-num{
+    font-family:'JetBrains Mono',monospace;
+    color:var(--amber-dim);
+    font-size:13px;
+  }
+  .section-title{
+    font-family:'JetBrains Mono',monospace;
+    font-size:20px;
+    font-weight:700;
+    letter-spacing:0.02em;
+    margin:0;
+  }
+  .section-rule{
+    flex:1;
+    height:1px;
+    background:linear-gradient(90deg, var(--line), transparent);
+  }
+
+  .body-text p{
+    font-size:15.5px;
+    line-height:1.75;
+    color:var(--muted);
+    margin:0 0 14px;
+  }
+  .body-text strong{color:var(--ink);}
+  .body-text a{ color:var(--amber); border-bottom:1px dotted var(--amber-dim); text-decoration:none; }
+  .body-text a:hover{ color:var(--cyan); border-color:var(--cyan); }
+
+  .tags{display:flex; flex-wrap:wrap; gap:8px; margin-top:16px;}
+  .tag{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    padding:5px 10px;
+    border:1px solid var(--line);
+    color:var(--cyan);
+    background:rgba(94,234,212,0.04);
+  }
+
+  /* ---------- Link cards (source repo / OS site) ---------- */
+  .link-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(220px,1fr));
+    gap:14px;
+    margin-top:20px;
+  }
+  .link-card{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    padding:18px 20px;
+    border:1px solid var(--line);
+    background:var(--panel);
+    text-decoration:none;
+    transition:border-color .18s ease, transform .18s ease, background .18s ease;
+  }
+  .link-card:hover{ border-color:var(--amber); transform:translateY(-2px); background:#101d36; }
+  .link-name{
+    font-family:'JetBrains Mono',monospace;
+    font-weight:700;
+    font-size:14px;
+    color:var(--ink);
+  }
+  .link-desc{ font-size:13px; color:var(--muted); line-height:1.5; }
+  .link-url{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    color:var(--muted-2);
+    word-break:break-all;
+  }
+
+  /* ---------- Screens gallery ---------- */
+  .gallery{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(230px,1fr));
+    gap:18px;
+  }
+  .shot{
+    border:1px solid var(--line);
+    background:var(--panel);
+    overflow:hidden;
+  }
+  .shot img{
+    display:block;
+    width:100%;
+    height:220px;
+    object-fit:cover;
+    object-position:top center;
+    filter:grayscale(0.15) contrast(1.02);
+  }
+  .shot-cap{ padding:12px 14px; }
+  .shot-cap .app{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    color:var(--amber);
+    margin-bottom:4px;
+  }
+  .shot-cap p{ font-size:13px; color:var(--muted); line-height:1.55; margin:0; }
+
+  /* ---------- Spec table ---------- */
+  .spec-table{
+    width:100%;
+    border-collapse:collapse;
+    border:1px solid var(--line);
+    background:var(--panel);
+  }
+  .spec-table td{
+    padding:12px 16px;
+    border-bottom:1px solid var(--line);
+    font-size:14px;
+  }
+  .spec-table tr:last-child td{ border-bottom:none; }
+  .spec-table td:first-child{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--muted-2);
+    width:160px;
+  }
+  .spec-table td:last-child{ color:var(--ink); }
+
+  footer{
+    border-top:1px solid var(--line);
+    padding-top:24px;
+    display:flex;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:12px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    color:var(--muted-2);
+  }
+  footer a{ color:var(--muted-2); }
+  footer a:hover{ color:var(--amber); }
+
+  a:focus-visible, .link-card:focus-visible{
+    outline:2px solid var(--amber);
+    outline-offset:2px;
+  }
+
+  /* ---------- Gallery lightbox ---------- */
+  .shot-btn{
+    display:block;
+    width:100%;
+    padding:0;
+    margin:0;
+    border:none;
+    background:none;
+    cursor:pointer;
+    font:inherit;
+    color:inherit;
+  }
+  .shot-btn:focus-visible{ outline:2px solid var(--amber); outline-offset:-2px; }
+
+  .lightbox{
+    display:none;
+    position:fixed;
+    inset:0;
+    z-index:100;
+    background:rgba(5,9,18,0.94);
+    align-items:center;
+    justify-content:center;
+  }
+  .lightbox.open{ display:flex; }
+
+  .lb-figure{
+    position:relative;
+    max-width:min(92vw, 900px);
+    max-height:82vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+  .lb-img{
+    max-width:100%;
+    max-height:70vh;
+    border:1px solid var(--line);
+    background:#000;
+    filter:grayscale(0.15) contrast(1.02);
+  }
+  .lb-caption{
+    margin-top:14px;
+    text-align:center;
+    max-width:60ch;
+  }
+  .lb-caption .app{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    color:var(--amber);
+    margin-bottom:4px;
+  }
+  .lb-caption p{ font-size:13px; color:var(--muted); line-height:1.55; margin:0; }
+  .lb-counter{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    color:var(--muted-2);
+    margin-top:10px;
+  }
+
+  .lb-btn{
+    position:absolute;
+    top:50%;
+    transform:translateY(-50%);
+    width:44px;
+    height:44px;
+    border:1px solid var(--line);
+    background:var(--panel);
+    color:var(--ink);
+    font-family:'JetBrains Mono',monospace;
+    font-size:18px;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .lb-btn:hover{ border-color:var(--amber); color:var(--amber); }
+  .lb-prev{ left:-56px; }
+  .lb-next{ right:-56px; }
+  @media (max-width:760px){
+    .lb-prev{ left:0; }
+    .lb-next{ right:0; }
+  }
+
+  .lb-close{
+    position:absolute;
+    top:-44px;
+    right:-4px;
+    width:36px;
+    height:36px;
+    border:1px solid var(--line);
+    background:var(--panel);
+    color:var(--ink);
+    font-size:18px;
+    line-height:1;
+    cursor:pointer;
+  }
+  .lb-close:hover{ border-color:var(--amber); color:var(--amber); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <a class="backlink mono" href="../index.html">&larr; back to mcgivrer</a>
+
+  <!-- TITLE BLOCK -->
+  <div class="titleblock">
+    <div class="tb-corner-br"></div>
+    <div class="tb-top">
+      <span>DOC — HARDWARE LOG / REV. 2026</span>
+      <span class="live">ONLINE</span>
+    </div>
+    <div class="tb-main">
+      <p class="eyebrow">a pocket-sized, text-first computer</p>
+      <h1>Cyberdeck</h1>
+      <p class="role-line">
+        A small reflective-display handheld built around a <strong>Waveshare ESP32-S3-RLCD-4.2</strong>
+        board and a <strong>Rii i518BT</strong> mini wireless keyboard, running
+        <strong>SolarOS</strong> — a text-first embedded OS. No backlight, no
+        distractions: files, shell, player, weather, and a photo viewer, all in 1-bit.
+      </p>
+    </div>
+    <div class="tb-fields">
+      <div class="tb-field"><div class="k">Board</div><div class="v">ESP32-S3-RLCD-4.2</div></div>
+      <div class="tb-field"><div class="k">Display</div><div class="v">ST7305, 400×300, reflective</div></div>
+      <div class="tb-field"><div class="k">Keyboard</div><div class="v">Rii i518BT (BLE)</div></div>
+      <div class="tb-field"><div class="k">OS</div><div class="v">SolarOS</div></div>
+    </div>
+  </div>
+
+  <!-- HARDWARE -->
+  <section id="hardware">
+    <div class="section-head">
+      <span class="section-num">01</span>
+      <h2 class="section-title">Hardware</h2>
+      <div class="section-rule"></div>
+    </div>
+    <div class="body-text">
+      <p>The core is a <strong>Waveshare ESP32-S3-RLCD-4.2</strong> board: a 4.2"
+      reflective ST7305 LCD (400×300, monochrome, readable in daylight, no
+      backlight needed), an ESP32-S3 dual-core running at 240MHz, 8MB of PSRAM
+      and 16MB of flash. Input comes from a <strong>Rii i518BT</strong>, a
+      compact Bluetooth mini keyboard — paired over BLE, no dongle, no cable.
+      The whole thing sits in a 3D-printed case that clips the board and the
+      keyboard together into one slab you can hold in two hands.</p>
+    </div>
+    <table class="spec-table">
+      <tr><td>Board</td><td>Waveshare ESP32-S3-RLCD-4.2</td></tr>
+      <tr><td>Display</td><td>ST7305 reflective LCD, 400×300, 1-bit monochrome</td></tr>
+      <tr><td>MCU</td><td>ESP32-S3, dual-core, 240MHz</td></tr>
+      <tr><td>Memory</td><td>8MB PSRAM, 16MB flash</td></tr>
+      <tr><td>Connectivity</td><td>BLE 5.0</td></tr>
+      <tr><td>Keyboard</td><td>Rii i518BT, wireless mini keyboard (BLE)</td></tr>
+      <tr><td>Storage</td><td>microSD card</td></tr>
+      <tr><td>Case</td><td>3D-printed enclosure</td></tr>
+    </table>
+    <div class="tags">
+      <span class="tag">ESP32-S3</span>
+      <span class="tag">ST7305 e-paper-like display</span>
+      <span class="tag">BLE keyboard</span>
+      <span class="tag">3D-printed case</span>
+      <span class="tag">Battery powered</span>
+    </div>
+  </section>
+
+  <!-- SOFTWARE -->
+  <section id="software">
+    <div class="section-head">
+      <span class="section-num">02</span>
+      <h2 class="section-title">Software — SolarOS</h2>
+      <div class="section-rule"></div>
+    </div>
+    <div class="body-text">
+      <p>The OS is <strong>SolarOS</strong>, a text-first embedded OS built for
+      this exact class of low-power reflective-display hardware. It ships a
+      shell, a dual-pane file manager, a music player, a weather app and a
+      photo viewer — all rendered in 1-bit, all keyboard-driven. Source and
+      build details live on <strong>nilseuropa</strong>'s GitHub, under the
+      <code class="mono">solar_term</code> project.</p>
+    </div>
+    <div class="link-grid">
+      <a class="link-card" href="https://github.com/nilseuropa/solar_term" target="_blank" rel="noopener">
+        <div class="link-name">GitHub — nilseuropa/solar_term</div>
+        <div class="link-desc">Source, hardware notes and build instructions for SolarOS.</div>
+        <div class="link-url">github.com/nilseuropa/solar_term</div>
+      </a>
+      <a class="link-card" href="https://solar-os.eu" target="_blank" rel="noopener">
+        <div class="link-name">solar-os.eu</div>
+        <div class="link-desc">SolarOS project site — docs, releases and app gallery.</div>
+        <div class="link-url">solar-os.eu</div>
+      </a>
+    </div>
+  </section>
+
+  <!-- SCREENS -->
+  <section id="screens">
+    <div class="section-head">
+      <span class="section-num">03</span>
+      <h2 class="section-title">On screen</h2>
+      <div class="section-rule"></div>
+    </div>
+    <div class="gallery">
+      <div class="shot">
+        <button type="button" class="shot-btn" data-index="0">
+          <img src="img/cyberdeck-files.jpg" alt="SolarOS Files app, dual-pane file manager showing /sdcard">
+        </button>
+        <div class="shot-cap">
+          <div class="app">Files</div>
+          <p>Dual-pane file manager — view, edit, copy, move, mkdir, delete and zip, all from the keyboard.</p>
+        </div>
+      </div>
+      <div class="shot">
+        <button type="button" class="shot-btn" data-index="1">
+          <img src="img/cyberdeck-shell.jpg" alt="SolarOS shell showing a directory listing">
+        </button>
+        <div class="shot-cap">
+          <div class="app">Shell</div>
+          <p>A proper text shell — <code class="mono">ls</code>, navigation, and the usual file operations.</p>
+        </div>
+      </div>
+      <div class="shot">
+        <button type="button" class="shot-btn" data-index="2">
+          <img src="img/cyberdeck-player.jpg" alt="SolarOS Player app with a cassette-style UI">
+        </button>
+        <div class="shot-cap">
+          <div class="app">Player</div>
+          <p>Music player with a cassette-tape UI, playlist support and a volume bar.</p>
+        </div>
+      </div>
+      <div class="shot">
+        <button type="button" class="shot-btn" data-index="3">
+          <img src="img/cyberdeck-photo.jpg" alt="A dithered monochrome portrait photo displayed on the reflective LCD">
+        </button>
+        <div class="shot-cap">
+          <div class="app">Photo viewer</div>
+          <p>Photos rendered as 1-bit dithered images — surprisingly good detail on the reflective panel.</p>
+        </div>
+      </div>
+      <div class="shot">
+        <button type="button" class="shot-btn" data-index="4">
+          <img src="img/cyberdeck-weather.jpg" alt="Heather weather app showing temperature and precipitation graphs for Hochfelden, FR">
+        </button>
+        <div class="shot-cap">
+          <div class="app">Heather</div>
+          <p>Weather via Open-Meteo — temperature and precipitation graphs for the next 24 hours, auto-refresh every 10 minutes.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="lb-figure">
+      <button type="button" class="lb-btn lb-close" id="lbClose" aria-label="Close">&times;</button>
+      <button type="button" class="lb-btn lb-prev" id="lbPrev" aria-label="Previous screenshot">&larr;</button>
+      <img class="lb-img" id="lbImg" src="" alt="">
+      <button type="button" class="lb-btn lb-next" id="lbNext" aria-label="Next screenshot">&rarr;</button>
+      <div class="lb-caption">
+        <div class="app" id="lbApp"></div>
+        <p id="lbDesc"></p>
+        <div class="lb-counter" id="lbCounter"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span>© 2026 Frédéric Delorme — mcgivrer</span>
+    <span><a href="../index.html">&larr; back to homepage</a></span>
+    <span>[ << <a href="https://pages.cyberspace.online/ring?from=mcgivrer&dir=prev">prev</a> | <a href="https://pages.cyberspace.online/random">random</a> | <a href="https://pages.cyberspace.online/ring?from=mcgivrer&dir=next">next</a> >> ]</span>
+  </footer>
+
+</div>
+
+<script>
+(function(){
+  var buttons = Array.prototype.slice.call(document.querySelectorAll('.shot-btn'));
+  if(!buttons.length) return;
+
+  var shots = buttons.map(function(btn){
+    var img = btn.querySelector('img');
+    var cap = btn.closest('.shot').querySelector('.shot-cap');
+    return {
+      src: img.getAttribute('src'),
+      alt: img.getAttribute('alt') || '',
+      app: cap ? (cap.querySelector('.app') || {}).textContent || '' : '',
+      desc: cap ? (cap.querySelector('p') || {}).textContent || '' : ''
+    };
+  });
+
+  var lightbox = document.getElementById('lightbox');
+  var lbImg = document.getElementById('lbImg');
+  var lbApp = document.getElementById('lbApp');
+  var lbDesc = document.getElementById('lbDesc');
+  var lbCounter = document.getElementById('lbCounter');
+  var current = 0;
+
+  function render(){
+    var s = shots[current];
+    lbImg.src = s.src;
+    lbImg.alt = s.alt;
+    lbApp.textContent = s.app;
+    lbDesc.textContent = s.desc;
+    lbCounter.textContent = (current + 1) + ' / ' + shots.length;
+  }
+
+  function open(index){
+    current = index;
+    render();
+    lightbox.classList.add('open');
+    lightbox.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+  function close(){
+    lightbox.classList.remove('open');
+    lightbox.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }
+  function next(){ current = (current + 1) % shots.length; render(); }
+  function prev(){ current = (current - 1 + shots.length) % shots.length; render(); }
+
+  buttons.forEach(function(btn, i){
+    btn.addEventListener('click', function(){ open(i); });
+  });
+
+  document.getElementById('lbClose').addEventListener('click', close);
+  document.getElementById('lbNext').addEventListener('click', next);
+  document.getElementById('lbPrev').addEventListener('click', prev);
+
+  lightbox.addEventListener('click', function(e){
+    if(e.target === lightbox) close();
+  });
+
+  document.addEventListener('keydown', function(e){
+    if(!lightbox.classList.contains('open')) return;
+    if(e.key === 'Escape') close();
+    else if(e.key === 'ArrowRight') next();
+    else if(e.key === 'ArrowLeft') prev();
+  });
+})();
+</script>
+</body>
+</html>

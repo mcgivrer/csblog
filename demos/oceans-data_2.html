@@ -177,7 +177,7 @@
   </div>
   <div class="layer-row">
     <span class="swatch temp"></span>
-    <label for="toggle-temp">Temperature (NOAA CoralTemp)</label>
+    <label for="toggle-temp">Temperature (SST)</label>
     <span class="count mono" id="count-temp">—</span>
     <label class="switch">
       <input type="checkbox" id="toggle-temp">
@@ -245,8 +245,8 @@
 <button id="hud-open" aria-label="Show control panel" title="Show panel">☰</button>
 
 <div id="footer-note">
-  Data: Open‑Meteo Marine &amp; Forecast APIs (currents, wind) and NOAA Coral Reef Watch CoralTemp via ERDDAP (temperature).
-  Drag to rotate the globe, scroll to zoom. Day/night lighting follows the real sun (or the replayed day, at 12:00 UTC).
+  Data: Open‑Meteo Marine API (Copernicus Marine / MeteoFrance model) &amp; Open‑Meteo Forecast API.
+  Drag to rotate the globe, scroll to zoom.
 </div>
 
 <div id="error-toast"></div>
@@ -275,11 +275,6 @@
   const FETCH_TIMEOUT_MS = 25000;
   const MARINE_URL = 'https://marine-api.open-meteo.com/v1/marine';
   const FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
-  // Temperature now comes from NOAA Coral Reef Watch's CoralTemp product via ERDDAP —
-  // no account needed, CORS-enabled, daily 5km satellite SST, already in Celsius.
-  const CORALTEMP_URL = 'https://coastwatch.noaa.gov/erddap/griddap/noaacrwsstDaily.json';
-  const CORALTEMP_LAT_STRIDE = Math.round(LAT_STEP / 0.05); // native grid is 0.05° — convert our 9° spacing to an index count
-  const CORALTEMP_LON_STRIDE = Math.round(LON_STEP / 0.05);
   const LAT_MIN = -81, LON_MIN = -180;
   const NLAT = Math.round((-LAT_MIN - LAT_MIN)/LAT_STEP) + 1; // number of distinct grid latitudes
   const NLON = Math.round(360/LON_STEP);                       // number of distinct grid longitudes (wraps)
@@ -287,7 +282,6 @@
   // Layer meshes — declared here (before the render loop) since animate() reads them
   // on every frame to drive the flow animation.
   let currentsMesh=null, windMesh=null, tempMesh=null;
-  let replayFrames = null; // also read by animate() to decide whether to auto-advance the sun by real time
 
   /* ---------------------------------------------------------------------
    * THREE.JS SCENE SETUP
@@ -313,9 +307,10 @@
   }
   fitCameraToGlobe();
 
-  scene.add(new THREE.AmbientLight(0xffffff, 0.28)); // dimmer ambient so the night side reads as dark
-  const sun = new THREE.DirectionalLight(0xffffff, 1.6);
-  sun.position.set(6, 3, 5); // placeholder until updateSun() runs (defined further below)
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.15);
+  sun.position.set(6, 3, 5);
+  scene.add(sun);
 
   // starfield
   (function addStars(){
@@ -337,11 +332,6 @@
 
   const globeGroup = new THREE.Group();
   scene.add(globeGroup);
-  // The sun light is parented to globeGroup (not the scene) so its position is
-  // expressed in the same geographic (lat/lon) space the rest of the app uses —
-  // it then rotates along with the globe's own display orientation (auto-rotate
-  // / user drag), instead of drifting across the geography as the view spins.
-  globeGroup.add(sun);
 
   // Earth sphere with texture (graceful fallback if it fails to load)
   const loader = new THREE.TextureLoader();
@@ -412,7 +402,6 @@
   });
 
   const clockStart = performance.now();
-  let lastSunUpdate = -Infinity;
   function animate(){
     requestAnimationFrame(animate);
     if(autoRotate && !dragging) rotY += 0.0009;
@@ -420,9 +409,6 @@
     const elapsed = (performance.now() - clockStart) / 1000;
     if(currentsMesh) currentsMesh.material.uniforms.uTime.value = elapsed;
     if(windMesh) windMesh.material.uniforms.uTime.value = elapsed;
-    // Keep the terminator moving with real time in live mode; replay mode sets
-    // the sun explicitly per frame (see applyReplayFrame) and is left alone here.
-    if(!replayFrames && elapsed - lastSunUpdate > 30){ updateSun(new Date()); lastSunUpdate = elapsed; }
     renderer.render(scene, camera);
   }
   animate();
@@ -439,35 +425,6 @@
        r*Math.sin(phi)*Math.sin(theta)
     );
   }
-
-  /* ---------------------------------------------------------------------
-   * DAY / NIGHT — the sun's direction is derived from an actual date/time
-   * (real clock in live mode, or the replayed day at 12:00 UTC in replay
-   * mode) and expressed as a lat/lon "subsolar point": the spot on Earth
-   * directly under the sun. The directional light is placed there, in the
-   * same geographic space as everything else on the globe, so the day/
-   * night terminator tracks real Earth orientation regardless of how the
-   * user has spun the view.
-   * ------------------------------------------------------------------- */
-  function subsolarPoint(date){
-    const start = Date.UTC(date.getUTCFullYear(), 0, 0);
-    const dayOfYear = (date.getTime() - start) / 86400000;
-    // Declination: approximate solar elevation of the equator-crossing sun through the year.
-    const declination = -23.44 * Math.cos((2*Math.PI/365) * (dayOfYear + 10));
-    const utcHours = date.getUTCHours() + date.getUTCMinutes()/60 + date.getUTCSeconds()/3600;
-    // Sun sits over the Greenwich meridian at 12:00 UTC, over 180° at 00:00 UTC.
-    let lon = (12 - utcHours) * 15;
-    lon = ((lon + 180) % 360 + 360) % 360 - 180;
-    return {lat: declination, lon};
-  }
-  function updateSun(date){
-    const {lat, lon} = subsolarPoint(date);
-    const dir = latLonToVector3(lat, lon, 1);
-    const dist = 20;
-    sun.position.set(dir.x*dist, dir.y*dist, dir.z*dist);
-  }
-  updateSun(new Date()); // initial placement, before any data has loaded
-
   function localAxes(lat, lon){
     const phi = (90-lat)*(Math.PI/180);
     const theta = (lon+180)*(Math.PI/180);
@@ -599,11 +556,17 @@
     return out;
   }
 
-  // Shared fetch: timeout via Promise.race (see note above about avoiding
-  // AbortController), plus surfacing the server's own error reason when present.
-  // Works for any JSON API — Open-Meteo (returns {error, reason}) or ERDDAP
-  // (returns {error: "..."} as plain text/HTML on failure, handled below).
-  async function fetchJsonWithTimeout(url){
+  async function fetchBatch(baseUrl, points, params){
+    const lat = points.map(p=>p.lat).join(',');
+    const lon = points.map(p=>p.lon).join(',');
+    const url = `${baseUrl}?latitude=${lat}&longitude=${lon}&${params}`;
+    // Note: deliberately NOT using AbortController here. In some sandboxed/preview
+    // environments, fetch() is proxied to a parent frame via postMessage, and an
+    // AbortSignal can't be structured-cloned — it throws "AbortSignal object could
+    // not be cloned" instead of ever reaching the network. A plain timeout race
+    // avoids touching fetch's options object at all, so it works everywhere; the
+    // only trade-off is that a timed-out request keeps running in the background
+    // instead of being cancelled, which is harmless for a read-only GET.
     let res;
     try{
       res = await Promise.race([
@@ -614,28 +577,15 @@
       throw new Error(e.message && e.message.indexOf('timeout') === 0 ? e.message : `network error (${e.message})`);
     }
     if(!res.ok){
+      // Surface the API's own explanation when it sends one (Open-Meteo returns {error:true, reason:"..."}).
       let reason = 'HTTP ' + res.status;
       try{
         const body = await res.json();
-        if(body && body.reason) reason += ': ' + body.reason; // Open-Meteo shape
-      }catch(_e){
-        try{ const text = await res.text(); if(text) reason += ': ' + text.slice(0,200); }catch(_e2){}
-      }
+        if(body && body.reason) reason += ': ' + body.reason;
+      }catch(_e){ /* body wasn't JSON — keep the plain HTTP status */ }
       throw new Error(reason);
     }
-    return res.json();
-  }
-
-  async function fetchBatch(baseUrl, points, params){
-    const lat = points.map(p=>p.lat).join(',');
-    const lon = points.map(p=>p.lon).join(',');
-    const url = `${baseUrl}?latitude=${lat}&longitude=${lon}&${params}`;
-    // Note: deliberately NOT using AbortController here. In some sandboxed/preview
-    // environments, fetch() is proxied to a parent frame via postMessage, and an
-    // AbortSignal can't be structured-cloned — it throws "AbortSignal object could
-    // not be cloned" instead of ever reaching the network. A plain timeout race
-    // (inside fetchJsonWithTimeout) avoids touching fetch's options object at all.
-    const data = await fetchJsonWithTimeout(url);
+    const data = await res.json();
     return Array.isArray(data) ? data : [data];
   }
 
@@ -879,7 +829,7 @@
   });
   el('refresh-btn').addEventListener('click', ()=>{
     if(replayFrames){ stopReplayPlayback(); replayFrames = null; el('replay-transport').classList.remove('show'); }
-    loadAll(true); // explicit refresh always bypasses the cache
+    loadAll();
   });
   el('density-select').addEventListener('change', ()=>{ if(lastData) rebuildMeshes(lastData); });
 
@@ -949,13 +899,14 @@
     const curV = new Float64Array(NLAT*NLON).fill(NaN);
     const windU = new Float64Array(NLAT*NLON).fill(NaN);
     const windV = new Float64Array(NLAT*NLON).fill(NaN);
-    const tempArr = new Float64Array(NLAT*NLON).fill(NaN); // filled separately from NOAA CoralTemp — see fetchCoralTemp*
+    const tempArr = new Float64Array(NLAT*NLON).fill(NaN);
 
     grid.forEach((pt, i)=>{
       const mv = pickMarine(marineData[i]);
       if(mv){
         const {u, v} = toUV(mv.spd, mv.dir, 0);
         curU[i] = u; curV[i] = v;
+        if(isFinite(mv.sst)) tempArr[i] = mv.sst;
       }
       const wv = pickWind(windData[i]);
       if(wv){
@@ -966,140 +917,11 @@
     return {curU, curV, windU, windV, tempArr};
   }
 
-  /* ---------------------------------------------------------------------
-   * TEMPERATURE — NOAA Coral Reef Watch "CoralTemp" via ERDDAP (no account,
-   * CORS-enabled, daily 5km satellite SST, already in °C). One griddap
-   * request returns a whole lat/lon rectangle at once — cheaper and simpler
-   * than Open-Meteo's per-point batching, which we keep only for currents/wind.
-   * ------------------------------------------------------------------- */
-  function nearestGridIndex(lat, lon){
-    let latIdx = Math.round((lat - LAT_MIN) / LAT_STEP);
-    latIdx = Math.max(0, Math.min(NLAT-1, latIdx));
-    let lonIdx = Math.round((lon - LON_MIN) / LON_STEP);
-    lonIdx = ((lonIdx % NLON) + NLON) % NLON;
-    return latIdx*NLON + lonIdx;
-  }
-  // Pulls {latitude, longitude, analysed_sst} out of ERDDAP's generic
-  // {table:{columnNames, rows}} JSON shape by column name, not position.
-  function erddapColumns(json, ...names){
-    const cols = json && json.table && json.table.columnNames;
-    const rows = json && json.table && json.table.rows;
-    if(!cols || !rows) throw new Error('unexpected ERDDAP response shape');
-    const idx = names.map(n => cols.indexOf(n));
-    if(idx.some(i => i === -1)) throw new Error('missing expected column in ERDDAP response');
-    return {rows, idx};
-  }
-  function coralTempQueryUrl(timeExpr){
-    const latQ = `(${LAT_MIN}):${CORALTEMP_LAT_STRIDE}:(${-LAT_MIN})`;
-    const lonQ = `(${LON_MIN}):${CORALTEMP_LON_STRIDE}:(${-LON_MIN-LON_STEP})`;
-    return `${CORALTEMP_URL}?analysed_sst[${timeExpr}][${latQ}][${lonQ}]`;
-  }
-  // Live: today's latest available day.
-  async function fetchCoralTempLive(){
-    const json = await fetchJsonWithTimeout(coralTempQueryUrl('(last)'));
-    const {rows, idx} = erddapColumns(json, 'latitude', 'longitude', 'analysed_sst');
-    const [latI, lonI, sstI] = idx;
-    const tempArr = new Float64Array(NLAT*NLON).fill(NaN);
-    for(const row of rows){
-      const sst = row[sstI];
-      if(sst === null || sst === undefined) continue;
-      tempArr[nearestGridIndex(row[latI], row[lonI])] = sst;
-    }
-    return tempArr;
-  }
-  // Replay: one request for the whole date range, split into a Map keyed by
-  // the same 'YYYY-MM-DD' label used for the current/wind replay frames.
-  async function fetchCoralTempRange(startDateStr, endDateStr){
-    const timeExpr = `(${startDateStr}T12:00:00Z):1:(${endDateStr}T12:00:00Z)`;
-    const json = await fetchJsonWithTimeout(coralTempQueryUrl(timeExpr));
-    const {rows, idx} = erddapColumns(json, 'time', 'latitude', 'longitude', 'analysed_sst');
-    const [timeI, latI, lonI, sstI] = idx;
-    const byDate = new Map();
-    for(const row of rows){
-      const sst = row[sstI];
-      if(sst === null || sst === undefined) continue;
-      const dateStr = String(row[timeI]).slice(0,10);
-      if(!byDate.has(dateStr)) byDate.set(dateStr, new Float64Array(NLAT*NLON).fill(NaN));
-      byDate.get(dateStr)[nearestGridIndex(row[latI], row[lonI])] = sst;
-    }
-    return byDate;
-  }
-
-  /* ---------------------------------------------------------------------
-   * LOCAL CACHE — avoids re-downloading the same data on every visit.
-   * Live conditions are cached briefly (they're a nowcast, so they age);
-   * a replay's historical window is cached per exact day-range key since
-   * past history never changes once the day is over.
-   * ------------------------------------------------------------------- */
-  const CACHE_PREFIX = 'oceans-data-cache:';
-  const LIVE_CACHE_KEY = CACHE_PREFIX + 'live';
-  const LIVE_CACHE_TTL_MS = 15 * 60 * 1000; // 15 min — "current" conditions go stale
-
-  function todayUTC(){ return new Date().toISOString().slice(0,10); }
-
-  // Float64Array -> plain array, rounded to keep the cached JSON small. NaN
-  // serializes to null automatically via JSON.stringify; restored on read.
-  function packArr(arr){
-    const out = new Array(arr.length);
-    for(let i=0;i<arr.length;i++) out[i] = isFinite(arr[i]) ? Math.round(arr[i]*10000)/10000 : null;
-    return out;
-  }
-  function unpackArr(arr){
-    const out = new Float64Array(arr.length);
-    for(let i=0;i<arr.length;i++) out[i] = (arr[i] === null || arr[i] === undefined) ? NaN : arr[i];
-    return out;
-  }
-  function packGrids(g){
-    return { curU: packArr(g.curU), curV: packArr(g.curV), windU: packArr(g.windU), windV: packArr(g.windV), tempArr: packArr(g.tempArr) };
-  }
-  function unpackGrids(p){
-    return { curU: unpackArr(p.curU), curV: unpackArr(p.curV), windU: unpackArr(p.windU), windV: unpackArr(p.windV), tempArr: unpackArr(p.tempArr) };
-  }
-
-  function readCache(key){
-    try{
-      const raw = localStorage.getItem(key);
-      if(!raw) return null;
-      return JSON.parse(raw);
-    }catch(e){ return null; }
-  }
-  function writeCache(key, obj){
-    try{
-      localStorage.setItem(key, JSON.stringify(obj));
-      return true;
-    }catch(e){
-      console.warn('Cache write skipped (storage full or unavailable):', e.message);
-      return false;
-    }
-  }
-  // Keep only the most recent replay cache entry so switching between 2/4/6-week
-  // windows a few times in one session can't slowly fill up localStorage.
-  function pruneReplayCache(exceptKey){
-    try{
-      for(let i=localStorage.length-1;i>=0;i--){
-        const k = localStorage.key(i);
-        if(k && k.indexOf(CACHE_PREFIX+'replay:') === 0 && k !== exceptKey) localStorage.removeItem(k);
-      }
-    }catch(e){ /* ignore */ }
-  }
-
   let loading = false;
   let lastData = null; // {curU, curV, windU, windV, tempArr} — coarse grids currently on screen
 
-  async function loadAll(forceRefresh){
+  async function loadAll(){
     if(loading) return;
-
-    // Fast path: a fresh-enough cached snapshot skips the network entirely.
-    if(!forceRefresh){
-      const cached = readCache(LIVE_CACHE_KEY);
-      if(cached && (Date.now() - cached.ts) < LIVE_CACHE_TTL_MS){
-        lastData = unpackGrids(cached.grids);
-        rebuildMeshes(lastData);
-        el('stat-time').textContent = new Date(cached.ts).toLocaleTimeString('en-US') + ' (cached)';
-        return;
-      }
-    }
-
     loading = true;
     el('refresh-btn').disabled = true;
     el('replay-load').disabled = true;
@@ -1109,7 +931,7 @@
     const totalSteps = 2;
 
     try{
-      const marineParams = 'current=ocean_current_velocity,ocean_current_direction&wind_speed_unit=ms&forecast_days=1';
+      const marineParams = 'current=ocean_current_velocity,ocean_current_direction,sea_surface_temperature&wind_speed_unit=ms&forecast_days=1';
       const windParams = 'current=wind_speed_10m,wind_direction_10m&wind_speed_unit=ms&forecast_days=1';
 
       const marineDataPromise = runBatched(grid, MARINE_URL, marineParams, (d,t)=>{
@@ -1121,38 +943,17 @@
         setLoading(((marineProgress+windProgress)/totalSteps)*100, true);
       });
 
-      // NOTE: CoralTemp is deliberately NOT awaited here. It's a separate host
-      // (coastwatch.noaa.gov) with untested real-world latency/CORS behavior from
-      // this app; if it were part of this Promise.all, a slow or stuck NOAA request
-      // would leave the whole loading screen stuck even though currents/wind are
-      // ready. Currents+wind render as soon as they're ready; temperature fills in
-      // moments later (see below), on its own timeout, without blocking anything.
       const [marineData, windData] = await Promise.all([marineDataPromise, windDataPromise]);
 
       // Current direction: oceanographic convention (flows TOWARD) -> offset 0 (handled in buildGrids).
       // Wind direction from Open-Meteo: meteorological convention (blows FROM) -> offset 180° (idem).
       lastData = buildGrids(
         marineData, windData,
-        m => (m && m.current) ? {spd:m.current.ocean_current_velocity, dir:m.current.ocean_current_direction} : null,
+        m => (m && m.current) ? {spd:m.current.ocean_current_velocity, dir:m.current.ocean_current_direction, sst:m.current.sea_surface_temperature} : null,
         w => (w && w.current) ? {spd:w.current.wind_speed_10m, dir:w.current.wind_direction_10m} : null
       );
       rebuildMeshes(lastData);
-      const now = Date.now();
-      el('stat-time').textContent = new Date(now).toLocaleTimeString('en-US');
-      writeCache(LIVE_CACHE_KEY, {ts: now, grids: packGrids(lastData)});
-
-      // Fire-and-follow-up: update the temperature layer whenever NOAA responds,
-      // whether that's 200ms or the full 25s timeout from now.
-      fetchCoralTempLive().then(coralTempArr=>{
-        if(lastData){
-          lastData.tempArr = coralTempArr;
-          rebuildMeshes(lastData);
-          writeCache(LIVE_CACHE_KEY, {ts: Date.now(), grids: packGrids(lastData)});
-        }
-      }).catch(e=>{
-        console.error('CoralTemp fetch failed:', e);
-        showError('NOAA CoralTemp temperature unavailable (' + e.message + ') — currents/wind unaffected.');
-      });
+      el('stat-time').textContent = new Date().toLocaleTimeString('en-US');
 
     }catch(e){
       console.error(e);
@@ -1174,7 +975,7 @@
    * only the response payload is bigger), sample one snapshot per day,
    * and let the user scrub or auto-play through them.
    * ------------------------------------------------------------------- */
-  // replayFrames declared earlier (near the top) so animate() can read it before this runs.
+  let replayFrames = null;   // [{curU,curV,windU,windV,tempArr,label}, ...]
   let replayIndex = 0;
   let replayTimer = null;
 
@@ -1187,9 +988,6 @@
     el('stat-time').textContent = frame.label + ' (replay)';
     el('replay-slider').value = idx;
     el('replay-date').textContent = frame.label;
-    // Each frame is sampled at 12:00 UTC on its date — use that same instant for the
-    // sun so the terminator matches the day actually being shown, not the real clock.
-    updateSun(new Date(frame.label + 'T12:00:00Z'));
   }
 
   function stopReplayPlayback(){
@@ -1199,19 +997,6 @@
 
   async function loadReplay(days){
     if(loading) return;
-
-    // Historical windows don't change once the day is over, so cache per
-    // (days, today's UTC date) and skip the network on a repeat visit/selection.
-    const cacheKey = CACHE_PREFIX + 'replay:' + days + ':' + todayUTC();
-    const cached = readCache(cacheKey);
-    if(cached && Array.isArray(cached.frames) && cached.frames.length){
-      replayFrames = cached.frames.map(f => Object.assign(unpackGrids(f), {label: f.label}));
-      el('replay-slider').max = replayFrames.length - 1;
-      el('replay-transport').classList.add('show');
-      applyReplayFrame(0);
-      return;
-    }
-
     loading = true;
     el('replay-load').disabled = true;
     el('refresh-btn').disabled = true;
@@ -1222,7 +1007,7 @@
     const totalSteps = 2;
 
     try{
-      const marineParams = `hourly=ocean_current_velocity,ocean_current_direction&wind_speed_unit=ms&past_days=${days}&forecast_days=1&timezone=UTC`;
+      const marineParams = `hourly=ocean_current_velocity,ocean_current_direction,sea_surface_temperature&wind_speed_unit=ms&past_days=${days}&forecast_days=1&timezone=UTC`;
       const windParams = `hourly=wind_speed_10m,wind_direction_10m&wind_speed_unit=ms&past_days=${days}&forecast_days=1&timezone=UTC`;
 
       // Each point now returns weeks of hourly data instead of one instantaneous value, so the
@@ -1237,10 +1022,6 @@
         setLoading(((marineProgress+windProgress)/totalSteps)*100, true);
       }, REPLAY_BATCH_SIZE, REPLAY_CONCURRENCY);
 
-      // NOTE: CoralTemp is NOT part of this Promise.all, same reasoning as in loadAll() —
-      // it's a separate, untested-latency host and must never be able to stall the whole
-      // replay screen. Frames render with blank temperature first; NOAA's answer (whenever
-      // it arrives) patches temperature into the already-visible frames afterward.
       const [marineData, windData] = await Promise.all([marineDataPromise, windDataPromise]);
 
       // Find the first point that actually has an hourly series, to know how many
@@ -1250,15 +1031,15 @@
       if(!ref) throw new Error('no hourly data returned');
       const times = ref.hourly.time;
 
-      // One snapshot per day, sampled at 12:00 UTC. Temperature starts blank (NaN) and
-      // is filled in later, non-blocking, once NOAA responds (see below).
+      // One snapshot per day, sampled at 12:00 UTC.
       const frames = [];
       for(let h=12; h<times.length; h+=24){
         const grids = buildGrids(
           marineData, windData,
           m => (m && m.hourly) ? {
             spd: m.hourly.ocean_current_velocity ? m.hourly.ocean_current_velocity[h] : NaN,
-            dir: m.hourly.ocean_current_direction ? m.hourly.ocean_current_direction[h] : NaN
+            dir: m.hourly.ocean_current_direction ? m.hourly.ocean_current_direction[h] : NaN,
+            sst: m.hourly.sea_surface_temperature ? m.hourly.sea_surface_temperature[h] : NaN
           } : null,
           w => (w && w.hourly) ? {
             spd: w.hourly.wind_speed_10m ? w.hourly.wind_speed_10m[h] : NaN,
@@ -1275,30 +1056,13 @@
       // silently blank while wind still animates.
       const marineOk = marineData.some(m => m && m.hourly);
       const windOk = windData.some(w => w && w.hourly);
-      if(!marineOk && windOk) showError('Ocean current history unavailable for this period — showing wind only.');
-      else if(marineOk && !windOk) showError('Wind history unavailable for this period — showing currents only.');
+      if(!marineOk && windOk) showError('Ocean current & temperature history unavailable for this period — showing wind only.');
+      else if(marineOk && !windOk) showError('Wind history unavailable for this period — showing currents/temperature only.');
 
       replayFrames = frames;
-      pruneReplayCache(cacheKey);
-      writeCache(cacheKey, {ts: Date.now(), frames: frames.map(f => Object.assign(packGrids(f), {label: f.label}))});
       el('replay-slider').max = frames.length - 1;
       el('replay-transport').classList.add('show');
       applyReplayFrame(0);
-
-      // Fetch the whole range's temperature in one request, non-blocking. Patches
-      // into the frames (and re-renders the currently visible one) whenever NOAA
-      // answers — the replay is already fully usable (currents + wind) before this.
-      const startD = new Date(Date.now() - days*86400000);
-      const endD = new Date();
-      fetchCoralTempRange(startD.toISOString().slice(0,10), endD.toISOString().slice(0,10)).then(coralTempByDate=>{
-        if(replayFrames !== frames) return; // user moved on (exited or loaded a different window) meanwhile
-        frames.forEach(f=>{ const t = coralTempByDate.get(f.label); if(t) f.tempArr = t; });
-        writeCache(cacheKey, {ts: Date.now(), frames: frames.map(f => Object.assign(packGrids(f), {label: f.label}))});
-        applyReplayFrame(replayIndex); // refresh whichever frame is on screen right now
-      }).catch(e=>{
-        console.error('CoralTemp range fetch failed:', e);
-        showError('NOAA CoralTemp history unavailable (' + e.message + ') — currents/wind unaffected.');
-      });
 
     }catch(e){
       console.error(e);
@@ -1335,7 +1099,6 @@
     stopReplayPlayback();
     replayFrames = null;
     el('replay-transport').classList.remove('show');
-    updateSun(new Date()); // snap back to the real sun immediately, don't wait for the throttle
     loadAll();
   });
 
