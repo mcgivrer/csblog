@@ -25,7 +25,7 @@
 - [8. Internationalisation — nouvelles clés](#8-internationalisation--nouvelles-clés)
 - [9. Plan de vérification](#9-plan-de-vérification)
 - [10. Questions ouvertes / décisions à confirmer](#10-questions-ouvertes--décisions-à-confirmer)
-- [11. Priorisation suggérée](#11-priorisation-suggérée)
+- [11. Plan d'implémentation](#11-plan-dimplémentation)
 - [12. Référence — tous les raccourcis clavier](#12-référence--tous-les-raccourcis-clavier)
 
 ---
@@ -602,16 +602,83 @@ Cohérent avec la rigueur déjà appliquée aux évolutions précédentes (tests
 
 ---
 
-## 11. Priorisation suggérée
+## 11. Plan d'implémentation
 
-Pour une mise en œuvre progressive plutôt qu'un unique gros chantier :
+### 11.1 Principe de séquencement
 
-1. **Mode Pause** — autonome, sans dépendance aux autres, risque d'implémentation faible.
-2. **Interface (F10, F3, barre d'icônes, correctif du roulis)** — également autonome et de faible risque ; peut être traité en parallèle du mode Pause dès le départ.
-3. **Crédits (gain + affichage)** — simple, et nécessaire avant les réparations (§4.4) qui en dépendent.
-4. **Incendie moteur** — un seul type d'événement, sert de gabarit pour les pannes suivantes.
-5. **Pannes diverses**, puis **attaques de pirates** — réutilisent le même squelette (dégât → malus → réparation) posé à l'étape précédente.
-6. **Mise en scène des navettes** — purement cosmétique, sans dépendance aux autres chantiers ; peut être traitée en parallèle à tout moment.
+L'objectif est de maximiser le nombre d'étapes réalisables — et **vérifiables** — indépendamment les unes des autres, avant de passer aux quelques points de convergence réels. Deux catégories de liens sont distinguées ci-dessous, à ne pas confondre :
+
+- **Dépendance réelle** : l'étape B a besoin d'un élément concret produit par l'étape A pour avoir un sens ou pour être testable (ex. le panneau de réparation a besoin qu'un dégât existe pour afficher autre chose qu'une liste vide).
+- **Ordre de confort** : rien n'empêche de construire B avant A, mais le faire dans l'autre sens évite une reprise mineure plus tard (ex. écrire la garde clavier du mode Pause une fois que toutes les nouvelles touches existent déjà, plutôt que devoir la compléter à chaque nouvelle touche ajoutée ensuite).
+
+### 11.2 Graphe de dépendances
+
+```mermaid
+flowchart TD
+    subgraph L0["Palier 0 — zéro dépendance, parallélisable à volonté"]
+        A1["1 · Correctif aide<br/>roulis E/R (§5.3)"]
+        A2["2 · Largeur panneau<br/>plan de vol (§5.6)"]
+        A3["3 · F10 coupure voix (§5.1)"]
+        A4["4 · F3 cycle caméra<br/>+ retrait ancien CTRL (§5.4)"]
+        A5["5 · Crédits — gain,<br/>affichage, solde (§2.1/2.2/2.4)"]
+        A6["6 · Mise en scène<br/>des navettes (§3)"]
+    end
+
+    subgraph L1["Palier 1"]
+        B7["7 · Mode Pause (§1)"]
+        B8["8 · Barre d'icônes HUD (§5.2/5.5)"]
+        B9["9 · Coquille « services<br/>portuaires » (§2.3)"]
+    end
+
+    subgraph L2["Palier 2"]
+        C10["10 · Incendie moteur +<br/>squelette dégâts/réparation (§4.1/4.4)"]
+    end
+
+    subgraph L3["Palier 3"]
+        D11["11 · Pannes diverses (§4.2)"]
+        D12["12 · Attaques de pirates (§4.3)"]
+    end
+
+    A1 -.->|confort| B7
+    A2 -.->|confort| B7
+    A3 -.->|confort| B7
+    A4 -.->|confort| B7
+    A4 -->|réel : fonction de cycle déjà écrite| B8
+    A5 --> B9
+    B9 --> C10
+    C10 --> D11
+    C10 --> D12
+```
+
+*(Flèches pleines = dépendance réelle ; flèches pointillées = ordre de confort, non bloquant.)*
+
+### 11.3 Détail des étapes
+
+> Les numéros d'étape ci-dessous sont **fixes** et correspondent exactement à ceux du graphe du §11.2 ; ils sont référencés tels quels dans les dépendances mentionnées.
+
+**Palier 0 — à traiter en premier, dans n'importe quel ordre, y compris en parallèle par plusieurs personnes**
+
+- **Étape 1 — Correctif de l'aide affichée** (§5.3) — remplacer `A / E` par `E / R` dans `hint_main`, les 4 langues. Le code de pilotage n'a rien à changer, l'écart n'était que dans le texte. *Validation : l'aide affichée correspond au comportement réel du clavier.*
+- **Étape 2 — Largeur du panneau de plan de vol** (§5.6) — CSS uniquement (`230px → 300px`, passage au gabarit deux lignes par étape). *Validation : sur un échantillon large de noms générés, plus aucune troncature anormale.*
+- **Étape 3 — F10, coupure de la voix** (§5.1) — un raccourci de plus vers le drapeau `radioMuted` déjà existant. *Validation : `F10` et le bouton muet du panneau radio restent synchronisés dans les deux sens.*
+- **Étape 4 — F3, cycle des modes caméra** (§5.4) — nouveau gestionnaire sur `F3` appelant la fonction de cycle déjà écrite (`cameraMode = (cameraMode+1) % CAMERA_MODES.length`) ; suppression du mécanisme de comptage d'appuis `CTRL` (fenêtre de tolérance, distinction 1/2/3 appuis) devenu inutile. *Validation : un appui = un cran, y compris le rebouclage du dernier mode au premier ; `CTRL` + glisser (regard libre) n'est pas affecté.*
+- **Étape 5 — Crédits : génération, affichage, persistance** (§2.1, §2.2, §2.4) — tirage du nombre de conteneurs (1 à 5), répartition entre les navettes déjà existantes, affichage à côté de `SEED`, solde initial à 10 000. Ne s'accroche qu'à la séquence de livraison déjà en place ; aucun des autres chantiers n'a besoin d'exister pour la tester. *Validation : sur un grand nombre d'étapes simulées, le total crédité correspond exactement à la somme des conteneurs annoncés par la radio.*
+- **Étape 6 — Mise en scène des navettes** (§3) — dock sur la coque, catalogue de séquences de plans tiré au hasard. Purement cosmétique : aucune dépendance, ni de/vers aucun autre chantier. *Validation : chaque séquence du catalogue s'exécute sans erreur, la caméra principale reprend proprement après chacune.*
+
+**Palier 1 — chacun dépend d'au plus un élément du palier 0**
+
+- **Étape 7 — Mode Pause** (§1) — aucune dépendance réelle (peut techniquement être fait en tout premier), mais le construire *après* les étapes 1 à 4 évite d'avoir à revenir compléter la garde clavier à chaque nouvelle touche : au moment d'écrire « neutraliser toutes les touches sauf celles de la pause », `F10`/`F3` existent déjà et sont naturellement couverts du premier coup. *Validation : aucune valeur de simulation ne bouge pendant `gamePaused`, sur une fenêtre de plusieurs secondes ; `speechSynthesis.pause()/resume()` avec un message en cours ; sortie propre vers reprise ou écran-titre.*
+- **Étape 8 — Barre d'icônes du HUD** (§5.2, §5.5) — les sept bascules de visibilité de panneaux n'ont besoin de rien d'autre que les panneaux déjà existants. Seul le **bouton caméra** de cette barre a une dépendance réelle : il appelle la même fonction que `F3` (étape 4), donc cette dernière doit exister avant d'ajouter ce bouton précis — le reste de la barre peut être construit sans attendre. *Validation : chaque bouton masque/affiche exactement son panneau ; le bouton caméra produit exactement le même effet que `F3`.*
+- **Étape 9 — Coquille du panneau « services portuaires »** (§2.3) — dépendance réelle sur l'étape 5 : sans solde de crédits, le panneau n'a rien de cohérent à afficher ni à débiter. À ce stade (avant le palier 2), il peut se limiter à un service cosmétique type « révision générale » pour ne pas rester vide — l'option de réparation viendra avec l'étape 10. *Validation : le panneau s'affiche au bon moment (fin de livraison), débite correctement le solde, refuse un achat si le solde est insuffisant.*
+
+**Palier 2 — le vrai point de convergence**
+
+- **Étape 10 — Incendie moteur + squelette dégâts/réparation** (§4.1, §4.4) — dépendance réelle sur l'étape 9 (le panneau de services portuaires doit déjà exister pour y brancher l'option de réparation) et, transitivement, sur l'étape 5 (les crédits). C'est ici que se met en place le modèle générique (`damageState`, malus appliqué en vol, invite de réparation après livraison) que les pannes et les pirates réutiliseront tel quel. *Validation : cycle complet surchauffe → alarme → fenêtre d'intervention (`I`) → succès/échec → malus → réparation payante à l'étape suivante.*
+
+**Palier 3 — réutilisent le squelette du palier 2, parallélisables entre eux**
+
+- **Étape 11 — Pannes diverses** (§4.2) — mêmes mécanismes que l'étape 10 (dégât → malus → réparation), nouveaux systèmes affectés (radar, RCS, autopilote) et leurs malus propres.
+- **Étape 12 — Attaques de pirates** (§4.3) — dépend aussi de l'étape 10 pour le volet dégâts/réparation, mais son contenu (roster de vaisseaux, dialogue à choix) est indépendant de l'étape 11 : les deux peuvent être menées de front une fois le palier 2 livré.
 
 ---
 
