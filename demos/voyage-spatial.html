@@ -198,6 +198,41 @@
   .hud-telemetry .tm-amber{ color:var(--amber); }
   @media (max-width:760px){ .hud-telemetry{ display:none !important; } }
 
+  /* ---------- canal radio — échanges équipage / contrôle du port ---------- */
+  .hud-radio{
+    position:absolute; right:18px; top:230px; width:300px;
+    padding:10px 12px 8px;
+    display:none; flex-direction:column;
+    opacity:0; transition:opacity .5s ease;
+  }
+  .hud-radio.visible{ display:flex; opacity:1; }
+  .radio-title{
+    font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted-2);
+    border-bottom:1px solid var(--line); padding-bottom:6px; margin-bottom:6px;
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .radio-title .dot{ color:var(--cyan); animation:blink 1.8s infinite; }
+  .radio-mute{
+    pointer-events:auto; cursor:pointer;
+    background:none; border:1px solid var(--line); color:var(--muted-2);
+    font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1;
+    padding:3px 6px; margin-left:8px;
+  }
+  .radio-mute:hover{ border-color:var(--cyan); color:var(--cyan); }
+  .radio-log{ display:flex; flex-direction:column; gap:7px; max-height:270px; overflow:hidden; }
+  .radio-line{
+    font-size:10.5px; line-height:1.4;
+    opacity:0; transform:translateY(4px);
+    animation:radioIn .4s ease forwards;
+  }
+  @keyframes radioIn{ to{ opacity:1; transform:translateY(0); } }
+  .radio-line .who{ font-weight:700; letter-spacing:0.04em; margin-right:5px; }
+  .radio-line.tower .who{ color:var(--cyan); }
+  .radio-line.ship .who{ color:var(--amber); }
+  .radio-line .txt{ color:var(--ink); }
+  @media (max-width:900px){ .hud-radio{ display:none !important; } }
+  @media (prefers-reduced-motion: reduce){ .radio-line{ animation:none; opacity:1; transform:none; } }
+
   /* ---------- étiquettes des étoiles connues, projetées en écran ---------- */
   #starLabels{ position:fixed; inset:0; z-index:2; pointer-events:none; overflow:hidden; }
   .star-label{
@@ -270,6 +305,9 @@
   <div class="hud-hint mono" id="hint">
     ↑↓←→ / Z Q S D — orientation&nbsp; · &nbsp;A / E — roulis&nbsp; · &nbsp;MAJ — propulsion&nbsp; · &nbsp;glisser la souris — viser&nbsp; · &nbsp;H — masquer
   </div>
+  <div class="hud-hint mono" id="arrivalHint" style="display:none; bottom:52px;">
+    ENTRÉE — abréger la manœuvre (travelling accéléré)
+  </div>
 
   <!-- panneau des jauges moteur, bas d'écran -->
   <div class="panel hud-engines" id="enginesPanel">
@@ -281,6 +319,12 @@
   <div class="hud-telemetry mono" id="telemetryPanel">
     <div class="tm-title">COMMANDES MOTEUR</div>
     <div id="telemetryBody"></div>
+  </div>
+
+  <!-- canal radio : échanges équipage / contrôle du port pendant l'approche -->
+  <div class="panel hud-radio mono" id="radioPanel">
+    <div class="radio-title"><span>CANAL RADIO</span><span><button class="radio-mute" id="radioMuteBtn" title="Couper le son du canal radio">🔊</button><span class="dot">●</span></span></div>
+    <div class="radio-log" id="radioLog"></div>
   </div>
 </div>
 
@@ -1713,9 +1757,12 @@ function buildNebulaCell(ix,iy,iz){
   const worldCenter = new THREE.Vector3(ix*NEBULA_CELL + offset.x, iy*NEBULA_CELL + offset.y, iz*NEBULA_CELL + offset.z);
   const mesh = buildNebulaCluster(type, rng, {
     radius: 420 + rng()*480,
-    puffCount: 55 + Math.floor(rng()*60)
+    puffCount: 55 + Math.floor(rng()*60),
+    fade: 0   /* apparition progressive : on démarre invisible, cf. animate() */
   });
   mesh.position.copy(worldCenter);
+  mesh.userData.targetFade = 1.0;
+  mesh.userData.currentFade = 0;
   scene.add(mesh);
   return {mesh:mesh, name:name, type:type.name, isNebula:true};
 }
@@ -1799,20 +1846,44 @@ function generateSystemData(leg){
   const v = new THREE.Vector3().crossVectors(planeNormal, u).normalize();
 
   const planets = [];
-  let orbit = 130 + rng()*70;
+  /* Échelle : le vaisseau mesure ~50 unités de long. Une planète doit
+     dominer largement la vue à l'approche — jamais paraître comparable au
+     vaisseau. Rayons choisis pour un diamètre 5 à 17 fois la longueur du
+     vaisseau.
+     L'espacement orbital est calculé À PARTIR DES RAYONS RÉELS, et non
+     tiré indépendamment d'eux : deux planètes voisines pourraient sinon se
+     chevaucher dès que leurs angles orbitaux (indépendants) se rapprochent
+     — l'écart entre deux orbites doit donc TOUJOURS excéder la somme de
+     leurs deux rayons, plus une marge de sécurité, quel que soit l'angle. */
+  const kinds = [];
   for(let i=0;i<count;i++){
-    orbit += 110 + rng()*140;
     const isHab = (i === habIdx);
     const kind = isHab
       ? PLANET_KINDS[Math.floor(rng()*HABITABLE_KIND_COUNT)]
       : PLANET_KINDS[Math.floor(rng()*PLANET_KINDS.length)];
+    const radius = kind.gas ? (200+rng()*120) : (100+rng()*100);
+    kinds.push({kind:kind, radius:radius, isHab:isHab});
+  }
+  /* Marge de sécurité minimale entre deux orbites, PAS l'écart total (les
+     deux rayons sont déjà ajoutés séparément ci-dessous) — volontairement
+     modeste : une marge généreuse ici gonflerait la longueur totale de la
+     route bien au-delà du hop étoile-à-étoile qui la détermine par ailleurs
+     (constaté : jusqu'à 40 000 unités de route, ~16 min de croisière,
+     largement responsable de l'impression que l'arrivée ne se déclenche
+     jamais). */
+  const GAP_MIN = 80, GAP_RANGE = 120;
+  let orbit = 320 + rng()*180;
+  for(let i=0;i<count;i++){
+    if(i > 0) orbit += kinds[i-1].radius + kinds[i].radius + (GAP_MIN + rng()*GAP_RANGE);
+    const isHab = kinds[i].isHab;
+    const kind = kinds[i].kind;
+    const radius = kinds[i].radius;
 
     const angle = rng()*Math.PI*2;
     const offset = u.clone().multiplyScalar(Math.cos(angle)*orbit)
                     .addScaledVector(v, Math.sin(angle)*orbit);
     const worldPos = leg.starPosition.clone().add(offset);
 
-    const radius = kind.gas ? (20+rng()*14) : (9+rng()*10);
     const oceanFrac = kind.gas ? 0 : THREE.MathUtils.clamp(kind.ocean + (rng()-0.5)*0.22, 0, 0.92);
 
     const planet = {
@@ -2023,7 +2094,7 @@ function buildPlanetSystemMeshes(leg){
         blending:THREE.AdditiveBlending
       });
       const beacon = new THREE.Sprite(beaconMat);
-      beacon.scale.setScalar(p.radius*0.5);
+      beacon.scale.setScalar(p.radius*0.09);
       beacon.position.copy(p.portLocal).multiplyScalar(p.radius*1.03);
       mesh.add(beacon);
       p.beaconSprite = beacon;
@@ -2366,11 +2437,17 @@ function computeRoute(origin, heading, alignShip){
   if(!ROUTE.legs.length){ ROUTE.curve = null; ROUTE.length = 0; refreshRoutePanel(); return; }
 
   /* génération des systèmes planétaires : la cible réelle de chaque étape
-     devient la planète habitable (son port spatial), pas l'étoile elle-même */
+     devient la planète habitable (son port spatial), pas l'étoile elle-même.
+     La courbe ne vise cependant pas le CENTRE de la planète — désormais bien
+     plus grande que le vaisseau — mais un point d'approche sûr, décalé vers
+     l'extérieur le long de l'axe étoile→planète, pour que le vol frôle la
+     planète au lieu de traverser sa surface. */
   ROUTE.legs.forEach(function(leg){
     leg.system = generateSystemData(leg);
     const hab = leg.system.planets[leg.system.habIdx];
-    leg.position = hab.position.clone();
+    leg.planet = hab;
+    const outward = hab.position.clone().sub(leg.starPosition).normalize();
+    leg.position = hab.position.clone().addScaledVector(outward, hab.radius*2.6);
     leg.cityName = hab.cityName;
     leg.portName = hab.portName;
   });
@@ -2415,17 +2492,32 @@ window.addEventListener('keydown', function(e){
     const hint = document.getElementById('hint');
     hint.style.opacity = (hint.style.opacity === '0') ? '1' : '0';
   }
+  /* abrégé de la manœuvre d'orbite/livraison : le reste de la séquence se
+     joue en accéléré (travelling rapide) plutôt que d'être coupé net —
+     les navettes et le canal radio restent visibles, juste comprimés. */
+  if(e.code === 'Enter' && flightPhase === 'ARRIVAL_PAUSE'){
+    arrivalSkip = true;
+  }
 });
 window.addEventListener('keyup', function(e){ keys[e.code] = false; });
 
 let dragging=false, lastPX=0, lastPY=0, dragYaw=0, dragPitch=0;
+/* caméra libre : Ctrl + glisser oriente la vue autour du vaisseau sans
+   toucher au pilotage — un simple regard autour de soi, pas une commande. */
+let camOrbitYaw=0, camOrbitPitch=0;
 canvas.addEventListener('pointerdown', function(e){ dragging=true; lastPX=e.clientX; lastPY=e.clientY; });
 window.addEventListener('pointerup', function(){ dragging=false; });
 window.addEventListener('pointermove', function(e){
   if(!dragging) return;
-  dragYaw = -(e.clientX-lastPX)*0.0022;
-  dragPitch = -(e.clientY-lastPY)*0.0022;
+  const dx = e.clientX-lastPX, dy = e.clientY-lastPY;
   lastPX=e.clientX; lastPY=e.clientY;
+  if(e.ctrlKey){
+    camOrbitYaw   -= dx*0.0032;
+    camOrbitPitch  = THREE.MathUtils.clamp(camOrbitPitch - dy*0.0032, -1.3, 1.3);
+    return;   /* ne pilote pas le vaisseau pendant un regard libre */
+  }
+  dragYaw = -dx*0.0022;
+  dragPitch = -dy*0.0022;
   lastInputTime = performance.now();
 });
 
@@ -2442,14 +2534,345 @@ const CAM_OFFSET = new THREE.Vector3(0, 12, 46);
 let camPos = new THREE.Vector3(0, 12, 46);
 let camLook = new THREE.Vector3(0,0,-40);
 
-/* ---------- pause d'arrivée ----------
-   À la fin d'un itinéraire, le vaisseau coupe les gaz et dérive sur son
-   erre pendant que le suivant est calculé ; la caméra quitte la poursuite
-   pour un travelling circulaire autour de la coque. */
+/* ---------- pause d'arrivée : mise en orbite + livraison ----------
+   À la fin d'un itinéraire, le vaisseau ne s'arrête plus sur place : il
+   entre en orbite autour de la planète de destination pour un tour complet,
+   le temps que de petites navettes transfèrent quelques conteneurs vers le
+   port spatial. Le prochain itinéraire est calculé pendant la manœuvre. */
 let flightPhase = 'CRUISE';           /* 'CRUISE' | 'ARRIVAL_PAUSE' */
 let pauseTimer = 0;
-const ARRIVAL_PAUSE_DURATION = 4.2;
-const _arrivalOffset = new THREE.Vector3();
+const ARRIVAL_PAUSE_DURATION = 17;    /* durée d'un tour d'orbite complet — allongée
+                                          pour laisser le temps de montrer le transfert
+                                          des conteneurs par les navettes */
+const ARRIVAL_FF_SCALE = 4.5;         /* facteur d'accélération en mode abrégé */
+let arrivalSkip = false;              /* déclenché par la touche d'abrégé (Entrée) */
+let arrivalTimeScale = 1;             /* lu par updateShuttles(), hors de updateFlight */
+const CUTAWAY_DURATION = 2.8;         /* plan large sur le prélèvement, à chaque navette */
+const ORBIT_CAPTURE_TIME = 1.3;       /* fondu d'entrée sur le cercle d'orbite */
+
+const orbitState = {
+  active:false, planet:null, center:new THREE.Vector3(),
+  radius:0, U:new THREE.Vector3(), V:new THREE.Vector3(), N:new THREE.Vector3(),
+  startPos:new THREE.Vector3(), startQuat:new THREE.Quaternion(),
+  camPhase0:0, shuttles:[], spawned:[false,false,false],
+  spawnFractions:[0.16,0.42,0.68],
+  radioScript:[], radioIdx:0,
+  cutawayUntil:-1   /* valeur de pauseTimer jusqu'à laquelle le plan large reste actif */
+};
+
+/* =========================================================================
+   CANAL RADIO — échanges équipage / contrôle du port pendant l'approche
+   Un script de messages horodatés (fraction de la durée de l'orbite),
+   généré depuis le seed de la planète : demande d'autorisation, coordination
+   des transferts de conteneurs (calée sur les largages de navettes),
+   échange technique sur les navettes, puis remerciements de clôture.
+   ========================================================================= */
+function buildRadioScript(planet){
+  const rng = rngFor(SEED+':radio:'+planet.seedNoise);
+  function pick(arr){ return arr[Math.floor(rng()*arr.length)]; }
+  const tower = 'Contrôle ' + planet.cityName;
+  const ship = SHIP_REGISTRY;
+  const msgs = [];
+
+  /* 1. demande d'autorisation d'approche */
+  msgs.push({t:0.02, from:'ship', label:ship, text: pick([
+    tower+', ici '+ship+', cargo en approche, demande autorisation de mise en orbite.',
+    tower+', '+ship+' en finale, requête d\u2019autorisation d\u2019approche.'
+  ])});
+  msgs.push({t:0.08, from:'tower', label:tower, text: pick([
+    ship+', autorisation accordée, orbite standard confirmée. Bienvenue à '+planet.cityName+'.',
+    'Autorisation accordée, '+ship+'. Trajectoire propre, poursuivez.'
+  ])});
+
+  /* 2. coordination des transferts de conteneurs, calée sur les navettes */
+  const labels = ['Navette 1','Navette 2','Navette 3'];
+  orbitState.spawnFractions.forEach(function(f, i){
+    const n = 1 + Math.floor(rng()*2);
+    msgs.push({t:f+0.015, from:'ship', label:ship, text: pick([
+      tower+', largage de '+labels[i]+', '+n+' conteneur'+(n>1?'s':'')+' à bord, cap sur le port.',
+      tower+', '+labels[i]+' détachée, cargaison confirmée pour livraison.'
+    ])});
+    msgs.push({t:f+0.06, from:'tower', label:tower, text: pick([
+      'Bien reçu, piste de réception dégagée pour '+labels[i]+'.',
+      labels[i]+' identifiée, vous êtes autorisés à descendre.'
+    ])});
+  });
+
+  /* 3. échange technique lié aux mini-vaisseaux (navettes) */
+  msgs.push({t:0.50, from:'tower', label:tower, text: pick([
+    ship+', confirmez le blindage thermique de vos navettes avant rentrée.',
+    ship+', état de propulsion de vos navettes ?'
+  ])});
+  msgs.push({t:0.55, from:'ship', label:ship, text: pick([
+    'Blindage nominal, navettes certifiées pour l\u2019entrée atmosphérique.',
+    'Propulsion nominale, autonomie suffisante pour le retour à bord.'
+  ])});
+
+  /* 4. remerciements de clôture */
+  msgs.push({t:0.90, from:'tower', label:tower, text: pick([
+    'Cargaison réceptionnée, merci pour la livraison '+ship+'. Bon vol.',
+    'Transfert terminé, merci de votre passage. '+tower+' termine.'
+  ])});
+  msgs.push({t:0.95, from:'ship', label:ship, text: pick([
+    'Merci '+tower+', à la prochaine rotation.',
+    'Bien reçu, merci pour l\u2019accueil. '+ship+' reprend sa route.'
+  ])});
+
+  msgs.sort(function(a,b){ return a.t-b.t; });
+  return msgs;
+}
+function appendRadioLine(entry){
+  const log = document.getElementById('radioLog');
+  if(!log) return;
+  const div = document.createElement('div');
+  div.className = 'radio-line ' + entry.from;
+  div.innerHTML = '<span class="who">['+entry.label+']</span><span class="txt">'+entry.text+'</span>';
+  log.appendChild(div);
+  while(log.children.length > 6) log.removeChild(log.firstChild);
+  playRadioBlip(entry.from);
+  /* en mode abrégé, les lignes défilent trop vite pour être lues à voix
+     haute sans se chevaucher — on garde le bip, on saute la voix */
+  if(!arrivalSkip) speakRadioLine(entry);
+}
+
+/* =========================================================================
+   SON ET VOIX DU CANAL RADIO
+   Le bip est synthétisé (Web Audio), pas un fichier audio à charger.
+   Pour la voix : il n'existe pas d'API internet gratuite et sans clé qui
+   fasse de la synthèse vocale multi-voix depuis une page statique — la
+   seule option réellement gratuite, sans inscription ni clé, est l'API
+   navigateur SpeechSynthesis (locale : elle utilise les voix déjà
+   installées par le système/navigateur, pas un service distant). C'est
+   ce qu'on utilise ici ; le nombre et la qualité des voix disponibles
+   varient selon le navigateur et l'OS de la personne qui joue.
+   ========================================================================= */
+let radioMuted = false;
+let audioCtx = null;
+function getAudioCtx(){
+  if(!audioCtx){
+    try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }
+    catch(e){ audioCtx = null; }
+  }
+  return audioCtx;
+}
+function playRadioBlip(from){
+  if(radioMuted) return;
+  const ctx = getAudioCtx();
+  if(!ctx) return;
+  const t0 = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'square';
+  const baseFreq = from === 'tower' ? 920 : 640;
+  osc.frequency.setValueAtTime(baseFreq, t0);
+  osc.frequency.exponentialRampToValueAtTime(baseFreq*0.7, t0+0.09);
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.exponentialRampToValueAtTime(0.05, t0+0.012);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0+0.13);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(t0);
+  osc.stop(t0+0.15);
+}
+
+let ttsVoices = [];
+function refreshVoices(){ if(window.speechSynthesis) ttsVoices = window.speechSynthesis.getVoices(); }
+if(window.speechSynthesis){
+  refreshVoices();
+  window.speechSynthesis.onvoiceschanged = refreshVoices;
+}
+function pickVoice(from){
+  if(!ttsVoices.length) return null;
+  const fr = ttsVoices.filter(function(v){ return /^fr/i.test(v.lang); });
+  const pool = fr.length ? fr : ttsVoices;
+  if(pool.length < 2) return pool[0] || null;
+  /* on cherche deux voix nettement différentes plutôt que deux index
+     arbitraires, quand les noms le permettent */
+  if(from === 'tower'){
+    return pool.find(function(v){ return /female|femme|amélie|amelie|marie|julie/i.test(v.name); }) || pool[0];
+  }
+  return pool.find(function(v){ return /male|homme|thomas|nicolas|paul|daniel/i.test(v.name); }) || pool[pool.length-1];
+}
+function speakRadioLine(entry){
+  if(radioMuted || !window.speechSynthesis) return;
+  const u = new SpeechSynthesisUtterance(entry.text);
+  const v = pickVoice(entry.from);
+  if(v) u.voice = v;
+  u.lang = (v && v.lang) || 'fr-FR';
+  u.rate = entry.from === 'tower' ? 0.98 : 1.05;
+  u.pitch = entry.from === 'tower' ? 0.85 : 1.2;
+  u.volume = 0.85;
+  window.speechSynthesis.speak(u);
+}
+(function initRadioMuteButton(){
+  const btn = document.getElementById('radioMuteBtn');
+  if(!btn) return;
+  btn.addEventListener('click', function(e){
+    e.stopPropagation();
+    radioMuted = !radioMuted;
+    btn.textContent = radioMuted ? '🔇' : '🔊';
+    if(radioMuted && window.speechSynthesis) window.speechSynthesis.cancel();
+  });
+})();
+
+function startOrbitDelivery(planet){
+  /* nettoyage défensif d'un éventuel reliquat de navettes non arrivées */
+  orbitState.shuttles.forEach(function(s){ scene.remove(s.group); disposePlanetGroup(s.group); });
+  orbitState.shuttles.length = 0;
+  orbitState.spawned = [false,false,false];
+
+  const center = planet.position.clone();
+  const toShip = shipRig.position.clone().sub(center);
+  const dist = Math.max(toShip.length(), 1);
+  const U = toShip.clone().divideScalar(dist);
+  const fwd = new THREE.Vector3(0,0,-1).applyQuaternion(shipRig.quaternion);
+  let N = new THREE.Vector3().crossVectors(U, fwd);
+  if(N.lengthSq() < 1e-6){
+    N = new THREE.Vector3().crossVectors(U, new THREE.Vector3(0,1,0));
+    if(N.lengthSq() < 1e-6) N = new THREE.Vector3().crossVectors(U, new THREE.Vector3(1,0,0));
+  }
+  N.normalize();
+  let V = new THREE.Vector3().crossVectors(N, U).normalize();
+  if(V.dot(fwd) < 0){ V.negate(); N.negate(); }  /* aligne le sens de parcours sur le cap actuel */
+
+  orbitState.active = true;
+  orbitState.planet = planet;
+  orbitState.center = center;
+  orbitState.radius = planet.radius*2.3;
+  orbitState.U = U; orbitState.V = V; orbitState.N = N;
+  /* garde-fou anti-collision : si le vaisseau se retrouve anormalement
+     proche de la planète au moment du déclenchement (léger dépassement du
+     seuil d'arrivée, etc.), on démarre la capture depuis un point sûr sur
+     le même axe plutôt que depuis sa position réelle — sans quoi le
+     fondu vers le cercle d'orbite pourrait couper à travers la surface. */
+  const safeDist = Math.max(dist, planet.radius*1.7);
+  orbitState.startPos.copy(center).addScaledVector(U, safeDist);
+  orbitState.startQuat.copy(shipRig.quaternion);
+  orbitState.camPhase0 = Math.random()*Math.PI*2;
+
+  /* canal radio : script généré depuis le seed de la planète, panneau vidé et affiché */
+  orbitState.radioScript = buildRadioScript(planet);
+  orbitState.radioIdx = 0;
+  const radioLog = document.getElementById('radioLog');
+  if(radioLog) radioLog.innerHTML = '';
+  const radioPanel = document.getElementById('radioPanel');
+  if(radioPanel) radioPanel.classList.add('visible');
+  const arrivalHint = document.getElementById('arrivalHint');
+  if(arrivalHint) arrivalHint.style.display = 'block';
+}
+
+/* ---------- navettes de livraison ----------
+   De petits vaisseaux transfèrent quelques conteneurs vers le port spatial
+   pendant que le vaisseau principal reste en orbite. */
+function buildShuttle(){
+  const g = new THREE.Group();
+  const hullMat = new THREE.MeshStandardMaterial({color:0x8f3026, metalness:0.4, roughness:0.62});
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.9, 3.0), hullMat);
+  g.add(hull);
+  const contColors = [0xd9a12c, 0x2d5f9e, 0xa33a2e, 0x2f7a72];
+  const contMat = new THREE.MeshStandardMaterial({
+    color: contColors[Math.floor(Math.random()*contColors.length)], metalness:0.3, roughness:0.78
+  });
+  const cont = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.8, 1.2), contMat);
+  cont.position.set(0, 0.58, 0.35);
+  g.add(cont);
+  const glowMat = new THREE.SpriteMaterial({
+    map:glowTex, color:0x4da6ff, blending:THREE.AdditiveBlending, transparent:true, depthWrite:false
+  });
+  const glow = new THREE.Sprite(glowMat);
+  glow.scale.set(1.1,1.1,1);
+  glow.position.set(0,0,1.7);
+  g.add(glow);
+  return {group:g, glow:glow};
+}
+function spawnShuttle(){
+  const sh = buildShuttle();
+  sh.group.position.copy(shipRig.position);
+  sh.group.quaternion.copy(shipRig.quaternion);
+  scene.add(sh.group);
+  const arcOffset = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5)
+    .normalize().multiplyScalar(50 + Math.random()*70);
+  orbitState.shuttles.push({
+    group:sh.group, glow:sh.glow, startPos:shipRig.position.clone(),
+    t:0, duration:3.2+Math.random()*0.7, arcOffset:arcOffset
+  });
+}
+const _shuttleTarget = new THREE.Vector3();
+function updateShuttles(dt){
+  for(let i=orbitState.shuttles.length-1; i>=0; i--){
+    const s = orbitState.shuttles[i];
+    s.t += dt;
+    const f = Math.min(1, s.t/s.duration);
+    const ease = f*f*(3-2*f);
+    if(orbitState.planet && orbitState.planet.beaconSprite){
+      orbitState.planet.beaconSprite.getWorldPosition(_shuttleTarget);
+    } else if(orbitState.planet){
+      _shuttleTarget.copy(orbitState.planet.position);
+    }
+    const pos = s.startPos.clone().lerp(_shuttleTarget, ease);
+    const arc = Math.sin(Math.PI*f);
+    pos.addScaledVector(s.arcOffset, arc);
+    s.group.position.copy(pos);
+
+    const lookDir = _shuttleTarget.clone().sub(pos);
+    if(lookDir.lengthSq() > 1e-6){
+      const m4 = new THREE.Matrix4().lookAt(new THREE.Vector3(0,0,0), lookDir.normalize(), new THREE.Vector3(0,1,0));
+      s.group.quaternion.setFromRotationMatrix(m4);
+    }
+    /* rétrécissement + fondu en fin de trajectoire : simulation d'un atterrissage */
+    const shrink = f > 0.82 ? THREE.MathUtils.mapLinear(f, 0.82, 1, 1, 0.12) : 1;
+    s.group.scale.setScalar(shrink);
+    s.glow.material.opacity = shrink;
+
+    if(f >= 1){
+      scene.remove(s.group);
+      disposePlanetGroup(s.group);
+      orbitState.shuttles.splice(i,1);
+    }
+  }
+}
+
+/* ---------- position/orientation du vaisseau sur le cercle d'orbite ---------- */
+function updateOrbitDelivery(dt){
+  const os = orbitState;
+  const angularSpeed = (Math.PI*2)/ARRIVAL_PAUSE_DURATION;
+  const angle = pauseTimer*angularSpeed;
+  const cosA = Math.cos(angle), sinA = Math.sin(angle);
+  const parametricPos = os.center.clone()
+    .addScaledVector(os.U, cosA*os.radius)
+    .addScaledVector(os.V, sinA*os.radius);
+  const tangent = os.U.clone().multiplyScalar(-sinA).addScaledVector(os.V, cosA).normalize();
+  const m4 = new THREE.Matrix4().lookAt(new THREE.Vector3(0,0,0), tangent, os.N);
+  const targetQuat = new THREE.Quaternion().setFromRotationMatrix(m4);
+
+  /* capture douce : on part de la position/orientation réelles du vaisseau
+     à l'instant du déclenchement plutôt que de le téléporter sur le cercle */
+  const capT = Math.min(1, pauseTimer/ORBIT_CAPTURE_TIME);
+  const blend = capT*capT*(3-2*capT);
+  shipRig.position.copy(os.startPos).lerp(parametricPos, blend);
+  shipRig.quaternion.copy(os.startQuat).slerp(targetQuat, blend);
+
+  /* déclenchement des navettes, réparties sur le tour d'orbite */
+  const frac = pauseTimer/ARRIVAL_PAUSE_DURATION;
+  os.spawnFractions.forEach(function(sf, i){
+    if(!os.spawned[i] && frac >= sf){
+      os.spawned[i] = true;
+      spawnShuttle();
+      /* plan large sur le prélèvement des conteneurs — sauté en mode abrégé,
+         où l'on privilégie le travelling continu à la coupure de plan */
+      if(!arrivalSkip) os.cutawayUntil = pauseTimer + CUTAWAY_DURATION;
+    }
+  });
+
+  /* canal radio : les messages du script sont déjà triés par instant de
+     déclenchement — un simple curseur qui avance suffit */
+  while(os.radioIdx < os.radioScript.length && os.radioScript[os.radioIdx].t <= frac){
+    appendRadioLine(os.radioScript[os.radioIdx]);
+    os.radioIdx++;
+  }
+
+  currentSpeed = os.radius*angularSpeed;
+  return tangent;
+}
 
 /* =========================================================================
    INERTIE DE ROTATION
@@ -2512,19 +2935,59 @@ function updateFlight(dt, elapsed){
     /* pause d'arrivée : aucune commande, aucun pilotage — la vitesse
        angulaire s'éteint par le seul amortissement, plus bas dans cette
        fonction, exactement comme un axe relâché en vol normal. */
-  } else if(manual){
-    tx += -pitchInput * TORQUE.pitch;
-    ty +=  yawInput   * TORQUE.yaw;
-    tz += -rollKey    * TORQUE.roll;
-
-    /* la souris agit comme un manche : impulsion proportionnelle au geste */
-    if(dragYaw || dragPitch){
-      ty += dragYaw   * TORQUE.yaw   * 55;
-      tx += dragPitch * TORQUE.pitch * 55;
-      dragYaw = 0; dragPitch = 0;
-    }
   } else {
-    /* --- AUTOPILOTE : SUIVI DE COURBE PAR CHAMP DE VECTEURS ---
+    /* --- SUIVI DE ROUTE : toujours actif, pilotage manuel OU automatique ---
+       La progression le long de la courbe (et donc la détection d'arrivée)
+       ne doit JAMAIS dépendre du mode de pilotage : cette logique vivait
+       auparavant uniquement dans la branche autopilote, ce qui voulait dire
+       que piloter manuellement à l'approche d'une destination empêchait
+       purement et simplement l'arrivée de se déclencher — aucune navette,
+       aucun canal radio, sans le moindre message d'erreur. */
+    if(ROUTE.curve && ROUTE.length > 0){
+      const L = ROUTE.length;
+      const SEARCH_AHEAD = 420, SEARCH_STEPS = 24;
+      let bestS = ROUTE.s, bestD = Infinity;
+      for(let i=0;i<=SEARCH_STEPS;i++){
+        const s = ROUTE.s + (i/SEARCH_STEPS)*SEARCH_AHEAD;
+        if(s > L) break;
+        const q = ROUTE.curve.getPointAt(s/L, _routeTmpA);
+        const d = q.distanceToSquared(shipRig.position);
+        if(d < bestD){ bestD = d; bestS = s; }
+      }
+      ROUTE.s = bestS;
+
+      let idx = 0;
+      while(idx < ROUTE.legS.length-1 && ROUTE.s > ROUTE.legS[idx] - 120) idx++;
+      if(idx !== ROUTE.index){ ROUTE.index = idx; refreshRoutePanel(); ensureSystemsBuilt(); }
+
+      /* itinéraire terminé : mise en orbite autour de la planète de
+         destination pour un tour complet, le temps de livrer la cargaison
+         par navettes et de calculer le prochain itinéraire. On capture la
+         référence de la planète AVANT computeRoute(), qui remplace
+         ROUTE.legs par la nouvelle route. */
+      if(ROUTE.index === ROUTE.legs.length-1 && ROUTE.s > ROUTE.length - 180){
+        const destPlanet = ROUTE.legs[ROUTE.legs.length-1].planet;
+        const curFwd = new THREE.Vector3(0,0,-1).applyQuaternion(shipRig.quaternion);
+        startOrbitDelivery(destPlanet);
+        computeRoute(shipRig.position, curFwd, false);
+        flightPhase = 'ARRIVAL_PAUSE';
+        pauseTimer = 0;
+      }
+    }
+
+    if(manual){
+      tx += -pitchInput * TORQUE.pitch;
+      ty +=  yawInput   * TORQUE.yaw;
+      tz += -rollKey    * TORQUE.roll;
+
+      /* la souris agit comme un manche : impulsion proportionnelle au geste */
+      if(dragYaw || dragPitch){
+        ty += dragYaw   * TORQUE.yaw   * 55;
+        tx += dragPitch * TORQUE.pitch * 55;
+        dragYaw = 0; dragPitch = 0;
+      }
+    } else if(flightPhase !== 'ARRIVAL_PAUSE'){
+      /* --- AUTOPILOTE : SUIVI DE COURBE PAR CHAMP DE VECTEURS ---
        Objectif : rester CENTRÉ dans les portiques. Viser l'étoile en ligne
        droite ferait couper les virages ; la poursuite pure seule oscille,
        car la visée est courte face au rayon de virage du vaisseau (~110 u).
@@ -2543,83 +3006,55 @@ function updateFlight(dt, elapsed){
        correction laisse la composante perpendiculaire libre de diverger —
        le vaisseau finit en rotation saturée, dix fois plus vite que
        nécessaire, et sort du couloir. */
-    if(ROUTE.curve && ROUTE.length > 0){
-      const L = ROUTE.length;
-      /* 1. abscisse curviligne : point de la courbe le plus proche, cherché
-         dans une fenêtre locale vers l'avant (coût constant par image) */
-      const SEARCH_AHEAD = 420, SEARCH_STEPS = 24;
-      let bestS = ROUTE.s, bestD = Infinity;
-      for(let i=0;i<=SEARCH_STEPS;i++){
-        const s = ROUTE.s + (i/SEARCH_STEPS)*SEARCH_AHEAD;
-        if(s > L) break;
-        const q = ROUTE.curve.getPointAt(s/L, _routeTmpA);
-        const d = q.distanceToSquared(shipRig.position);
-        if(d < bestD){ bestD = d; bestS = s; }
-      }
-      ROUTE.s = bestS;
+      if(ROUTE.curve && ROUTE.length > 0){
+        const L = ROUTE.length;
+        /* direction voulue : tangente + rappel vers la courbe
+           (ROUTE.s déjà mis à jour par le suivi de route ci-dessus) */
+        const LD = 180, KC = 1.4;      /* pondération tangente / rappel latéral */
+        const here = ROUTE.curve.getPointAt(ROUTE.s/L, _routeTmpA);
+        const ahead = ROUTE.curve.getPointAt(Math.min((ROUTE.s+2)/L, 1), _routeTmpB);
+        const tang = _routeTmpC.copy(ahead).sub(here).normalize();
+        const desired = _routeTmpD.copy(tang).multiplyScalar(LD)
+          .addScaledVector(_routeTmpE.copy(here).sub(shipRig.position), KC)
+          .normalize();
 
-      /* 2. direction voulue : tangente + rappel vers la courbe */
-      const LD = 180, KC = 1.4;      /* pondération tangente / rappel latéral */
-      const here = ROUTE.curve.getPointAt(ROUTE.s/L, _routeTmpA);
-      const ahead = ROUTE.curve.getPointAt(Math.min((ROUTE.s+2)/L, 1), _routeTmpB);
-      const tang = _routeTmpC.copy(ahead).sub(here).normalize();
-      const desired = _routeTmpD.copy(tang).multiplyScalar(LD)
-        .addScaledVector(_routeTmpE.copy(here).sub(shipRig.position), KC)
-        .normalize();
+        /* anticipation : rotation que la courbe imposera un peu plus loin */
+        const LF = 140;
+        const m0 = ROUTE.curve.getPointAt(Math.min((ROUTE.s+LF)/L, 1), _routeTmpA);
+        const m1 = ROUTE.curve.getPointAt(Math.min((ROUTE.s+2*LF)/L, 1), _routeTmpB);
+        const tang2 = _routeTmpE.copy(m1).sub(m0).normalize();
+        const turn = _routeTmpF.crossVectors(tang, tang2);
+        const turnLen = turn.length();
+        let wffx = 0, wffy = 0;
+        if(turnLen > 1e-9){
+          const kappa = Math.asin(THREE.MathUtils.clamp(turnLen,-1,1))/LF;
+          const wFF = currentSpeed*kappa;
+          /* axe de rotation ramené dans le repère local du vaisseau */
+          turn.divideScalar(turnLen).applyQuaternion(_qInv.copy(shipRig.quaternion).invert());
+          wffx = wFF*turn.x; wffy = wFF*turn.y;
+        }
 
-      /* 3. anticipation : rotation que la courbe imposera un peu plus loin */
-      const LF = 140;
-      const m0 = ROUTE.curve.getPointAt(Math.min((ROUTE.s+LF)/L, 1), _routeTmpA);
-      const m1 = ROUTE.curve.getPointAt(Math.min((ROUTE.s+2*LF)/L, 1), _routeTmpB);
-      const tang2 = _routeTmpE.copy(m1).sub(m0).normalize();
-      const turn = _routeTmpF.crossVectors(tang, tang2);
-      const turnLen = turn.length();
-      let wffx = 0, wffy = 0;
-      if(turnLen > 1e-9){
-        const kappa = Math.asin(THREE.MathUtils.clamp(turnLen,-1,1))/LF;
-        const wFF = currentSpeed*kappa;
-        /* axe de rotation ramené dans le repère local du vaisseau */
-        turn.divideScalar(turnLen).applyQuaternion(_qInv.copy(shipRig.quaternion).invert());
-        wffx = wFF*turn.x; wffy = wFF*turn.y;
-      }
+        /* erreur de cap, en axe-angle (bien défini pour tout angle) */
+        const local = _routeTmpA.copy(desired)
+          .applyQuaternion(_qInv.copy(shipRig.quaternion).invert());
+        let ax = local.y, ay = -local.x;
+        const axLen = Math.hypot(ax, ay);
+        const angle = Math.atan2(axLen, -local.z);
 
-      /* erreur de cap, en axe-angle (bien défini pour tout angle) */
-      const local = _routeTmpA.copy(desired)
-        .applyQuaternion(_qInv.copy(shipRig.quaternion).invert());
-      let ax = local.y, ay = -local.x;
-      const axLen = Math.hypot(ax, ay);
-      const angle = Math.atan2(axLen, -local.z);
+        const KP = 1.2, KW = 8;
+        let wdx = wffx, wdy = wffy;
+        if(axLen > 1e-6){
+          ax /= axLen; ay /= axLen;
+          wdx += ax*angle*KP; wdy += ay*angle*KP;
+        }
+        /* plafond de la consigne, cohérent avec les limites mécaniques */
+        const wdm = Math.hypot(wdx, wdy);
+        if(wdm > 0.36){ wdx *= 0.36/wdm; wdy *= 0.36/wdm; }
 
-      const KP = 1.2, KW = 8;
-      let wdx = wffx, wdy = wffy;
-      if(axLen > 1e-6){
-        ax /= axLen; ay /= axLen;
-        wdx += ax*angle*KP; wdy += ay*angle*KP;
-      }
-      /* plafond de la consigne, cohérent avec les limites mécaniques */
-      const wdm = Math.hypot(wdx, wdy);
-      if(wdm > 0.36){ wdx *= 0.36/wdm; wdy *= 0.36/wdm; }
-
-      tx += THREE.MathUtils.clamp((wdx - angVel.x)*KW, -1, 1) * TORQUE.pitch;
-      ty += THREE.MathUtils.clamp((wdy - angVel.y)*KW, -1, 1) * TORQUE.yaw;
-      /* remise à plat lente du roulis */
-      tz += THREE.MathUtils.clamp(-angVel.z*1.6, -1, 1) * TORQUE.roll * 0.5;
-
-      /* 4. progression des étapes, déduite de l'abscisse curviligne */
-      let idx = 0;
-      while(idx < ROUTE.legS.length-1 && ROUTE.s > ROUTE.legS[idx] - 120) idx++;
-      if(idx !== ROUTE.index){ ROUTE.index = idx; refreshRoutePanel(); ensureSystemsBuilt(); }
-
-      /* 5. itinéraire terminé : on entre en pause d'arrivée — la caméra
-         part en travelling pendant que le prochain itinéraire (étapes,
-         systèmes planétaires, portiques) est calculé. Cap et position de
-         départ = ceux du vaisseau à l'instant présent, donc la nouvelle
-         route se raccorde sans à-coup à la fin de la précédente. */
-      if(ROUTE.index === ROUTE.legs.length-1 && ROUTE.s > ROUTE.length - 180){
-        const curFwd = new THREE.Vector3(0,0,-1).applyQuaternion(shipRig.quaternion);
-        computeRoute(shipRig.position, curFwd, false);
-        flightPhase = 'ARRIVAL_PAUSE';
-        pauseTimer = 0;
+        tx += THREE.MathUtils.clamp((wdx - angVel.x)*KW, -1, 1) * TORQUE.pitch;
+        ty += THREE.MathUtils.clamp((wdy - angVel.y)*KW, -1, 1) * TORQUE.yaw;
+        /* remise à plat lente du roulis */
+        tz += THREE.MathUtils.clamp(-angVel.z*1.6, -1, 1) * TORQUE.roll * 0.5;
       }
     }
   }
@@ -2649,11 +3084,17 @@ function updateFlight(dt, elapsed){
   if(Math.abs(tz) > TQ_TH) rcsDemand.roll  = Math.sign(tz);
 
   const boosting = !paused && !!(keys['ShiftLeft']||keys['ShiftRight']||keys['Space']);
-  const targetSpeed = paused ? 0 : CRUISE_SPEED * (boosting ? BOOST_MULT : 1);
-  currentSpeed += (targetSpeed-currentSpeed)*Math.min(1, dt*2.2);
-
-  const forward = new THREE.Vector3(0,0,-1).applyQuaternion(shipRig.quaternion);
-  shipRig.position.addScaledVector(forward, currentSpeed*dt);
+  let forward;
+  if(paused){
+    /* position et orientation pilotées par la mécanique orbitale, pas par
+       l'intégration couple/vitesse habituelle */
+    forward = updateOrbitDelivery(dt);
+  } else {
+    const targetSpeed = CRUISE_SPEED * (boosting ? BOOST_MULT : 1);
+    currentSpeed += (targetSpeed-currentSpeed)*Math.min(1, dt*2.2);
+    forward = new THREE.Vector3(0,0,-1).applyQuaternion(shipRig.quaternion);
+    shipRig.position.addScaledVector(forward, currentSpeed*dt);
+  }
 
   const speedlines = document.getElementById('speedlines');
   speedlines.style.opacity = boosting ? '0.5' : '0';
@@ -2740,32 +3181,75 @@ function updateFlight(dt, elapsed){
     b.mat.opacity = v * b.peak;
   });
 
-  /* caméra : poursuite normale, ou travelling circulaire pendant la pause
-     d'arrivée. Les deux branches écrivent dans les MÊMES variables
-     partagées (camPos/camLook), donc la transition entre les deux modes
-     reste amortie par le lerp — jamais de saut brutal au changement d'état. */
+  /* caméra : poursuite normale, ou plan cinématique orbitant la PLANÈTE
+     pendant la mise en orbite/livraison — pour garder le vaisseau ET la
+     planète dans le cadre. Les deux branches écrivent dans les MÊMES
+     variables partagées (camPos/camLook) : la transition reste amortie par
+     le lerp, jamais de saut brutal au changement d'état. */
   if(paused){
-    pauseTimer += dt;
-    /* orbite lente autour du vaisseau, rayon et hauteur qui respirent
-       légèrement pour ne pas paraître mécanique */
-    const orbitAngle = pauseTimer * 0.35;
-    const orbitRadius = 78 + Math.sin(pauseTimer*0.4)*14;
-    const orbitHeight = 22 + Math.sin(pauseTimer*0.6+1.1)*10;
-    _arrivalOffset.set(Math.cos(orbitAngle)*orbitRadius, orbitHeight, Math.sin(orbitAngle)*orbitRadius);
-    const desired = shipRig.position.clone().add(_arrivalOffset);
-    camPos.lerp(desired, Math.min(1, dt*2.4));
-    camera.position.copy(camPos);
-    camLook.lerp(shipRig.position, Math.min(1, dt*2.4));
-    camera.up.set(0,1,0);
-    camera.lookAt(camLook);
+    arrivalTimeScale = arrivalSkip ? ARRIVAL_FF_SCALE : 1;
+    pauseTimer += dt*arrivalTimeScale;
+    const os = orbitState;
+
+    if(os.cutawayUntil > pauseTimer){
+      /* ---------- plan large : prélèvement des conteneurs par la navette ----------
+         Caméra latérale, ancrée sur le vaisseau, qui cadre à la fois la
+         cale et la navette qui vient de s'en détacher. */
+      const lastShuttle = os.shuttles[os.shuttles.length-1];
+      const shipUp = new THREE.Vector3(0,1,0).applyQuaternion(shipRig.quaternion);
+      const shipRight = new THREE.Vector3(1,0,0).applyQuaternion(shipRig.quaternion);
+      const camOffset = shipRight.clone().multiplyScalar(72).addScaledVector(shipUp, 22);
+      const desired = shipRig.position.clone().add(camOffset);
+      camPos.lerp(desired, Math.min(1, dt*3));
+      camera.position.copy(camPos);
+      const lookMid = lastShuttle
+        ? shipRig.position.clone().lerp(lastShuttle.group.position, 0.5)
+        : shipRig.position.clone();
+      camLook.lerp(lookMid, Math.min(1, dt*3));
+      camera.up.set(0,1,0);
+      camera.lookAt(camLook);
+    } else {
+      /* ---------- plan d'ensemble : orbite autour de la planète ----------
+         Le regard libre (Ctrl+souris) décale l'angle et la hauteur de ce
+         plan, pour regarder autour de soi sans interrompre la manœuvre. */
+      const camAngle = pauseTimer*0.16 + os.camPhase0 + camOrbitYaw;
+      const camDist = os.radius*1.9;
+      const camHeight = os.radius*0.55 + Math.sin(pauseTimer*0.3)*os.radius*0.08 + camOrbitPitch*os.radius*0.6;
+      const desired = os.center.clone()
+        .addScaledVector(os.U, Math.cos(camAngle)*camDist)
+        .addScaledVector(os.V, Math.sin(camAngle)*camDist)
+        .addScaledVector(os.N, camHeight);
+      camPos.lerp(desired, Math.min(1, dt*1.6));
+      camera.position.copy(camPos);
+      /* on regarde un point entre le vaisseau et la planète, pondéré vers la
+         planète, pour que l'orbite entière (et les navettes) reste lisible */
+      const lookTarget = os.center.clone().lerp(shipRig.position, 0.35);
+      camLook.lerp(lookTarget, Math.min(1, dt*1.6));
+      camera.up.set(0,1,0);
+      camera.lookAt(camLook);
+    }
 
     if(pauseTimer >= ARRIVAL_PAUSE_DURATION){
       flightPhase = 'CRUISE';
       pauseTimer = 0;
+      orbitState.active = false;
+      arrivalSkip = false;
+      arrivalTimeScale = 1;
+      const radioPanel = document.getElementById('radioPanel');
+      if(radioPanel) radioPanel.classList.remove('visible');
+      const arrivalHint = document.getElementById('arrivalHint');
+      if(arrivalHint) arrivalHint.style.display = 'none';
+      if(window.speechSynthesis) window.speechSynthesis.cancel();
     }
   } else {
-    /* caméra en poursuite, avec un léger amortissement pour un rendu cinématique */
-    const desiredCamPos = shipRig.position.clone().add(CAM_OFFSET.clone().applyQuaternion(shipRig.quaternion));
+    arrivalTimeScale = 1;
+    /* caméra en poursuite, avec un léger amortissement pour un rendu cinématique.
+       Le regard libre (Ctrl+souris) tourne l'offset de poursuite AUTOUR du
+       vaisseau, dans son propre repère, avant d'être orienté par son cap :
+       on regarde autour de soi sans changer la trajectoire suivie. */
+    const freeLook = new THREE.Quaternion().setFromEuler(new THREE.Euler(camOrbitPitch, camOrbitYaw, 0, 'YXZ'));
+    const camQuat = shipRig.quaternion.clone().multiply(freeLook);
+    const desiredCamPos = shipRig.position.clone().add(CAM_OFFSET.clone().applyQuaternion(camQuat));
     camPos.lerp(desiredCamPos, Math.min(1, dt*4.5));
     camera.position.copy(camPos);
     const desiredLook = shipRig.position.clone().add(forward.clone().multiplyScalar(45));
@@ -2775,7 +3259,7 @@ function updateFlight(dt, elapsed){
   }
 
   document.getElementById('modeBadge').textContent =
-    paused ? 'ARRIVÉE' : (manual ? 'MANUEL' : 'AUTOPILOTE');
+    paused ? 'MISE EN ORBITE' : (manual ? 'MANUEL' : 'AUTOPILOTE');
   document.getElementById('modeBadge').className =
     'hud-mode mono ' + (paused ? 'auto' : (manual?'manual':'auto'));
 }
@@ -2949,10 +3433,17 @@ function animate(){
     refreshField(NEBULA_CELL, NEBULA_RADIUS, nebulaField, buildNebulaCell);
   }
 
-  /* nébuleuses : le shader gère billboard et dérive, on ne pousse que le temps */
+  /* nébuleuses : apparition progressive (fondu exponentiel) + dérive du temps.
+     Sans ce fondu, une nébuleuse entrant dans le rayon suivi apparaîtrait
+     d'un coup, pleinement opaque — un vrai « pop » visuel en plein vol. */
   nebulaField.forEach(function(obj){
     if(!obj) return;
     obj.mesh.material.uniforms.uTime.value = elapsed;
+    const ud = obj.mesh.userData;
+    if(ud && ud.currentFade < ud.targetFade - 0.001){
+      ud.currentFade += (ud.targetFade - ud.currentFade) * Math.min(1, dt*0.5);
+      obj.mesh.material.uniforms.uFade.value = ud.currentFade;
+    }
   });
   backdrop.children.forEach(function(child){
     if(child.material && child.material.uniforms && child.material.uniforms.uTime){
@@ -2966,6 +3457,11 @@ function animate(){
   /* systèmes planétaires actifs : spin, éclairage propre à chaque étoile
      hôte, dérive des nuages, orbite des satellites */
   updatePlanetSystems(dt, elapsed);
+
+  /* navettes de livraison : indépendantes de la phase de vol, pour qu'une
+     navette encore en approche termine son trajet même si le vaisseau
+     principal a déjà repris sa route */
+  updateShuttles(dt*arrivalTimeScale);
 
   /* portiques : la luminosité est recalculée dans le shader à partir de la
      position et du cap du vaisseau — un seul envoi d'uniformes par image */
