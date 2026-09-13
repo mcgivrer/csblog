@@ -47,4 +47,9 @@
 
 ##### Step 3
 
-- Ajouter des modes de suivi caméra, appuyer rapidement 2x sur CTRL change le mode: tracking simple, plan séquence autour du vaisseau, succession de plans filmant le vaisseau à distance avec en fond des planètes ou des nébuleuses.  3 appuis courts sur CTRL ramènent au mode tracking standard.
+- Ajouter des modes de suivi caméra, appuyer rapidement 2x sur CTRL change le mode: tracking simple, plans-séquences autour du vaisseau, succession de plans filmant le vaisseau à distance avec en fond des planètes ou des nébuleuses.  3 appuis courts sur CTRL ramènent au mode tracking standard. 
+- Les petites navettes de transport doivent être beaucoup moins rapides pour que les messages vocaux soient coordonnés dans le temps.  On peut abréger la séquence pour la terminer rapidement via un appui sur la touche SPACE. 
+- En phase d'approche d'une étape, le vaisseau doit ralentir pour commencer les transmissions
+- Le panneau "CANAL RADIO" est trop haut sur le HUD, il recouvre le panneau "OBJET LE PLUS PROCHE".
+- Juste après l'initialisation, afficher un écran de titre "Space Travel & transport" avec le choix de la langue du jeu : français (existant), anglais, allemand et espagnol à créer.
+

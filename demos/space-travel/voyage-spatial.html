@@ -141,9 +141,18 @@
   .hud-mode.manual{ color:var(--amber); border-color:var(--amber-dim); }
   .hud-mode.auto{ color:var(--cyan); }
 
+  /* ---------- rangée basse : température · propulsion · commandes ----------
+     Les trois panneaux vivaient séparément (dont un flottant, projeté en 3D
+     à côté du vaisseau) ; ils sont désormais regroupés dans une seule
+     rangée fixe au bas de l'écran, plus lisible et plus stable. */
+  .hud-bottom-row{
+    position:absolute; left:50%; bottom:58px; transform:translateX(-50%);
+    display:flex; align-items:flex-end; gap:14px; z-index:1;
+  }
+  .hud-bottom-row > .panel{ position:relative; }
+
   /* ---------- panneau de jauges moteur ---------- */
   .hud-engines{
-    position:absolute; left:50%; bottom:58px; transform:translateX(-50%);
     padding:6px 14px 6px;
     display:flex; flex-direction:column; align-items:center; gap:4px;
   }
@@ -176,17 +185,11 @@
   .gauge-sep{ width:1px; height:28px; align-self:flex-end; background:var(--line); margin:0 2px; }
   @media (max-width:900px){ .hud-engines{ display:none; } }
 
-  /* ---------- dialogue de télémétrie moteur, projeté près du vaisseau ---------- */
+  /* ---------- commandes moteur — panneau fixe, plus flottant projeté ---------- */
   .hud-telemetry{
-    position:fixed; z-index:2; pointer-events:none;
     min-width:190px;
     padding:8px 10px;
-    background:rgba(8,14,26,0.55);
-    border:1px solid rgba(94,234,212,0.28);
-    backdrop-filter:blur(1.5px);
     font-size:10px; line-height:1.6; color:var(--cyan);
-    display:none;
-    transition:opacity .15s linear;
   }
   .hud-telemetry .tm-title{
     font-size:8.5px; letter-spacing:0.12em; color:var(--muted-2);
@@ -196,7 +199,24 @@
   .hud-telemetry .tm-line{ display:flex; justify-content:space-between; gap:10px; white-space:nowrap; }
   .hud-telemetry .tm-off{ color:var(--muted-2); opacity:0.6; }
   .hud-telemetry .tm-amber{ color:var(--amber); }
-  @media (max-width:760px){ .hud-telemetry{ display:none !important; } }
+  @media (max-width:900px){ .hud-telemetry{ display:none !important; } }
+
+  /* ---------- température moteur ---------- */
+  .hud-temp{
+    min-width:150px;
+    padding:8px 10px;
+    font-size:10px; line-height:1.6; color:var(--ink);
+  }
+  .hud-temp .tm-title{
+    font-size:8.5px; letter-spacing:0.12em; color:var(--muted-2);
+    border-bottom:1px solid var(--line);
+    padding-bottom:4px; margin-bottom:4px;
+  }
+  .hud-temp .tm-line{ display:flex; justify-content:space-between; gap:10px; white-space:nowrap; }
+  .hud-temp .tm-normal{ color:var(--cyan); }
+  .hud-temp .tm-warm{ color:var(--amber); }
+  .hud-temp .tm-hot{ color:#ff6b57; }
+  @media (max-width:900px){ .hud-temp{ display:none !important; } }
 
   /* ---------- canal radio — échanges équipage / contrôle du port ---------- */
   .hud-radio{
@@ -332,22 +352,28 @@
   </div>
 
   <div class="hud-hint mono" id="hint">
-    ↑↓←→ / Z Q S D — orientation&nbsp; · &nbsp;A / E — roulis&nbsp; · &nbsp;MAJ — propulsion&nbsp; · &nbsp;glisser la souris — viser&nbsp; · &nbsp;H — masquer
+    ↑↓←→ / Z Q S D — orientation&nbsp; · &nbsp;A / E — roulis&nbsp; · &nbsp;MAJ — propulsion&nbsp; · &nbsp;glisser la souris — viser&nbsp; · &nbsp;CTRL+souris — regard libre&nbsp; · &nbsp;TAB — canal radio&nbsp; · &nbsp;H — masquer
   </div>
   <div class="hud-hint mono" id="arrivalHint" style="display:none; bottom:52px;">
     ENTRÉE — abréger la manœuvre (travelling accéléré)
   </div>
 
-  <!-- panneau des jauges moteur, bas d'écran -->
-  <div class="panel hud-engines" id="enginesPanel">
-    <div class="engines-title mono">PROPULSION</div>
-    <div class="engines-row" id="enginesRow"></div>
-  </div>
+  <!-- rangée basse : température, propulsion, commandes moteur -->
+  <div class="hud-bottom-row">
+    <div class="panel hud-temp mono" id="tempPanel">
+      <div class="tm-title">TEMPÉRATURE MOTEUR</div>
+      <div id="tempBody"></div>
+    </div>
 
-  <!-- dialogue de télémétrie flottant, projeté à côté du vaisseau -->
-  <div class="hud-telemetry mono" id="telemetryPanel">
-    <div class="tm-title">COMMANDES MOTEUR</div>
-    <div id="telemetryBody"></div>
+    <div class="panel hud-engines" id="enginesPanel">
+      <div class="engines-title mono">PROPULSION</div>
+      <div class="engines-row" id="enginesRow"></div>
+    </div>
+
+    <div class="panel hud-telemetry mono" id="telemetryPanel">
+      <div class="tm-title">COMMANDES MOTEUR</div>
+      <div id="telemetryBody"></div>
+    </div>
   </div>
 
   <!-- canal radio : échanges équipage / contrôle du port pendant l'approche -->
@@ -2037,6 +2063,10 @@ function generateSystemData(leg){
       seedNoise: rng()*1000,
       hueShift: rng(),
       hasAtmosphere: !!kind.atmo,
+      /* anneaux : uniquement les géantes gazeuses, environ une chance sur
+         deux — comme Saturne ou Uranus plutôt que Vénus ou la Terre */
+      hasRings: kind.gas && rng() < 0.5,
+      ringSeed: rng()*1000,
       isHabitable: isHab
     };
     if(isHab){
@@ -2052,7 +2082,26 @@ function generateSystemData(leg){
     }
     planets.push(planet);
   }
-  return {planets: planets, habIdx: habIdx};
+
+  /* champ d'astéroïdes : placé dans le VIDE entre deux orbites planétaires
+     consécutives (jamais sur l'orbite d'une planète), comme la ceinture
+     principale du Système solaire logée entre Mars et Jupiter — pas une
+     dispersion uniforme dans tout le système. Environ deux systèmes sur
+     cinq en comptent un. */
+  let asteroidBelt = null;
+  if(planets.length >= 2 && rng() < 0.4){
+    const byDist = planets.map(function(p){
+      return {p:p, d:p.position.distanceTo(leg.starPosition)};
+    }).sort(function(a,b){ return a.d-b.d; });
+    const gapIdx = Math.floor(rng()*(byDist.length-1));
+    const inner = byDist[gapIdx].d + byDist[gapIdx].p.radius + 60;
+    const outer = byDist[gapIdx+1].d - byDist[gapIdx+1].p.radius - 60;
+    if(outer > inner + 150){
+      asteroidBelt = { inner: inner, outer: outer, count: 240 + Math.floor(rng()*260) };
+    }
+  }
+
+  return {planets: planets, habIdx: habIdx, asteroidBelt: asteroidBelt};
 }
 
 /* ---------- shader de surface planétaire ----------
@@ -2181,6 +2230,134 @@ const ATMO_FRAG = `
 `;
 
 /* ---------- construction des maillages d'un système (différée) ---------- */
+/* ---------- anneaux planétaires (géantes gazeuses uniquement) ----------
+   THREE.RingGeometry mappe ses UV par projection plane (pas radiale), ce
+   qui déformerait une texture de bandes concentriques — on construit donc
+   une géométrie dédiée où v=0 au rayon interne, v=1 au rayon externe. */
+/* =========================================================================
+   ASTÉROÏDES — quelques gabarits de forme générés une seule fois au
+   chargement (pas un par astéroïde placé), puis dupliqués massivement par
+   instance. Les astronomes réels observent effectivement quelques grandes
+   familles de formes (patatoïdes allongés, blocs anguleux, corps presque
+   sphériques pour les plus gros — l'auto-gravité les arrondit) plutôt
+   qu'une infinité de silhouettes uniques.
+   ========================================================================= */
+const ASTEROID_TEMPLATES = (function(){
+  const templates = [];
+  const N = 5;
+  for(let t=0; t<N; t++){
+    const rng = rngFor('asteroid-template-'+t);
+    const geo = new THREE.IcosahedronGeometry(1, 1);
+    const pos = geo.attributes.position;
+    /* quelques coefficients de bruit directionnel, tirés une fois : une
+       vraie fBm serait superflue pour une forme vue de loin la plupart
+       du temps, mais on combine trois fréquences pour éviter l'aspect
+       trop régulier d'un simple icosaèdre déformé par un seul sinus */
+    const kx=1+rng()*2.4, ky=1+rng()*2.4, kz=1+rng()*2.4;
+    const px=rng()*10, py=rng()*10, pz=rng()*10;
+    const stretch = new THREE.Vector3(0.75+rng()*0.5, 0.75+rng()*0.5, 0.75+rng()*0.5);
+    for(let v=0; v<pos.count; v++){
+      const x=pos.getX(v), y=pos.getY(v), z=pos.getZ(v);
+      const len = Math.hypot(x,y,z) || 1;
+      const nx=x/len, ny=y/len, nz=z/len;
+      const n = Math.sin(nx*kx+px)*Math.cos(ny*ky+py) + 0.5*Math.sin(nz*kz+pz);
+      const r = THREE.MathUtils.clamp(0.78 + n*0.22, 0.5, 1.18);
+      pos.setXYZ(v, nx*r*stretch.x, ny*r*stretch.y, nz*r*stretch.z);
+    }
+    geo.computeVertexNormals();
+    templates.push(geo);
+  }
+  return templates;
+})();
+const ASTEROID_MAT = new THREE.MeshStandardMaterial({ color:0x8c8378, roughness:0.96, metalness:0.04 });
+
+/* Place une ceinture entre deux orbites (dans le VIDE laissé entre deux
+   planètes, comme la ceinture principale entre Mars et Jupiter) — jamais
+   sur l'orbite d'une planète elle-même. Tailles réparties en loi de
+   puissance (rng()*rng() biaise fortement vers le petit) : l'écrasante
+   majorité des astéroïdes réels sont de petits corps, les gros étant rares. */
+function buildAsteroidBelt(leg, innerR, outerR, count){
+  const rng = rngFor(SEED+':asteroids:'+leg.cell);
+  const group = new THREE.Group();
+  const perTemplate = Math.max(1, Math.ceil(count/ASTEROID_TEMPLATES.length));
+  const dummy = new THREE.Object3D();
+  ASTEROID_TEMPLATES.forEach(function(geo){
+    const inst = new THREE.InstancedMesh(geo, ASTEROID_MAT, perTemplate);
+    for(let i=0;i<perTemplate;i++){
+      const angle = rng()*Math.PI*2;
+      const r = innerR + rng()*(outerR-innerR);
+      /* ceinture aplatie : faible dispersion hors du plan, comme dans la réalité */
+      const height = (rng()-0.5)*(outerR-innerR)*0.05;
+      dummy.position.set(Math.cos(angle)*r, height, Math.sin(angle)*r);
+      const size = 1.1 + rng()*rng()*26;
+      dummy.scale.setScalar(size);
+      dummy.rotation.set(rng()*Math.PI*2, rng()*Math.PI*2, rng()*Math.PI*2);
+      dummy.updateMatrix();
+      inst.setMatrixAt(i, dummy.matrix);
+    }
+    inst.instanceMatrix.needsUpdate = true;
+    group.add(inst);
+  });
+  return group;
+}
+
+function buildRingGeometry(innerR, outerR, segments){
+  const geo = new THREE.BufferGeometry();
+  const positions = [], uvs = [], indices = [];
+  for(let i=0;i<=segments;i++){
+    const theta = (i/segments)*Math.PI*2;
+    const cos = Math.cos(theta), sin = Math.sin(theta);
+    positions.push(cos*innerR, sin*innerR, 0);
+    uvs.push(i/segments, 0);
+    positions.push(cos*outerR, sin*outerR, 0);
+    uvs.push(i/segments, 1);
+  }
+  for(let i=0;i<segments;i++){
+    const a=i*2, b=i*2+1, c=i*2+2, d=i*2+3;
+    indices.push(a,b,c, b,d,c);
+  }
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions,3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs,2));
+  geo.setIndex(indices);
+  return geo;
+}
+/* profil radial en bandes, déterministe (seed de la planète) — pas de
+   bruit par pixel non maîtrisé : quelques paramètres tirés une fois,
+   ensuite une fonction lisse (sinus) donne des bandes nettes plutôt
+   qu'un grain aléatoire par ligne. */
+function buildRingTexture(seed){
+  const rng = rngFor(seed);
+  const h = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = 1; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  const imgData = ctx.createImageData(1, h);
+  const bands = 5 + Math.floor(rng()*6);
+  const phase = rng()*Math.PI*2;
+  const grain = 0.10 + rng()*0.10;
+  const tone = rng();
+  const baseColor = tone < 0.5
+    ? [214, 198, 168]   /* poussière/roche, teinte chaude */
+    : [206, 214, 222];  /* glace, teinte froide */
+  for(let y=0; y<h; y++){
+    const t = y/(h-1);
+    let v = 0.5 + 0.30*Math.sin(t*bands*Math.PI*2 + phase);
+    v += Math.sin(t*97.0 + phase*3.0) * grain * 0.4;
+    v = Math.max(0, Math.min(1, v));
+    const edgeFade = Math.min(t/0.05, (1-t)/0.05, 1);
+    const alpha = Math.max(0, v*edgeFade);
+    const idx = y*4;
+    imgData.data[idx]   = baseColor[0];
+    imgData.data[idx+1] = baseColor[1];
+    imgData.data[idx+2] = baseColor[2];
+    imgData.data[idx+3] = Math.round(alpha*255);
+  }
+  ctx.putImageData(imgData, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.needsUpdate = true;
+  return tex;
+}
+
 function buildPlanetSystemMeshes(leg){
   const group = new THREE.Group();
   const sys = leg.system;
@@ -2224,6 +2401,25 @@ function buildPlanetSystemMeshes(leg){
       pg.add(atmo);
     }
 
+    /* anneaux : uniquement les géantes gazeuses tirées favorables (§ génération).
+       Le disque est construit dans le plan équatorial local (perpendiculaire
+       à l'axe de spin, avant l'inclinaison du groupe pg) : il hérite donc
+       naturellement de l'inclinaison de la planète, comme dans la réalité. */
+    if(p.hasRings){
+      const ringInner = p.radius*1.5;
+      const ringOuter = p.radius*(2.25 + (p.ringSeed%100)/100*0.85);
+      const ringGeo = buildRingGeometry(ringInner, ringOuter, 72);
+      const ringTex = buildRingTexture(SEED+':ring:'+leg.cell+':'+p.seedNoise);
+      const ringMat = new THREE.MeshBasicMaterial({
+        map: ringTex, transparent:true, side:THREE.DoubleSide,
+        depthWrite:false, opacity:0.88
+      });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.rotation.x = Math.PI/2;
+      ring.rotation.y = ((p.ringSeed%137)/137 - 0.5) * 0.5;
+      pg.add(ring);
+    }
+
     /* balise du port spatial : sprite parenté au maillage qui tourne — sa
        position suit donc la rotation de la planète sans recalcul par image */
     if(p.isHabitable){
@@ -2263,6 +2459,12 @@ function buildPlanetSystemMeshes(leg){
     group.add(pg);
     p.group = pg;
   });
+
+  if(sys.asteroidBelt){
+    const belt = buildAsteroidBelt(leg, sys.asteroidBelt.inner, sys.asteroidBelt.outer, sys.asteroidBelt.count);
+    belt.position.copy(leg.starPosition);
+    group.add(belt);
+  }
 
   return group;
 }
@@ -2531,8 +2733,8 @@ function buildRouteGates(curve){
         if(vFade < 0.01) discard;
         /* le cadre (pas les coins ambre) est tracé en pointillés */
         if(vCorner < 0.5){
-          float d = mod(vDist, 22.0);
-          if(d > 12.0) discard;
+          float d = mod(vDist, 11.0);
+          if(d > 5.5) discard;
         }
         gl_FragColor = vec4(vCol, vFade * uOpacity);
       }
@@ -2609,12 +2811,17 @@ function computeRoute(origin, heading, alignShip){
   ROUTE.builtSystems.forEach(function(grp){ scene.remove(grp); disposePlanetGroup(grp); });
   ROUTE.builtSystems.clear();
 
-  /* 6 étapes plutôt que 12 : un cycle complet (croisière + arrivée + nouvel
-     itinéraire) doit rester perceptible en quelques minutes, pas en dix —
-     sans quoi la séquence d'arrivée paraît ne jamais se déclencher. */
-  ROUTE.legs = planRoute(origin, heading, 6);
+  /* Le nombre d'étapes varie d'un itinéraire à l'autre (3 à 12) : chaque
+     trajet a sa propre longueur, plutôt qu'un compte fixe. */
+  const legCount = 3 + Math.floor(Math.random()*10);
+  ROUTE.legs = planRoute(origin, heading, legCount);
   ROUTE.index = 0;
   ROUTE.s = 0;
+  /* déclenchement de la mise en orbite/livraison : désormais À CHAQUE
+     étape (pas seulement à la fin de l'itinéraire) — cet index avance
+     indépendamment de ROUTE.index (qui sert à l'affichage du plan de vol)
+     pour éviter tout conflit d'ordre entre les deux seuils. */
+  ROUTE.nextDelivery = 0;
   if(!ROUTE.legs.length){ ROUTE.curve = null; ROUTE.length = 0; refreshRoutePanel(); return; }
 
   /* génération des systèmes planétaires : la cible réelle de chaque étape
@@ -2811,6 +3018,15 @@ window.addEventListener('keydown', function(e){
   if(e.code === 'Enter' && flightPhase === 'ARRIVAL_PAUSE'){
     arrivalSkip = true;
   }
+  /* TAB bascule directement l'affichage du canal radio, à tout moment —
+     un simple interrupteur, pas une préférence qui viendrait interférer
+     avec l'affichage/masquage automatique au début/fin de la manœuvre.
+     preventDefault : Tab déplacerait sinon le focus clavier sur la page. */
+  if(e.code === 'Tab'){
+    e.preventDefault();
+    const panel = document.getElementById('radioPanel');
+    if(panel) panel.classList.toggle('visible');
+  }
 });
 window.addEventListener('keyup', function(e){ keys[e.code] = false; });
 
@@ -2873,13 +3089,14 @@ let camLook = new THREE.Vector3(0,0,-40);
    port spatial. Le prochain itinéraire est calculé pendant la manœuvre. */
 let flightPhase = 'CRUISE';           /* 'CRUISE' | 'ARRIVAL_PAUSE' */
 let pauseTimer = 0;
-const ARRIVAL_PAUSE_DURATION = 17;    /* durée d'un tour d'orbite complet — allongée
-                                          pour laisser le temps de montrer le transfert
-                                          des conteneurs par les navettes */
+/* La phase d'approche est volontairement plus lente que le reste du vol :
+   on doit avoir le temps de VOIR le déchargement des conteneurs, pas
+   juste le deviner entre deux plans qui défilent trop vite. */
+const ARRIVAL_PAUSE_DURATION = 26;    /* durée d'un tour d'orbite complet */
 const ARRIVAL_FF_SCALE = 4.5;         /* facteur d'accélération en mode abrégé */
 let arrivalSkip = false;              /* déclenché par la touche d'abrégé (Entrée) */
 let arrivalTimeScale = 1;             /* lu par updateShuttles(), hors de updateFlight */
-const CUTAWAY_DURATION = 2.8;         /* plan large sur le prélèvement, à chaque navette */
+const CUTAWAY_DURATION = 4.2;         /* plan large sur le prélèvement, à chaque navette */
 const ORBIT_CAPTURE_TIME = 1.3;       /* fondu d'entrée sur le cercle d'orbite */
 
 const orbitState = {
@@ -2889,6 +3106,7 @@ const orbitState = {
   camPhase0:0, shuttles:[], spawned:[false,false,false],
   spawnFractions:[0.16,0.42,0.68],
   radioScript:[], radioIdx:0,
+  voiceGender:{ship:'male', tower:'female'},
   cutawayUntil:-1   /* valeur de pauseTimer jusqu'à laquelle le plan large reste actif */
 };
 
@@ -2963,7 +3181,8 @@ function appendRadioLine(entry){
   while(log.children.length > 6) log.removeChild(log.firstChild);
   playRadioBlip(entry.from);
   /* en mode abrégé, les lignes défilent trop vite pour être lues à voix
-     haute sans se chevaucher — on garde le bip, on saute la voix */
+     haute sans se chevaucher — on garde le bip, on saute la voix (et donc
+     la garde radioSpeaking, puisqu'aucune lecture n'est en cours) */
   if(!arrivalSkip) speakRadioLine(entry);
 }
 
@@ -2979,6 +3198,7 @@ function appendRadioLine(entry){
    varient selon le navigateur et l'OS de la personne qui joue.
    ========================================================================= */
 let radioMuted = false;
+let radioSpeaking = false;  /* false, ou l'utterance en cours de lecture */
 let audioCtx = null;
 function getAudioCtx(){
   if(!audioCtx){
@@ -3017,23 +3237,41 @@ function pickVoice(from){
   const fr = ttsVoices.filter(function(v){ return /^fr/i.test(v.lang); });
   const pool = fr.length ? fr : ttsVoices;
   if(pool.length < 2) return pool[0] || null;
-  /* on cherche deux voix nettement différentes plutôt que deux index
-     arbitraires, quand les noms le permettent */
-  if(from === 'tower'){
-    return pool.find(function(v){ return /female|femme|amélie|amelie|marie|julie/i.test(v.name); }) || pool[0];
-  }
-  return pool.find(function(v){ return /male|homme|thomas|nicolas|paul|daniel/i.test(v.name); }) || pool[pool.length-1];
+  /* le genre de chaque interlocuteur est tiré aléatoirement à chaque
+     échange (cf. startOrbitDelivery) plutôt que fixé par rôle : parfois
+     la tour est une voix masculine, parfois féminine, indépendamment de
+     l'équipage — pour ne pas toujours entendre la même association. */
+  const gender = orbitState.voiceGender[from];
+  const pattern = gender === 'female'
+    ? /female|femme|amélie|amelie|marie|julie/i
+    : /male|homme|thomas|nicolas|paul|daniel/i;
+  return pool.find(function(v){ return pattern.test(v.name); }) || pool[Math.floor(Math.random()*pool.length)];
 }
 function speakRadioLine(entry){
-  if(radioMuted || !window.speechSynthesis) return;
+  if(radioMuted || !window.speechSynthesis){ return; }
   const u = new SpeechSynthesisUtterance(entry.text);
   const v = pickVoice(entry.from);
   if(v) u.voice = v;
   u.lang = (v && v.lang) || 'fr-FR';
   u.rate = entry.from === 'tower' ? 0.98 : 1.05;
-  u.pitch = entry.from === 'tower' ? 0.85 : 1.2;
+  /* le ton suit le GENRE tiré pour cet interlocuteur, pas son rôle : la
+     tour et l'équipage sonnent différemment selon le tirage du jour. */
+  u.pitch = orbitState.voiceGender[entry.from] === 'female' ? 1.15 : 0.85;
   u.volume = 0.85;
+  /* on bloque le message suivant tant que celui-ci n'est pas terminé —
+     et on ne bloque JAMAIS indéfiniment : onend/onerror lèvent tous les
+     deux la garde, et un filet de sécurité la lève aussi après un délai
+     large (estimation très généreuse), au cas où l'évènement ne se
+     déclencherait pas sur un navigateur particulier. */
+  radioSpeaking = true;
+  const release = function(){
+    if(radioSpeaking === u) radioSpeaking = false;
+  };
+  u.onend = release;
+  u.onerror = release;
+  radioSpeaking = u;
   window.speechSynthesis.speak(u);
+  setTimeout(function(){ if(radioSpeaking === u) radioSpeaking = false; }, 16000);
 }
 (function initRadioMuteButton(){
   const btn = document.getElementById('radioMuteBtn');
@@ -3042,7 +3280,7 @@ function speakRadioLine(entry){
     e.stopPropagation();
     radioMuted = !radioMuted;
     btn.textContent = radioMuted ? '🔇' : '🔊';
-    if(radioMuted && window.speechSynthesis) window.speechSynthesis.cancel();
+    if(radioMuted && window.speechSynthesis){ window.speechSynthesis.cancel(); radioSpeaking = false; }
   });
 })();
 
@@ -3081,7 +3319,14 @@ function startOrbitDelivery(planet){
   orbitState.startQuat.copy(shipRig.quaternion);
   orbitState.camPhase0 = Math.random()*Math.PI*2;
 
-  /* canal radio : script généré depuis le seed de la planète, panneau vidé et affiché */
+  /* canal radio : script généré depuis le seed de la planète, panneau vidé et affiché.
+     Le genre de chaque voix est tiré au hasard à chaque échange — équipage
+     et tour peuvent être masculins, féminins, ou l'un de chaque, sans
+     schéma fixe d'un appel à l'autre. */
+  orbitState.voiceGender = {
+    ship:  Math.random() < 0.5 ? 'male' : 'female',
+    tower: Math.random() < 0.5 ? 'male' : 'female'
+  };
   orbitState.radioScript = buildRadioScript(planet);
   orbitState.radioIdx = 0;
   const radioLog = document.getElementById('radioLog');
@@ -3196,8 +3441,12 @@ function updateOrbitDelivery(dt){
   });
 
   /* canal radio : les messages du script sont déjà triés par instant de
-     déclenchement — un simple curseur qui avance suffit */
-  while(os.radioIdx < os.radioScript.length && os.radioScript[os.radioIdx].t <= frac){
+     déclenchement, MAIS on n'affiche jamais le suivant tant que la voix
+     est encore en train de lire le précédent — sans cette garde, un
+     message pouvait apparaître (et sa lecture démarrer, mise en file par
+     le navigateur) alors que le message précédent n'avait pas fini d'être
+     dicté, et le texte affiché prenait de l'avance sur la voix. */
+  if(!radioSpeaking && os.radioIdx < os.radioScript.length && os.radioScript[os.radioIdx].t <= frac){
     appendRadioLine(os.radioScript[os.radioIdx]);
     os.radioIdx++;
   }
@@ -3292,16 +3541,24 @@ function updateFlight(dt, elapsed){
       while(idx < ROUTE.legS.length-1 && ROUTE.s > ROUTE.legS[idx] - 120) idx++;
       if(idx !== ROUTE.index){ ROUTE.index = idx; refreshRoutePanel(); ensureSystemsBuilt(); }
 
-      /* itinéraire terminé : mise en orbite autour de la planète de
-         destination pour un tour complet, le temps de livrer la cargaison
-         par navettes et de calculer le prochain itinéraire. On capture la
-         référence de la planète AVANT computeRoute(), qui remplace
-         ROUTE.legs par la nouvelle route. */
-      if(ROUTE.index === ROUTE.legs.length-1 && ROUTE.s > ROUTE.length - 180){
-        const destPlanet = ROUTE.legs[ROUTE.legs.length-1].planet;
-        const curFwd = new THREE.Vector3(0,0,-1).applyQuaternion(shipRig.quaternion);
-        startOrbitDelivery(destPlanet);
-        computeRoute(shipRig.position, curFwd, false);
+      /* mise en orbite/livraison à CHAQUE étape de l'itinéraire, pas
+         seulement à la fin : dès que le vaisseau approche le point
+         d'approche de l'étape en cours de livraison (ROUTE.nextDelivery,
+         suivi séparément de ROUTE.index pour éviter tout conflit d'ordre
+         entre les deux seuils), on déclenche la manœuvre. Seule la
+         DERNIÈRE étape entraîne le calcul d'un nouvel itinéraire complet ;
+         pour les autres, le vaisseau reprend simplement sa route existante
+         vers l'étape suivante une fois la livraison terminée. */
+      if(ROUTE.nextDelivery < ROUTE.legs.length && ROUTE.s > ROUTE.legS[ROUTE.nextDelivery] - 180){
+        const deliverIdx = ROUTE.nextDelivery;
+        const destPlanet = ROUTE.legs[deliverIdx].planet;
+        const isLastLeg = (deliverIdx === ROUTE.legs.length - 1);
+        ROUTE.nextDelivery++;
+        startOrbitDelivery(destPlanet, isLastLeg);
+        if(isLastLeg){
+          const curFwd = new THREE.Vector3(0,0,-1).applyQuaternion(shipRig.quaternion);
+          computeRoute(shipRig.position, curFwd, false);
+        }
         flightPhase = 'ARRIVAL_PAUSE';
         pauseTimer = 0;
       }
@@ -3499,6 +3756,7 @@ function updateFlight(dt, elapsed){
 
   /* ---------- dialogue de télémétrie : commandes envoyées aux moteurs ---------- */
   updateTelemetryPanel(mainPowers, boosting);
+  updateEngineTemps(mainPowers, dt);
 
   /* ---------- balises clignotantes de la nacelle ----------
      Chaque balise suit son propre cycle : phase et période distinctes,
@@ -3532,36 +3790,48 @@ function updateFlight(dt, elapsed){
       const shipRight = new THREE.Vector3(1,0,0).applyQuaternion(shipRig.quaternion);
       const camOffset = shipRight.clone().multiplyScalar(72).addScaledVector(shipUp, 22);
       const desired = shipRig.position.clone().add(camOffset);
-      camPos.lerp(desired, Math.min(1, dt*3));
+      camPos.lerp(desired, Math.min(1, dt*1.6));
       camera.position.copy(camPos);
       const lookMid = lastShuttle
         ? shipRig.position.clone().lerp(lastShuttle.group.position, 0.5)
         : shipRig.position.clone();
-      camLook.lerp(lookMid, Math.min(1, dt*3));
+      camLook.lerp(lookMid, Math.min(1, dt*1.6));
       camera.up.set(0,1,0);
       camera.lookAt(camLook);
     } else {
       /* ---------- plan d'ensemble : orbite autour de la planète ----------
          Le regard libre (Ctrl+souris) décale l'angle et la hauteur de ce
-         plan, pour regarder autour de soi sans interrompre la manœuvre. */
-      const camAngle = pauseTimer*0.16 + os.camPhase0 + camOrbitYaw;
+         plan, pour regarder autour de soi sans interrompre la manœuvre.
+         Rotation et amortissement volontairement lents : un travelling
+         posé, pas un survol précipité. */
+      const camAngle = pauseTimer*0.09 + os.camPhase0 + camOrbitYaw;
       const camDist = os.radius*1.9;
-      const camHeight = os.radius*0.55 + Math.sin(pauseTimer*0.3)*os.radius*0.08 + camOrbitPitch*os.radius*0.6;
+      const camHeight = os.radius*0.55 + Math.sin(pauseTimer*0.18)*os.radius*0.08 + camOrbitPitch*os.radius*0.6;
       const desired = os.center.clone()
         .addScaledVector(os.U, Math.cos(camAngle)*camDist)
         .addScaledVector(os.V, Math.sin(camAngle)*camDist)
         .addScaledVector(os.N, camHeight);
-      camPos.lerp(desired, Math.min(1, dt*1.6));
+      camPos.lerp(desired, Math.min(1, dt*0.9));
       camera.position.copy(camPos);
       /* on regarde un point entre le vaisseau et la planète, pondéré vers la
          planète, pour que l'orbite entière (et les navettes) reste lisible */
       const lookTarget = os.center.clone().lerp(shipRig.position, 0.35);
-      camLook.lerp(lookTarget, Math.min(1, dt*1.6));
+      camLook.lerp(lookTarget, Math.min(1, dt*0.9));
       camera.up.set(0,1,0);
       camera.lookAt(camLook);
     }
 
-    if(pauseTimer >= ARRIVAL_PAUSE_DURATION){
+    /* fin de la manœuvre : la durée minimale ET la fin complète du
+       dialogue radio (dernier message affiché, sa lecture terminée) sont
+       toutes deux nécessaires — sans cette seconde condition, une voix
+       lente ou des messages nombreux pourraient se faire couper avant la
+       fin par le simple minuteur. */
+    const radioDone = os.radioIdx >= os.radioScript.length && !radioSpeaking;
+    /* plafond défensif : si quelque chose empêchait radioDone de devenir
+       vrai (cas non prévu), la manœuvre se termine quand même plutôt que
+       de bloquer indéfiniment le vol. */
+    const hardCap = pauseTimer >= ARRIVAL_PAUSE_DURATION*2.5;
+    if((pauseTimer >= ARRIVAL_PAUSE_DURATION && radioDone) || hardCap){
       flightPhase = 'CRUISE';
       pauseTimer = 0;
       orbitState.active = false;
@@ -3602,24 +3872,12 @@ function updateFlight(dt, elapsed){
 let lastHudUpdate = 0;
 /* =========================================================================
    DIALOGUE DE TÉLÉMÉTRIE — commandes d'allumage/puissance envoyées aux
-   moteurs, projeté à l'écran juste à côté du vaisseau (offset fixe par
-   rapport à sa position projetée, pas un panneau HUD fixe).
+   moteurs. Panneau fixe du HUD (rangée basse), à côté de la propulsion —
+   il était auparavant projeté en 3D juste à côté du vaisseau ; l'ancrage
+   fixe est plus lisible et ne bouge plus avec la caméra.
    ========================================================================= */
-const _tmProj = new THREE.Vector3();
 let lastTmUpdate = 0;
 function updateTelemetryPanel(mainPowers, boosting){
-  const panel = document.getElementById('telemetryPanel');
-  if(!panel) return;
-
-  /* projection de la position du vaisseau à l'écran */
-  _tmProj.copy(shipRig.position).project(camera);
-  if(_tmProj.z > 1 || _tmProj.z < -1){ panel.style.display = 'none'; return; }
-  const sx = (_tmProj.x*0.5+0.5)*window.innerWidth;
-  const sy = (1-(_tmProj.y*0.5+0.5))*window.innerHeight;
-  panel.style.display = 'block';
-  panel.style.left = (sx + 130) + 'px';
-  panel.style.top  = (sy - 70) + 'px';
-
   /* le texte n'a pas besoin d'être réécrit à 60 Hz : ~6 fois/s suffit à
      donner l'impression d'un flux temps réel sans agiter le lecteur */
   const now = performance.now();
@@ -3627,6 +3885,7 @@ function updateTelemetryPanel(mainPowers, boosting){
   lastTmUpdate = now;
 
   const body = document.getElementById('telemetryBody');
+  if(!body) return;
   const avgMain = mainPowers.reduce(function(a,b){return a+b;},0)/Math.max(mainPowers.length,1);
   let html = '<div class="tm-line'+(boosting?' tm-amber':'')+'">' +
     '<span>RÉACTEURS 1-4</span><span>'+(avgMain>0.02?Math.round(avgMain*100)+'%':'VEILLE')+'</span></div>';
@@ -3646,6 +3905,35 @@ function updateTelemetryPanel(mainPowers, boosting){
   });
   if(!anyRcs) html += '<div class="tm-line tm-off"><span>RCS</span><span>veille</span></div>';
 
+  body.innerHTML = html;
+}
+
+/* =========================================================================
+   TEMPÉRATURE MOTEUR — simulation simple : chaque réacteur chauffe avec sa
+   puissance effective et refroidit plus lentement qu'il ne chauffe (inertie
+   thermique). Affichée dans son propre panneau, à gauche de PROPULSION.
+   ========================================================================= */
+let engineTemps = [43, 41, 44, 40];  /* légère dissymétrie de départ, moins synthétique que 4 valeurs identiques */
+let lastTempUpdate = 0;
+function updateEngineTemps(mainPowers, dt){
+  for(let i=0;i<engineTemps.length;i++){
+    const target = 42 + (mainPowers[i]||0) * 268;  /* ~42°C au repos, jusqu'à ~310°C à pleine puissance */
+    /* monte nettement plus vite qu'elle ne redescend : un réacteur chauffe
+       vite sous charge, mais met du temps à se refroidir une fois coupé */
+    const rate = target > engineTemps[i] ? 0.35 : 0.12;
+    engineTemps[i] += (target - engineTemps[i]) * Math.min(1, dt*rate);
+  }
+
+  const now = performance.now();
+  if(now - lastTempUpdate < 160) return;
+  lastTempUpdate = now;
+  const body = document.getElementById('tempBody');
+  if(!body) return;
+  let html = '';
+  engineTemps.forEach(function(t, i){
+    const cls = t > 220 ? 'tm-hot' : (t > 120 ? 'tm-warm' : 'tm-normal');
+    html += '<div class="tm-line"><span>M'+(i+1)+'</span><span class="'+cls+'">'+Math.round(t)+' °C</span></div>';
+  });
   body.innerHTML = html;
 }
 
