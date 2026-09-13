@@ -1,0 +1,3077 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Voyage spatial — Navigation quantique</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b1220;
+    --bg-2:#0e1729;
+    --panel:#0f1a30;
+    --line:#25375c;
+    --ink:#e8edf5;
+    --muted:#8ea0c4;
+    --muted-2:#5d6f92;
+    --amber:#ffb454;
+    --amber-dim:#a97a3d;
+    --cyan:#5eead4;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; width:100%; height:100%; overflow:hidden;
+    background:var(--bg); color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:'JetBrains Mono',monospace;}
+  canvas#scene{ position:fixed; inset:0; display:block; z-index:0; }
+
+  /* ---------- vignette + scanlines d'ambiance ---------- */
+  .atmo{
+    position:fixed; inset:0; z-index:1; pointer-events:none;
+    background:
+      radial-gradient(ellipse at center, transparent 45%, rgba(2,5,12,0.55) 100%),
+      repeating-linear-gradient(rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 3px);
+  }
+  .speedlines{
+    position:fixed; inset:0; z-index:1; pointer-events:none;
+    background: repeating-conic-gradient(from 0deg, rgba(255,255,255,0.05) 0deg 0.7deg, transparent 0.7deg 6deg);
+    mix-blend-mode:screen;
+    opacity:0;
+    transition:opacity .5s ease;
+  }
+
+  /* ---------- HUD ---------- */
+  #hud{ position:fixed; inset:0; z-index:2; pointer-events:none; }
+  .panel{
+    position:absolute;
+    border:1px solid var(--line);
+    background:linear-gradient(180deg, rgba(94,234,212,0.04), transparent 60%), rgba(15,26,48,0.72);
+    backdrop-filter:blur(2px);
+  }
+  .panel::before, .panel::after{
+    content:""; position:absolute; width:10px; height:10px; border:1.5px solid var(--amber);
+  }
+  .panel::before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }
+  .panel::after{ bottom:-1px; right:-1px; border-left:none; border-top:none; }
+
+  .hud-top{
+    position:absolute; top:0; left:0; right:0;
+    display:flex; justify-content:space-between; align-items:center;
+    padding:10px 18px;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg, rgba(11,18,32,0.85), rgba(11,18,32,0.35));
+    font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted-2);
+  }
+  .hud-top .amber{ color:var(--amber); }
+  .hud-top .live{ color:var(--cyan); }
+  .hud-top .live::before{ content:"●"; margin-right:6px; animation:blink 1.8s infinite; }
+  @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:.25;} }
+
+  .hud-left{ top:64px; left:18px; width:190px; padding:12px 14px; }
+
+  /* ---------- plan de vol ---------- */
+  .hud-route{
+    position:absolute; left:18px; top:210px; width:230px;
+    padding:10px 0 8px;
+    max-height:calc(100vh - 280px);
+    display:flex; flex-direction:column;
+  }
+  .route-title{
+    font-family:'JetBrains Mono',monospace; font-size:10px;
+    letter-spacing:0.14em; text-transform:uppercase; color:var(--muted-2);
+    padding:0 14px 8px; border-bottom:1px solid var(--line);
+  }
+  .route-title .amber{ color:var(--amber); }
+  .route-list{ overflow:hidden; padding:6px 0 0; }
+  .route-leg{
+    display:flex; align-items:baseline; gap:8px;
+    padding:5px 14px;
+    font-family:'JetBrains Mono',monospace; font-size:11px;
+    color:var(--muted-2);
+    border-left:2px solid transparent;
+  }
+  .route-leg .num{ font-size:9px; color:var(--muted-2); min-width:16px; }
+  .route-leg .nm{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .route-leg .dd{ font-size:9px; opacity:0.7; }
+  /* étape franchie */
+  .route-leg.done{ color:var(--muted-2); opacity:0.42; }
+  .route-leg.done .nm{ text-decoration:line-through; }
+  /* étape en cours : clignote */
+  .route-leg.next{
+    color:var(--amber); border-left-color:var(--amber);
+    background:linear-gradient(90deg, rgba(255,180,84,0.10), transparent);
+    animation:legblink 1.4s ease-in-out infinite;
+  }
+  .route-leg.next .num, .route-leg.next .dd{ color:var(--amber); }
+  @keyframes legblink{ 0%,100%{opacity:1;} 50%{opacity:0.38;} }
+  /* étapes à venir */
+  .route-leg.todo{ color:var(--muted); }
+  @media (prefers-reduced-motion: reduce){
+    .route-leg.next{ animation:none; }
+  }
+  @media (max-width:760px){
+    .hud-route{ display:none; }
+  }
+  .hud-right{ top:64px; right:18px; width:240px; padding:12px 14px; }
+
+  .row{ display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px dashed var(--line); }
+  .row:last-child{ border-bottom:none; }
+  .k{ font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted-2); }
+  .v{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--ink); font-weight:500; }
+
+  .hud-right .k{ margin-bottom:8px; }
+  .obj-name{ font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--amber); line-height:1.25; min-height:20px; }
+  .obj-meta{ font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--cyan); margin-top:6px; line-height:1.7; }
+  .obj-meta sub{ font-size:8px; }
+
+  .hud-hint{
+    position:absolute; bottom:16px; left:50%; transform:translateX(-50%);
+    font-size:10.5px; letter-spacing:0.05em; color:var(--muted);
+    background:rgba(15,26,48,0.6); border:1px solid var(--line); padding:7px 14px;
+    white-space:nowrap; transition:opacity .6s ease;
+  }
+  .hud-mode{ position:absolute; top:64px; left:50%; transform:translateX(-50%);
+    padding:5px 14px; border:1px solid var(--line); background:rgba(15,26,48,0.72);
+    font-size:10px; letter-spacing:0.16em; text-transform:uppercase; color:var(--muted-2);
+  }
+  .hud-mode.manual{ color:var(--amber); border-color:var(--amber-dim); }
+  .hud-mode.auto{ color:var(--cyan); }
+
+  /* ---------- panneau de jauges moteur ---------- */
+  .hud-engines{
+    position:absolute; left:50%; bottom:58px; transform:translateX(-50%);
+    padding:6px 14px 6px;
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+  }
+  .engines-title{
+    font-size:8px; letter-spacing:0.16em; color:var(--muted-2);
+  }
+  .engines-row{ display:flex; align-items:flex-end; gap:5px; }
+  .gauge{
+    display:flex; flex-direction:column; align-items:center; gap:2px;
+  }
+  .gauge-track{
+    position:relative; background:#060a14; border:1px solid var(--line);
+    overflow:hidden;
+  }
+  .gauge.main .gauge-track{ width:18px; height:42px; }
+  .gauge.rcs  .gauge-track{ width:7px;  height:28px; }
+  .gauge-fill{
+    position:absolute; left:0; right:0; bottom:0; height:0%;
+    transition:height 0.08s linear;
+  }
+  .gauge.main .gauge-fill{ background:linear-gradient(0deg, #1a5fbf, #6cb8ff); }
+  .gauge.rcs  .gauge-fill{ background:linear-gradient(0deg, var(--amber-dim), var(--amber)); }
+  .gauge.rcs.axis-yaw   .gauge-fill{ background:linear-gradient(0deg, #1d7a70, var(--cyan)); }
+  .gauge.rcs.axis-roll  .gauge-fill{ background:linear-gradient(0deg, #7a4d1d, #ffb454); }
+  .gauge-label{
+    font-size:7.5px; letter-spacing:0.02em; color:var(--muted-2); text-align:center;
+    line-height:1.1;
+  }
+  .gauge-pct{ font-size:7.5px; color:var(--muted); }
+  .gauge-sep{ width:1px; height:28px; align-self:flex-end; background:var(--line); margin:0 2px; }
+  @media (max-width:900px){ .hud-engines{ display:none; } }
+
+  /* ---------- dialogue de télémétrie moteur, projeté près du vaisseau ---------- */
+  .hud-telemetry{
+    position:fixed; z-index:2; pointer-events:none;
+    min-width:190px;
+    padding:8px 10px;
+    background:rgba(8,14,26,0.55);
+    border:1px solid rgba(94,234,212,0.28);
+    backdrop-filter:blur(1.5px);
+    font-size:10px; line-height:1.6; color:var(--cyan);
+    display:none;
+    transition:opacity .15s linear;
+  }
+  .hud-telemetry .tm-title{
+    font-size:8.5px; letter-spacing:0.12em; color:var(--muted-2);
+    border-bottom:1px solid rgba(94,234,212,0.2);
+    padding-bottom:4px; margin-bottom:4px;
+  }
+  .hud-telemetry .tm-line{ display:flex; justify-content:space-between; gap:10px; white-space:nowrap; }
+  .hud-telemetry .tm-off{ color:var(--muted-2); opacity:0.6; }
+  .hud-telemetry .tm-amber{ color:var(--amber); }
+  @media (max-width:760px){ .hud-telemetry{ display:none !important; } }
+
+  /* ---------- étiquettes des étoiles connues, projetées en écran ---------- */
+  #starLabels{ position:fixed; inset:0; z-index:2; pointer-events:none; overflow:hidden; }
+  .star-label{
+    position:absolute;
+    transform:translate(-50%,-100%);
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    color:var(--cyan);
+    text-shadow:0 0 6px rgba(94,234,212,0.6), 0 1px 3px rgba(0,0,0,0.85);
+    white-space:nowrap;
+    display:none;
+    transition:opacity .2s linear;
+  }
+
+  @media (max-width:760px){
+    .hud-left{ width:150px; font-size:11px; }
+    .hud-right{ width:180px; }
+    .hud-hint{ font-size:9px; padding:6px 10px; max-width:90vw; white-space:normal; text-align:center; }
+  }
+
+  /* ---------- écran de démarrage ---------- */
+  #boot{
+    position:fixed; inset:0; z-index:5; background:var(--bg);
+    display:flex; align-items:center; justify-content:center;
+    transition:opacity .8s ease; cursor:pointer;
+  }
+  #boot.hidden{ opacity:0; pointer-events:none; }
+  #boot .term{
+    font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--cyan);
+    line-height:1.9; white-space:pre-wrap; max-width:560px; padding:0 20px;
+  }
+  #boot .term .amber{ color:var(--amber); }
+  #boot .skip{ position:absolute; bottom:24px; font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--muted-2); letter-spacing:0.1em; text-transform:uppercase; }
+</style>
+</head>
+<body>
+
+<canvas id="scene"></canvas>
+<div class="atmo"></div>
+<div class="speedlines" id="speedlines"></div>
+
+<div id="hud">
+  <div id="starLabels"></div>
+  <div class="hud-top">
+    <span><span class="amber">NAVIGATION QUANTIQUE</span> &nbsp;//&nbsp; <span id="shipName" class="mono">R.S.C. VENTARIS</span></span>
+    <span>SEED&nbsp;<span id="seedVal" class="mono amber">—</span>&nbsp;&nbsp;<span class="live">EN LIGNE</span></span>
+  </div>
+
+  <div class="hud-mode auto mono" id="modeBadge">AUTOPILOTE</div>
+
+  <div class="panel hud-left">
+    <div class="row"><span class="k">Vitesse</span><span class="v" id="speedVal">0 u/s</span></div>
+    <div class="row"><span class="k">Secteur</span><span class="v" id="sectorVal">0 · 0 · 0</span></div>
+    <div class="row"><span class="k">Cap</span><span class="v" id="headingVal">000°</span></div>
+  </div>
+
+  <div class="panel hud-route" id="routePanel">
+    <div class="route-title">Plan de vol <span class="amber" id="routeProgress">—</span></div>
+    <div class="route-list" id="routeList"></div>
+  </div>
+
+  <div class="panel hud-right">
+    <div class="k mono">OBJET LE PLUS PROCHE</div>
+    <div class="obj-name" id="nearName">—</div>
+    <div class="obj-meta" id="nearMeta">—</div>
+  </div>
+
+  <div class="hud-hint mono" id="hint">
+    ↑↓←→ / Z Q S D — orientation&nbsp; · &nbsp;A / E — roulis&nbsp; · &nbsp;MAJ — propulsion&nbsp; · &nbsp;glisser la souris — viser&nbsp; · &nbsp;H — masquer
+  </div>
+
+  <!-- panneau des jauges moteur, bas d'écran -->
+  <div class="panel hud-engines" id="enginesPanel">
+    <div class="engines-title mono">PROPULSION</div>
+    <div class="engines-row" id="enginesRow"></div>
+  </div>
+
+  <!-- dialogue de télémétrie flottant, projeté à côté du vaisseau -->
+  <div class="hud-telemetry mono" id="telemetryPanel">
+    <div class="tm-title">COMMANDES MOTEUR</div>
+    <div id="telemetryBody"></div>
+  </div>
+</div>
+
+<div id="boot">
+  <div class="term" id="bootTerm"></div>
+  <div class="skip">cliquer pour ignorer</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+"use strict";
+
+/* =========================================================================
+   1. PRNG SEEDÉ — tout l'univers découle d'une seule graine
+   ========================================================================= */
+function xmur3(str){
+  let h = 1779033703 ^ str.length;
+  for(let i=0;i<str.length;i++){
+    h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+    h = (h<<13) | (h>>>19);
+  }
+  return function(){
+    h = Math.imul(h ^ (h>>>16), 2246822507);
+    h = Math.imul(h ^ (h>>>13), 3266489909);
+    h ^= h>>>16;
+    return h>>>0;
+  };
+}
+function mulberry32(a){
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a>>>15), 1 | a);
+    t = (t + Math.imul(t ^ (t>>>7), 61 | t)) ^ t;
+    return ((t ^ (t>>>14)) >>> 0) / 4294967296;
+  };
+}
+function rngFor(tag){ return mulberry32(xmur3(tag)()); }
+
+const SEED = Date.now().toString(36).toUpperCase() + '-' +
+  Math.floor(Math.random()*46656).toString(36).toUpperCase().padStart(3,'0');
+document.getElementById('seedVal').textContent = SEED;
+
+/* =========================================================================
+   2. GÉNÉRATEUR DE NOMS — mélange de racines grecques, latines, hindi,
+      chinoises, françaises, anglaises, russes, espagnoles, portugaises
+   ========================================================================= */
+const LANG_BANKS = {
+  grec:      ['thal','xan','ory','phe','kass','iot','nyx','ther','poly','aster','dora','krys','helio','sel'],
+  latin:     ['sol','lux','via','nova','terra','ignis','stel','magna','fer','rex','aqua','umbra','ventus','ferox'],
+  hindi:     ['chandra','tara','veer','anant','surya','maya','indra','shakti','deva','loka','ratna','megha'],
+  chinois:   ['xing','tian','long','yun','hai','feng','jing','ming','hua','shan','lan','yue'],
+  francais:  ['etoile','ombre','lune','ciel','feu','vent','noir','clair','riviere','songe','brume','aube'],
+  anglais:   ['star','drift','shadow','edge','far','deep','light','wander','void','dawn','frost','ash'],
+  russe:     ['zvezda','nebo','ogon','burya','tumana','svet','krasny','volna','strannik','zima'],
+  espagnol:  ['estrella','sombra','fuego','cielo','luna','viento','lejano','claro','niebla','alba'],
+  portugais: ['estrela','nevoa','fogo','ceu','lua','vento','distante','bruma','aurora']
+};
+const LANG_KEYS = Object.keys(LANG_BANKS);
+function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+function generateName(rng){
+  const l1 = LANG_KEYS[Math.floor(rng()*LANG_KEYS.length)];
+  let l2 = LANG_KEYS[Math.floor(rng()*LANG_KEYS.length)];
+  let guard = 0;
+  while(l2 === l1 && guard < 5){ l2 = LANG_KEYS[Math.floor(rng()*LANG_KEYS.length)]; guard++; }
+  const bank1 = LANG_BANKS[l1], bank2 = LANG_BANKS[l2];
+  const part1 = cap(bank1[Math.floor(rng()*bank1.length)]);
+  const part2 = bank2[Math.floor(rng()*bank2.length)];
+  const joiner = rng() < 0.45 ? '-' : ' ';
+  let name = part1 + joiner + cap(part2);
+  if(rng() < 0.55){ name += ' ' + Math.floor(rng()*899+100); }
+  return name;
+}
+
+/* =========================================================================
+   2bis. MODÈLE ASTROPHYSIQUE
+   Chaque étoile est tirée d'une population stellaire réaliste puis toutes
+   ses grandeurs observables en découlent par les lois de l'astrophysique.
+   ========================================================================= */
+
+/* --- Classes spectrales de la séquence principale, avec les fractions
+   réellement observées dans le voisinage solaire (les naines M dominent
+   très largement ; les O sont quasi introuvables). --- */
+const SPECTRAL_CLASSES = [
+  /* classe, fraction, masse min/max (M☉), T min/max (K) */
+  {cls:'M', frac:0.7645,  mMin:0.08, mMax:0.45, tMin:2400,  tMax:3700},
+  {cls:'K', frac:0.1210,  mMin:0.45, mMax:0.80, tMin:3700,  tMax:5200},
+  {cls:'G', frac:0.0760,  mMin:0.80, mMax:1.04, tMin:5200,  tMax:6000},
+  {cls:'F', frac:0.0300,  mMin:1.04, mMax:1.40, tMin:6000,  tMax:7500},
+  {cls:'A', frac:0.0060,  mMin:1.40, mMax:2.10, tMin:7500,  tMax:10000},
+  {cls:'B', frac:0.0013,  mMin:2.10, mMax:16.0, tMin:10000, tMax:30000},
+  {cls:'O', frac:0.00003, mMin:16.0, mMax:60.0, tMin:30000, tMax:45000}
+];
+
+/* Classes de luminosité (Yerkes). La séquence principale domine, mais on
+   garde une minorité de géantes, supergéantes et naines blanches. */
+const LUMINOSITY_CLASSES = [
+  {code:'V',   label:'naine (séquence principale)', frac:0.880},
+  {code:'IV',  label:'sous-géante',                 frac:0.030},
+  {code:'III', label:'géante',                      frac:0.045},
+  {code:'I',   label:'supergéante',                 frac:0.003},
+  {code:'D',   label:'naine blanche',               frac:0.042}
+];
+
+const T_SUN = 5772;          // température effective du Soleil (K)
+const MBOL_SUN = 4.74;       // magnitude bolométrique absolue du Soleil
+
+function pickWeighted(rng, table){
+  let total = 0;
+  for(const e of table) total += e.frac;
+  let r = rng()*total;
+  for(const e of table){ r -= e.frac; if(r <= 0) return e; }
+  return table[table.length-1];
+}
+
+/* --- Loi de Planck → chromaticité CIE → sRGB linéaire.
+   Approximation analytique du lieu planckien (valide ~1700–25000 K),
+   c'est ainsi qu'on obtient la vraie couleur d'un corps noir. --- */
+function blackbodyRGB(T){
+  const t = Math.max(1700, Math.min(40000, T));
+  let x;
+  if(t <= 4000){
+    x = -0.2661239e9/(t*t*t) - 0.2343589e6/(t*t) + 0.8776956e3/t + 0.179910;
+  } else {
+    x = -3.0258469e9/(t*t*t) + 2.1070379e6/(t*t) + 0.2226347e3/t + 0.240390;
+  }
+  let y;
+  if(t <= 2222){
+    y = -1.1063814*x*x*x - 1.34811020*x*x + 2.18555832*x - 0.20219683;
+  } else if(t <= 4000){
+    y = -0.9549476*x*x*x - 1.37418593*x*x + 2.09137015*x - 0.16748867;
+  } else {
+    y =  3.0817580*x*x*x - 5.87338670*x*x + 3.75112997*x - 0.37001483;
+  }
+  /* xyY (Y=1) → XYZ */
+  const X = x/y, Y = 1.0, Z = (1-x-y)/y;
+  /* XYZ → sRGB linéaire (matrice sRGB D65) */
+  let r =  3.2406*X - 1.5372*Y - 0.4986*Z;
+  let g = -0.9689*X + 1.8758*Y + 0.0415*Z;
+  let b =  0.0557*X - 0.2040*Y + 1.0570*Z;
+  /* on normalise sur le canal le plus fort : on conserve la TEINTE,
+     l'intensité étant portée séparément par la luminosité */
+  const max = Math.max(r,g,b,1e-6);
+  r = Math.max(0, r/max); g = Math.max(0, g/max); b = Math.max(0, b/max);
+  return {r:r, g:g, b:b};
+}
+
+/* --- Relation masse-luminosité (séquence principale), par domaines --- */
+function luminosityFromMass(M){
+  if(M < 0.43)  return 0.23 * Math.pow(M, 2.3);
+  if(M < 2.0)   return Math.pow(M, 4.0);
+  if(M < 55.0)  return 1.4 * Math.pow(M, 3.5);
+  return 32000 * M;
+}
+
+/* --- Loi de Stefan-Boltzmann : L = 4πR²σT⁴, donc R/R☉ dérive de L et T --- */
+function radiusFromLT(L, T){
+  return Math.sqrt(L) * Math.pow(T_SUN/T, 2);
+}
+
+/* --- Magnitude apparente : loi en carré inverse via le module de distance
+   m = M_bol + 5·log10(d/10pc) --- */
+function apparentMagnitude(L, distPc){
+  const Mbol = MBOL_SUN - 2.5*Math.log10(Math.max(L, 1e-8));
+  const d = Math.max(distPc, 1e-4);
+  return Mbol + 5*Math.log10(d/10);
+}
+
+/* --- Génère une étoile physiquement cohérente à partir du PRNG seedé --- */
+function generateStar(rng){
+  const sc = pickWeighted(rng, SPECTRAL_CLASSES);
+  const lc = pickWeighted(rng, LUMINOSITY_CLASSES);
+
+  /* Fonction de masse initiale de Salpeter (dN/dM ∝ M^-2.35) échantillonnée
+     par transformation inverse à l'intérieur du domaine de la classe. */
+  const alpha = 2.35;
+  const a = Math.pow(sc.mMin, 1-alpha), b = Math.pow(sc.mMax, 1-alpha);
+  let mass = Math.pow(a + rng()*(b-a), 1/(1-alpha));
+
+  /* Sous-classe 0–9 : position dans le domaine de température (0 = plus chaud) */
+  const tFrac = rng();
+  let temp = sc.tMax - tFrac*(sc.tMax - sc.tMin);
+  const sub = Math.min(9, Math.floor(tFrac*10));
+
+  let lum = luminosityFromMass(mass);
+
+  /* Les classes évoluées s'écartent de la séquence principale : une géante a
+     quitté la fusion de l'hydrogène en cœur, s'est dilatée et refroidie. */
+  if(lc.code === 'IV'){ lum *= 2.5 + rng()*3; }
+  else if(lc.code === 'III'){ lum *= 25 + rng()*60;  temp *= 0.72; }
+  else if(lc.code === 'I'){   lum *= 4000 + rng()*20000; temp *= 0.62; }
+  else if(lc.code === 'D'){
+    /* Naine blanche : cœur dégénéré, très chaude mais de la taille de la Terre */
+    temp = 6000 + rng()*24000;
+    mass = 0.5 + rng()*0.7;
+    lum = 4*Math.PI*Math.pow(0.013, 2)*Math.pow(temp/T_SUN, 4);
+  }
+  /* Plancher physique : aucune étoile connue ne descend sous ~2000 K
+     (limite de la fusion de l'hydrogène ; en dessous ce sont des naines brunes) */
+  if(lc.code !== 'D') temp = Math.max(temp, 2100);
+
+  const radius = (lc.code === 'D') ? 0.013*Math.pow(0.6/mass, 1/3) : radiusFromLT(lum, temp);
+  const color = blackbodyRGB(temp);
+
+  const designation = (lc.code === 'D')
+    ? 'D' + sc.cls + ' ' + sub
+    : sc.cls + sub + ' ' + lc.code;
+
+  return {
+    spectralClass: sc.cls,
+    subClass: sub,
+    lumClass: lc.code,
+    lumLabel: lc.label,
+    designation: designation,
+    temp: temp,          // K
+    mass: mass,          // M☉
+    lum: lum,            // L☉
+    radius: radius,      // R☉
+    color: color         // sRGB linéaire normalisé (teinte de corps noir)
+  };
+}
+/* Types de nébuleuses : couleur de cœur (colorA) et couleur de bord (colorB).
+   Le dégradé cœur→bord est ce qui donne leur volume aux bouffées de gaz. */
+const NEBULA_TYPES = [
+  {name:'Nébuleuse en émission',    colorA:0xff5d8a, colorB:0x7a2d6b},
+  {name:'Région HII',               colorA:0xff8fa8, colorB:0x8e3f7a},
+  {name:'Nébuleuse obscure',        colorA:0x3a2a5c, colorB:0x140e26},
+  {name:'Nébuleuse planétaire',     colorA:0x7dffe8, colorB:0x1d6f82},
+  {name:'Rémanent de supernova',    colorA:0xffb066, colorB:0x8f3a2a},
+  {name:'Pouponnière stellaire',    colorA:0xc08cff, colorB:0x3d47a8},
+  {name:'Nébuleuse par réflexion',  colorA:0x8fb8ff, colorB:0x2a3f8f},
+  {name:'Nuage moléculaire',        colorA:0x5e7ba8, colorB:0x1e2a4d},
+  {name:'Nébuleuse en émission OIII',colorA:0x6fffc4, colorB:0x2a7a6b}
+];
+
+/* =========================================================================
+   3. SCÈNE THREE.JS
+   ========================================================================= */
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x0b1220, 0.00026);
+
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 6000);
+
+window.addEventListener('resize', function(){
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+});
+
+/* lumière d'appoint très faible : l'espace n'a pas d'éclairage ambiant réel,
+   mais un minimum reste nécessaire pour que la coque ne soit pas un aplat noir */
+scene.add(new THREE.AmbientLight(0x141c2e, 0.55));
+
+/* ---------- éclairage du vaisseau par l'étoile la plus proche ----------
+   Une unique lumière directionnelle joue le rôle de « soleil local ». Sa
+   direction, sa couleur et son intensité convergent en douceur vers celles
+   de l'étoile dominante, de sorte que passer d'une étoile à l'autre se
+   traduit par un fondu progressif et non par un saut brutal. */
+const starLight = new THREE.DirectionalLight(0xdfe8ff, 1.0);
+starLight.position.set(4,6,3);
+scene.add(starLight);
+
+const lightState = {
+  dir: new THREE.Vector3(0.5,0.8,0.4).normalize(),
+  color: new THREE.Color(0xdfe8ff),
+  intensity: 0.8
+};
+const _lightTmpDir = new THREE.Vector3();
+const _lightTmpCol = new THREE.Color();
+
+function updateStarLighting(dt){
+  let best = null, bestScore = -Infinity, bestDist = 0;
+  starField.forEach(function(obj){
+    if(!obj) return;
+    const d = Math.max(obj.mesh.position.distanceTo(shipRig.position), 1);
+    /* « étoile dominante » = celle dont le flux reçu est le plus fort :
+       c'est bien la loi en carré inverse qui départage, pas la seule distance */
+    const flux = obj.star.lum/(d*d);
+    if(flux > bestScore){ bestScore = flux; best = obj; bestDist = d; }
+  });
+
+  if(best){
+    _lightTmpDir.copy(best.mesh.position).sub(shipRig.position).normalize();
+    _lightTmpCol.setRGB(best.star.color.r, best.star.color.g, best.star.color.b);
+    /* éclairement reçu, compressé pour rester dans une plage exploitable */
+    const illum = THREE.MathUtils.clamp(
+      Math.pow(best.star.lum/(bestDist*bestDist) * 9000, 0.32), 0.12, 2.4
+    );
+    /* convergence exponentielle : ~1.1 s de fondu, indépendante du framerate */
+    const k = 1 - Math.exp(-dt*0.9);
+    lightState.dir.lerp(_lightTmpDir, k).normalize();
+    lightState.color.lerp(_lightTmpCol, k);
+    lightState.intensity += (illum - lightState.intensity)*k;
+  } else {
+    const k = 1 - Math.exp(-dt*0.9);
+    lightState.intensity += (0.15 - lightState.intensity)*k;
+  }
+
+  starLight.position.copy(shipRig.position).addScaledVector(lightState.dir, 100);
+  starLight.target.position.copy(shipRig.position);
+  starLight.target.updateMatrixWorld();
+  starLight.color.copy(lightState.color);
+  starLight.intensity = lightState.intensity;
+}
+scene.add(starLight.target);
+
+/* ---------- texture de lueur générée en canvas (pas d'asset externe) ---------- */
+function makeGlowTexture(){
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(64,64,0,64,64,64);
+  g.addColorStop(0,'rgba(255,255,255,1)');
+  g.addColorStop(0.35,'rgba(255,255,255,0.55)');
+  g.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle = g; ctx.fillRect(0,0,128,128);
+  return new THREE.CanvasTexture(c);
+}
+const glowTex = makeGlowTexture();
+
+/* ---------- texture de bruit fBm à 4 canaux indépendants ----------
+   Repris du principe de nebula.frag : le bruit est PRÉ-CALCULÉ dans une
+   texture plutôt que recalculé par fragment. Une seule lecture de texture
+   remplace une fBm procédurale — c'est ce qui permet d'afficher des
+   centaines de bouffées de gaz sans effondrer le framerate.
+   Les 4 canaux R/G/B/A portent 4 champs de bruit décorrélés : chaque
+   bouffée en choisit un, ce qui évite toute répétition visible. */
+function makeNoiseTexture(size){
+  const rng = rngFor(SEED+':noise');
+  const N = size || 256;
+
+  /* bruit de valeur sur grille, interpolé en douceur */
+  function valueNoiseGrid(res){
+    const g = new Float32Array(res*res);
+    for(let i=0;i<res*res;i++) g[i] = rng();
+    return g;
+  }
+  function sampleGrid(g, res, x, y){
+    /* coordonnées enroulées => texture raccordable sans couture */
+    const xi = Math.floor(x), yi = Math.floor(y);
+    const xf = x-xi, yf = y-yi;
+    const sx = xf*xf*(3-2*xf), sy = yf*yf*(3-2*yf);
+    const i0 = ((xi%res)+res)%res, i1 = (i0+1)%res;
+    const j0 = ((yi%res)+res)%res, j1 = (j0+1)%res;
+    const a = g[j0*res+i0], b = g[j0*res+i1];
+    const c = g[j1*res+i0], d = g[j1*res+i1];
+    return (a+(b-a)*sx) + ((c+(d-c)*sx) - (a+(b-a)*sx))*sy;
+  }
+  function fbmChannel(){
+    const octaves = [8, 16, 32, 64];
+    const grids = octaves.map(function(r){ return {res:r, g:valueNoiseGrid(r)}; });
+    const out = new Float32Array(N*N);
+    let min = Infinity, max = -Infinity;
+    for(let y=0;y<N;y++){
+      for(let x=0;x<N;x++){
+        let v = 0, amp = 0.5;
+        for(const o of grids){
+          v += amp * sampleGrid(o.g, o.res, x/N*o.res, y/N*o.res);
+          amp *= 0.5;
+        }
+        out[y*N+x] = v;
+        if(v<min) min=v; if(v>max) max=v;
+      }
+    }
+    /* normalisation sur 0..1 pour exploiter toute la dynamique */
+    const span = Math.max(max-min, 1e-6);
+    for(let i=0;i<out.length;i++) out[i] = (out[i]-min)/span;
+    return out;
+  }
+
+  const chans = [fbmChannel(), fbmChannel(), fbmChannel(), fbmChannel()];
+  const data = new Uint8Array(N*N*4);
+  for(let i=0;i<N*N;i++){
+    data[i*4]   = chans[0][i]*255;
+    data[i*4+1] = chans[1][i]*255;
+    data[i*4+2] = chans[2][i]*255;
+    data[i*4+3] = chans[3][i]*255;
+  }
+  const tex = new THREE.DataTexture(data, N, N, THREE.RGBAFormat);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.minFilter = THREE.LinearMipMapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.generateMipmaps = true;
+  tex.needsUpdate = true;
+  return tex;
+}
+const noiseTex = makeNoiseTexture(256);
+
+/* =========================================================================
+   3bis. SHADER DE SURFACE STELLAIRE
+   Photosphère avec assombrissement centre-bord (approximation d'Eddington :
+   I(μ)/I(1) = 1 - u(1-μ), u≈0.6) + granulation convective et taches.
+   ========================================================================= */
+const STAR_VERT = `
+  varying vec3 vNormal;
+  varying vec3 vPos;
+  varying vec3 vWorldPos;
+  void main(){
+    vNormal = normalize(normalMatrix * normal);
+    vPos = position;
+    /* modelMatrix n'est PAS auto-déclaré dans le fragment shader par
+       Three.js (seul le vertex shader le reçoit) : on calcule donc la
+       position monde ICI et on la transmet en varying, plutôt que de
+       refaire la multiplication côté fragment — ce qui ne compilait pas. */
+    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vWorldPos = wp.xyz;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+const STAR_FRAG = `
+  precision highp float;
+  varying vec3 vNormal;
+  varying vec3 vPos;
+  varying vec3 vWorldPos;
+  uniform vec3 baseColor;
+  uniform float limbU;
+  uniform float time;
+  uniform float granulation;
+  uniform float seed;
+
+  float hash(vec3 p){
+    p = fract(p*0.3183099 + vec3(0.1,0.2,0.3));
+    p *= 17.0;
+    return fract(p.x*p.y*p.z*(p.x+p.y+p.z));
+  }
+  float noise(vec3 x){
+    vec3 i = floor(x); vec3 f = fract(x);
+    f = f*f*(3.0-2.0*f);
+    return mix(
+      mix(mix(hash(i+vec3(0,0,0)),hash(i+vec3(1,0,0)),f.x),
+          mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x), f.y),
+      mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),
+          mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x), f.y), f.z);
+  }
+  float fbm(vec3 p){
+    float v=0.0, a=0.5;
+    for(int i=0;i<3;i++){ v += a*noise(p); p *= 2.1; a *= 0.5; }
+    return v;
+  }
+  void main(){
+    /* mu = cosinus de l'angle entre la normale et la ligne de visée */
+    vec3 viewDir = normalize(cameraPosition - vWorldPos);
+    float mu = clamp(dot(normalize(vNormal), normalize(viewDir)), 0.0, 1.0);
+
+    /* assombrissement centre-bord : le bord du disque est plus froid/sombre
+       car on y voit des couches plus hautes de la photosphère */
+    float limb = 1.0 - limbU*(1.0 - mu);
+
+    /* granulation convective : cellules qui se renouvellent lentement */
+    vec3 gp = normalize(vPos)*7.0 + vec3(seed);
+    float gran = fbm(gp + vec3(0.0, 0.0, time*0.08));
+    float cells = mix(1.0, 0.80 + 0.40*gran, granulation);
+
+    /* taches stellaires (zones magnétiques plus froides) */
+    float spot = smoothstep(0.62, 0.78, fbm(gp*0.45 + vec3(seed*1.7)));
+    cells *= mix(1.0, 0.55, spot*granulation);
+
+    /* le bord paraît plus rouge : les couches hautes rayonnent plus froid */
+    vec3 col = baseColor * limb * cells;
+    col = mix(col, col*vec3(1.15, 0.80, 0.58), (1.0-mu)*0.55);
+
+    gl_FragColor = vec4(col, 1.0);
+  }
+`;
+
+/* ---------- étiquettes DOM des étoiles connues (projetées à l'écran) ---------- */
+const labelContainer = document.getElementById('starLabels');
+function createStarLabel(text){
+  const el = document.createElement('div');
+  el.className = 'star-label';
+  el.textContent = text;
+  labelContainer.appendChild(el);
+  return el;
+}
+
+/* =========================================================================
+   4. FOND D'ÉTOILES DÉCORATIVES — plusieurs couches, recentrées sur le
+      vaisseau à chaque image pour rester "infinies" et toujours denses
+   ========================================================================= */
+const backdrop = new THREE.Group();
+scene.add(backdrop);
+window.__backdrop = backdrop;
+
+/* Les étoiles de fond suivent la même population que les étoiles nommées :
+   couleur de corps noir issue de leur température, taille du point pilotée
+   par la magnitude apparente (loi en carré inverse) — d'où un ciel très
+   majoritairement composé de points rouges/orangés faibles, ponctué de
+   rares étoiles blanc-bleu éclatantes, comme le ciel réel.
+
+   Optimisation : générer intégralement 200 000+ étoiles coûterait près
+   d'une seconde de blocage au démarrage. On tire donc UN ÉCHANTILLON de la
+   population (quelques milliers d'étoiles complètes), puis chaque point du
+   fond pioche dedans. La distribution statistique reste rigoureusement
+   celle du modèle — seule la diversité des valeurs exactes est finie, ce
+   qui est invisible sur des points de quelques pixels. */
+const STAR_SAMPLE = (function(){
+  const rng = rngFor(SEED+':starsample');
+  const N = 3000;
+  const sample = new Array(N);
+  for(let i=0;i<N;i++){
+    const s = generateStar(rng);
+    sample[i] = {r:s.color.r, g:s.color.g, b:s.color.b, lum:s.lum};
+  }
+  return sample;
+})();
+
+function buildStarLayer(tag, count, rMin, rMax, sizeScale, opts){
+  opts = opts || {};
+  const rng = rngFor(SEED+':'+tag);
+  const positions = new Float32Array(count*3);
+  const colors = new Float32Array(count*3);
+  const sizes = new Float32Array(count);
+  for(let i=0;i<count;i++){
+    const r = rMin + rng()*(rMax-rMin);
+    const theta = rng()*Math.PI*2;
+    const phi = Math.acos(2*rng()-1);
+    positions[i*3]   = r*Math.sin(phi)*Math.cos(theta);
+    positions[i*3+1] = r*Math.sin(phi)*Math.sin(theta);
+    positions[i*3+2] = r*Math.cos(phi);
+
+    const star = STAR_SAMPLE[(rng()*STAR_SAMPLE.length)|0];
+    colors[i*3] = star.r; colors[i*3+1] = star.g; colors[i*3+2] = star.b;
+
+    /* magnitude apparente → taille perçue. L'échelle des magnitudes est
+       logarithmique : 5 magnitudes = facteur 100 en flux. */
+    const distPc = r / 38;
+    const mag = apparentMagnitude(star.lum, distPc);
+    const brightness = Math.pow(10, -0.4*(mag - 6.0));  // normalisé sur mag 6 (limite œil nu)
+    sizes[i] = sizeScale * THREE.MathUtils.clamp(Math.pow(brightness, 0.22), 0.35, 4.5);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions,3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors,3));
+  geo.setAttribute('aSize', new THREE.BufferAttribute(sizes,1));
+
+  const mat = new THREE.ShaderMaterial({
+    uniforms:{
+      map:{value:glowTex},
+      uOpacity:{value: opts.opacity!==undefined?opts.opacity:1}
+    },
+    vertexShader:`
+      attribute float aSize;
+      varying vec3 vColor;
+      void main(){
+        vColor = color;
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = aSize * (300.0 / max(-mv.z, 1.0));
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader:`
+      precision highp float;
+      uniform sampler2D map;
+      uniform float uOpacity;
+      varying vec3 vColor;
+      void main(){
+        vec4 t = texture2D(map, gl_PointCoord);
+        gl_FragColor = vec4(vColor * t.a, t.a * uOpacity);
+      }
+    `,
+    transparent:true,
+    depthWrite:false,
+    vertexColors:true,
+    blending:THREE.AdditiveBlending,
+    fog:false
+  });
+  const points = new THREE.Points(geo, mat);
+  points.frustumCulled = false;
+  backdrop.add(points);
+  return points;
+}
+
+/* couche lointaine très dense, étoiles faibles (le gros du ciel réel) */
+buildStarLayer('skybox', 70000, 2400, 4200, 1.45, {opacity:0.62});
+/* seconde couche lointaine décalée : renforce la granularité du fond */
+buildStarLayer('skybox2', 52000, 1900, 3600, 1.20, {opacity:0.52});
+/* troisième couche : comble les vides, donne l'impression de voie lactée */
+buildStarLayer('skybox3', 38000, 1500, 3100, 1.00, {opacity:0.44});
+/* couche intermédiaire — donne de la profondeur en volant */
+buildStarLayer('dust', 44000, 700, 2300, 1.10, {opacity:0.55});
+/* couche proche supplémentaire : parallaxe marquée au passage */
+buildStarLayer('dust2', 18000, 380, 1100, 0.95, {opacity:0.48});
+/* étoiles décoratives proches, statistiquement les plus brillantes du champ */
+buildStarLayer('accent', 700, 500, 2600, 3.0, {opacity:0.9});
+
+/* =========================================================================
+   5. LE VAISSEAU — PORTE-CONTENEURS SPATIAL (low poly)
+   Silhouette en deux blocs : une longue nacelle cargo à claire-voie remplie
+   de conteneurs colorés à l'avant, reliée par une épine dorsale à un bloc
+   propulsif arrière massif portant la passerelle et une grappe de quatre
+   réacteurs. Le nez pointe vers -Z.
+   ========================================================================= */
+const shipRig = new THREE.Object3D();
+scene.add(shipRig);
+
+const shipMesh = new THREE.Group();
+shipRig.add(shipMesh);
+
+/* immatriculation dérivée du seed — peinte sur le flanc du bloc arrière */
+const SHIP_REGISTRY = (function(){
+  const rng = rngFor(SEED+':registry');
+  const prefixes = ['MIR','KAI','VEGA','ORIN','TALA','NOVA','SUR','HELI'];
+  return prefixes[Math.floor(rng()*prefixes.length)] + '-' +
+         String(Math.floor(rng()*89)+10);
+})();
+
+(function buildShip(){
+  const rng = rngFor(SEED+':ship');
+
+  /* ---------- palette ---------- */
+  const redHull   = new THREE.MeshStandardMaterial({color:0x8f3026, metalness:0.35, roughness:0.72});
+  const redDark   = new THREE.MeshStandardMaterial({color:0x6b241d, metalness:0.35, roughness:0.78});
+  const greyDeck  = new THREE.MeshStandardMaterial({color:0x5a6067, metalness:0.55, roughness:0.60});
+  const darkPanel = new THREE.MeshStandardMaterial({color:0x23272d, metalness:0.50, roughness:0.70});
+  const frameMat  = new THREE.MeshStandardMaterial({color:0x7a2c23, metalness:0.40, roughness:0.70});
+  const glassMat  = new THREE.MeshStandardMaterial({color:0x0d1a2a, metalness:0.85, roughness:0.20,
+                                                    emissive:0x1b3a5c, emissiveIntensity:0.6});
+
+  /* =======================================================================
+     A. BLOC PROPULSIF ARRIÈRE — masse principale, peinte en rouge
+     ======================================================================= */
+  const aft = new THREE.Group();
+  aft.position.z = 6;
+  shipMesh.add(aft);
+
+  /* corps principal : caisson trapézoïdal (plus étroit vers l'avant) */
+  /* corps principal : caisson trapézoïdal (prisme à section carrée).
+     La rotation de 45° qui met les faces à plat doit être CUITE DANS LA
+     GÉOMÉTRIE (rotateY = axe propre du prisme). L'appliquer via
+     `mesh.rotation.z` basculerait l'axe du caisson de 45° en travers du
+     vaisseau, car l'ordre d'Euler XYZ compose R = Rx·Ry·Rz. */
+  const bodyGeo = new THREE.CylinderGeometry(4.4, 4.4, 15, 4, 1);
+  bodyGeo.rotateY(Math.PI/4);
+  const body = new THREE.Mesh(bodyGeo, redHull);
+  body.rotation.x = Math.PI/2;   /* axe du prisme → +Z : perpendiculaire à la section */
+  body.scale.set(1.35, 1, 0.72); /* aplati : large et bas */
+  aft.add(body);
+  /* demi-cotes réelles du caisson après rotation + échelle, pour caler
+     précisément tous les éléments rapportés dessus */
+  const BODY_HW = 4.4*Math.SQRT1_2*1.35;   /* demi-largeur  ≈ 4.20 */
+  const BODY_HH = 4.4*Math.SQRT1_2*0.72;   /* demi-hauteur  ≈ 2.24 */
+  const BODY_HL = 7.5;                     /* demi-longueur */
+
+  /* casquette supérieure grise (pont technique) */
+  const topDeck = new THREE.Mesh(new THREE.BoxGeometry(7.4, 0.5, 12), greyDeck);
+  topDeck.position.set(0.9, BODY_HH + 0.25, 0.4);
+  aft.add(topDeck);
+
+  /* flancs sombres nervurés */
+  [-1,1].forEach(function(s){
+    const flank = new THREE.Mesh(new THREE.BoxGeometry(0.35, 3.2, 12.5), darkPanel);
+    flank.position.set(s*(BODY_HW + 0.15), -0.4, 0.3);
+    aft.add(flank);
+    /* nervures horizontales */
+    for(let i=0;i<4;i++){
+      const rib = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.16, 11), redDark);
+      rib.position.set(s*(BODY_HW + 0.40), -1.6 + i*0.85, 0.3);
+      aft.add(rib);
+    }
+  });
+
+  /* grille de radiateur sur le dessus, façon panneau ventilé */
+  const grille = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.14, 5.2), darkPanel);
+  grille.position.set(0.4, BODY_HH + 0.57, -1.2);
+  aft.add(grille);
+  for(let i=0;i<7;i++){
+    const slat = new THREE.Mesh(new THREE.BoxGeometry(4.3, 0.10, 0.30), greyDeck);
+    slat.position.set(0.4, BODY_HH + 0.65, -3.4 + i*0.72);
+    aft.add(slat);
+  }
+
+  /* immatriculation peinte sur le flanc bâbord */
+  (function paintRegistry(){
+    const c = document.createElement('canvas');
+    c.width = 512; c.height = 128;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0,0,512,128);
+    ctx.fillStyle = 'rgba(198,205,212,0.82)';
+    ctx.font = 'bold 84px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(SHIP_REGISTRY, 256, 68);
+    const tex = new THREE.CanvasTexture(c);
+    tex.anisotropy = 4;
+    const mat = new THREE.MeshBasicMaterial({map:tex, transparent:true, depthWrite:false});
+    [-1,1].forEach(function(s){
+      const decal = new THREE.Mesh(new THREE.PlaneGeometry(7.5, 1.9), mat);
+      decal.position.set(s*(BODY_HW + 0.38), -1.5, 1.2);
+      decal.rotation.y = s*Math.PI/2;
+      aft.add(decal);
+    });
+  })();
+
+  /* ---------- passerelle décalée sur le pont supérieur ---------- */
+  const bridge = new THREE.Group();
+  bridge.position.set(-1.3, BODY_HH + 1.25, -3.6);
+  aft.add(bridge);
+
+  const bridgeHull = new THREE.Mesh(new THREE.BoxGeometry(3.4, 1.5, 5.4), redHull);
+  bridge.add(bridgeHull);
+  /* toit incliné */
+  const bridgeTop = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.45, 4.4), redDark);
+  bridgeTop.position.y = 0.95;
+  bridge.add(bridgeTop);
+  /* bandeau de verrière tourné vers l'avant */
+  const windows = new THREE.Mesh(new THREE.BoxGeometry(3.1, 0.55, 0.22), glassMat);
+  windows.position.set(0, 0.25, -2.72);
+  bridge.add(windows);
+  /* mâts d'antenne */
+  [-0.9, 0.9].forEach(function(x){
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.8, 6), greyDeck);
+    mast.position.set(x, 1.9, -0.6);
+    bridge.add(mast);
+  });
+
+  /* =======================================================================
+     B. GRAPPE DE QUATRE RÉACTEURS (2x2) à l'arrière
+     ======================================================================= */
+  window.__engineGlows = [];
+  window.__engineCones = [];
+  const nozzleMat = new THREE.MeshStandardMaterial({color:0x33383f, metalness:0.8, roughness:0.35});
+  const plumeMat = new THREE.SpriteMaterial({map:glowTex, color:0x4da6ff,
+    blending:THREE.AdditiveBlending, transparent:true, depthWrite:false});
+
+  [[-2.3,-1.3],[2.3,-1.3],[-2.3,1.3],[2.3,1.3]].forEach(function(p){
+    const ex = p[0], ey = p[1];
+    /* carter du réacteur */
+    const housing = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.45, 3.4, 8), nozzleMat);
+    housing.rotation.x = Math.PI/2;
+    housing.position.set(ex, ey, 8.6);
+    aft.add(housing);
+    /* anneau de tuyère */
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.25, 0.5, 8), redDark);
+    ring.rotation.x = Math.PI/2;
+    ring.position.set(ex, ey, 10.2);
+    aft.add(ring);
+    /* cœur incandescent */
+    const coreGlow = new THREE.Sprite(plumeMat.clone());
+    coreGlow.scale.set(3.0, 3.0, 1);
+    coreGlow.position.set(ex, ey, 10.6);
+    aft.add(coreGlow);
+    window.__engineGlows.push(coreGlow);
+    /* panache : cône dont la BASE est calée sur la tuyère et l'apex vers
+       l'arrière. On translate la géométrie pour que la base soit à l'origine
+       locale — ainsi l'allongement en propulsion étire le panache vers
+       l'arrière sans décoller sa base du réacteur. */
+    const PLUME_LEN = 13;
+    const coneGeo = new THREE.ConeGeometry(0.95, PLUME_LEN, 10, 1, true);
+    coneGeo.translate(0, PLUME_LEN/2, 0);   /* base en Y=0, apex en Y=+len */
+    const coneMat = new THREE.MeshBasicMaterial({
+      color:0x3d93ff, transparent:true, opacity:0.26,
+      blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide
+    });
+    const cone = new THREE.Mesh(coneGeo, coneMat);
+    cone.rotation.x = Math.PI/2;            /* +Y local → +Z monde (vers l'arrière) */
+    cone.position.set(ex, ey, 10.3);
+    aft.add(cone);
+    window.__engineCones.push(cone);
+  });
+
+  /* =======================================================================
+     B-bis. MINI-PROPULSEURS D'ATTITUDE (RCS)
+     Tuyères de manœuvre réparties sur la coque. En vol spatial, tourner
+     suppose un couple : chaque rotation allume les tuyères opposées deux à
+     deux. On les regroupe par axe et par sens, pour n'allumer que celles
+     qui produisent effectivement le couple demandé.
+     Convention : `axis` = yaw|pitch|roll, `sign` = sens du couple.
+     ======================================================================= */
+  window.__rcs = [];
+  const rcsNozzleMat = new THREE.MeshStandardMaterial({color:0x2b3037, metalness:0.75, roughness:0.45});
+
+  /* géométrie de trainée partagée : cône dont la BASE est à l'origine locale
+     et l'apex en +Y. Un cône (et non un sprite) est indispensable ici : un
+     sprite reste face caméra, donc l'allonger l'étirerait à l'écran au lieu
+     de l'étirer dans l'axe d'éjection des gaz. */
+  const RCS_TRAIL_LEN = 2.4;
+  const rcsTrailGeo = new THREE.ConeGeometry(0.20, RCS_TRAIL_LEN, 7, 1, true);
+  rcsTrailGeo.translate(0, RCS_TRAIL_LEN/2, 0);
+
+  /* pos = emplacement sur la coque ; dir = direction d'éjection des gaz */
+  function addRCS(pos, dir, axis, sign, scale){
+    const g = new THREE.Group();
+    g.position.set(pos[0], pos[1], pos[2]);
+    const d = new THREE.Vector3(dir[0], dir[1], dir[2]).normalize();
+    const orient = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), d);
+
+    /* petite tuyère conique, tournée vers la direction d'éjection */
+    const nz = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.22, 0.34, 6), rcsNozzleMat);
+    nz.quaternion.copy(orient);
+    nz.position.copy(d).multiplyScalar(0.17);
+    g.add(nz);
+
+    /* trainée : cône additif aligné sur l'axe d'éjection, éteint par défaut */
+    const trailMat = new THREE.MeshBasicMaterial({
+      color:0x7ec8ff, transparent:true, opacity:0,
+      blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide
+    });
+    const jet = new THREE.Mesh(rcsTrailGeo, trailMat);
+    jet.quaternion.copy(orient);
+    jet.position.copy(d).multiplyScalar(0.28);
+    jet.visible = false;
+    g.add(jet);
+
+    aft.add(g);
+    window.__rcs.push({jet:jet, axis:axis, sign:sign, base:(scale||1)});
+  }
+
+  /* --- LACET (yaw) : tuyères latérales, éjection vers l'extérieur ---
+     Virer à gauche = pousser la proue à gauche : tuyère avant tribord +
+     tuyère arrière bâbord. */
+  const RX = BODY_HW + 0.1;
+  addRCS([ RX,  0.2, -5.5], [ 1, 0, 0], 'yaw',  1, 1.0);  /* avant tribord */
+  addRCS([-RX,  0.2,  5.0], [-1, 0, 0], 'yaw',  1, 1.0);  /* arrière bâbord */
+  addRCS([-RX,  0.2, -5.5], [-1, 0, 0], 'yaw', -1, 1.0);  /* avant bâbord */
+  addRCS([ RX,  0.2,  5.0], [ 1, 0, 0], 'yaw', -1, 1.0);  /* arrière tribord */
+
+  /* --- TANGAGE (pitch) : tuyères dorsales et ventrales --- */
+  const RY = BODY_HH + 0.1;
+  addRCS([-1.6,  RY, -5.5], [0,  1, 0], 'pitch', -1, 0.9); /* avant dessus */
+  addRCS([ 1.6,  RY, -5.5], [0,  1, 0], 'pitch', -1, 0.9);
+  addRCS([-1.6, -RY,  5.0], [0, -1, 0], 'pitch', -1, 0.9); /* arrière dessous */
+  addRCS([ 1.6, -RY,  5.0], [0, -1, 0], 'pitch', -1, 0.9);
+  addRCS([-1.6, -RY, -5.5], [0, -1, 0], 'pitch',  1, 0.9); /* avant dessous */
+  addRCS([ 1.6, -RY, -5.5], [0, -1, 0], 'pitch',  1, 0.9);
+  addRCS([-1.6,  RY,  5.0], [0,  1, 0], 'pitch',  1, 0.9); /* arrière dessus */
+  addRCS([ 1.6,  RY,  5.0], [0,  1, 0], 'pitch',  1, 0.9);
+
+  /* --- ROULIS (roll) : couple pur, tuyères en haut/bas de chaque flanc,
+     éjection en sens opposés d'un bord à l'autre --- */
+  addRCS([ RX,  RY*0.75, 0.5], [0,  1, 0], 'roll',  1, 0.85); /* tribord vers le haut */
+  addRCS([-RX, -RY*0.75, 0.5], [0, -1, 0], 'roll',  1, 0.85); /* bâbord vers le bas */
+  addRCS([-RX,  RY*0.75, 0.5], [0,  1, 0], 'roll', -1, 0.85);
+  addRCS([ RX, -RY*0.75, 0.5], [0, -1, 0], 'roll', -1, 0.85);
+
+  /* =======================================================================
+     C. ÉPINE DORSALE — poutre de liaison cargo ↔ propulsion
+     ======================================================================= */
+  const spine = new THREE.Mesh(new THREE.BoxGeometry(3.2, 2.0, 7), redDark);
+  spine.position.set(0, 0.2, -3);
+  shipMesh.add(spine);
+  /* jambes de force en diagonale */
+  [-1,1].forEach(function(s){
+    const strut = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 8.5), frameMat);
+    strut.position.set(s*2.4, -0.4, -3);
+    strut.rotation.y = -s*0.13;
+    shipMesh.add(strut);
+  });
+
+  /* =======================================================================
+     D. NACELLE CARGO À CLAIRE-VOIE + CONTENEURS
+     ======================================================================= */
+  const cargo = new THREE.Group();
+  cargo.position.set(0, 0.4, -19);
+  shipMesh.add(cargo);
+
+  const CARGO_LEN = 26, CARGO_W = 9.0, CARGO_H = 5.2;
+  const hw = CARGO_W/2, hh = CARGO_H/2, hl = CARGO_LEN/2;
+
+  /* -- longerons : 4 rails d'angle courant sur toute la longueur -- */
+  [[-hw,-hh],[hw,-hh],[-hw,hh],[hw,hh]].forEach(function(c){
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, CARGO_LEN), frameMat);
+    rail.position.set(c[0], c[1], 0);
+    cargo.add(rail);
+  });
+
+  /* -- cadres transversaux répartis le long de la nacelle -- */
+  const FRAMES = 7;
+  for(let i=0;i<FRAMES;i++){
+    const z = -hl + (i/(FRAMES-1))*CARGO_LEN;
+    /* montants verticaux */
+    [-hw, hw].forEach(function(x){
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.34, CARGO_H, 0.34), frameMat);
+      post.position.set(x, 0, z);
+      cargo.add(post);
+    });
+    /* traverses haute et basse */
+    [hh, -hh].forEach(function(y){
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(CARGO_W, 0.32, 0.32), frameMat);
+      beam.position.set(0, y, z);
+      cargo.add(beam);
+    });
+  }
+
+  /* -- croix de Saint-André entre les cadres (rigidité du treillis) -- */
+  for(let i=0;i<FRAMES-1;i++){
+    const z0 = -hl + (i/(FRAMES-1))*CARGO_LEN;
+    const z1 = -hl + ((i+1)/(FRAMES-1))*CARGO_LEN;
+    const zc = (z0+z1)/2, span = z1-z0;
+    const diag = Math.sqrt(span*span + CARGO_H*CARGO_H);
+    const angle = Math.atan2(CARGO_H, span);
+    [-hw, hw].forEach(function(x){
+      [1,-1].forEach(function(dir){
+        const br = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.20, diag), frameMat);
+        br.position.set(x, 0, zc);
+        br.rotation.x = dir*angle;
+        cargo.add(br);
+      });
+    });
+  }
+
+  /* -- plancher sombre sous la cale -- */
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(CARGO_W-0.4, 0.3, CARGO_LEN-0.6), darkPanel);
+  floor.position.y = -hh + 0.1;
+  cargo.add(floor);
+
+  /* -- étrave : capot avant fermé. Même précaution que pour le caisson
+     arrière : le roulis de 45° est cuit dans la géométrie, sans quoi
+     l'échelle non uniforme (appliquée avant la rotation) déformerait la
+     section carrée en losange. -- */
+  const prowGeo = new THREE.CylinderGeometry(2.6, 3.4, 3.2, 4, 1);
+  prowGeo.rotateY(Math.PI/4);
+  const prow = new THREE.Mesh(prowGeo, redHull);
+  prow.rotation.x = -Math.PI/2;   /* axe → -Z : l'extrémité étroite en avant */
+  prow.scale.set(1.5, 1, 0.95);
+  prow.position.set(0, 0, -hl - 1.4);
+  cargo.add(prow);
+
+  /* =======================================================================
+     E. CONTENEURS — instanciés, couleurs tirées du seed
+     ======================================================================= */
+  const CONT_PALETTE = [
+    0x2d5f9e, 0xd9a12c, 0xc25a25, 0xa33a2e,
+    0x2f7a72, 0x6b6f75, 0x3f6fb5, 0xb8892a
+  ];
+  const COLS = 5, LAYERS = 3, BAYS = 11;
+  const cw = 1.42, chh = 1.34, cl = 2.10;   /* dimensions d'un conteneur */
+
+  const slots = [];
+  for(let b=0;b<BAYS;b++){
+    for(let c=0;c<COLS;c++){
+      for(let l=0;l<LAYERS;l++){
+        /* quelques emplacements vides : une cale n'est jamais pleine */
+        if(rng() < 0.16) continue;
+        slots.push({
+          x: (c - (COLS-1)/2) * (cw+0.10),
+          y: -hh + 0.55 + l*(chh+0.06),
+          z: -hl + 1.2 + b*(cl+0.16),
+          color: CONT_PALETTE[Math.floor(rng()*CONT_PALETTE.length)],
+          shade: 0.78 + rng()*0.32
+        });
+      }
+    }
+  }
+
+  const contGeo = new THREE.BoxGeometry(cw, chh, cl);
+  const contMat = new THREE.MeshStandardMaterial({metalness:0.30, roughness:0.78});
+  const containers = new THREE.InstancedMesh(contGeo, contMat, slots.length);
+  const dummy = new THREE.Object3D();
+  const cCol = new THREE.Color();
+  slots.forEach(function(s, i){
+    dummy.position.set(s.x, s.y, s.z);
+    dummy.rotation.set(0,0,0);
+    dummy.updateMatrix();
+    containers.setMatrixAt(i, dummy.matrix);
+    cCol.setHex(s.color).multiplyScalar(s.shade);
+    containers.setColorAt(i, cCol);
+  });
+  containers.instanceMatrix.needsUpdate = true;
+  if(containers.instanceColor) containers.instanceColor.needsUpdate = true;
+  cargo.add(containers);
+
+  /* =======================================================================
+     F. FEUX DE PONT — chapelets ambre le long des rails (détail signature)
+     ======================================================================= */
+  (function deckLights(){
+    const pts = [];
+    const STEP = 1.15;
+    for(let z=-hl; z<=hl; z+=STEP){
+      pts.push(-hw, hh+0.28, z);
+      pts.push( hw, hh+0.28, z);
+      pts.push(-hw, -hh-0.24, z);
+      pts.push( hw, -hh-0.24, z);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pts), 3));
+    const mat = new THREE.PointsMaterial({
+      size:0.42, map:glowTex, color:0xffb454, transparent:true,
+      depthWrite:false, blending:THREE.AdditiveBlending, sizeAttenuation:true, fog:false
+    });
+    cargo.add(new THREE.Points(geo, mat));
+  })();
+
+  /* feux de navigation réglementaires : rouge à bâbord, cyan à tribord */
+  const navMatA = new THREE.MeshBasicMaterial({color:0xff4d4d, transparent:true});
+  const navMatB = new THREE.MeshBasicMaterial({color:0x5eead4, transparent:true});
+  const navA = new THREE.Mesh(new THREE.SphereGeometry(0.17,8,8), navMatA);
+  navA.position.set(-hw-0.3, hh+0.5, -hl+1);
+  const navB = new THREE.Mesh(new THREE.SphereGeometry(0.17,8,8), navMatB);
+  navB.position.set(hw+0.3, hh+0.5, -hl+1);
+  cargo.add(navA, navB);
+  window.__navLights = [navMatA, navMatB];
+
+  /* =======================================================================
+     G. FEUX CLIGNOTANTS DE NACELLE — balises de gabarit
+     Petites balises réparties sur le treillis, clignotant chacune à son
+     propre rythme et sa propre phase : c'est la désynchronisation qui
+     donne l'impression d'un gréement réel plutôt que d'une guirlande.
+     ======================================================================= */
+  window.__beacons = [];
+  (function cargoBeacons(){
+    const brng = rngFor(SEED+':beacons');
+    const BEACON_COLORS = [0xffb454, 0xff4d4d, 0x5eead4, 0xffe27a];
+    const spots = [];
+
+    /* balises d'angle, sur les quatre longerons, réparties en longueur */
+    for(let i=0;i<6;i++){
+      const z = -hl + 1.5 + (i/5)*(CARGO_LEN-3);
+      [[-hw-0.25, hh+0.25],[hw+0.25, hh+0.25],
+       [-hw-0.25,-hh-0.25],[hw+0.25,-hh-0.25]].forEach(function(c){
+        if(brng() < 0.45) spots.push([c[0], c[1], z]);
+      });
+    }
+    /* quelques balises sur les traverses hautes, en travers de la cale */
+    for(let i=0;i<5;i++){
+      spots.push([(brng()-0.5)*CARGO_W*0.8, hh+0.3, -hl + 2 + brng()*(CARGO_LEN-4)]);
+    }
+
+    spots.forEach(function(s){
+      const color = BEACON_COLORS[Math.floor(brng()*BEACON_COLORS.length)];
+      const mat = new THREE.SpriteMaterial({
+        map:glowTex, color:color, blending:THREE.AdditiveBlending,
+        transparent:true, depthWrite:false, opacity:0
+      });
+      const sp = new THREE.Sprite(mat);
+      const size = 0.5 + brng()*0.35;
+      sp.scale.set(size, size, 1);
+      sp.position.set(s[0], s[1], s[2]);
+      cargo.add(sp);
+      window.__beacons.push({
+        mat: mat,
+        /* période et phase propres à chaque balise */
+        period: 1.1 + brng()*2.6,
+        phase: brng()*Math.PI*2,
+        /* rapport cyclique : proportion du cycle où la balise est allumée */
+        duty: 0.12 + brng()*0.22,
+        peak: 0.55 + brng()*0.45
+      });
+    });
+  })();
+
+  /* recentrage : l'origine du rig tombe au milieu de la silhouette */
+  shipMesh.position.z = 4;
+})();
+
+/* le HUD affiche la même immatriculation que celle peinte sur la coque */
+document.getElementById('shipName').textContent = 'CARGO ' + SHIP_REGISTRY;
+
+/* =========================================================================
+   5bis. PANNEAU DE JAUGES MOTEUR — construit dynamiquement à partir des
+   mêmes tableaux que ceux qui pilotent les sprites (aucune donnée dupliquée
+   à la main : 4 réacteurs, 16 tuyères RCS, toujours en phase avec la coque).
+   ========================================================================= */
+const RCS_AXIS_LABELS = {
+  yaw:   {P:'LACET +',    N:'LACET −'},
+  pitch: {P:'TANGAGE +',  N:'TANGAGE −'},
+  roll:  {P:'ROULIS +',   N:'ROULIS −'}
+};
+window.__gaugeEls = {main:[], rcs:[]};
+
+(function buildEnginePanel(){
+  const row = document.getElementById('enginesRow');
+  if(!row) return;
+
+  /* réacteurs principaux : larges */
+  (window.__engineGlows||[]).forEach(function(g, i){
+    const el = document.createElement('div');
+    el.className = 'gauge main';
+    el.innerHTML =
+      '<div class="gauge-pct" id="mainPct'+i+'">0%</div>' +
+      '<div class="gauge-track"><div class="gauge-fill" id="mainFill'+i+'"></div></div>' +
+      '<div class="gauge-label">M'+(i+1)+'</div>';
+    row.appendChild(el);
+    window.__gaugeEls.main.push({
+      fill: null, pct: null   /* résolus juste après l'insertion DOM */
+    });
+  });
+  window.__gaugeEls.main.forEach(function(g,i){
+    g.fill = document.getElementById('mainFill'+i);
+    g.pct  = document.getElementById('mainPct'+i);
+  });
+
+  const sep = document.createElement('div');
+  sep.className = 'gauge-sep';
+  row.appendChild(sep);
+
+  /* tuyères d'attitude : fines, numérotées dans l'ordre de la coque
+     (1-4 lacet, 5-12 tangage, 13-16 roulis) — la couleur garde la lecture
+     par axe, le numéro permet de désigner une tuyère précise */
+  (window.__rcs||[]).forEach(function(t, i){
+    const sign = t.sign > 0 ? 'P' : 'N';
+    const fullLabel = RCS_AXIS_LABELS[t.axis][sign];
+    const el = document.createElement('div');
+    el.className = 'gauge rcs axis-'+t.axis;
+    el.title = 'Propulseur '+(i+1)+' — '+fullLabel;
+    el.innerHTML =
+      '<div class="gauge-track"><div class="gauge-fill" id="rcsFill'+i+'"></div></div>' +
+      '<div class="gauge-label">'+(i+1)+'</div>';
+    row.appendChild(el);
+  });
+  window.__gaugeEls.rcs = (window.__rcs||[]).map(function(t,i){
+    return {fill: document.getElementById('rcsFill'+i), thruster: t};
+  });
+})();
+
+/* =========================================================================
+   6. NÉBULEUSES — CHAMPS DE BOUFFÉES DE GAZ INSTANCIÉES
+   Approche reprise de nebula.vert / nebula.frag (demo001-arm64) : au lieu
+   d'un unique volume raymarché, une nébuleuse est un AMAS de dizaines de
+   « bouffées » (puffs) — des quads billboardés, chacun portant une couleur
+   de cœur et une couleur de bord, et échantillonnant un champ de bruit
+   pré-calculé. Le coût par fragment tombe d'une quarantaine d'itérations
+   de fBm à UNE lecture de texture, ce qui permet d'en afficher beaucoup
+   plus — d'où un fond d'espace réellement décoré.
+   Points clés du shader de référence conservés :
+     · atténuation radiale au CARRÉ (a = alpha·t²) → bords vaporeux
+     · dégradé cœur→bord via mix(colIn, colOut, d²)
+     · alpha PRÉ-MULTIPLIÉ, mélange (ONE, ONE_MINUS_SRC_ALPHA)
+     · sélecteur de canal R/G/B/A pour 4 champs de bruit décorrélés
+   ========================================================================= */
+const NEBULA_VERT = `
+  attribute vec3  iPos;      // position de la bouffée (espace local de l'amas)
+  attribute float iSize;     // rayon monde
+  attribute float iAlpha;    // opacité de base
+  attribute vec3  iColIn;    // couleur de cœur
+  attribute vec3  iColOut;   // couleur de bord
+  attribute vec4  iNoise;    // xy = décalage uv, z = échelle uv, w = canal
+
+  uniform float uTime;
+  uniform float uFade;       // fondu global de l'amas
+
+  varying vec2  vCorner;
+  varying vec3  vColIn;
+  varying vec3  vColOut;
+  varying float vAlpha;
+  varying vec2  vNoiseUv;
+  varying vec4  vMask;
+
+  void main(){
+    /* l'attribut position porte le coin du quad unitaire (-1..1) : Three.js
+       le déclare déjà et exige sa présence pour émettre l'appel de rendu */
+    vec2 corner = position.xy;
+
+    /* dérive lente et respiration : le gaz n'est jamais tout à fait figé */
+    float ph = iNoise.x * 6.2831853;
+    vec3 drift = vec3(
+      sin(uTime*0.05 + ph),
+      cos(uTime*0.04 + ph*1.7),
+      sin(uTime*0.035 + ph*2.3)
+    ) * iSize * 0.10;
+    float breathe = 1.0 + 0.10*sin(uTime*0.07 + ph*3.1);
+
+    /* billboard : on décale dans le plan de la caméra (espace vue) */
+    vec4 mv = modelViewMatrix * vec4(iPos + drift, 1.0);
+    mv.xy += corner * iSize * breathe;
+    gl_Position = projectionMatrix * mv;
+
+    vCorner  = corner;
+    vColIn   = iColIn;
+    vColOut  = iColOut;
+    vAlpha   = iAlpha * uFade;
+    /* uv calculée ici pour que le fragment ne fasse qu'UNE lecture */
+    vNoiseUv = iNoise.xy + (corner*0.5 + 0.5) * iNoise.z;
+    /* sélecteur de canal : un des 4 champs de bruit indépendants */
+    vMask = vec4(
+      float(iNoise.w < 0.5),
+      float(iNoise.w >= 0.5 && iNoise.w < 1.5),
+      float(iNoise.w >= 1.5 && iNoise.w < 2.5),
+      float(iNoise.w >= 2.5)
+    );
+  }
+`;
+const NEBULA_FRAG = `
+  precision highp float;
+
+  varying vec2  vCorner;
+  varying vec3  vColIn;
+  varying vec3  vColOut;
+  varying float vAlpha;
+  varying vec2  vNoiseUv;
+  varying vec4  vMask;
+
+  uniform sampler2D uNoise;
+
+  void main(){
+    float d2 = dot(vCorner, vCorner);
+    if(d2 > 1.0) discard;
+
+    float falloff = 1.0 - d2;                        // 1 au centre, 0 au bord
+    float n = dot(texture2D(uNoise, vNoiseUv), vMask);
+    float t = falloff * (0.35 + 0.75*n);
+    float a = vAlpha * t * t;                        // courbe au carré : bords vaporeux
+    if(a < 0.002) discard;
+
+    vec3 tint = mix(vColIn, vColOut, d2);
+    gl_FragColor = vec4(tint * a, a);                // alpha PRÉ-MULTIPLIÉ
+  }
+`;
+
+/* géométrie de base partagée : un quad unitaire (2 triangles), instancié par
+   bouffée. Nommé `position` car Three.js abandonne le rendu d'une géométrie
+   dépourvue de cet attribut. */
+const PUFF_CORNERS = new Float32Array([
+  -1,-1,0,  1,-1,0,  1,1,0,
+  -1,-1,0,  1,1,0,  -1,1,0
+]);
+
+/* Construit un amas de bouffées formant une nébuleuse.
+   La forme est un ellipsoïde aplati aléatoirement, avec des bouffées plus
+   grosses et plus opaques au cœur, plus fines et diffuses en périphérie. */
+function buildNebulaCluster(typeDef, rng, opts){
+  opts = opts || {};
+  const puffCount = opts.puffCount || (55 + Math.floor(rng()*55));
+  const radius = opts.radius || (420 + rng()*380);
+
+  const iPos    = new Float32Array(puffCount*3);
+  const iSize   = new Float32Array(puffCount);
+  const iAlpha  = new Float32Array(puffCount);
+  const iColIn  = new Float32Array(puffCount*3);
+  const iColOut = new Float32Array(puffCount*3);
+  const iNoise  = new Float32Array(puffCount*4);
+
+  /* axes de l'ellipsoïde : les nébuleuses réelles sont rarement sphériques */
+  const ax = 0.6 + rng()*0.9, ay = 0.45 + rng()*0.8, az = 0.6 + rng()*0.9;
+  const colIn  = new THREE.Color(typeDef.colorA);
+  const colOut = new THREE.Color(typeDef.colorB);
+  const cTmp = new THREE.Color();
+
+  for(let i=0;i<puffCount;i++){
+    /* distribution vers le centre (racine cubique biaisée) : cœur dense */
+    const u = Math.pow(rng(), 0.62);
+    const theta = rng()*Math.PI*2;
+    const phi = Math.acos(2*rng()-1);
+    const r = u*radius;
+    iPos[i*3]   = r*Math.sin(phi)*Math.cos(theta)*ax;
+    iPos[i*3+1] = r*Math.sin(phi)*Math.sin(theta)*ay;
+    iPos[i*3+2] = r*Math.cos(phi)*az;
+
+    /* les bouffées du cœur sont plus grosses et plus denses */
+    const coreness = 1.0 - u;
+    iSize[i]  = radius * (0.28 + rng()*0.42) * (0.55 + coreness*0.75);
+    iAlpha[i] = (0.10 + rng()*0.16) * (0.4 + coreness*0.9);
+
+    /* variation chromatique par bouffée autour des 2 teintes du type */
+    cTmp.copy(colIn).lerp(colOut, rng()*0.45);
+    cTmp.offsetHSL((rng()-0.5)*0.05, (rng()-0.5)*0.15, (rng()-0.5)*0.12);
+    iColIn[i*3] = cTmp.r; iColIn[i*3+1] = cTmp.g; iColIn[i*3+2] = cTmp.b;
+    cTmp.copy(colOut).offsetHSL((rng()-0.5)*0.06, 0, (rng()-0.5)*0.10);
+    iColOut[i*3] = cTmp.r; iColOut[i*3+1] = cTmp.g; iColOut[i*3+2] = cTmp.b;
+
+    /* fenêtre de bruit : décalage + échelle + canal */
+    iNoise[i*4]   = rng();
+    iNoise[i*4+1] = rng();
+    iNoise[i*4+2] = 0.35 + rng()*0.75;
+    iNoise[i*4+3] = Math.floor(rng()*4);
+  }
+
+  const geo = new THREE.InstancedBufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(PUFF_CORNERS, 3));
+  geo.setAttribute('iPos',    new THREE.InstancedBufferAttribute(iPos, 3));
+  geo.setAttribute('iSize',   new THREE.InstancedBufferAttribute(iSize, 1));
+  geo.setAttribute('iAlpha',  new THREE.InstancedBufferAttribute(iAlpha, 1));
+  geo.setAttribute('iColIn',  new THREE.InstancedBufferAttribute(iColIn, 3));
+  geo.setAttribute('iColOut', new THREE.InstancedBufferAttribute(iColOut, 3));
+  geo.setAttribute('iNoise',  new THREE.InstancedBufferAttribute(iNoise, 4));
+  geo.instanceCount = puffCount;
+  /* borne explicite : évite tout calcul de sphère englobante sur un quad
+     unitaire qui ne reflète pas l'étendue réelle de l'amas */
+  geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(0,0,0), radius*2.2);
+
+  const mat = new THREE.ShaderMaterial({
+    vertexShader: NEBULA_VERT,
+    fragmentShader: NEBULA_FRAG,
+    uniforms:{
+      uNoise:{value: noiseTex},
+      uTime:{value: 0},
+      uFade:{value: opts.fade!==undefined ? opts.fade : 1.0}
+    },
+    transparent:true,
+    depthWrite:false,
+    depthTest: opts.depthTest!==undefined ? opts.depthTest : true,
+    /* alpha pré-multiplié, exactement comme le shader de référence */
+    blending: THREE.CustomBlending,
+    blendSrc: THREE.OneFactor,
+    blendDst: THREE.OneMinusSrcAlphaFactor,
+    blendEquation: THREE.AddEquation
+  });
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.frustumCulled = false;
+  mesh.renderOrder = opts.renderOrder || 0;
+  return mesh;
+}
+
+/* ---------- nébuleuses de fond lointain ----------
+   Rattachées au groupe `backdrop`, qui suit le vaisseau : elles décorent
+   l'arrière-plan en permanence, quelle que soit la distance parcourue.
+   Rendues AVANT les étoiles (renderOrder négatif) et sans écriture de
+   profondeur, pour former une toile de fond que le champ stellaire vient
+   ponctuer. */
+(function buildBackdropNebulae(){
+  const rng = rngFor(SEED+':backdrop-neb');
+  const COUNT = 9;
+  for(let i=0;i<COUNT;i++){
+    const type = NEBULA_TYPES[Math.floor(rng()*NEBULA_TYPES.length)];
+    const neb = buildNebulaCluster(type, rng, {
+      radius: 900 + rng()*1100,
+      puffCount: 45 + Math.floor(rng()*45),
+      fade: 0.30 + rng()*0.30,     /* discrètes : elles habillent sans écraser */
+      depthTest: false,
+      renderOrder: -10
+    });
+    /* réparties sur une sphère lointaine autour du vaisseau */
+    const r = 3000 + rng()*1400;
+    const theta = rng()*Math.PI*2;
+    const phi = Math.acos(2*rng()-1);
+    neb.position.set(
+      r*Math.sin(phi)*Math.cos(theta),
+      r*Math.sin(phi)*Math.sin(theta),
+      r*Math.cos(phi)
+    );
+    backdrop.add(neb);
+  }
+})();
+
+/* =========================================================================
+   7. CHAMPS PROCÉDURAUX — étoiles et nébuleuses en cellules déterministes
+      (même seed + mêmes coordonnées de cellule => même contenu, toujours)
+   ========================================================================= */
+const STAR_CELL = 190, STAR_RADIUS = 3;       // 7x7x7 cellules suivies — champ dense
+const NEBULA_CELL = 1600, NEBULA_RADIUS = 1;  // 3x3x3 cellules suivies (coût GPU maîtrisé)
+const STAR_PROXIMITY_RANGE = STAR_CELL * STAR_RADIUS; // distance à partir de laquelle une étoile grossit/brille
+
+const starField = new Map();
+const nebulaField = new Map();
+
+/* --- Données d'une cellule stellaire, SANS créer de géométrie.
+   Cette fonction est l'unique source de vérité : le rendu comme le
+   planificateur de route l'utilisent. Les faire tirer chacun dans le PRNG
+   de leur côté ferait diverger les deux séquences, et la route viserait
+   des étoiles qui ne sont pas là où on les dessine. --- */
+const _starDataCache = new Map();
+function starDataForCell(ix,iy,iz){
+  const key = ix+','+iy+','+iz;
+  if(_starDataCache.has(key)) return _starDataCache.get(key);
+
+  const rng = rngFor(SEED+':star:'+ix+':'+iy+':'+iz);
+  let data = null;
+  if(rng() <= 0.5){
+    const ox = (rng()-0.5)*STAR_CELL*0.85;
+    const oy = (rng()-0.5)*STAR_CELL*0.85;
+    const oz = (rng()-0.5)*STAR_CELL*0.85;
+    const star = generateStar(rng);
+    const name = generateName(rng);
+    const seedNoise = rng()*100;
+    data = {
+      position: new THREE.Vector3(ix*STAR_CELL+ox, iy*STAR_CELL+oy, iz*STAR_CELL+oz),
+      star: star, name: name, seedNoise: seedNoise, cell: key
+    };
+  }
+  /* le cache évite de rejouer le PRNG à chaque interrogation du planificateur */
+  if(_starDataCache.size > 20000) _starDataCache.clear();
+  _starDataCache.set(key, data);
+  return data;
+}
+
+function buildStarCell(ix,iy,iz){
+  const data = starDataForCell(ix,iy,iz);
+  if(!data) return null;
+  const star = data.star, name = data.name, seedNoise = data.seedNoise;
+
+  const group = new THREE.Group();
+  group.position.copy(data.position);
+
+  /* Échelle de rendu : les rayons stellaires réels sont ~10⁻⁸ fois les
+     distances interstellaires — impossibles à rendre à l'échelle. On
+     compresse donc logarithmiquement le rayon physique, ce qui conserve
+     l'ORDRE et les rapports perçus (une supergéante reste écrasante face à
+     une naine M) tout en restant visible à l'écran. */
+  const baseCore = 1.4 * Math.pow(star.radius, 0.42);
+  const color = new THREE.Color(star.color.r, star.color.g, star.color.b);
+
+  const coreMat = new THREE.ShaderMaterial({
+    vertexShader: STAR_VERT,
+    fragmentShader: STAR_FRAG,
+    uniforms:{
+      baseColor:{value: color},
+      limbU:{value: 0.45 + 0.3*Math.exp(-star.temp/9000)}, /* les étoiles froides s'assombrissent plus au bord */
+      time:{value:0},
+      granulation:{value: star.temp < 7000 ? 1.0 : 0.25},   /* convection de surface : marquée chez les froides */
+      seed:{value: seedNoise}
+    }
+  });
+  const core = new THREE.Mesh(new THREE.SphereGeometry(baseCore, 24, 24), coreMat);
+  group.add(core);
+
+  /* halo : la couronne/diffusion. Sa taille suit la racine de la luminosité
+     (rapport flux/surface), sa teinte reste celle du corps noir. */
+  const baseHalo = baseCore * (3.0 + 1.6*Math.log10(1 + star.lum));
+  const haloMat = new THREE.SpriteMaterial({map:glowTex, color:color, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending});
+  const halo = new THREE.Sprite(haloMat);
+  halo.scale.setScalar(baseHalo);
+  group.add(halo);
+
+  scene.add(group);
+  const label = createStarLabel(name);
+  return {
+    mesh:group, core:core, halo:halo, baseCore:baseCore, baseHalo:baseHalo,
+    name:name, star:star, type:star.designation, label:label,
+    dispose:function(){ label.remove(); }
+  };
+}
+function buildNebulaCell(ix,iy,iz){
+  const rng = rngFor(SEED+':nebula:'+ix+':'+iy+':'+iz);
+  if(rng() > 0.42) return null;   /* bien plus fréquentes qu'avant : le fond doit être habité */
+  const offset = new THREE.Vector3(
+    (rng()-0.5)*NEBULA_CELL*0.7,
+    (rng()-0.5)*NEBULA_CELL*0.7,
+    (rng()-0.5)*NEBULA_CELL*0.7
+  );
+  const typeIdx = Math.floor(rng()*NEBULA_TYPES.length);
+  const type = NEBULA_TYPES[typeIdx];
+  const name = generateName(rng);
+
+  const worldCenter = new THREE.Vector3(ix*NEBULA_CELL + offset.x, iy*NEBULA_CELL + offset.y, iz*NEBULA_CELL + offset.z);
+  const mesh = buildNebulaCluster(type, rng, {
+    radius: 420 + rng()*480,
+    puffCount: 55 + Math.floor(rng()*60)
+  });
+  mesh.position.copy(worldCenter);
+  scene.add(mesh);
+  return {mesh:mesh, name:name, type:type.name, isNebula:true};
+}
+
+function refreshField(cellSize, radius, map, buildFn){
+  const p = shipRig.position;
+  const cx = Math.round(p.x/cellSize), cy = Math.round(p.y/cellSize), cz = Math.round(p.z/cellSize);
+  const active = new Set();
+  for(let dx=-radius; dx<=radius; dx++){
+    for(let dy=-radius; dy<=radius; dy++){
+      for(let dz=-radius; dz<=radius; dz++){
+        const ix=cx+dx, iy=cy+dy, iz=cz+dz;
+        const key = ix+','+iy+','+iz;
+        active.add(key);
+        if(!map.has(key)){
+          map.set(key, buildFn(ix,iy,iz));
+        }
+      }
+    }
+  }
+  map.forEach(function(obj, key){
+    if(!active.has(key)){
+      if(obj && obj.mesh) scene.remove(obj.mesh);
+      if(obj && obj.dispose) obj.dispose();
+      map.delete(key);
+    }
+  });
+}
+
+/* =========================================================================
+   7bis. PLAN DE VOL — route jalonnée d'étoiles, calculée en amont
+   La route est établie au démarrage, avant le premier rendu : on cherche
+   de proche en proche l'étoile suivante dans un cône vers l'avant, à une
+   distance de saut plausible. Comme `starDataForCell` est purement
+   déterministe, la route ne dépend que du seed — deux exécutions avec la
+   même graine donnent exactement le même itinéraire.
+   ========================================================================= */
+const ROUTE = {
+  legs: [],        /* étoiles-étapes, dans l'ordre */
+  index: 0,        /* étape visée */
+  gates: null,     /* portiques rectangulaires matérialisant la route */
+  curve: null,     /* spline de Catmull-Rom passant par les étapes */
+  length: 0,       /* longueur d'arc totale */
+  s: 0,            /* abscisse curviligne du vaisseau sur la courbe */
+  legS: [],        /* abscisse curviligne de chaque étape */
+  builtSystems: new Map()  /* legIndex -> Group ; seules l'étape en cours et
+                               la suivante ont des maillages réellement en scène */
+};
+
+/* =========================================================================
+   7ter. SYSTÈMES PLANÉTAIRES — 2 à 3 planètes par étoile de la route
+   Une seule planète du système est habitable : c'est elle qui porte la
+   ville et le port spatial réellement ciblés par le vaisseau. Les planètes
+   NE RÉVOLUTIONNENT PAS autour de leur étoile (seule leur rotation propre,
+   le "spin", est animée) : leur centre doit rester exactement là où la
+   courbe de vol a été tracée, sous peine de voir le vaisseau arriver dans
+   le vide. Seules les données sont ici — la construction des maillages
+   (coûteuse : shader + atmosphère + satellites) est différée et limitée à
+   l'étape en cours + la suivante (cf. ensureSystemsBuilt), pour absorber
+   le coût du rendu temps réel sur plusieurs planètes visibles.
+   ========================================================================= */
+const PLANET_KINDS = [
+  {name:'monde océanique',   ocean:0.62, life:true,  atmo:true},
+  {name:'monde continental', ocean:0.32, life:true,  atmo:true},
+  {name:'monde désertique',  ocean:0.04, life:false, atmo:true},
+  {name:'monde glacé',       ocean:0.50, life:false, atmo:true,  icy:true},
+  {name:'monde volcanique',  ocean:0.00, life:false, atmo:false, volcanic:true},
+  {name:'géante gazeuse',    ocean:0.00, life:false, atmo:true,  gas:true}
+];
+const HABITABLE_KIND_COUNT = 2;   /* océanique, continental — indices 0,1 */
+
+function generateSystemData(leg){
+  const rng = rngFor(SEED+':system:'+leg.cell);
+  const count = 2 + Math.floor(rng()*2);        /* 2 ou 3 planètes */
+  const habIdx = Math.floor(rng()*count);
+
+  /* plan orbital commun au système, à peine incliné */
+  const planeNormal = new THREE.Vector3(rng()-0.5, (rng()-0.5)*0.35, rng()-0.5).normalize();
+  const ref = Math.abs(planeNormal.y) < 0.9 ? new THREE.Vector3(0,1,0) : new THREE.Vector3(1,0,0);
+  const u = new THREE.Vector3().crossVectors(ref, planeNormal).normalize();
+  const v = new THREE.Vector3().crossVectors(planeNormal, u).normalize();
+
+  const planets = [];
+  let orbit = 130 + rng()*70;
+  for(let i=0;i<count;i++){
+    orbit += 110 + rng()*140;
+    const isHab = (i === habIdx);
+    const kind = isHab
+      ? PLANET_KINDS[Math.floor(rng()*HABITABLE_KIND_COUNT)]
+      : PLANET_KINDS[Math.floor(rng()*PLANET_KINDS.length)];
+
+    const angle = rng()*Math.PI*2;
+    const offset = u.clone().multiplyScalar(Math.cos(angle)*orbit)
+                    .addScaledVector(v, Math.sin(angle)*orbit);
+    const worldPos = leg.starPosition.clone().add(offset);
+
+    const radius = kind.gas ? (20+rng()*14) : (9+rng()*10);
+    const oceanFrac = kind.gas ? 0 : THREE.MathUtils.clamp(kind.ocean + (rng()-0.5)*0.22, 0, 0.92);
+
+    const planet = {
+      kind: kind,
+      name: kind.name,
+      radius: radius,
+      position: worldPos,
+      oceanFrac: oceanFrac,
+      spinSpeed: (0.05 + rng()*0.10) * (rng()<0.5 ? 1 : -1),
+      spinAngle: rng()*Math.PI*2,
+      tilt: (rng()-0.5)*0.6,
+      moonCount: kind.gas ? Math.floor(rng()*3) : (rng()<0.4 ? 1 : 0),
+      seedNoise: rng()*1000,
+      hueShift: rng(),
+      hasAtmosphere: !!kind.atmo,
+      isHabitable: isHab
+    };
+    if(isHab){
+      planet.cityName = generateName(rng);
+      planet.portName = 'Port de ' + planet.cityName;
+      /* point de la surface qui porte le port, en coordonnées OBJET (donc
+         solidaire de la rotation de la planète, sans recalcul par image) */
+      const lat = (rng()-0.5)*Math.PI*0.65;   /* on évite les pôles */
+      const lon = rng()*Math.PI*2;
+      planet.portLocal = new THREE.Vector3(
+        Math.cos(lat)*Math.cos(lon), Math.sin(lat), Math.cos(lat)*Math.sin(lon)
+      );
+    }
+    planets.push(planet);
+  }
+  return {planets: planets, habIdx: habIdx};
+}
+
+/* ---------- shader de surface planétaire ----------
+   Continents/océans/calottes via bruit fBm échantillonné en espace OBJET
+   (le motif reste collé à la surface quand la planète tourne). Nuages et
+   éclairage jour/nuit calculés dans le MÊME passage — pas de second maillage
+   de nuages, pas de second draw call : c'est ce qui rend un relief animé
+   supportable sur plusieurs planètes à la fois. */
+const PLANET_VERT = `
+  varying vec3 vObjNormal;
+  varying vec3 vWorldNormal;
+  void main(){
+    vObjNormal = normal;
+    vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+const PLANET_FRAG = `
+  precision highp float;
+  varying vec3 vObjNormal;
+  varying vec3 vWorldNormal;
+  uniform vec3 uLightDir;
+  uniform vec3 uLightColor;
+  uniform float uOceanFrac;
+  uniform float uSeed;
+  uniform float uHue;
+  uniform float uTime;
+  uniform float uGas;
+  uniform float uIcy;
+  uniform float uVolcanic;
+
+  float hash(vec3 p){
+    p = fract(p*0.3183099 + vec3(0.1,0.2,0.3));
+    p *= 17.0;
+    return fract(p.x*p.y*p.z*(p.x+p.y+p.z));
+  }
+  float noise(vec3 x){
+    vec3 i = floor(x); vec3 f = fract(x);
+    f = f*f*(3.0-2.0*f);
+    return mix(
+      mix(mix(hash(i+vec3(0,0,0)),hash(i+vec3(1,0,0)),f.x),
+          mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x), f.y),
+      mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),
+          mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x), f.y), f.z);
+  }
+  float fbm(vec3 p){
+    float v=0.0, a=0.5;
+    for(int i=0;i<4;i++){ v += a*noise(p); p *= 2.05; a *= 0.5; }
+    return v;
+  }
+  void main(){
+    vec3 n = normalize(vObjNormal);
+    vec3 seedOff = vec3(uSeed);
+    vec3 surface;
+    float landMask = 0.0;
+
+    if(uGas > 0.5){
+      /* géante gazeuse : bandes latitudinales perturbées par du bruit */
+      float bands = sin(n.y*16.0 + fbm(n*2.0+seedOff)*3.2);
+      vec3 bandA = vec3(0.55+uHue*0.15, 0.42, 0.30);
+      vec3 bandB = vec3(0.88, 0.78-uHue*0.1, 0.58);
+      surface = mix(bandA, bandB, smoothstep(-0.3, 0.3, bands));
+    } else {
+      float h = fbm(n*3.1 + seedOff);
+      landMask = step(1.0-uOceanFrac, h);
+      vec3 oceanColor = uIcy>0.5 ? vec3(0.72,0.84,0.94) : vec3(0.04,0.16,0.40);
+      vec3 landA = mix(vec3(0.16,0.34,0.12), vec3(0.6,0.55,0.35), uHue*0.4);
+      vec3 landB = vec3(0.44,0.32,0.15);
+      vec3 land = mix(landA, landB, fbm(n*5.2+seedOff+7.0));
+      if(uVolcanic > 0.5){
+        land = mix(vec3(0.22,0.05,0.03), vec3(0.92,0.38,0.05), smoothstep(0.45,0.78,h));
+      }
+      surface = mix(oceanColor, land, landMask);
+      /* calottes polaires */
+      float polar = smoothstep(0.74, 0.92, abs(n.y)) * step(0.5, 1.0-uVolcanic);
+      surface = mix(surface, vec3(0.97), polar);
+      /* relief : la même hauteur qui sépare terre/mer sert de pseudo-ombrage */
+      surface *= 0.86 + 0.28*h;
+    }
+
+    /* éclairage jour/nuit, calculé en espace MONDE (correct quelle que soit
+       la rotation de spin déjà appliquée à la géométrie) */
+    float ndl = clamp(dot(vWorldNormal, uLightDir), 0.0, 1.0);
+    vec3 lit = surface * (0.05 + ndl*0.95) * uLightColor;
+
+    if(uGas < 0.5 && uVolcanic < 0.5){
+      /* lumières de villes, uniquement sur les terres, côté nuit */
+      float night = clamp(-dot(vWorldNormal, uLightDir), 0.0, 1.0);
+      float cityN = fbm(n*42.0 + seedOff + 13.0);
+      float cityMask = landMask * step(0.83, cityN);
+      lit += vec3(1.0,0.82,0.45) * cityMask * night * 1.5;
+
+      /* nuages : bruit décalé dans le temps pour donner une dérive lente,
+         mélangés en supplément — pas de second maillage */
+      float cloudN = fbm(n*6.0 + seedOff + vec3(uTime*0.02, 0.0, 0.0));
+      float cloud = smoothstep(0.56, 0.76, cloudN);
+      lit = mix(lit, vec3(1.0)*(0.15+ndl*0.85), cloud*0.55);
+    }
+
+    gl_FragColor = vec4(lit, 1.0);
+  }
+`;
+
+/* ---------- atmosphère : liseré de Fresnel, une sphère de plus, additive --- */
+const ATMO_VERT = `
+  varying vec3 vNormalW;
+  varying vec3 vWorldPos;
+  void main(){
+    vNormalW = normalize((modelMatrix * vec4(normal,0.0)).xyz);
+    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vWorldPos = wp.xyz;
+    gl_Position = projectionMatrix * viewMatrix * wp;
+  }
+`;
+const ATMO_FRAG = `
+  precision highp float;
+  varying vec3 vNormalW;
+  varying vec3 vWorldPos;
+  uniform vec3 uColor;
+  void main(){
+    vec3 viewDir = normalize(cameraPosition - vWorldPos);
+    float rim = 1.0 - abs(dot(normalize(vNormalW), viewDir));
+    float a = pow(rim, 2.4) * 0.75;
+    gl_FragColor = vec4(uColor, a);
+  }
+`;
+
+/* ---------- construction des maillages d'un système (différée) ---------- */
+function buildPlanetSystemMeshes(leg){
+  const group = new THREE.Group();
+  const sys = leg.system;
+
+  sys.planets.forEach(function(p){
+    const pg = new THREE.Group();
+    pg.position.copy(p.position);
+    pg.rotation.z = p.tilt;
+
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: PLANET_VERT,
+      fragmentShader: PLANET_FRAG,
+      uniforms:{
+        uLightDir:{value:new THREE.Vector3(1,0,0)},
+        uLightColor:{value:new THREE.Color(0xffffff)},
+        uOceanFrac:{value:p.oceanFrac},
+        uSeed:{value:p.seedNoise},
+        uHue:{value:p.hueShift},
+        uTime:{value:0},
+        uGas:{value:p.kind.gas?1:0},
+        uIcy:{value:p.kind.icy?1:0},
+        uVolcanic:{value:p.kind.volcanic?1:0}
+      }
+    });
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(p.radius, 40, 28), mat);
+    mesh.rotation.y = p.spinAngle;
+    pg.add(mesh);
+    p.mesh = mesh;
+
+    if(p.hasAtmosphere){
+      const atmoColor = p.kind.gas ? new THREE.Color(0xe8caa0)
+        : p.kind.icy ? new THREE.Color(0xbfe3ff)
+        : new THREE.Color(0x8fc4ff);
+      const atmoMat = new THREE.ShaderMaterial({
+        vertexShader: ATMO_VERT, fragmentShader: ATMO_FRAG,
+        uniforms:{ uColor:{value:atmoColor} },
+        transparent:true, depthWrite:false, side:THREE.BackSide,
+        blending:THREE.AdditiveBlending
+      });
+      const atmo = new THREE.Mesh(new THREE.SphereGeometry(p.radius*1.07, 32, 24), atmoMat);
+      pg.add(atmo);
+    }
+
+    /* balise du port spatial : sprite parenté au maillage qui tourne — sa
+       position suit donc la rotation de la planète sans recalcul par image */
+    if(p.isHabitable){
+      const beaconMat = new THREE.SpriteMaterial({
+        map: glowTex, color:0xffb454, transparent:true, depthWrite:false,
+        blending:THREE.AdditiveBlending
+      });
+      const beacon = new THREE.Sprite(beaconMat);
+      beacon.scale.setScalar(p.radius*0.5);
+      beacon.position.copy(p.portLocal).multiplyScalar(p.radius*1.03);
+      mesh.add(beacon);
+      p.beaconSprite = beacon;
+    }
+
+    /* satellites : orbite locale simple, portée par un pivot */
+    p.moonPivots = [];
+    const moonRng = rngFor(SEED+':moons:'+leg.cell+':'+p.seedNoise);
+    for(let m=0;m<p.moonCount;m++){
+      const pivot = new THREE.Object3D();
+      pivot.rotation.x = (moonRng()-0.5)*0.8;
+      pivot.rotation.z = moonRng()*Math.PI*2;
+      const moonR = p.radius*(0.18+moonRng()*0.12);
+      const orbitR = p.radius*(2.2+moonRng()*1.8+m*1.4);
+      const moonMat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color().setHSL(0.08, 0.12, 0.45+moonRng()*0.2),
+        roughness:0.9, metalness:0.05
+      });
+      const moon = new THREE.Mesh(new THREE.SphereGeometry(moonR, 12, 10), moonMat);
+      moon.position.set(orbitR, 0, 0);
+      pivot.add(moon);
+      pivot.userData.speed = (0.15+moonRng()*0.2) * (moonRng()<0.5?1:-1);
+      pg.add(pivot);
+      p.moonPivots.push(pivot);
+    }
+
+    group.add(pg);
+    p.group = pg;
+  });
+
+  return group;
+}
+
+function disposePlanetGroup(grp){
+  grp.traverse(function(obj){
+    if(obj.geometry) obj.geometry.dispose();
+    if(obj.material){
+      if(Array.isArray(obj.material)) obj.material.forEach(function(m){ m.dispose(); });
+      else obj.material.dispose();
+    }
+  });
+}
+
+/* ---------- streaming : seuls les systèmes de l'étape en cours + la
+   suivante existent réellement en scène — c'est ce qui absorbe le coût
+   d'un rendu temps réel sur un shader relativement riche. ---------- */
+function ensureSystemsBuilt(){
+  const keep = new Set();
+  [ROUTE.index, ROUTE.index+1].forEach(function(i){
+    if(i>=0 && i<ROUTE.legs.length) keep.add(i);
+  });
+  keep.forEach(function(i){
+    if(!ROUTE.builtSystems.has(i) && ROUTE.legs[i] && ROUTE.legs[i].system){
+      const grp = buildPlanetSystemMeshes(ROUTE.legs[i]);
+      scene.add(grp);
+      ROUTE.builtSystems.set(i, grp);
+    }
+  });
+  ROUTE.builtSystems.forEach(function(grp, i){
+    if(!keep.has(i)){
+      scene.remove(grp);
+      disposePlanetGroup(grp);
+      ROUTE.builtSystems.delete(i);
+    }
+  });
+}
+
+const HOP_MIN = 700, HOP_MAX = 1500;   /* longueur d'un saut entre étapes */
+
+/* Cherche la meilleure étoile suivante depuis `from`, en privilégiant
+   celles alignées sur `heading` et à bonne distance de saut. */
+function findNextWaypoint(from, heading, visited, minAlign){
+  const searchR = Math.ceil(HOP_MAX/STAR_CELL);
+  const ALIGN = (minAlign !== undefined) ? minAlign : 0.35;
+  const c = {
+    x: Math.round(from.x/STAR_CELL),
+    y: Math.round(from.y/STAR_CELL),
+    z: Math.round(from.z/STAR_CELL)
+  };
+  let best = null, bestScore = -Infinity;
+  const v = new THREE.Vector3();
+
+  for(let dx=-searchR; dx<=searchR; dx++){
+    for(let dy=-searchR; dy<=searchR; dy++){
+      for(let dz=-searchR; dz<=searchR; dz++){
+        const data = starDataForCell(c.x+dx, c.y+dy, c.z+dz);
+        if(!data || visited.has(data.cell)) continue;
+        v.copy(data.position).sub(from);
+        const d = v.length();
+        if(d < HOP_MIN || d > HOP_MAX) continue;
+        v.divideScalar(d);
+        const align = v.dot(heading);
+        if(align < ALIGN) continue;          /* on ne fait pas demi-tour */
+        /* on préfère : bien aligné, à mi-portée, et brillant (repère sûr) */
+        const distScore = 1 - Math.abs(d - (HOP_MIN+HOP_MAX)/2)/((HOP_MAX-HOP_MIN)/2);
+        const lumScore = Math.min(Math.log10(1 + data.star.lum)/3, 1);
+        const score = align*2.2 + distScore*0.9 + lumScore*0.8;
+        if(score > bestScore){ bestScore = score; best = {data:data, dir:v.clone(), dist:d}; }
+      }
+    }
+  }
+  return best;
+}
+
+function planRoute(origin, initialHeading, legCount){
+  const visited = new Set();
+  const legs = [];
+  let from = origin.clone();
+  let heading = initialHeading.clone().normalize();
+
+  for(let i=0;i<legCount;i++){
+    /* repli progressif : si aucune étoile n'est bien alignée, on accepte un
+       virage plus marqué plutôt que d'interrompre la route */
+    let next = findNextWaypoint(from, heading, visited, 0.35);
+    if(!next) next = findNextWaypoint(from, heading, visited, 0.0);
+    if(!next) next = findNextWaypoint(from, heading, visited, -0.6);
+    if(!next) break;
+    visited.add(next.data.cell);
+    legs.push({
+      name: next.data.name,
+      designation: next.data.star.designation,
+      position: next.data.position.clone(),
+      starPosition: next.data.position.clone(),
+      cell: next.data.cell,
+      dist: next.dist,
+      star: next.data.star
+    });
+    from = next.data.position.clone();
+    /* le cap suivant part de l'étape atteinte, légèrement infléchi pour
+       que la route serpente au lieu d'être une ligne droite */
+    const jitter = rngFor(SEED+':route:'+i);
+    heading = next.dir.clone();
+    heading.x += (jitter()-0.5)*0.55;
+    heading.y += (jitter()-0.5)*0.40;
+    heading.z += (jitter()-0.5)*0.55;
+    heading.normalize();
+  }
+  return legs;
+}
+
+/* ---------- matérialisation de la route : COURBE + portiques ----------
+   La trajectoire est une spline de Catmull-Rom passant par l'origine puis
+   par chaque étoile-étape. Choix volontaire face à une B-spline : une
+   B-spline ne passe PAS par ses points de contrôle, or la route doit
+   effectivement atteindre chaque étoile. Le paramétrage « centripète »
+   évite les boucles et dépassements dans les virages serrés, défaut
+   classique du Catmull-Rom uniforme.
+
+   Les portiques sont ensuite échantillonnés le long de cette courbe, avec
+   un repère propagé de proche en proche (transport parallèle) : reconstruire
+   un repère à partir d'un « haut » fixe ferait brusquement pivoter les
+   carrés quand la trajectoire passe près de la verticale. */
+const GATE_SPACING = 320;      /* espacement le long de la courbe */
+const GATE_HALF = 34;          /* demi-côté du carré */
+
+function buildRouteCurve(legs, origin){
+  const pts = [origin.clone()];
+  legs.forEach(function(l){ pts.push(l.position.clone()); });
+  if(pts.length < 3){
+    /* Catmull-Rom exige au moins 3 points : on prolonge dans l'axe */
+    const last = pts[pts.length-1], prev = pts[pts.length-2] || origin;
+    pts.push(last.clone().add(last.clone().sub(prev)));
+  }
+  const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal', 0.5);
+  curve.arcLengthDivisions = 2000;
+  return curve;
+}
+
+function buildRouteGates(curve){
+  const totalLen = curve.getLength();
+  const count = Math.max(2, Math.floor(totalLen/GATE_SPACING));
+
+  const positions = [];
+  const cols = [];
+  const amber = new THREE.Color(0xffb454);
+  const cyan  = new THREE.Color(0x5eead4);
+
+  /* transport parallèle du repère le long de la courbe */
+  let up = new THREE.Vector3(0,1,0);
+  const tan = new THREE.Vector3(), right = new THREE.Vector3(), realUp = new THREE.Vector3();
+  const p = new THREE.Vector3();
+
+  for(let i=0;i<=count;i++){
+    const u = i/count;
+    curve.getPointAt(u, p);
+    curve.getTangentAt(u, tan).normalize();
+
+    /* on projette le « haut » précédent hors de la tangente : le repère
+       tourne le moins possible d'un portique au suivant */
+    realUp.copy(up).addScaledVector(tan, -up.dot(tan));
+    if(realUp.lengthSq() < 1e-6){
+      realUp.set(0,0,1).addScaledVector(tan, -tan.z);
+      if(realUp.lengthSq() < 1e-6) realUp.set(1,0,0);
+    }
+    realUp.normalize();
+    right.crossVectors(tan, realUp).normalize();
+    up.copy(realUp);
+
+    /* un portique sur quatre en cyan : repère de comptage */
+    const col = (i % 4 === 0) ? cyan : amber;
+    const half = GATE_HALF;
+    const corners = [
+      [ half,  half], [ half, -half], [-half, -half], [-half,  half]
+    ].map(function(c){
+      return new THREE.Vector3().copy(p)
+        .addScaledVector(right, c[0])
+        .addScaledVector(realUp, c[1]);
+    });
+    for(let k=0;k<4;k++){
+      const a = corners[k], b = corners[(k+1)%4];
+      positions.push(a.x,a.y,a.z, b.x,b.y,b.z);
+      for(let n=0;n<2;n++) cols.push(col.r, col.g, col.b);
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+  geo.setAttribute('aCol', new THREE.BufferAttribute(new Float32Array(cols), 3));
+
+  /* La luminosité est calculée PAR IMAGE dans le shader, à partir de la
+     position du vaisseau : un portique proche est vif, il s'éteint
+     progressivement à mesure qu'il s'éloigne en amont, et disparaît une
+     fois dépassé. Faire cela sur le CPU imposerait de réécrire le tampon
+     de couleurs à chaque image. */
+  const mat = new THREE.ShaderMaterial({
+    uniforms:{
+      uShipPos:{value:new THREE.Vector3()},
+      uShipFwd:{value:new THREE.Vector3(0,0,-1)},
+      uNear:{value:250},
+      uFar:{value:2600},
+      uOpacity:{value:0.9}
+    },
+    vertexShader:`
+      attribute vec3 aCol;
+      uniform vec3 uShipPos;
+      uniform vec3 uShipFwd;
+      uniform float uNear;
+      uniform float uFar;
+      varying vec3 vCol;
+      varying float vFade;
+      void main(){
+        vec3 wp = (modelMatrix * vec4(position, 1.0)).xyz;
+        vec3 rel = wp - uShipPos;
+        float d = length(rel);
+        /* décroissance avec la distance en amont */
+        float fade = 1.0 - smoothstep(uNear, uFar, d);
+        /* extinction de ce qui est derrière le vaisseau */
+        float ahead = dot(normalize(rel + vec3(1e-5)), uShipFwd);
+        fade *= smoothstep(-0.25, 0.25, ahead);
+        vCol = aCol;
+        vFade = fade;
+        gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+      }
+    `,
+    fragmentShader:`
+      precision highp float;
+      uniform float uOpacity;
+      varying vec3 vCol;
+      varying float vFade;
+      void main(){
+        if(vFade < 0.01) discard;
+        gl_FragColor = vec4(vCol, vFade * uOpacity);
+      }
+    `,
+    transparent:true,
+    depthWrite:false,
+    blending:THREE.AdditiveBlending,
+    fog:false
+  });
+
+  const lines = new THREE.LineSegments(geo, mat);
+  lines.frustumCulled = false;
+  lines.renderOrder = 5;
+  const group = new THREE.Group();
+  group.add(lines);
+  group.userData.material = mat;
+  return group;
+}
+
+
+/* ---------- rendu du panneau de plan de vol ----------
+   Appelé au calcul de la route puis à chaque franchissement d'étape : on
+   ne reconstruit pas le DOM à chaque image. */
+function refreshRoutePanel(){
+  const list = document.getElementById('routeList');
+  const prog = document.getElementById('routeProgress');
+  if(!list) return;
+  if(!ROUTE.legs.length){
+    list.innerHTML = '<div class="route-leg todo"><span class="nm">Aucune route</span></div>';
+    if(prog) prog.textContent = '';
+    return;
+  }
+  prog.textContent = (ROUTE.index+1) + '/' + ROUTE.legs.length;
+
+  /* fenêtre glissante : l'étape courante reste visible sans faire déborder
+     le panneau quand la route est longue */
+  const WINDOW = 7;
+  let start = Math.max(0, Math.min(ROUTE.index-2, ROUTE.legs.length-WINDOW));
+  const slice = ROUTE.legs.slice(start, start+WINDOW);
+
+  list.innerHTML = slice.map(function(leg, i){
+    const idx = start+i;
+    const cls = idx < ROUTE.index ? 'done' : (idx === ROUTE.index ? 'next' : 'todo');
+    /* la destination affichée est le PORT SPATIAL réellement ciblé — le
+       nom de l'étoile passe en second, comme repère de navigation */
+    const dest = leg.portName || leg.name;
+    const sub = leg.portName ? (leg.name+' · '+leg.designation) : leg.designation;
+    return '<div class="route-leg '+cls+'">' +
+             '<span class="num">'+String(idx+1).padStart(2,'0')+'</span>' +
+             '<span class="nm">'+dest+'</span>' +
+             '<span class="dd">'+sub+'</span>' +
+           '</div>';
+  }).join('');
+}
+
+/* =========================================================================
+   8. COMMANDES DE VOL — dérive automatique par défaut, prise de contrôle
+      au clavier (ZQSD / flèches / AE) ou à la souris (glisser)
+   ========================================================================= */
+const AXIS_X = new THREE.Vector3(1,0,0), AXIS_Y = new THREE.Vector3(0,1,0), AXIS_Z = new THREE.Vector3(0,0,1);
+
+/* =========================================================================
+   PLANIFICATION / RELANCE D'ITINÉRAIRE
+   Fonction commune au démarrage et à la relance automatique en fin de
+   route : établit les étapes, la courbe, les repères d'abscisse curviligne
+   de chaque étape et les portiques, à partir d'une position et d'un cap
+   de départ donnés. Définie au niveau global : l'autopilote (plus bas)
+   doit pouvoir l'appeler dès qu'une route est terminée.
+   ========================================================================= */
+function computeRoute(origin, heading, alignShip){
+  if(ROUTE.gates){ scene.remove(ROUTE.gates); ROUTE.gates = null; }
+  /* les systèmes de l'ancienne route n'ont plus de sens une fois les
+     étapes renumérotées : on les démonte tous avant de recalculer */
+  ROUTE.builtSystems.forEach(function(grp){ scene.remove(grp); disposePlanetGroup(grp); });
+  ROUTE.builtSystems.clear();
+
+  ROUTE.legs = planRoute(origin, heading, 12);
+  ROUTE.index = 0;
+  ROUTE.s = 0;
+  if(!ROUTE.legs.length){ ROUTE.curve = null; ROUTE.length = 0; refreshRoutePanel(); return; }
+
+  /* génération des systèmes planétaires : la cible réelle de chaque étape
+     devient la planète habitable (son port spatial), pas l'étoile elle-même */
+  ROUTE.legs.forEach(function(leg){
+    leg.system = generateSystemData(leg);
+    const hab = leg.system.planets[leg.system.habIdx];
+    leg.position = hab.position.clone();
+    leg.cityName = hab.cityName;
+    leg.portName = hab.portName;
+  });
+
+  ROUTE.curve = buildRouteCurve(ROUTE.legs, origin);
+  ROUTE.length = ROUTE.curve.getLength();
+
+  /* abscisse curviligne de chaque étape : on la retrouve en cherchant le
+     point de la courbe le plus proche de l'étoile. C'est ce repère qui
+     pilote l'avancement du panneau de plan de vol. */
+  const SAMPLES = 1200;
+  const cache = [];
+  for(let i=0;i<=SAMPLES;i++){
+    cache.push(ROUTE.curve.getPointAt(i/SAMPLES));
+  }
+  ROUTE.legS = ROUTE.legs.map(function(leg){
+    let bi = 0, bd = Infinity;
+    for(let i=0;i<=SAMPLES;i++){
+      const d = cache[i].distanceToSquared(leg.position);
+      if(d < bd){ bd = d; bi = i; }
+    }
+    return (bi/SAMPLES)*ROUTE.length;
+  });
+
+  ROUTE.gates = buildRouteGates(ROUTE.curve);
+  scene.add(ROUTE.gates);
+
+  if(alignShip){
+    /* orientation initiale : nez aligné sur la tangente de la courbe.
+       Uniquement au tout premier calcul — en relance, le vaisseau garde
+       l'inertie de son vol en cours, il ne se réoriente pas d'un coup. */
+    const t0 = ROUTE.curve.getTangentAt(0).normalize();
+    shipRig.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,-1), t0);
+  }
+  ensureSystemsBuilt();
+  refreshRoutePanel();
+}
+const keys = {};
+window.addEventListener('keydown', function(e){
+  keys[e.code] = true;
+  if(e.code === 'KeyH'){
+    const hint = document.getElementById('hint');
+    hint.style.opacity = (hint.style.opacity === '0') ? '1' : '0';
+  }
+});
+window.addEventListener('keyup', function(e){ keys[e.code] = false; });
+
+let dragging=false, lastPX=0, lastPY=0, dragYaw=0, dragPitch=0;
+canvas.addEventListener('pointerdown', function(e){ dragging=true; lastPX=e.clientX; lastPY=e.clientY; });
+window.addEventListener('pointerup', function(){ dragging=false; });
+window.addEventListener('pointermove', function(e){
+  if(!dragging) return;
+  dragYaw = -(e.clientX-lastPX)*0.0022;
+  dragPitch = -(e.clientY-lastPY)*0.0022;
+  lastPX=e.clientX; lastPY=e.clientY;
+  lastInputTime = performance.now();
+});
+
+let manual = false;
+let lastInputTime = 0;
+/* sollicitation d'attitude de l'image courante, lue par les RCS */
+const rcsDemand = {yaw:0, pitch:0, roll:0};
+/* niveau d'allumage lissé de chaque tuyère (montée vive, extinction douce) */
+const rcsLevel = {yawP:0, yawN:0, pitchP:0, pitchN:0, rollP:0, rollN:0};
+const IDLE_MS = 3200;
+const CRUISE_SPEED = 42, BOOST_MULT = 3.1;
+let currentSpeed = CRUISE_SPEED;
+const CAM_OFFSET = new THREE.Vector3(0, 12, 46);
+let camPos = new THREE.Vector3(0, 12, 46);
+let camLook = new THREE.Vector3(0,0,-40);
+
+/* ---------- pause d'arrivée ----------
+   À la fin d'un itinéraire, le vaisseau coupe les gaz et dérive sur son
+   erre pendant que le suivant est calculé ; la caméra quitte la poursuite
+   pour un travelling circulaire autour de la coque. */
+let flightPhase = 'CRUISE';           /* 'CRUISE' | 'ARRIVAL_PAUSE' */
+let pauseTimer = 0;
+const ARRIVAL_PAUSE_DURATION = 4.2;
+const _arrivalOffset = new THREE.Vector3();
+
+/* =========================================================================
+   INERTIE DE ROTATION
+   Le vaisseau ne tourne plus instantanément : les commandes appliquent un
+   COUPLE, qui fait évoluer une vitesse angulaire, laquelle intègre
+   l'orientation. Un cargo de plusieurs centaines de tonnes met plusieurs
+   secondes à établir puis à annuler sa rotation — c'est ce retard qui donne
+   la sensation de masse.
+   L'amortissement représente les tuyères de stabilisation : sans lui, en
+   l'absence de frottement, le vaisseau tournerait indéfiniment.
+   ========================================================================= */
+const angVel = new THREE.Vector3();      /* rad/s autour des axes LOCAUX X,Y,Z */
+const TORQUE   = {pitch:0.30, yaw:0.26, roll:0.42};  /* accélération angulaire (rad/s²) */
+const ANG_MAX  = {pitch:0.42, yaw:0.38, roll:0.72};  /* vitesse angulaire plafond */
+const ANG_DAMP = 0.55;                   /* stabilisation quand la commande est relâchée */
+const _qDelta = new THREE.Quaternion();
+const _eTmp = new THREE.Euler();
+/* vecteurs de travail réutilisés par l'autopilote (évite d'allouer
+   plusieurs Vector3 par image, dans une boucle appelée 60 fois/s) */
+const _routeTmpA = new THREE.Vector3();
+const _routeTmpB = new THREE.Vector3();
+const _routeTmpC = new THREE.Vector3();
+const _routeTmpD = new THREE.Vector3();
+const _routeTmpE = new THREE.Vector3();
+const _routeTmpF = new THREE.Vector3();
+const _qInv = new THREE.Quaternion();
+
+function applyAngular(dt){
+  /* intégration de l'orientation à partir de la vitesse angulaire */
+  if(angVel.lengthSq() > 1e-12){
+    _eTmp.set(angVel.x*dt, angVel.y*dt, angVel.z*dt, 'XYZ');
+    _qDelta.setFromEuler(_eTmp);
+    shipRig.quaternion.multiply(_qDelta);
+    shipRig.quaternion.normalize();
+  }
+}
+
+function updateFlight(dt, elapsed){
+  const paused = (flightPhase === 'ARRIVAL_PAUSE');
+
+  /* sollicitation d'attitude de l'image, remise à zéro à chaque tour */
+  rcsDemand.yaw = 0; rcsDemand.pitch = 0; rcsDemand.roll = 0;
+
+  const pitchInput = ((keys['ArrowUp']||keys['KeyZ']||keys['KeyW'])?1:0) - ((keys['ArrowDown']||keys['KeyS'])?1:0);
+  const yawInput   = ((keys['ArrowLeft']||keys['KeyQ']||keys['KeyA'])?1:0) - ((keys['ArrowRight']||keys['KeyD'])?1:0);
+  const rollKey    = (keys['KeyE']?1:0) - (keys['KeyR']?1:0);
+
+  const hasManualInput = pitchInput!==0 || yawInput!==0 || rollKey!==0 || dragYaw!==0 || dragPitch!==0;
+  if(hasManualInput) lastInputTime = performance.now();
+  manual = !paused && (performance.now() - lastInputTime) < IDLE_MS;
+
+  /* --- couples demandés, exprimés dans le repère local du vaisseau ---
+     Signes : un tangage « cabrer » (pitchInput +1) correspond à un couple
+     NÉGATIF autour de X, et un roulis (rollKey +1) à un couple négatif
+     autour de Z. Les tuyères RCS lisent exactement les mêmes valeurs, ce
+     qui garantit qu'elles soufflent du bon côté. */
+  let tx = 0, ty = 0, tz = 0;
+
+  if(paused){
+    /* pause d'arrivée : aucune commande, aucun pilotage — la vitesse
+       angulaire s'éteint par le seul amortissement, plus bas dans cette
+       fonction, exactement comme un axe relâché en vol normal. */
+  } else if(manual){
+    tx += -pitchInput * TORQUE.pitch;
+    ty +=  yawInput   * TORQUE.yaw;
+    tz += -rollKey    * TORQUE.roll;
+
+    /* la souris agit comme un manche : impulsion proportionnelle au geste */
+    if(dragYaw || dragPitch){
+      ty += dragYaw   * TORQUE.yaw   * 55;
+      tx += dragPitch * TORQUE.pitch * 55;
+      dragYaw = 0; dragPitch = 0;
+    }
+  } else {
+    /* --- AUTOPILOTE : SUIVI DE COURBE PAR CHAMP DE VECTEURS ---
+       Objectif : rester CENTRÉ dans les portiques. Viser l'étoile en ligne
+       droite ferait couper les virages ; la poursuite pure seule oscille,
+       car la visée est courte face au rayon de virage du vaisseau (~110 u).
+
+       Trois éléments, tous nécessaires :
+       1. direction voulue = tangente à la courbe + rappel latéral vers elle ;
+       2. anticipation de courbure : on lit la courbe plus loin pour connaître
+          À L'AVANCE la vitesse de rotation à établir, au lieu de réagir après
+          coup (une masse pareille ne rattrape pas son retard) ;
+       3. asservissement en cascade : la boucle externe produit une consigne
+          de VITESSE ANGULAIRE (vecteur), la boucle interne la convertit en
+          couple.
+
+       Point critique : la boucle interne asservit les DEUX composantes du
+       vecteur vitesse angulaire. Ne piloter que sa projection sur l'axe de
+       correction laisse la composante perpendiculaire libre de diverger —
+       le vaisseau finit en rotation saturée, dix fois plus vite que
+       nécessaire, et sort du couloir. */
+    if(ROUTE.curve && ROUTE.length > 0){
+      const L = ROUTE.length;
+      /* 1. abscisse curviligne : point de la courbe le plus proche, cherché
+         dans une fenêtre locale vers l'avant (coût constant par image) */
+      const SEARCH_AHEAD = 420, SEARCH_STEPS = 24;
+      let bestS = ROUTE.s, bestD = Infinity;
+      for(let i=0;i<=SEARCH_STEPS;i++){
+        const s = ROUTE.s + (i/SEARCH_STEPS)*SEARCH_AHEAD;
+        if(s > L) break;
+        const q = ROUTE.curve.getPointAt(s/L, _routeTmpA);
+        const d = q.distanceToSquared(shipRig.position);
+        if(d < bestD){ bestD = d; bestS = s; }
+      }
+      ROUTE.s = bestS;
+
+      /* 2. direction voulue : tangente + rappel vers la courbe */
+      const LD = 180, KC = 1.4;      /* pondération tangente / rappel latéral */
+      const here = ROUTE.curve.getPointAt(ROUTE.s/L, _routeTmpA);
+      const ahead = ROUTE.curve.getPointAt(Math.min((ROUTE.s+2)/L, 1), _routeTmpB);
+      const tang = _routeTmpC.copy(ahead).sub(here).normalize();
+      const desired = _routeTmpD.copy(tang).multiplyScalar(LD)
+        .addScaledVector(_routeTmpE.copy(here).sub(shipRig.position), KC)
+        .normalize();
+
+      /* 3. anticipation : rotation que la courbe imposera un peu plus loin */
+      const LF = 140;
+      const m0 = ROUTE.curve.getPointAt(Math.min((ROUTE.s+LF)/L, 1), _routeTmpA);
+      const m1 = ROUTE.curve.getPointAt(Math.min((ROUTE.s+2*LF)/L, 1), _routeTmpB);
+      const tang2 = _routeTmpE.copy(m1).sub(m0).normalize();
+      const turn = _routeTmpF.crossVectors(tang, tang2);
+      const turnLen = turn.length();
+      let wffx = 0, wffy = 0;
+      if(turnLen > 1e-9){
+        const kappa = Math.asin(THREE.MathUtils.clamp(turnLen,-1,1))/LF;
+        const wFF = currentSpeed*kappa;
+        /* axe de rotation ramené dans le repère local du vaisseau */
+        turn.divideScalar(turnLen).applyQuaternion(_qInv.copy(shipRig.quaternion).invert());
+        wffx = wFF*turn.x; wffy = wFF*turn.y;
+      }
+
+      /* erreur de cap, en axe-angle (bien défini pour tout angle) */
+      const local = _routeTmpA.copy(desired)
+        .applyQuaternion(_qInv.copy(shipRig.quaternion).invert());
+      let ax = local.y, ay = -local.x;
+      const axLen = Math.hypot(ax, ay);
+      const angle = Math.atan2(axLen, -local.z);
+
+      const KP = 1.2, KW = 8;
+      let wdx = wffx, wdy = wffy;
+      if(axLen > 1e-6){
+        ax /= axLen; ay /= axLen;
+        wdx += ax*angle*KP; wdy += ay*angle*KP;
+      }
+      /* plafond de la consigne, cohérent avec les limites mécaniques */
+      const wdm = Math.hypot(wdx, wdy);
+      if(wdm > 0.36){ wdx *= 0.36/wdm; wdy *= 0.36/wdm; }
+
+      tx += THREE.MathUtils.clamp((wdx - angVel.x)*KW, -1, 1) * TORQUE.pitch;
+      ty += THREE.MathUtils.clamp((wdy - angVel.y)*KW, -1, 1) * TORQUE.yaw;
+      /* remise à plat lente du roulis */
+      tz += THREE.MathUtils.clamp(-angVel.z*1.6, -1, 1) * TORQUE.roll * 0.5;
+
+      /* 4. progression des étapes, déduite de l'abscisse curviligne */
+      let idx = 0;
+      while(idx < ROUTE.legS.length-1 && ROUTE.s > ROUTE.legS[idx] - 120) idx++;
+      if(idx !== ROUTE.index){ ROUTE.index = idx; refreshRoutePanel(); ensureSystemsBuilt(); }
+
+      /* 5. itinéraire terminé : on entre en pause d'arrivée — la caméra
+         part en travelling pendant que le prochain itinéraire (étapes,
+         systèmes planétaires, portiques) est calculé. Cap et position de
+         départ = ceux du vaisseau à l'instant présent, donc la nouvelle
+         route se raccorde sans à-coup à la fin de la précédente. */
+      if(ROUTE.index === ROUTE.legs.length-1 && ROUTE.s > ROUTE.length - 180){
+        const curFwd = new THREE.Vector3(0,0,-1).applyQuaternion(shipRig.quaternion);
+        computeRoute(shipRig.position, curFwd, false);
+        flightPhase = 'ARRIVAL_PAUSE';
+        pauseTimer = 0;
+      }
+    }
+  }
+
+  /* --- intégration : couple -> vitesse angulaire --- */
+  angVel.x += tx*dt;
+  angVel.y += ty*dt;
+  angVel.z += tz*dt;
+
+  /* amortissement actif sur les axes sans commande (tuyères de maintien) */
+  const damp = Math.exp(-ANG_DAMP*dt);
+  if(Math.abs(tx) < 1e-4) angVel.x *= damp;
+  if(Math.abs(ty) < 1e-4) angVel.y *= damp;
+  if(Math.abs(tz) < 1e-4) angVel.z *= damp;
+
+  angVel.x = THREE.MathUtils.clamp(angVel.x, -ANG_MAX.pitch, ANG_MAX.pitch);
+  angVel.y = THREE.MathUtils.clamp(angVel.y, -ANG_MAX.yaw,   ANG_MAX.yaw);
+  angVel.z = THREE.MathUtils.clamp(angVel.z, -ANG_MAX.roll,  ANG_MAX.roll);
+
+  applyAngular(dt);
+
+  /* --- les tuyères soufflent selon le COUPLE réellement appliqué ---
+     Seuil : une correction infime ne doit pas déclencher un jet visible. */
+  const TQ_TH = 0.02;
+  if(Math.abs(tx) > TQ_TH) rcsDemand.pitch = Math.sign(tx);
+  if(Math.abs(ty) > TQ_TH) rcsDemand.yaw   = Math.sign(ty);
+  if(Math.abs(tz) > TQ_TH) rcsDemand.roll  = Math.sign(tz);
+
+  const boosting = !paused && !!(keys['ShiftLeft']||keys['ShiftRight']||keys['Space']);
+  const targetSpeed = paused ? 0 : CRUISE_SPEED * (boosting ? BOOST_MULT : 1);
+  currentSpeed += (targetSpeed-currentSpeed)*Math.min(1, dt*2.2);
+
+  const forward = new THREE.Vector3(0,0,-1).applyQuaternion(shipRig.quaternion);
+  shipRig.position.addScaledVector(forward, currentSpeed*dt);
+
+  const speedlines = document.getElementById('speedlines');
+  speedlines.style.opacity = boosting ? '0.5' : '0';
+
+  /* réacteurs : le cœur et le panache réagissent à la poussée.
+     Scintillement volontairement faible (±2 %) et lent : un moteur de
+     croisière doit paraître stable, pas clignotant. */
+  const glowScale = boosting ? 4.4 : 3.0;
+  /* puissance affichée = ratio de la vitesse de consigne réellement établie
+     sur la vitesse maximale ; c'est la même grandeur physique qui pilote
+     déjà le déplacement, donc jauges et mouvement ne peuvent pas diverger */
+  const enginePowerBase = THREE.MathUtils.clamp(currentSpeed/(CRUISE_SPEED*BOOST_MULT), 0, 1);
+  const mainPowers = [];
+  (window.__engineGlows||[]).forEach(function(g, i){
+    g.scale.set(glowScale,glowScale,1);
+    const flicker = 0.98 + 0.02*Math.sin(elapsed*3.2 + g.position.x*3.1);
+    mainPowers[i] = THREE.MathUtils.clamp(enginePowerBase*flicker, 0, 1);
+  });
+  (window.__engineCones||[]).forEach(function(c){
+    /* le panache s'allonge et s'intensifie en propulsion
+       (facteur borné : au-delà, la pointe viendrait traverser la caméra) */
+    const stretch = boosting ? 1.45 : 1.0;
+    const flicker = 0.98 + 0.02*Math.sin(elapsed*3.2 + c.position.x*3.1);
+    c.scale.set(1, stretch*flicker, 1);
+    c.material.opacity = (boosting ? 0.42 : 0.26) * flicker;
+  });
+  (window.__navLights||[]).forEach(function(m){ m.opacity = 0.4+0.6*Math.abs(Math.sin(elapsed*3 + (m===window.__navLights[1]?Math.PI:0))); });
+
+  /* ---------- tuyères d'attitude ----------
+     Montée rapide à l'allumage, extinction plus lente : c'est cette
+     asymétrie qui donne la sensation d'une bouffée de gaz qui se dissipe
+     plutôt que d'un interrupteur. */
+  const rise = 1 - Math.exp(-dt*22);
+  const fall = 1 - Math.exp(-dt*6);
+  function ramp(cur, target){
+    return cur + (target - cur) * (target > cur ? rise : fall);
+  }
+  rcsLevel.yawP   = ramp(rcsLevel.yawP,   rcsDemand.yaw   > 0.05 ? 1 : 0);
+  rcsLevel.yawN   = ramp(rcsLevel.yawN,   rcsDemand.yaw   < -0.05 ? 1 : 0);
+  rcsLevel.pitchP = ramp(rcsLevel.pitchP, rcsDemand.pitch > 0.05 ? 1 : 0);
+  rcsLevel.pitchN = ramp(rcsLevel.pitchN, rcsDemand.pitch < -0.05 ? 1 : 0);
+  rcsLevel.rollP  = ramp(rcsLevel.rollP,  rcsDemand.roll  > 0.05 ? 1 : 0);
+  rcsLevel.rollN  = ramp(rcsLevel.rollN,  rcsDemand.roll  < -0.05 ? 1 : 0);
+
+  (window.__rcs||[]).forEach(function(t){
+    const key = t.axis + (t.sign > 0 ? 'P' : 'N');
+    const lvl = rcsLevel[key] || 0;
+    t.currentLevel = lvl;   /* lu par le panneau de jauges et la télémétrie */
+    if(lvl < 0.01){ t.jet.material.opacity = 0; t.jet.visible = false; return; }
+    /* crépitement rapide propre à chaque tuyère : jet de gaz sous pression */
+    const sput = 0.75 + 0.25*Math.sin(elapsed*38 + t.jet.position.x*7.7 + t.jet.position.y*4.3);
+    t.jet.visible = true;
+    t.jet.material.opacity = lvl * 0.75 * sput;
+    /* la trainée s'allonge dans SON axe (Y local du cône = axe d'éjection) :
+       facteur 2 sur la longueur, l'épaisseur restant contenue */
+    const w = t.base * (0.65 + lvl*0.45) * (0.85 + 0.15*sput);
+    const l = t.base * (0.8 + lvl*1.6) * (0.80 + 0.20*sput) * 2.0;
+    t.jet.scale.set(w, l, w);
+  });
+
+  /* ---------- panneau de jauges : lecture directe des grandeurs ci-dessus ---------- */
+  (window.__gaugeEls.main||[]).forEach(function(g, i){
+    const pct = Math.round((mainPowers[i]||0)*100);
+    if(g.fill) g.fill.style.height = pct+'%';
+    if(g.pct)  g.pct.textContent = pct+'%';
+  });
+  (window.__gaugeEls.rcs||[]).forEach(function(g){
+    if(g.fill) g.fill.style.height = Math.round((g.thruster.currentLevel||0)*100)+'%';
+  });
+
+  /* ---------- dialogue de télémétrie : commandes envoyées aux moteurs ---------- */
+  updateTelemetryPanel(mainPowers, boosting);
+
+  /* ---------- balises clignotantes de la nacelle ----------
+     Chaque balise suit son propre cycle : phase et période distinctes,
+     avec un rapport cyclique court (éclat bref) et un fondu en sortie. */
+  (window.__beacons||[]).forEach(function(b){
+    const t = ((elapsed + b.phase) % b.period) / b.period;
+    let v = 0;
+    if(t < b.duty){
+      /* éclat : montée quasi instantanée puis décroissance */
+      v = Math.pow(1 - t/b.duty, 1.6);
+    }
+    b.mat.opacity = v * b.peak;
+  });
+
+  /* caméra : poursuite normale, ou travelling circulaire pendant la pause
+     d'arrivée. Les deux branches écrivent dans les MÊMES variables
+     partagées (camPos/camLook), donc la transition entre les deux modes
+     reste amortie par le lerp — jamais de saut brutal au changement d'état. */
+  if(paused){
+    pauseTimer += dt;
+    /* orbite lente autour du vaisseau, rayon et hauteur qui respirent
+       légèrement pour ne pas paraître mécanique */
+    const orbitAngle = pauseTimer * 0.35;
+    const orbitRadius = 78 + Math.sin(pauseTimer*0.4)*14;
+    const orbitHeight = 22 + Math.sin(pauseTimer*0.6+1.1)*10;
+    _arrivalOffset.set(Math.cos(orbitAngle)*orbitRadius, orbitHeight, Math.sin(orbitAngle)*orbitRadius);
+    const desired = shipRig.position.clone().add(_arrivalOffset);
+    camPos.lerp(desired, Math.min(1, dt*2.4));
+    camera.position.copy(camPos);
+    camLook.lerp(shipRig.position, Math.min(1, dt*2.4));
+    camera.up.set(0,1,0);
+    camera.lookAt(camLook);
+
+    if(pauseTimer >= ARRIVAL_PAUSE_DURATION){
+      flightPhase = 'CRUISE';
+      pauseTimer = 0;
+    }
+  } else {
+    /* caméra en poursuite, avec un léger amortissement pour un rendu cinématique */
+    const desiredCamPos = shipRig.position.clone().add(CAM_OFFSET.clone().applyQuaternion(shipRig.quaternion));
+    camPos.lerp(desiredCamPos, Math.min(1, dt*4.5));
+    camera.position.copy(camPos);
+    const desiredLook = shipRig.position.clone().add(forward.clone().multiplyScalar(45));
+    camLook.lerp(desiredLook, Math.min(1, dt*4.5));
+    camera.up.copy(new THREE.Vector3(0,1,0).applyQuaternion(shipRig.quaternion));
+    camera.lookAt(camLook);
+  }
+
+  document.getElementById('modeBadge').textContent =
+    paused ? 'ARRIVÉE' : (manual ? 'MANUEL' : 'AUTOPILOTE');
+  document.getElementById('modeBadge').className =
+    'hud-mode mono ' + (paused ? 'auto' : (manual?'manual':'auto'));
+}
+
+/* =========================================================================
+   9. HUD — objet le plus proche, secteur, vitesse (rafraîchi périodiquement)
+   ========================================================================= */
+let lastHudUpdate = 0;
+/* =========================================================================
+   DIALOGUE DE TÉLÉMÉTRIE — commandes d'allumage/puissance envoyées aux
+   moteurs, projeté à l'écran juste à côté du vaisseau (offset fixe par
+   rapport à sa position projetée, pas un panneau HUD fixe).
+   ========================================================================= */
+const _tmProj = new THREE.Vector3();
+let lastTmUpdate = 0;
+function updateTelemetryPanel(mainPowers, boosting){
+  const panel = document.getElementById('telemetryPanel');
+  if(!panel) return;
+
+  /* projection de la position du vaisseau à l'écran */
+  _tmProj.copy(shipRig.position).project(camera);
+  if(_tmProj.z > 1 || _tmProj.z < -1){ panel.style.display = 'none'; return; }
+  const sx = (_tmProj.x*0.5+0.5)*window.innerWidth;
+  const sy = (1-(_tmProj.y*0.5+0.5))*window.innerHeight;
+  panel.style.display = 'block';
+  panel.style.left = (sx + 130) + 'px';
+  panel.style.top  = (sy - 70) + 'px';
+
+  /* le texte n'a pas besoin d'être réécrit à 60 Hz : ~6 fois/s suffit à
+     donner l'impression d'un flux temps réel sans agiter le lecteur */
+  const now = performance.now();
+  if(now - lastTmUpdate < 160) return;
+  lastTmUpdate = now;
+
+  const body = document.getElementById('telemetryBody');
+  const avgMain = mainPowers.reduce(function(a,b){return a+b;},0)/Math.max(mainPowers.length,1);
+  let html = '<div class="tm-line'+(boosting?' tm-amber':'')+'">' +
+    '<span>RÉACTEURS 1-4</span><span>'+(avgMain>0.02?Math.round(avgMain*100)+'%':'VEILLE')+'</span></div>';
+
+  const groups = [
+    ['yaw','P','LACET +'], ['yaw','N','LACET −'],
+    ['pitch','P','TANGAGE +'], ['pitch','N','TANGAGE −'],
+    ['roll','P','ROULIS +'], ['roll','N','ROULIS −']
+  ];
+  let anyRcs = false;
+  groups.forEach(function(g){
+    const lvl = rcsLevel[g[0]+g[1]] || 0;
+    if(lvl > 0.02){
+      anyRcs = true;
+      html += '<div class="tm-line"><span>RCS '+g[2]+'</span><span>'+Math.round(lvl*100)+'%</span></div>';
+    }
+  });
+  if(!anyRcs) html += '<div class="tm-line tm-off"><span>RCS</span><span>veille</span></div>';
+
+  body.innerHTML = html;
+}
+
+function updateHud(now){
+  document.getElementById('speedVal').textContent = Math.round(currentSpeed) + ' u/s';
+  const p = shipRig.position;
+  document.getElementById('sectorVal').textContent =
+    Math.round(p.x/STAR_CELL)+' · '+Math.round(p.y/STAR_CELL)+' · '+Math.round(p.z/STAR_CELL);
+  const forward = new THREE.Vector3(0,0,-1).applyQuaternion(shipRig.quaternion);
+  const heading = ((Math.atan2(forward.x, -forward.z)*180/Math.PI)+360)%360;
+  document.getElementById('headingVal').textContent = String(Math.round(heading)).padStart(3,'0')+'°';
+
+  if(now - lastHudUpdate < 350) return;
+  lastHudUpdate = now;
+
+  let nearest = null, nearestDist = Infinity;
+  function scan(map){
+    map.forEach(function(obj){
+      if(!obj) return;
+      const d = obj.mesh.position.distanceTo(p);
+      if(d < nearestDist){ nearestDist = d; nearest = obj; }
+    });
+  }
+  scan(starField); scan(nebulaField);
+
+  /* systèmes planétaires réellement construits (étape en cours + suivante) */
+  ROUTE.builtSystems.forEach(function(grp, legIndex){
+    const leg = ROUTE.legs[legIndex];
+    if(!leg || !leg.system) return;
+    leg.system.planets.forEach(function(pl){
+      if(!pl.mesh) return;
+      const d = pl.position.distanceTo(p);
+      if(d < nearestDist){
+        nearestDist = d;
+        nearest = {isPlanet:true, planet:pl, leg:leg, mesh:{position:pl.position}};
+      }
+    });
+  });
+
+  if(nearest && nearest.isPlanet){
+    const pl = nearest.planet, leg = nearest.leg;
+    const label = pl.isHabitable ? pl.portName
+      : (pl.kind.name.charAt(0).toUpperCase()+pl.kind.name.slice(1));
+    document.getElementById('nearName').textContent = label;
+    let meta = pl.isHabitable ? ('Ville de '+pl.cityName+' · cible de navigation<br>') : '';
+    meta += leg.name + ' · ' + pl.kind.name;
+    if(!pl.kind.gas) meta += ' · '+Math.round(pl.oceanFrac*100)+'% immergé';
+    meta += '<br>rayon '+pl.radius.toFixed(1)+' u';
+    if(pl.moonCount) meta += ' · '+pl.moonCount+' satellite'+(pl.moonCount>1?'s':'');
+    meta += '<br>'+(nearestDist).toFixed(0)+' u';
+    document.getElementById('nearMeta').innerHTML = meta;
+  } else if(nearest){
+    document.getElementById('nearName').textContent = nearest.name;
+    const distPc = (nearestDist/38).toFixed(2);
+    if(nearest.star){
+      const s = nearest.star;
+      const mag = apparentMagnitude(s.lum, Math.max(nearestDist/38, 1e-3));
+      document.getElementById('nearMeta').innerHTML =
+        s.designation + ' · ' + s.lumLabel + '<br>' +
+        'T<sub>eff</sub> ' + Math.round(s.temp).toLocaleString('fr-FR') + ' K · ' +
+        Math.round(s.temp - 273).toLocaleString('fr-FR') + ' °C<br>' +
+        'M ' + s.mass.toFixed(2) + ' M☉ · R ' + s.radius.toFixed(2) + ' R☉<br>' +
+        'L ' + (s.lum < 0.01 ? s.lum.toExponential(1) : s.lum.toFixed(2)) + ' L☉ · ' +
+        'm<sub>v</sub> ' + mag.toFixed(1) + '<br>' +
+        distPc + ' pc';
+    } else {
+      document.getElementById('nearMeta').innerHTML = nearest.type + ' · ' + distPc + ' pc';
+    }
+  } else {
+    document.getElementById('nearName').textContent = '—';
+    document.getElementById('nearMeta').textContent = 'Espace interstellaire';
+  }
+}
+
+/* =========================================================================
+   10. BOUCLE PRINCIPALE
+   ========================================================================= */
+const clock = new THREE.Clock();
+let chunkAccum = 0;
+/* =========================================================================
+   ANIMATION DES SYSTÈMES PLANÉTAIRES CONSTRUITS
+   Spin, éclairage propre à l'étoile hôte (et non l'étoile dominante du
+   vaisseau — chaque planète est éclairée par SON soleil), dérive des
+   nuages (via uTime), orbite des satellites.
+   ========================================================================= */
+const _planetLightDir = new THREE.Vector3();
+function updatePlanetSystems(dt, elapsed){
+  ROUTE.builtSystems.forEach(function(grp, legIndex){
+    const leg = ROUTE.legs[legIndex];
+    if(!leg || !leg.system) return;
+    leg.system.planets.forEach(function(p){
+      if(!p.mesh) return;
+      p.mesh.rotation.y += p.spinSpeed*dt;
+      const u = p.mesh.material.uniforms;
+      u.uTime.value = elapsed;
+      _planetLightDir.copy(leg.starPosition).sub(p.position).normalize();
+      u.uLightDir.value.copy(_planetLightDir);
+      u.uLightColor.value.setRGB(leg.star.color.r, leg.star.color.g, leg.star.color.b);
+      (p.moonPivots||[]).forEach(function(pivot){
+        pivot.rotation.y += pivot.userData.speed*dt;
+      });
+    });
+  });
+}
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.1);
+  const elapsed = clock.getElapsedTime();
+
+  updateFlight(dt, elapsed);
+
+  chunkAccum += dt;
+  if(chunkAccum > 0.5){
+    chunkAccum = 0;
+    refreshField(STAR_CELL, STAR_RADIUS, starField, buildStarCell);
+    refreshField(NEBULA_CELL, NEBULA_RADIUS, nebulaField, buildNebulaCell);
+  }
+
+  /* nébuleuses : le shader gère billboard et dérive, on ne pousse que le temps */
+  nebulaField.forEach(function(obj){
+    if(!obj) return;
+    obj.mesh.material.uniforms.uTime.value = elapsed;
+  });
+  backdrop.children.forEach(function(child){
+    if(child.material && child.material.uniforms && child.material.uniforms.uTime){
+      child.material.uniforms.uTime.value = elapsed;
+    }
+  });
+
+  /* l'étoile dominante éclaire la coque, en fondu d'une étoile à l'autre */
+  updateStarLighting(dt);
+
+  /* systèmes planétaires actifs : spin, éclairage propre à chaque étoile
+     hôte, dérive des nuages, orbite des satellites */
+  updatePlanetSystems(dt, elapsed);
+
+  /* portiques : la luminosité est recalculée dans le shader à partir de la
+     position et du cap du vaisseau — un seul envoi d'uniformes par image */
+  if(ROUTE.gates){
+    const m = ROUTE.gates.userData.material;
+    m.uniforms.uShipPos.value.copy(shipRig.position);
+    m.uniforms.uShipFwd.value.set(0,0,-1).applyQuaternion(shipRig.quaternion);
+  }
+
+  /* étoiles : éclat régi par la loi en carré inverse (flux ∝ L/d²),
+     restitué en échelle de magnitudes + étiquette de nom projetée à l'écran */
+  const shipPos = shipRig.position;
+  const camForward = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+  const LABEL_RANGE = STAR_PROXIMITY_RANGE * 1.5;
+  const winW = window.innerWidth, winH = window.innerHeight;
+  const margin = 60;
+  starField.forEach(function(obj){
+    if(!obj) return;
+    const d = obj.mesh.position.distanceTo(shipPos);
+    const distPc = Math.max(d/38, 1e-3);
+
+    /* magnitude apparente réelle, puis conversion en éclat perçu.
+       L'œil et les capteurs répondent de façon logarithmique : on garde
+       cette compression plutôt que le flux brut, qui saturerait aussitôt. */
+    const mag = apparentMagnitude(obj.star.lum, distPc);
+    obj.mag = mag;
+    const flux = Math.pow(10, -0.4*(mag - 4.0));
+    const perceived = THREE.MathUtils.clamp(Math.pow(flux, 0.25), 0.0, 6.0);
+
+    /* le disque stellaire grandit selon son diamètre ANGULAIRE (∝ R/d) */
+    const angular = THREE.MathUtils.clamp(obj.baseCore*26/Math.max(d, 1), 0.3, 9.0);
+    obj.core.scale.setScalar(angular);
+    obj.core.material.uniforms.time.value = elapsed;
+
+    /* le halo grossit avec l'éclat perçu : c'est le "bloom" des étoiles
+       brillantes, effet de diffusion dans l'optique comme dans l'œil */
+    obj.halo.scale.setScalar(obj.baseHalo * (0.55 + perceived*0.55));
+    obj.halo.material.opacity = THREE.MathUtils.clamp(0.25 + perceived*0.35, 0.15, 1.0);
+
+    /* n'étiqueter que les étoiles effectivement détectables (mag < 9) */
+    if(d > LABEL_RANGE || mag > 9){ obj.label.style.display = 'none'; return; }
+    const toStar = obj.mesh.position.clone().sub(camera.position);
+    if(toStar.dot(camForward) <= 0){ obj.label.style.display = 'none'; return; }
+    const ndc = obj.mesh.position.clone().project(camera);
+    const sx = (ndc.x*0.5+0.5)*winW;
+    const sy = (1-(ndc.y*0.5+0.5))*winH;
+    if(sx < -margin || sx > winW+margin || sy < -margin || sy > winH+margin){
+      obj.label.style.display = 'none';
+      return;
+    }
+    obj.label.style.display = 'block';
+    obj.label.style.left = sx+'px';
+    obj.label.style.top = (sy-16-angular*3)+'px';
+    obj.label.style.opacity = String(THREE.MathUtils.clamp(1.05 - mag/10, 0.28, 1));
+  });
+
+  /* le décor d'étoiles lointaines suit le vaisseau pour rester toujours dense */
+  backdrop.position.copy(shipPos);
+
+  updateHud(performance.now());
+  renderer.render(scene, camera);
+}
+
+/* =========================================================================
+   11. ÉCRAN DE DÉMARRAGE — séquence terminal façon McGivrer
+   ========================================================================= */
+(function boot(){
+  const lines = [
+    '> INITIALISATION DE LA NAVIGATION QUANTIQUE...',
+    '> CHARGEMENT DE LA GRAINE : ' + SEED,
+    "> GÉNÉRATION DE L'UNIVERS LOCAL...",
+    '> CALIBRAGE DES CAPTEURS STELLAIRES : OK',
+    '> SYSTÈMES DE VOL : OK',
+    '> BASCULEMENT SUR AUTOPILOTE'
+  ];
+  const term = document.getElementById('bootTerm');
+  const bootEl = document.getElementById('boot');
+  let li = 0;
+  function nextLine(){
+    if(li >= lines.length){
+      setTimeout(finish, 500);
+      return;
+    }
+    const span = document.createElement('div');
+    span.textContent = lines[li];
+    if(li===1 || li===lines.length-1) span.className='amber';
+    term.appendChild(span);
+    li++;
+    setTimeout(nextLine, 340);
+  }
+  function finish(){
+    bootEl.classList.add('hidden');
+    setTimeout(function(){ bootEl.style.display='none'; }, 900);
+  }
+  bootEl.addEventListener('click', finish);
+  nextLine();
+
+  /* calcul du plan de vol AVANT le premier rendu : le vaisseau sait où il
+     va dès le départ, et les portiques sont tracés d'emblée sur tout le
+     trajet. `true` = orienter le nez sur la courbe (départ uniquement). */
+  computeRoute(shipRig.position, new THREE.Vector3(0,0,-1), true);
+
+  refreshField(STAR_CELL, STAR_RADIUS, starField, buildStarCell);
+  refreshField(NEBULA_CELL, NEBULA_RADIUS, nebulaField, buildNebulaCell);
+  animate();
+})();
+</script>
+</body>
+</html>
