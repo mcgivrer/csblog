@@ -53,3 +53,22 @@
 - Le panneau "CANAL RADIO" est trop haut sur le HUD, il recouvre le panneau "OBJET LE PLUS PROCHE".
 - Juste après l'initialisation, afficher un écran de titre "Space Travel & transport" avec le choix de la langue du jeu : français (existant), anglais, allemand et espagnol à créer.
 
+##### Step 4 (spec d'évolution car complexe)
+
+- Ajouter un mode Pause: un appui sur <kbd>ESCAPE</kbd> ou <kbd>P</kbd> ou "PAUSE" met le jeu en pause avec un message clair au centre: si appuis sur <kbd>ESCAPE</kbd> retour à l'écran titre, si appui sur <kbd>SPACE</kbd> ou <kbd>RETURN</kbd> ou <kbd>ENTER</kbd>, sorti du mode pause.
+- A chaque livraison de marchandises (containers), en fonction du nombre de conainer livbrés (aléatoire de 1 à 5), le joueur pilotant le cargo gagne des credits). ces crédit pourront être dépensé lors des étapes (escales) sur les planètes. Le nombre de crédits sera affiché dans la barre en haut de l'écran, juste à gauche de "SEED". Le joueur commence avec 10000 crédits.
+- Lors de l'envoie mes mini-trasporteurs (type pousseur) pour déposer les  containers, il faut faire un gros plan sur le départ depuis un DOCK dans le corps du vaisseau, puis le suivre de loin, jusqu'a sa destination.   le choix de suivre de la sequence de suivi (choix des plans et de la séquence) est aléatoire, afin d'éviter la monotonie.
+- Des évènnements aléatoires peuvent se déclancher, 
+  - Incendie moteur quand il chauffe rtop longtemps, du coup, il est demandé au joueur  d'intervenir et d'éteindre l'incendie (touche <kbd>I</kbd> comme intervention), le moteur est alors stoppé, ralentissant le vaisseau,
+  - Pannes divers (radar, moteurs auxilliaires(RCS), Auto-pilote, etc.)
+  - Attaques de pirates ou de mercenaires (prévoir différents type de vaisseau pirates, navette, vaisseau rapide) il peuvent voler de la marchandise ou demander un rançon pour libérer le vaisseau (un dialogue propose un choix, la couleur du dialogue dépendera du type d'évennement). 
+  Les pannes nécessiteront une réparation à la prochaine étape, demandé après la livraison des containers. Le coût de réparation dépendra du niveau des dégâts.
+- Le mode de la camera doit rester affiché (il disparait après le switch actuellement) il faut déplacer cette info dans la barre en haut de l'écran.
+La touche F10 permet de couper le son de la voix de synthèse.
+- Ajouter des boutons en bas à gauche permettant d'afficher/masquer les différents panneaux du HUD (seuls la ligne en haut et ces nouveaux boutons restent visibles)
+- Correctif sur l'aide le roll est conduit par les touches <kbd>E</kbd>et <kbd>R</kbd>.
+- Le changement de mode de camera est assuré par le touche <kbd>F3</kbd> et non plus le double pression sur <kbd>CTRL</kbd> (un petit bouton avec les autres nouveau bouton permet de faire le switch également).
+- Tous ces nouveaux boutons doivent avoir des icônes avec un tooltip.
+- Le panneau du plan de vol n'est pas assez large pour afficher les noms complets, il faut modifier sa largeur en l'augmentant. Attention, cependant, il ne doit pas s'étendre trop sur l'écran, écourter si nécessaire  la taille des noms.
+
+

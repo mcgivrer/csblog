@@ -317,6 +317,38 @@
   }
   #boot .term .amber{ color:var(--amber); }
   #boot .skip{ position:absolute; bottom:24px; font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--muted-2); letter-spacing:0.1em; text-transform:uppercase; }
+
+  /* ---------- écran-titre : choix de la langue ---------- */
+  #titleScreen{
+    position:fixed; inset:0; z-index:6; background:var(--bg);
+    display:flex; align-items:center; justify-content:center;
+    transition:opacity .6s ease;
+  }
+  #titleScreen.hidden{ opacity:0; pointer-events:none; }
+  .title-inner{ text-align:center; max-width:640px; padding:0 24px; }
+  .title-eyebrow{
+    font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.18em;
+    color:var(--muted-2); margin-bottom:18px;
+  }
+  .title-main{
+    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:34px;
+    letter-spacing:0.03em; color:var(--ink); margin-bottom:14px;
+  }
+  .title-main .amber{ color:var(--amber); }
+  .title-sub{
+    font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--muted);
+    margin-bottom:34px; letter-spacing:0.04em;
+  }
+  .title-langs{ display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
+  .lang-btn{
+    font-family:'JetBrains Mono',monospace; cursor:pointer;
+    background:rgba(94,234,212,0.05); border:1px solid var(--line); color:var(--ink);
+    padding:14px 22px; display:flex; flex-direction:column; align-items:center; gap:6px;
+    min-width:96px; transition:border-color .15s ease, background .15s ease;
+  }
+  .lang-btn:hover{ border-color:var(--cyan); background:rgba(94,234,212,0.12); }
+  .lang-btn .lang-flag{ font-size:15px; font-weight:700; color:var(--cyan); letter-spacing:0.08em; }
+  .lang-btn .lang-name{ font-size:11px; color:var(--muted); }
 </style>
 </head>
 <body>
@@ -328,25 +360,26 @@
 <div id="hud">
   <div id="starLabels"></div>
   <div class="hud-top">
-    <span><span class="amber">NAVIGATION QUANTIQUE</span> &nbsp;//&nbsp; <span id="shipName" class="mono">R.S.C. VENTARIS</span></span>
-    <span>SEED&nbsp;<span id="seedVal" class="mono amber">—</span>&nbsp;&nbsp;<span class="live">EN LIGNE</span></span>
+    <span><span class="amber" id="topBrand">NAVIGATION QUANTIQUE</span> &nbsp;//&nbsp; <span id="shipName" class="mono">R.S.C. VENTARIS</span></span>
+    <span><span id="seedLabel">SEED</span>&nbsp;<span id="seedVal" class="mono amber">—</span>&nbsp;&nbsp;<span class="live" id="onlineLabel">EN LIGNE</span></span>
   </div>
 
   <div class="hud-mode auto mono" id="modeBadge">AUTOPILOTE</div>
+  <div class="hud-mode mono" id="cameraModeFlash" style="top:96px; display:none; opacity:0; transition:opacity .5s ease;"></div>
 
   <div class="panel hud-left">
-    <div class="row"><span class="k">Vitesse</span><span class="v" id="speedVal">0 u/s</span></div>
-    <div class="row"><span class="k">Secteur</span><span class="v" id="sectorVal">0 · 0 · 0</span></div>
-    <div class="row"><span class="k">Cap</span><span class="v" id="headingVal">000°</span></div>
+    <div class="row"><span class="k" id="lblSpeed">Vitesse</span><span class="v" id="speedVal">0 u/s</span></div>
+    <div class="row"><span class="k" id="lblSector">Secteur</span><span class="v" id="sectorVal">0 · 0 · 0</span></div>
+    <div class="row"><span class="k" id="lblHeading">Cap</span><span class="v" id="headingVal">000°</span></div>
   </div>
 
   <div class="panel hud-route" id="routePanel">
-    <div class="route-title">Plan de vol <span class="amber" id="routeProgress">—</span></div>
+    <div class="route-title"><span id="lblFlightPlan">Plan de vol</span> <span class="amber" id="routeProgress">—</span></div>
     <div class="route-list" id="routeList"></div>
   </div>
 
-  <div class="panel hud-right">
-    <div class="k mono">OBJET LE PLUS PROCHE</div>
+  <div class="panel hud-right" id="nearestPanel">
+    <div class="k mono" id="lblNearest">OBJET LE PLUS PROCHE</div>
     <div class="obj-name" id="nearName">—</div>
     <div class="obj-meta" id="nearMeta">—</div>
   </div>
@@ -355,30 +388,30 @@
     ↑↓←→ / Z Q S D — orientation&nbsp; · &nbsp;A / E — roulis&nbsp; · &nbsp;MAJ — propulsion&nbsp; · &nbsp;glisser la souris — viser&nbsp; · &nbsp;CTRL+souris — regard libre&nbsp; · &nbsp;TAB — canal radio&nbsp; · &nbsp;H — masquer
   </div>
   <div class="hud-hint mono" id="arrivalHint" style="display:none; bottom:52px;">
-    ENTRÉE — abréger la manœuvre (travelling accéléré)
+    ESPACE — abréger la manœuvre (travelling accéléré)
   </div>
 
   <!-- rangée basse : température, propulsion, commandes moteur -->
   <div class="hud-bottom-row">
     <div class="panel hud-temp mono" id="tempPanel">
-      <div class="tm-title">TEMPÉRATURE MOTEUR</div>
+      <div class="tm-title" id="lblEngineTemp">TEMPÉRATURE MOTEUR</div>
       <div id="tempBody"></div>
     </div>
 
     <div class="panel hud-engines" id="enginesPanel">
-      <div class="engines-title mono">PROPULSION</div>
+      <div class="engines-title mono" id="lblPropulsion">PROPULSION</div>
       <div class="engines-row" id="enginesRow"></div>
     </div>
 
     <div class="panel hud-telemetry mono" id="telemetryPanel">
-      <div class="tm-title">COMMANDES MOTEUR</div>
+      <div class="tm-title" id="lblEngineCmd">COMMANDES MOTEUR</div>
       <div id="telemetryBody"></div>
     </div>
   </div>
 
   <!-- canal radio : échanges équipage / contrôle du port pendant l'approche -->
   <div class="panel hud-radio mono" id="radioPanel">
-    <div class="radio-title"><span>CANAL RADIO</span><span><button class="radio-mute" id="radioMuteBtn" title="Couper le son du canal radio">🔊</button><span class="dot">●</span></span></div>
+    <div class="radio-title"><span id="lblRadioChannel">CANAL RADIO</span><span><button class="radio-mute" id="radioMuteBtn" title="Couper le son du canal radio">🔊</button><span class="dot">●</span></span></div>
     <div class="radio-log" id="radioLog"></div>
   </div>
 </div>
@@ -388,9 +421,286 @@
   <div class="skip">cliquer pour ignorer</div>
 </div>
 
+<!-- écran-titre : choix de la langue, affiché juste après l'initialisation,
+     avant que le vaisseau ne prenne réellement l'air -->
+<div id="titleScreen" style="display:none;">
+  <div class="title-inner">
+    <div class="title-eyebrow">// SIMULATION SPATIALE PROCÉDURALE</div>
+    <div class="title-main">SPACE TRAVEL <span class="amber">&amp;</span> TRANSPORT</div>
+    <div class="title-sub" id="titleSub">Choisissez une langue</div>
+    <div class="title-langs">
+      <button class="lang-btn" data-lang="fr"><span class="lang-flag">FR</span><span class="lang-name">Français</span></button>
+      <button class="lang-btn" data-lang="en"><span class="lang-flag">EN</span><span class="lang-name">English</span></button>
+      <button class="lang-btn" data-lang="de"><span class="lang-flag">DE</span><span class="lang-name">Deutsch</span></button>
+      <button class="lang-btn" data-lang="es"><span class="lang-flag">ES</span><span class="lang-name">Español</span></button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 "use strict";
+
+/* =========================================================================
+   0. INTERNATIONALISATION — français (existant), anglais, allemand,
+   espagnol. Choisie sur l'écran-titre, avant que le jeu ne démarre
+   réellement ; LANG reste constante pour toute la session.
+   ========================================================================= */
+let LANG = 'fr';
+const I18N = {
+  fr: {
+    title_sub: 'Choisissez une langue',
+    topBrand: 'NAVIGATION QUANTIQUE', seedLabel: 'SEED', onlineLabel: 'EN LIGNE',
+    lblSpeed: 'Vitesse', lblSector: 'Secteur', lblHeading: 'Cap',
+    lblFlightPlan: 'Plan de vol', lblNearest: 'OBJET LE PLUS PROCHE',
+    lblEngineTemp: 'TEMPÉRATURE MOTEUR', lblPropulsion: 'PROPULSION', lblEngineCmd: 'COMMANDES MOTEUR',
+    lblRadioChannel: 'CANAL RADIO', radioMuteTitle: 'Couper le son du canal radio',
+    badge_auto: 'AUTOPILOTE', badge_manual: 'MANUEL', badge_orbit: 'MISE EN ORBITE',
+    hint_main: '\u2191\u2193\u2190\u2192 / Z Q S D \u2014 orientation\u00a0 \u00b7 \u00a0A / E \u2014 roulis\u00a0 \u00b7 \u00a0MAJ \u2014 propulsion\u00a0 \u00b7 \u00a0glisser la souris \u2014 viser\u00a0 \u00b7 \u00a0CTRL+souris \u2014 regard libre\u00a0 \u00b7 \u00a0TAB \u2014 canal radio\u00a0 \u00b7 \u00a0H \u2014 masquer',
+    hint_arrival: 'ESPACE \u2014 abr\u00e9ger la man\u0153uvre (travelling acc\u00e9l\u00e9r\u00e9)',
+    veille: 'veille', reactors14: 'R\u00c9ACTEURS 1-4', rcsLabel: 'RCS',
+    rcs_yawP:'LACET +', rcs_yawN:'LACET \u2212', rcs_pitchP:'TANGAGE +', rcs_pitchN:'TANGAGE \u2212', rcs_rollP:'ROULIS +', rcs_rollN:'ROULIS \u2212',
+    portPrefix: 'Port de ', cityOf: 'Ville de ', navTarget: ' \u00b7 cible de navigation',
+    submerged: '% immerg\u00e9', radiusUnit: 'rayon ', satellite:'satellite', satellites:'satellites',
+    interstellarSpace: 'Espace interstellaire',
+    cam_tracking:'POURSUITE STANDARD', cam_sequence:'PLAN-S\u00c9QUENCE', cam_distant:'PLANS LOINTAINS', cameraLabel:'CAM\u00c9RA \u2014 ',
+    planetKind_ocean:'monde oc\u00e9anique', planetKind_continental:'monde continental', planetKind_desert:'monde d\u00e9sertique',
+    planetKind_ice:'monde glac\u00e9', planetKind_volcanic:'monde volcanique', planetKind_gas:'g\u00e9ante gazeuse',
+    lum_V:'naine (s\u00e9quence principale)', lum_IV:'sous-g\u00e9ante', lum_III:'g\u00e9ante', lum_I:'supergéante', lum_D:'naine blanche',
+    nebula_emission:'N\u00e9buleuse en \u00e9mission', nebula_hii:'R\u00e9gion HII', nebula_dark:'N\u00e9buleuse obscure',
+    nebula_planetary:'N\u00e9buleuse plan\u00e9taire', nebula_supernova:'R\u00e9manent de supernova', nebula_nursery:'Pouponni\u00e8re stellaire',
+    nebula_reflection:'N\u00e9buleuse par r\u00e9flexion', nebula_molecular:'Nuage mol\u00e9culaire', nebula_oiii:'N\u00e9buleuse en \u00e9mission OIII',
+    ttsLang: 'fr-FR', noRoute: 'Aucune route'
+  },
+  en: {
+    title_sub: 'Choose a language',
+    topBrand: 'QUANTUM NAVIGATION', seedLabel: 'SEED', onlineLabel: 'ONLINE',
+    lblSpeed: 'Speed', lblSector: 'Sector', lblHeading: 'Heading',
+    lblFlightPlan: 'Flight plan', lblNearest: 'NEAREST OBJECT',
+    lblEngineTemp: 'ENGINE TEMPERATURE', lblPropulsion: 'PROPULSION', lblEngineCmd: 'ENGINE COMMANDS',
+    lblRadioChannel: 'RADIO CHANNEL', radioMuteTitle: 'Mute the radio channel',
+    badge_auto: 'AUTOPILOT', badge_manual: 'MANUAL', badge_orbit: 'ORBITAL INSERTION',
+    hint_main: '\u2191\u2193\u2190\u2192 / W A S D \u2014 orientation\u00a0 \u00b7 \u00a0Q / E \u2014 roll\u00a0 \u00b7 \u00a0SHIFT \u2014 thrust\u00a0 \u00b7 \u00a0drag mouse \u2014 aim\u00a0 \u00b7 \u00a0CTRL+mouse \u2014 free look\u00a0 \u00b7 \u00a0TAB \u2014 radio channel\u00a0 \u00b7 \u00a0H \u2014 hide',
+    hint_arrival: 'SPACE \u2014 skip ahead (fast travelling)',
+    veille: 'standby', reactors14: 'REACTORS 1-4', rcsLabel: 'RCS',
+    rcs_yawP:'YAW +', rcs_yawN:'YAW \u2212', rcs_pitchP:'PITCH +', rcs_pitchN:'PITCH \u2212', rcs_rollP:'ROLL +', rcs_rollN:'ROLL \u2212',
+    portPrefix: 'Port of ', cityOf: 'City of ', navTarget: ' \u00b7 navigation target',
+    submerged: '% submerged', radiusUnit: 'radius ', satellite:'moon', satellites:'moons',
+    interstellarSpace: 'Interstellar space',
+    cam_tracking:'STANDARD TRACKING', cam_sequence:'ORBIT SHOT', cam_distant:'DISTANT SHOTS', cameraLabel:'CAMERA \u2014 ',
+    planetKind_ocean:'ocean world', planetKind_continental:'continental world', planetKind_desert:'desert world',
+    planetKind_ice:'ice world', planetKind_volcanic:'volcanic world', planetKind_gas:'gas giant',
+    lum_V:'dwarf (main sequence)', lum_IV:'subgiant', lum_III:'giant', lum_I:'supergiant', lum_D:'white dwarf',
+    nebula_emission:'Emission nebula', nebula_hii:'HII region', nebula_dark:'Dark nebula',
+    nebula_planetary:'Planetary nebula', nebula_supernova:'Supernova remnant', nebula_nursery:'Stellar nursery',
+    nebula_reflection:'Reflection nebula', nebula_molecular:'Molecular cloud', nebula_oiii:'OIII emission nebula',
+    ttsLang: 'en-US', noRoute: 'No route'
+  },
+  de: {
+    title_sub: 'Sprache wählen',
+    topBrand: 'QUANTENNAVIGATION', seedLabel: 'SEED', onlineLabel: 'ONLINE',
+    lblSpeed: 'Geschwindigkeit', lblSector: 'Sektor', lblHeading: 'Kurs',
+    lblFlightPlan: 'Flugplan', lblNearest: 'N\u00c4CHSTES OBJEKT',
+    lblEngineTemp: 'TRIEBWERKSTEMPERATUR', lblPropulsion: 'ANTRIEB', lblEngineCmd: 'TRIEBWERKSSTEUERUNG',
+    lblRadioChannel: 'FUNKKANAL', radioMuteTitle: 'Funkkanal stummschalten',
+    badge_auto: 'AUTOPILOT', badge_manual: 'MANUELL', badge_orbit: 'ORBITEINSCHUSS',
+    hint_main: '\u2191\u2193\u2190\u2192 / W A S D \u2014 Ausrichtung\u00a0 \u00b7 \u00a0Q / E \u2014 Rollen\u00a0 \u00b7 \u00a0SHIFT \u2014 Schub\u00a0 \u00b7 \u00a0Maus ziehen \u2014 Zielen\u00a0 \u00b7 \u00a0STRG+Maus \u2014 freie Sicht\u00a0 \u00b7 \u00a0TAB \u2014 Funkkanal\u00a0 \u00b7 \u00a0H \u2014 ausblenden',
+    hint_arrival: 'LEERTASTE \u2014 Man\u00f6ver abk\u00fcrzen (schneller Kameraflug)',
+    veille: 'Standby', reactors14: 'TRIEBWERKE 1-4', rcsLabel: 'RCS',
+    rcs_yawP:'GIEREN +', rcs_yawN:'GIEREN \u2212', rcs_pitchP:'NICKEN +', rcs_pitchN:'NICKEN \u2212', rcs_rollP:'ROLLEN +', rcs_rollN:'ROLLEN \u2212',
+    portPrefix: 'Hafen von ', cityOf: 'Stadt ', navTarget: ' \u00b7 Navigationsziel',
+    submerged: '% \u00fcberflutet', radiusUnit: 'Radius ', satellite:'Mond', satellites:'Monde',
+    interstellarSpace: 'Interstellarer Raum',
+    cam_tracking:'STANDARDVERFOLGUNG', cam_sequence:'KREISFLUG', cam_distant:'FERNAUFNAHMEN', cameraLabel:'KAMERA \u2014 ',
+    planetKind_ocean:'Ozeanwelt', planetKind_continental:'Kontinentalwelt', planetKind_desert:'W\u00fcstenwelt',
+    planetKind_ice:'Eiswelt', planetKind_volcanic:'Vulkanwelt', planetKind_gas:'Gasriese',
+    lum_V:'Zwerg (Hauptreihe)', lum_IV:'Unterriese', lum_III:'Riese', lum_I:'\u00dcberriese', lum_D:'Wei\u00dfer Zwerg',
+    nebula_emission:'Emissionsnebel', nebula_hii:'HII-Region', nebula_dark:'Dunkelnebel',
+    nebula_planetary:'Planetarischer Nebel', nebula_supernova:'Supernova-\u00dcberrest', nebula_nursery:'Sternentstehungsgebiet',
+    nebula_reflection:'Reflexionsnebel', nebula_molecular:'Molek\u00fcelwolke', nebula_oiii:'OIII-Emissionsnebel',
+    ttsLang: 'de-DE', noRoute: 'Keine Route'
+  },
+  es: {
+    title_sub: 'Elige un idioma',
+    topBrand: 'NAVEGACI\u00d3N CU\u00c1NTICA', seedLabel: 'SEED', onlineLabel: 'EN L\u00cdNEA',
+    lblSpeed: 'Velocidad', lblSector: 'Sector', lblHeading: 'Rumbo',
+    lblFlightPlan: 'Plan de vuelo', lblNearest: 'OBJETO M\u00c1S CERCANO',
+    lblEngineTemp: 'TEMPERATURA DE MOTORES', lblPropulsion: 'PROPULSI\u00d3N', lblEngineCmd: 'CONTROL DE MOTORES',
+    lblRadioChannel: 'CANAL DE RADIO', radioMuteTitle: 'Silenciar el canal de radio',
+    badge_auto: 'PILOTO AUTOM\u00c1TICO', badge_manual: 'MANUAL', badge_orbit: 'INSERCI\u00d3N ORBITAL',
+    hint_main: '\u2191\u2193\u2190\u2192 / W A S D \u2014 orientaci\u00f3n\u00a0 \u00b7 \u00a0Q / E \u2014 alabeo\u00a0 \u00b7 \u00a0MAY\u00daS \u2014 propulsi\u00f3n\u00a0 \u00b7 \u00a0arrastrar rat\u00f3n \u2014 apuntar\u00a0 \u00b7 \u00a0CTRL+rat\u00f3n \u2014 vista libre\u00a0 \u00b7 \u00a0TAB \u2014 canal de radio\u00a0 \u00b7 \u00a0H \u2014 ocultar',
+    hint_arrival: 'ESPACIO \u2014 abreviar la maniobra (travelling acelerado)',
+    veille: 'reposo', reactors14: 'REACTORES 1-4', rcsLabel: 'RCS',
+    rcs_yawP:'GUI\u00d1ADA +', rcs_yawN:'GUI\u00d1ADA \u2212', rcs_pitchP:'CABECEO +', rcs_pitchN:'CABECEO \u2212', rcs_rollP:'ALABEO +', rcs_rollN:'ALABEO \u2212',
+    portPrefix: 'Puerto de ', cityOf: 'Ciudad de ', navTarget: ' \u00b7 destino de navegaci\u00f3n',
+    submerged: '% sumergido', radiusUnit: 'radio ', satellite:'sat\u00e9lite', satellites:'sat\u00e9lites',
+    interstellarSpace: 'Espacio interestelar',
+    cam_tracking:'SEGUIMIENTO EST\u00c1NDAR', cam_sequence:'PLANO ORBITAL', cam_distant:'PLANOS LEJANOS', cameraLabel:'C\u00c1MARA \u2014 ',
+    planetKind_ocean:'mundo oce\u00e1nico', planetKind_continental:'mundo continental', planetKind_desert:'mundo desértico',
+    planetKind_ice:'mundo helado', planetKind_volcanic:'mundo volc\u00e1nico', planetKind_gas:'gigante gaseoso',
+    lum_V:'enana (secuencia principal)', lum_IV:'subgigante', lum_III:'gigante', lum_I:'supergigante', lum_D:'enana blanca',
+    nebula_emission:'Nebulosa de emisi\u00f3n', nebula_hii:'Regi\u00f3n HII', nebula_dark:'Nebulosa oscura',
+    nebula_planetary:'Nebulosa planetaria', nebula_supernova:'Remanente de supernova', nebula_nursery:'Vivero estelar',
+    nebula_reflection:'Nebulosa de reflexi\u00f3n', nebula_molecular:'Nube molecular', nebula_oiii:'Nebulosa de emisi\u00f3n OIII',
+    ttsLang: 'es-ES', noRoute: 'Sin ruta'
+  }
+};
+function t(key){
+  const dict = I18N[LANG] || I18N.fr;
+  if(key in dict) return dict[key];
+  return (I18N.fr[key] !== undefined) ? I18N.fr[key] : key;
+}
+
+/* Dialogue radio : gabarits par langue, sous forme de fonctions (pas de
+   simples chaînes) pour permettre l'interpolation des noms — équipage,
+   tour de contrôle, ville, navette, nombre de conteneurs. */
+const RADIO_TEMPLATES = {
+  fr: {
+    towerName: function(city){ return 'Contrôle ' + city; },
+    shuttleLabel: function(i){ return 'Navette ' + i; },
+    hail: function(tower,ship){ return [
+      tower+', ici '+ship+', cargo en approche, demande autorisation de mise en orbite.',
+      tower+', '+ship+' en finale, requête d\u2019autorisation d\u2019approche.'
+    ]; },
+    hailReply: function(tower,ship,city){ return [
+      ship+', autorisation accordée, orbite standard confirmée. Bienvenue à '+city+'.',
+      'Autorisation accordée, '+ship+'. Trajectoire propre, poursuivez.'
+    ]; },
+    dropoff: function(tower,ship,label,n){ return [
+      tower+', largage de '+label+', '+n+' conteneur'+(n>1?'s':'')+' à bord, cap sur le port.',
+      tower+', '+label+' détachée, cargaison confirmée pour livraison.'
+    ]; },
+    dropoffReply: function(label){ return [
+      'Bien reçu, piste de réception dégagée pour '+label+'.',
+      label+' identifiée, vous êtes autorisés à descendre.'
+    ]; },
+    techQuery: function(ship){ return [
+      ship+', confirmez le blindage thermique de vos navettes avant rentrée.',
+      ship+', état de propulsion de vos navettes ?'
+    ]; },
+    techReply: function(){ return [
+      'Blindage nominal, navettes certifiées pour l\u2019entrée atmosphérique.',
+      'Propulsion nominale, autonomie suffisante pour le retour à bord.'
+    ]; },
+    thanks: function(tower,ship){ return [
+      'Cargaison réceptionnée, merci pour la livraison '+ship+'. Bon vol.',
+      'Transfert terminé, merci de votre passage. '+tower+' termine.'
+    ]; },
+    thanksReply: function(tower,ship){ return [
+      'Merci '+tower+', à la prochaine rotation.',
+      'Bien reçu, merci pour l\u2019accueil. '+ship+' reprend sa route.'
+    ]; }
+  },
+  en: {
+    towerName: function(city){ return city + ' Control'; },
+    shuttleLabel: function(i){ return 'Shuttle ' + i; },
+    hail: function(tower,ship){ return [
+      tower+', this is '+ship+', cargo inbound, requesting orbital insertion clearance.'
+    ]; },
+    hailReply: function(tower,ship,city){ return [
+      ship+', clearance granted, standard orbit confirmed. Welcome to '+city+'.'
+    ]; },
+    dropoff: function(tower,ship,label,n){ return [
+      tower+', releasing '+label+', '+n+' container'+(n>1?'s':'')+' aboard, heading to the port.'
+    ]; },
+    dropoffReply: function(label){ return [
+      'Copy that, landing pad clear for '+label+'.'
+    ]; },
+    techQuery: function(ship){ return [
+      ship+', confirm thermal shielding on your shuttles before re-entry.'
+    ]; },
+    techReply: function(){ return [
+      'Shielding nominal, shuttles certified for atmospheric entry.'
+    ]; },
+    thanks: function(tower,ship){ return [
+      'Cargo received, thanks for the delivery '+ship+'. Safe travels.'
+    ]; },
+    thanksReply: function(tower,ship){ return [
+      'Thanks '+tower+', see you next rotation.'
+    ]; }
+  },
+  de: {
+    towerName: function(city){ return city + ' Kontrolle'; },
+    shuttleLabel: function(i){ return 'Fähre ' + i; },
+    hail: function(tower,ship){ return [
+      tower+', hier '+ship+', Fracht im Anflug, bitte um Freigabe zum Orbiteinschuss.'
+    ]; },
+    hailReply: function(tower,ship,city){ return [
+      ship+', Freigabe erteilt, Standardorbit bestätigt. Willkommen in '+city+'.'
+    ]; },
+    dropoff: function(tower,ship,label,n){ return [
+      tower+', '+label+' wird ausgeklinkt, '+n+' Container an Bord, Kurs auf den Hafen.'
+    ]; },
+    dropoffReply: function(label){ return [
+      'Verstanden, Landeplatz frei für '+label+'.'
+    ]; },
+    techQuery: function(ship){ return [
+      ship+', bestätigen Sie den Hitzeschild Ihrer Fähren vor dem Wiedereintritt.'
+    ]; },
+    techReply: function(){ return [
+      'Hitzeschild nominal, Fähren für den Wiedereintritt zertifiziert.'
+    ]; },
+    thanks: function(tower,ship){ return [
+      'Fracht erhalten, danke für die Lieferung '+ship+'. Gute Reise.'
+    ]; },
+    thanksReply: function(tower,ship){ return [
+      'Danke '+tower+', bis zur nächsten Rotation.'
+    ]; }
+  },
+  es: {
+    towerName: function(city){ return 'Control ' + city; },
+    shuttleLabel: function(i){ return 'Nave ' + i; },
+    hail: function(tower,ship){ return [
+      tower+', aquí '+ship+', carga en aproximación, solicito autorización de inserción orbital.'
+    ]; },
+    hailReply: function(tower,ship,city){ return [
+      ship+', autorización concedida, órbita estándar confirmada. Bienvenido a '+city+'.'
+    ]; },
+    dropoff: function(tower,ship,label,n){ return [
+      tower+', liberando '+label+', '+n+' contenedor'+(n>1?'es':'')+' a bordo, rumbo al puerto.'
+    ]; },
+    dropoffReply: function(label){ return [
+      'Recibido, plataforma de aterrizaje libre para '+label+'.'
+    ]; },
+    techQuery: function(ship){ return [
+      ship+', confirme el escudo térmico de sus naves antes de la reentrada.'
+    ]; },
+    techReply: function(){ return [
+      'Escudo nominal, naves certificadas para la reentrada atmosférica.'
+    ]; },
+    thanks: function(tower,ship){ return [
+      'Carga recibida, gracias por la entrega '+ship+'. Buen viaje.'
+    ]; },
+    thanksReply: function(tower,ship){ return [
+      'Gracias '+tower+', hasta la próxima rotación.'
+    ]; }
+  }
+};
+
+/* applique la langue choisie à tous les libellés STATIQUES du HUD — les
+   textes générés dynamiquement (jauges, panneau le plus proche, radio…)
+   appellent t()/RADIO_TEMPLATES directement à chaque mise à jour. */
+function applyLanguage(){
+  const map = {
+    topBrand:'topBrand', seedLabel:'seedLabel', onlineLabel:'onlineLabel',
+    lblSpeed:'lblSpeed', lblSector:'lblSector', lblHeading:'lblHeading',
+    lblFlightPlan:'lblFlightPlan', lblNearest:'lblNearest',
+    lblEngineTemp:'lblEngineTemp', lblPropulsion:'lblPropulsion', lblEngineCmd:'lblEngineCmd',
+    lblRadioChannel:'lblRadioChannel'
+  };
+  Object.keys(map).forEach(function(id){
+    const el = document.getElementById(id);
+    if(el) el.textContent = t(map[id]);
+  });
+  const hint = document.getElementById('hint');
+  if(hint) hint.textContent = t('hint_main');
+  const arrivalHint = document.getElementById('arrivalHint');
+  if(arrivalHint) arrivalHint.textContent = t('hint_arrival');
+  const muteBtn = document.getElementById('radioMuteBtn');
+  if(muteBtn) muteBtn.title = t('radioMuteTitle');
+  document.documentElement.lang = LANG;
+}
+
 
 /* =========================================================================
    1. PRNG SEEDÉ — tout l'univers découle d'une seule graine
@@ -607,15 +917,15 @@ function generateStar(rng){
 /* Types de nébuleuses : couleur de cœur (colorA) et couleur de bord (colorB).
    Le dégradé cœur→bord est ce qui donne leur volume aux bouffées de gaz. */
 const NEBULA_TYPES = [
-  {name:'Nébuleuse en émission',    colorA:0xff5d8a, colorB:0x7a2d6b},
-  {name:'Région HII',               colorA:0xff8fa8, colorB:0x8e3f7a},
-  {name:'Nébuleuse obscure',        colorA:0x3a2a5c, colorB:0x140e26},
-  {name:'Nébuleuse planétaire',     colorA:0x7dffe8, colorB:0x1d6f82},
-  {name:'Rémanent de supernova',    colorA:0xffb066, colorB:0x8f3a2a},
-  {name:'Pouponnière stellaire',    colorA:0xc08cff, colorB:0x3d47a8},
-  {name:'Nébuleuse par réflexion',  colorA:0x8fb8ff, colorB:0x2a3f8f},
-  {name:'Nuage moléculaire',        colorA:0x5e7ba8, colorB:0x1e2a4d},
-  {name:'Nébuleuse en émission OIII',colorA:0x6fffc4, colorB:0x2a7a6b}
+  {key:'emission',   name:'Nébuleuse en émission',    colorA:0xff5d8a, colorB:0x7a2d6b},
+  {key:'hii',        name:'Région HII',               colorA:0xff8fa8, colorB:0x8e3f7a},
+  {key:'dark',       name:'Nébuleuse obscure',        colorA:0x3a2a5c, colorB:0x140e26},
+  {key:'planetary',  name:'Nébuleuse planétaire',     colorA:0x7dffe8, colorB:0x1d6f82},
+  {key:'supernova',  name:'Rémanent de supernova',    colorA:0xffb066, colorB:0x8f3a2a},
+  {key:'nursery',    name:'Pouponnière stellaire',    colorA:0xc08cff, colorB:0x3d47a8},
+  {key:'reflection', name:'Nébuleuse par réflexion',  colorA:0x8fb8ff, colorB:0x2a3f8f},
+  {key:'molecular',  name:'Nuage moléculaire',        colorA:0x5e7ba8, colorB:0x1e2a4d},
+  {key:'oiii',       name:'Nébuleuse en émission OIII',colorA:0x6fffc4, colorB:0x2a7a6b}
 ];
 
 /* =========================================================================
@@ -1911,7 +2221,7 @@ function buildNebulaCell(ix,iy,iz){
   mesh.userData.targetFade = 1.0;
   mesh.userData.currentFade = 0;
   scene.add(mesh);
-  return {mesh:mesh, name:name, type:type.name, isNebula:true};
+  return {mesh:mesh, name:name, type:type.name, typeIdx:typeIdx, isNebula:true};
 }
 
 function refreshField(cellSize, radius, map, buildFn){
@@ -1972,12 +2282,12 @@ const ROUTE = {
    le coût du rendu temps réel sur plusieurs planètes visibles.
    ========================================================================= */
 const PLANET_KINDS = [
-  {name:'monde océanique',   ocean:0.62, life:true,  atmo:true},
-  {name:'monde continental', ocean:0.32, life:true,  atmo:true},
-  {name:'monde désertique',  ocean:0.04, life:false, atmo:true},
-  {name:'monde glacé',       ocean:0.50, life:false, atmo:true,  icy:true},
-  {name:'monde volcanique',  ocean:0.00, life:false, atmo:false, volcanic:true},
-  {name:'géante gazeuse',    ocean:0.00, life:false, atmo:true,  gas:true}
+  {key:'ocean',      name:'monde océanique',   ocean:0.62, life:true,  atmo:true},
+  {key:'continental',name:'monde continental', ocean:0.32, life:true,  atmo:true},
+  {key:'desert',     name:'monde désertique',  ocean:0.04, life:false, atmo:true},
+  {key:'ice',        name:'monde glacé',       ocean:0.50, life:false, atmo:true,  icy:true},
+  {key:'volcanic',   name:'monde volcanique',  ocean:0.00, life:false, atmo:false, volcanic:true},
+  {key:'gas',        name:'géante gazeuse',    ocean:0.00, life:false, atmo:true,  gas:true}
 ];
 const HABITABLE_KIND_COUNT = 2;   /* océanique, continental — indices 0,1 */
 
@@ -2071,7 +2381,7 @@ function generateSystemData(leg){
     };
     if(isHab){
       planet.cityName = generateName(rng);
-      planet.portName = 'Port de ' + planet.cityName;
+      planet.portName = t('portPrefix') + planet.cityName;
       /* point de la surface qui porte le port, en coordonnées OBJET (donc
          solidaire de la rotation de la planète, sans recalcul par image) */
       const lat = (rng()-0.5)*Math.PI*0.65;   /* on évite les pôles */
@@ -2763,7 +3073,7 @@ function refreshRoutePanel(){
   const prog = document.getElementById('routeProgress');
   if(!list) return;
   if(!ROUTE.legs.length){
-    list.innerHTML = '<div class="route-leg todo"><span class="nm">Aucune route</span></div>';
+    list.innerHTML = '<div class="route-leg todo"><span class="nm">'+t('noRoute')+'</span></div>';
     if(prog) prog.textContent = '';
     return;
   }
@@ -3015,6 +3325,13 @@ window.addEventListener('keydown', function(e){
   /* abrégé de la manœuvre d'orbite/livraison : le reste de la séquence se
      joue en accéléré (travelling rapide) plutôt que d'être coupé net —
      les navettes et le canal radio restent visibles, juste comprimés. */
+  if(e.code === 'Space'){
+    /* empêche le défilement de la page (comportement par défaut du
+       navigateur pour Espace) — pertinent aussi bien pour la propulsion
+       en vol normal que pour l'abrégé pendant l'approche */
+    e.preventDefault();
+    if(flightPhase === 'ARRIVAL_PAUSE') arrivalSkip = true;
+  }
   if(e.code === 'Enter' && flightPhase === 'ARRIVAL_PAUSE'){
     arrivalSkip = true;
   }
@@ -3025,7 +3342,7 @@ window.addEventListener('keydown', function(e){
   if(e.code === 'Tab'){
     e.preventDefault();
     const panel = document.getElementById('radioPanel');
-    if(panel) panel.classList.toggle('visible');
+    if(panel){ panel.classList.toggle('visible'); repositionRadioPanel(); }
   }
 });
 window.addEventListener('keyup', function(e){ keys[e.code] = false; });
@@ -3033,10 +3350,75 @@ window.addEventListener('keyup', function(e){ keys[e.code] = false; });
 let dragging=false, lastPX=0, lastPY=0, dragYaw=0, dragPitch=0;
 /* caméra libre : Ctrl + glisser oriente la vue autour du vaisseau sans
    toucher au pilotage — un simple regard autour de soi, pas une commande.
-   Un simple appui court sur Ctrl (sans glisser) recentre la caméra
-   derrière le vaisseau, à sa position de poursuite d'origine. */
+   Un appui court sur Ctrl bascule ensuite entre plusieurs MODES de
+   caméra en croisière, selon le nombre d'appuis rapprochés :
+     1 appui  → recentre le regard libre (comportement existant)
+     2 appuis → mode de caméra suivant (poursuite → plan-séquence → plans lointains)
+     3 appuis → retour direct à la poursuite standard
+   On ne décide qu'une fois la fenêtre passée sans nouvel appui, pour
+   distinguer correctement 1, 2 ou 3 appuis d'une seule séquence. */
 let camOrbitYaw=0, camOrbitPitch=0;
 let ctrlDownAt=0, ctrlDragged=false;
+let ctrlTapCount=0, ctrlTapTimer=null;
+const CTRL_TAP_GAP = 380;
+const CAMERA_MODES = ['tracking','sequence','distant'];
+let cameraMode = 0;
+/* mode 'distant' : succession de plans fixes (coupes franches, pas de
+   fondu) à bonne distance du vaisseau, choisis pour cadrer une planète ou
+   une nébuleuse proche en arrière-plan quand c'est possible. */
+const distantShotState = { offset:new THREE.Vector3(80,40,220), until:0 };
+function pickDistantShot(elapsed){
+  let backdrop = null, backdropDist = Infinity;
+  ROUTE.builtSystems.forEach(function(grp, legIdx){
+    const leg = ROUTE.legs[legIdx];
+    if(!leg || !leg.system) return;
+    leg.system.planets.forEach(function(p){
+      const d = shipRig.position.distanceTo(p.position);
+      if(d < backdropDist){ backdropDist = d; backdrop = p.position; }
+    });
+  });
+  nebulaField.forEach(function(obj){
+    if(!obj) return;
+    const d = shipRig.position.distanceTo(obj.mesh.position);
+    if(d < backdropDist){ backdropDist = d; backdrop = obj.mesh.position; }
+  });
+  const dist = 260 + Math.random()*260;
+  let dir;
+  if(backdrop && backdropDist < 6000){
+    /* la caméra se place du côté OPPOSÉ au décor par rapport au vaisseau :
+       vue depuis la caméra, le vaisseau se détache alors devant lui */
+    dir = shipRig.position.clone().sub(backdrop).normalize();
+    dir.applyAxisAngle(new THREE.Vector3(0,1,0), (Math.random()-0.5)*0.7);
+  } else {
+    dir = new THREE.Vector3(Math.random()-0.5, (Math.random()-0.5)*0.5, Math.random()-0.5).normalize();
+  }
+  distantShotState.offset.copy(dir).multiplyScalar(dist);
+  distantShotState.until = elapsed + 6 + Math.random()*4;
+}
+
+function finalizeCtrlTaps(){
+  if(ctrlTapCount === 1){
+    camOrbitYaw = 0; camOrbitPitch = 0;
+  } else if(ctrlTapCount === 2){
+    cameraMode = (cameraMode+1) % CAMERA_MODES.length;
+    flashCameraModeLabel();
+  } else if(ctrlTapCount >= 3){
+    cameraMode = 0;
+    flashCameraModeLabel();
+  }
+  ctrlTapCount = 0;
+}
+let cameraModeFlashTimer = null;
+function flashCameraModeLabel(){
+  const el = document.getElementById('cameraModeFlash');
+  if(!el) return;
+  const keys = {tracking:'cam_tracking', sequence:'cam_sequence', distant:'cam_distant'};
+  el.textContent = t('cameraLabel') + t(keys[CAMERA_MODES[cameraMode]]);
+  el.style.display = 'block';
+  el.style.opacity = '1';
+  if(cameraModeFlashTimer) clearTimeout(cameraModeFlashTimer);
+  cameraModeFlashTimer = setTimeout(function(){ el.style.opacity = '0'; }, 1800);
+}
 window.addEventListener('keydown', function(e){
   if((e.code==='ControlLeft'||e.code==='ControlRight') && !e.repeat){
     ctrlDownAt = performance.now();
@@ -3047,8 +3429,9 @@ window.addEventListener('keyup', function(e){
   if(e.code==='ControlLeft'||e.code==='ControlRight'){
     const heldFor = performance.now() - ctrlDownAt;
     if(!ctrlDragged && heldFor < 400){
-      camOrbitYaw = 0;
-      camOrbitPitch = 0;
+      ctrlTapCount++;
+      if(ctrlTapTimer) clearTimeout(ctrlTapTimer);
+      ctrlTapTimer = setTimeout(finalizeCtrlTaps, CTRL_TAP_GAP);
     }
   }
 });
@@ -3092,7 +3475,9 @@ let pauseTimer = 0;
 /* La phase d'approche est volontairement plus lente que le reste du vol :
    on doit avoir le temps de VOIR le déchargement des conteneurs, pas
    juste le deviner entre deux plans qui défilent trop vite. */
-const ARRIVAL_PAUSE_DURATION = 26;    /* durée d'un tour d'orbite complet */
+const ARRIVAL_PAUSE_DURATION = 36;    /* durée d'un tour d'orbite complet — allongée pour
+                                          des navettes bien plus lentes (cf. §ci-dessous),
+                                          coordonnées avec les échanges radio */
 const ARRIVAL_FF_SCALE = 4.5;         /* facteur d'accélération en mode abrégé */
 let arrivalSkip = false;              /* déclenché par la touche d'abrégé (Entrée) */
 let arrivalTimeScale = 1;             /* lu par updateShuttles(), hors de updateFlight */
@@ -3104,7 +3489,7 @@ const orbitState = {
   radius:0, U:new THREE.Vector3(), V:new THREE.Vector3(), N:new THREE.Vector3(),
   startPos:new THREE.Vector3(), startQuat:new THREE.Quaternion(),
   camPhase0:0, shuttles:[], spawned:[false,false,false],
-  spawnFractions:[0.16,0.42,0.68],
+  spawnFractions:[0.08,0.30,0.52],
   radioScript:[], radioIdx:0,
   voiceGender:{ship:'male', tower:'female'},
   cutawayUntil:-1   /* valeur de pauseTimer jusqu'à laquelle le plan large reste actif */
@@ -3120,56 +3505,43 @@ const orbitState = {
 function buildRadioScript(planet){
   const rng = rngFor(SEED+':radio:'+planet.seedNoise);
   function pick(arr){ return arr[Math.floor(rng()*arr.length)]; }
-  const tower = 'Contrôle ' + planet.cityName;
+  const R = RADIO_TEMPLATES[LANG] || RADIO_TEMPLATES.fr;
+  const tower = R.towerName(planet.cityName);
   const ship = SHIP_REGISTRY;
   const msgs = [];
 
   /* 1. demande d'autorisation d'approche */
-  msgs.push({t:0.02, from:'ship', label:ship, text: pick([
-    tower+', ici '+ship+', cargo en approche, demande autorisation de mise en orbite.',
-    tower+', '+ship+' en finale, requête d\u2019autorisation d\u2019approche.'
-  ])});
-  msgs.push({t:0.08, from:'tower', label:tower, text: pick([
-    ship+', autorisation accordée, orbite standard confirmée. Bienvenue à '+planet.cityName+'.',
-    'Autorisation accordée, '+ship+'. Trajectoire propre, poursuivez.'
-  ])});
+  msgs.push({t:0.02, from:'ship', label:ship, text: pick(R.hail(tower,ship))});
+  msgs.push({t:0.08, from:'tower', label:tower, text: pick(R.hailReply(tower,ship,planet.cityName))});
 
   /* 2. coordination des transferts de conteneurs, calée sur les navettes */
-  const labels = ['Navette 1','Navette 2','Navette 3'];
   orbitState.spawnFractions.forEach(function(f, i){
+    const label = R.shuttleLabel(i+1);
     const n = 1 + Math.floor(rng()*2);
-    msgs.push({t:f+0.015, from:'ship', label:ship, text: pick([
-      tower+', largage de '+labels[i]+', '+n+' conteneur'+(n>1?'s':'')+' à bord, cap sur le port.',
-      tower+', '+labels[i]+' détachée, cargaison confirmée pour livraison.'
-    ])});
-    msgs.push({t:f+0.06, from:'tower', label:tower, text: pick([
-      'Bien reçu, piste de réception dégagée pour '+labels[i]+'.',
-      labels[i]+' identifiée, vous êtes autorisés à descendre.'
-    ])});
+    msgs.push({t:f+0.015, from:'ship', label:ship, text: pick(R.dropoff(tower,ship,label,n))});
+    msgs.push({t:f+0.06, from:'tower', label:tower, text: pick(R.dropoffReply(label))});
   });
 
   /* 3. échange technique lié aux mini-vaisseaux (navettes) */
-  msgs.push({t:0.50, from:'tower', label:tower, text: pick([
-    ship+', confirmez le blindage thermique de vos navettes avant rentrée.',
-    ship+', état de propulsion de vos navettes ?'
-  ])});
-  msgs.push({t:0.55, from:'ship', label:ship, text: pick([
-    'Blindage nominal, navettes certifiées pour l\u2019entrée atmosphérique.',
-    'Propulsion nominale, autonomie suffisante pour le retour à bord.'
-  ])});
+  msgs.push({t:0.50, from:'tower', label:tower, text: pick(R.techQuery(ship))});
+  msgs.push({t:0.55, from:'ship', label:ship, text: pick(R.techReply())});
 
   /* 4. remerciements de clôture */
-  msgs.push({t:0.90, from:'tower', label:tower, text: pick([
-    'Cargaison réceptionnée, merci pour la livraison '+ship+'. Bon vol.',
-    'Transfert terminé, merci de votre passage. '+tower+' termine.'
-  ])});
-  msgs.push({t:0.95, from:'ship', label:ship, text: pick([
-    'Merci '+tower+', à la prochaine rotation.',
-    'Bien reçu, merci pour l\u2019accueil. '+ship+' reprend sa route.'
-  ])});
+  msgs.push({t:0.90, from:'tower', label:tower, text: pick(R.thanks(tower,ship))});
+  msgs.push({t:0.95, from:'ship', label:ship, text: pick(R.thanksReply(tower,ship))});
 
   msgs.sort(function(a,b){ return a.t-b.t; });
   return msgs;
+}
+function repositionRadioPanel(){
+  const panel = document.getElementById('radioPanel');
+  const nearest = document.getElementById('nearestPanel');
+  if(!panel || !nearest) return;
+  /* calculé dynamiquement contre le bas RÉEL du panneau « objet le plus
+     proche » (sa hauteur varie avec la longueur des textes) plutôt qu'un
+     décalage fixe, qui finissait par le chevaucher. */
+  const rect = nearest.getBoundingClientRect();
+  panel.style.top = Math.round(rect.bottom + 14) + 'px';
 }
 function appendRadioLine(entry){
   const log = document.getElementById('radioLog');
@@ -3179,6 +3551,7 @@ function appendRadioLine(entry){
   div.innerHTML = '<span class="who">['+entry.label+']</span><span class="txt">'+entry.text+'</span>';
   log.appendChild(div);
   while(log.children.length > 6) log.removeChild(log.firstChild);
+  repositionRadioPanel();
   playRadioBlip(entry.from);
   /* en mode abrégé, les lignes défilent trop vite pour être lues à voix
      haute sans se chevaucher — on garde le bip, on saute la voix (et donc
@@ -3234,17 +3607,20 @@ if(window.speechSynthesis){
 }
 function pickVoice(from){
   if(!ttsVoices.length) return null;
-  const fr = ttsVoices.filter(function(v){ return /^fr/i.test(v.lang); });
-  const pool = fr.length ? fr : ttsVoices;
+  const langPrefix = t('ttsLang').slice(0,2);
+  const langMatch = ttsVoices.filter(function(v){ return v.lang && v.lang.slice(0,2).toLowerCase() === langPrefix; });
+  const pool = langMatch.length ? langMatch : ttsVoices;
   if(pool.length < 2) return pool[0] || null;
   /* le genre de chaque interlocuteur est tiré aléatoirement à chaque
      échange (cf. startOrbitDelivery) plutôt que fixé par rôle : parfois
      la tour est une voix masculine, parfois féminine, indépendamment de
-     l'équipage — pour ne pas toujours entendre la même association. */
+     l'équipage — pour ne pas toujours entendre la même association.
+     Les indices de nom couvrent plusieurs langues (les voix installées
+     varient selon le navigateur/système, cf. §12.3 de la documentation). */
   const gender = orbitState.voiceGender[from];
   const pattern = gender === 'female'
-    ? /female|femme|amélie|amelie|marie|julie/i
-    : /male|homme|thomas|nicolas|paul|daniel/i;
+    ? /female|femme|frau|mujer|amélie|amelie|marie|julie|samantha|karen|anna|maria|petra/i
+    : /male|homme|mann|hombre|thomas|nicolas|paul|daniel|david|stefan|carlos|jorge/i;
   return pool.find(function(v){ return pattern.test(v.name); }) || pool[Math.floor(Math.random()*pool.length)];
 }
 function speakRadioLine(entry){
@@ -3252,7 +3628,7 @@ function speakRadioLine(entry){
   const u = new SpeechSynthesisUtterance(entry.text);
   const v = pickVoice(entry.from);
   if(v) u.voice = v;
-  u.lang = (v && v.lang) || 'fr-FR';
+  u.lang = (v && v.lang) || t('ttsLang');
   u.rate = entry.from === 'tower' ? 0.98 : 1.05;
   /* le ton suit le GENRE tiré pour cet interlocuteur, pas son rôle : la
      tour et l'équipage sonnent différemment selon le tirage du jour. */
@@ -3333,6 +3709,7 @@ function startOrbitDelivery(planet){
   if(radioLog) radioLog.innerHTML = '';
   const radioPanel = document.getElementById('radioPanel');
   if(radioPanel) radioPanel.classList.add('visible');
+  repositionRadioPanel();
   const arrivalHint = document.getElementById('arrivalHint');
   if(arrivalHint) arrivalHint.style.display = 'block';
 }
@@ -3370,7 +3747,7 @@ function spawnShuttle(){
     .normalize().multiplyScalar(50 + Math.random()*70);
   orbitState.shuttles.push({
     group:sh.group, glow:sh.glow, startPos:shipRig.position.clone(),
-    t:0, duration:3.2+Math.random()*0.7, arcOffset:arcOffset
+    t:0, duration:11+Math.random()*3, arcOffset:arcOffset
   });
 }
 const _shuttleTarget = new THREE.Vector3();
@@ -3679,7 +4056,20 @@ function updateFlight(dt, elapsed){
        l'intégration couple/vitesse habituelle */
     forward = updateOrbitDelivery(dt);
   } else {
-    const targetSpeed = CRUISE_SPEED * (boosting ? BOOST_MULT : 1);
+    /* ralentissement à l'approche d'une étape : le vaisseau doit avoir
+       nettement réduit sa vitesse avant que les transmissions radio ne
+       commencent, plutôt que d'entamer l'échange en filant encore à
+       pleine vitesse. */
+    let approachScale = 1;
+    if(ROUTE.legS && ROUTE.nextDelivery < ROUTE.legS.length){
+      const distToArrival = ROUTE.legS[ROUTE.nextDelivery] - ROUTE.s;
+      const ZONE = 950;
+      if(distToArrival <= ZONE && distToArrival >= -300){
+        const t = THREE.MathUtils.clamp(distToArrival/ZONE, 0, 1);
+        approachScale = THREE.MathUtils.lerp(0.28, 1, t);
+      }
+    }
+    const targetSpeed = CRUISE_SPEED * (boosting ? BOOST_MULT : 1) * approachScale;
     currentSpeed += (targetSpeed-currentSpeed)*Math.min(1, dt*2.2);
     forward = new THREE.Vector3(0,0,-1).applyQuaternion(shipRig.quaternion);
     shipRig.position.addScaledVector(forward, currentSpeed*dt);
@@ -3821,17 +4211,19 @@ function updateFlight(dt, elapsed){
       camera.lookAt(camLook);
     }
 
-    /* fin de la manœuvre : la durée minimale ET la fin complète du
-       dialogue radio (dernier message affiché, sa lecture terminée) sont
-       toutes deux nécessaires — sans cette seconde condition, une voix
-       lente ou des messages nombreux pourraient se faire couper avant la
-       fin par le simple minuteur. */
+    /* fin de la manœuvre : la durée minimale, la fin complète du dialogue
+       radio (dernier message affiché, sa lecture terminée) ET l'atterrissage
+       de toutes les navettes déjà larguées sont nécessaires — sans ces
+       conditions, une voix lente, des messages nombreux ou des navettes
+       ralenties pourraient se faire couper avant la fin par le simple
+       minuteur. */
     const radioDone = os.radioIdx >= os.radioScript.length && !radioSpeaking;
-    /* plafond défensif : si quelque chose empêchait radioDone de devenir
-       vrai (cas non prévu), la manœuvre se termine quand même plutôt que
-       de bloquer indéfiniment le vol. */
+    const shuttlesDone = os.spawned.every(Boolean) && os.shuttles.length === 0;
+    /* plafond défensif : si quelque chose empêchait radioDone/shuttlesDone
+       de devenir vrais (cas non prévu), la manœuvre se termine quand même
+       plutôt que de bloquer indéfiniment le vol. */
     const hardCap = pauseTimer >= ARRIVAL_PAUSE_DURATION*2.5;
-    if((pauseTimer >= ARRIVAL_PAUSE_DURATION && radioDone) || hardCap){
+    if((pauseTimer >= ARRIVAL_PAUSE_DURATION && radioDone && shuttlesDone) || hardCap){
       flightPhase = 'CRUISE';
       pauseTimer = 0;
       orbitState.active = false;
@@ -3845,23 +4237,54 @@ function updateFlight(dt, elapsed){
     }
   } else {
     arrivalTimeScale = 1;
-    /* caméra en poursuite, avec un léger amortissement pour un rendu cinématique.
-       Le regard libre (Ctrl+souris) tourne l'offset de poursuite AUTOUR du
-       vaisseau, dans son propre repère, avant d'être orienté par son cap :
-       on regarde autour de soi sans changer la trajectoire suivie. */
-    const freeLook = new THREE.Quaternion().setFromEuler(new THREE.Euler(camOrbitPitch, camOrbitYaw, 0, 'YXZ'));
-    const camQuat = shipRig.quaternion.clone().multiply(freeLook);
-    const desiredCamPos = shipRig.position.clone().add(CAM_OFFSET.clone().applyQuaternion(camQuat));
-    camPos.lerp(desiredCamPos, Math.min(1, dt*4.5));
-    camera.position.copy(camPos);
-    const desiredLook = shipRig.position.clone().add(forward.clone().multiplyScalar(45));
-    camLook.lerp(desiredLook, Math.min(1, dt*4.5));
-    camera.up.copy(new THREE.Vector3(0,1,0).applyQuaternion(shipRig.quaternion));
-    camera.lookAt(camLook);
+    if(CAMERA_MODES[cameraMode] === 'sequence'){
+      /* ---------- plan-séquence : orbite continue autour du vaisseau ----------
+         Un plan filmé façon drone qui tourne lentement autour de l'appareil
+         pendant qu'il vole, plutôt qu'une poursuite fixe derrière lui. */
+      const seqAngle = elapsed*0.18;
+      const seqRadius = 95;
+      const seqHeight = 26 + Math.sin(elapsed*0.25)*10;
+      const shipUp = new THREE.Vector3(0,1,0).applyQuaternion(shipRig.quaternion);
+      const shipRight = new THREE.Vector3(1,0,0).applyQuaternion(shipRig.quaternion);
+      const shipFwd = new THREE.Vector3(0,0,-1).applyQuaternion(shipRig.quaternion);
+      const offset = shipRight.clone().multiplyScalar(Math.cos(seqAngle)*seqRadius)
+        .addScaledVector(shipFwd, Math.sin(seqAngle)*seqRadius)
+        .addScaledVector(shipUp, seqHeight);
+      const desired = shipRig.position.clone().add(offset);
+      camPos.lerp(desired, Math.min(1, dt*2.2));
+      camera.position.copy(camPos);
+      camLook.lerp(shipRig.position, Math.min(1, dt*2.2));
+      camera.up.set(0,1,0);
+      camera.lookAt(camLook);
+    } else if(CAMERA_MODES[cameraMode] === 'distant'){
+      /* ---------- plans lointains : coupes franches, décor en fond ---------- */
+      if(elapsed > distantShotState.until) pickDistantShot(elapsed);
+      camera.position.copy(shipRig.position).add(distantShotState.offset);
+      camPos.copy(camera.position);
+      camLook.copy(shipRig.position);
+      camera.up.set(0,1,0);
+      camera.lookAt(camLook);
+    } else {
+      /* ---------- poursuite standard ----------
+         Caméra en poursuite, avec un léger amortissement pour un rendu
+         cinématique. Le regard libre (Ctrl+souris) tourne l'offset de
+         poursuite AUTOUR du vaisseau, dans son propre repère, avant d'être
+         orienté par son cap : on regarde autour de soi sans changer la
+         trajectoire suivie. */
+      const freeLook = new THREE.Quaternion().setFromEuler(new THREE.Euler(camOrbitPitch, camOrbitYaw, 0, 'YXZ'));
+      const camQuat = shipRig.quaternion.clone().multiply(freeLook);
+      const desiredCamPos = shipRig.position.clone().add(CAM_OFFSET.clone().applyQuaternion(camQuat));
+      camPos.lerp(desiredCamPos, Math.min(1, dt*4.5));
+      camera.position.copy(camPos);
+      const desiredLook = shipRig.position.clone().add(forward.clone().multiplyScalar(45));
+      camLook.lerp(desiredLook, Math.min(1, dt*4.5));
+      camera.up.copy(new THREE.Vector3(0,1,0).applyQuaternion(shipRig.quaternion));
+      camera.lookAt(camLook);
+    }
   }
 
   document.getElementById('modeBadge').textContent =
-    paused ? 'MISE EN ORBITE' : (manual ? 'MANUEL' : 'AUTOPILOTE');
+    paused ? t('badge_orbit') : (manual ? t('badge_manual') : t('badge_auto'));
   document.getElementById('modeBadge').className =
     'hud-mode mono ' + (paused ? 'auto' : (manual?'manual':'auto'));
 }
@@ -3888,22 +4311,22 @@ function updateTelemetryPanel(mainPowers, boosting){
   if(!body) return;
   const avgMain = mainPowers.reduce(function(a,b){return a+b;},0)/Math.max(mainPowers.length,1);
   let html = '<div class="tm-line'+(boosting?' tm-amber':'')+'">' +
-    '<span>RÉACTEURS 1-4</span><span>'+(avgMain>0.02?Math.round(avgMain*100)+'%':'VEILLE')+'</span></div>';
+    '<span>'+t('reactors14')+'</span><span>'+(avgMain>0.02?Math.round(avgMain*100)+'%':t('veille').toUpperCase())+'</span></div>';
 
   const groups = [
-    ['yaw','P','LACET +'], ['yaw','N','LACET −'],
-    ['pitch','P','TANGAGE +'], ['pitch','N','TANGAGE −'],
-    ['roll','P','ROULIS +'], ['roll','N','ROULIS −']
+    ['yaw','P','rcs_yawP'], ['yaw','N','rcs_yawN'],
+    ['pitch','P','rcs_pitchP'], ['pitch','N','rcs_pitchN'],
+    ['roll','P','rcs_rollP'], ['roll','N','rcs_rollN']
   ];
   let anyRcs = false;
   groups.forEach(function(g){
     const lvl = rcsLevel[g[0]+g[1]] || 0;
     if(lvl > 0.02){
       anyRcs = true;
-      html += '<div class="tm-line"><span>RCS '+g[2]+'</span><span>'+Math.round(lvl*100)+'%</span></div>';
+      html += '<div class="tm-line"><span>'+t('rcsLabel')+' '+t(g[2])+'</span><span>'+Math.round(lvl*100)+'%</span></div>';
     }
   });
-  if(!anyRcs) html += '<div class="tm-line tm-off"><span>RCS</span><span>veille</span></div>';
+  if(!anyRcs) html += '<div class="tm-line tm-off"><span>'+t('rcsLabel')+'</span><span>'+t('veille')+'</span></div>';
 
   body.innerHTML = html;
 }
@@ -3975,14 +4398,15 @@ function updateHud(now){
 
   if(nearest && nearest.isPlanet){
     const pl = nearest.planet, leg = nearest.leg;
+    const kindLabel = t('planetKind_'+pl.kind.key);
     const label = pl.isHabitable ? pl.portName
-      : (pl.kind.name.charAt(0).toUpperCase()+pl.kind.name.slice(1));
+      : (kindLabel.charAt(0).toUpperCase()+kindLabel.slice(1));
     document.getElementById('nearName').textContent = label;
-    let meta = pl.isHabitable ? ('Ville de '+pl.cityName+' · cible de navigation<br>') : '';
-    meta += leg.name + ' · ' + pl.kind.name;
-    if(!pl.kind.gas) meta += ' · '+Math.round(pl.oceanFrac*100)+'% immergé';
-    meta += '<br>rayon '+pl.radius.toFixed(1)+' u';
-    if(pl.moonCount) meta += ' · '+pl.moonCount+' satellite'+(pl.moonCount>1?'s':'');
+    let meta = pl.isHabitable ? (t('cityOf')+pl.cityName+t('navTarget')+'<br>') : '';
+    meta += leg.name + ' · ' + kindLabel;
+    if(!pl.kind.gas) meta += ' · '+Math.round(pl.oceanFrac*100)+t('submerged');
+    meta += '<br>'+t('radiusUnit')+pl.radius.toFixed(1)+' u';
+    if(pl.moonCount) meta += ' · '+pl.moonCount+' '+(pl.moonCount>1?t('satellites'):t('satellite'));
     meta += '<br>'+(nearestDist).toFixed(0)+' u';
     document.getElementById('nearMeta').innerHTML = meta;
   } else if(nearest){
@@ -3992,7 +4416,7 @@ function updateHud(now){
       const s = nearest.star;
       const mag = apparentMagnitude(s.lum, Math.max(nearestDist/38, 1e-3));
       document.getElementById('nearMeta').innerHTML =
-        s.designation + ' · ' + s.lumLabel + '<br>' +
+        s.designation + ' · ' + t('lum_'+s.lumClass) + '<br>' +
         'T<sub>eff</sub> ' + Math.round(s.temp).toLocaleString('fr-FR') + ' K · ' +
         Math.round(s.temp - 273).toLocaleString('fr-FR') + ' °C<br>' +
         'M ' + s.mass.toFixed(2) + ' M☉ · R ' + s.radius.toFixed(2) + ' R☉<br>' +
@@ -4000,11 +4424,11 @@ function updateHud(now){
         'm<sub>v</sub> ' + mag.toFixed(1) + '<br>' +
         distPc + ' pc';
     } else {
-      document.getElementById('nearMeta').innerHTML = nearest.type + ' · ' + distPc + ' pc';
+      document.getElementById('nearMeta').innerHTML = t('nebula_'+(nearest.typeIdx!==undefined?NEBULA_TYPES[nearest.typeIdx].key:'emission')) + ' · ' + distPc + ' pc';
     }
   } else {
     document.getElementById('nearName').textContent = '—';
-    document.getElementById('nearMeta').textContent = 'Espace interstellaire';
+    document.getElementById('nearMeta').textContent = t('interstellarSpace');
   }
 }
 
@@ -4160,6 +4584,7 @@ function animate(){
   ];
   const term = document.getElementById('bootTerm');
   const bootEl = document.getElementById('boot');
+  const titleEl = document.getElementById('titleScreen');
   let li = 0;
   function nextLine(){
     if(li >= lines.length){
@@ -4173,21 +4598,40 @@ function animate(){
     li++;
     setTimeout(nextLine, 340);
   }
+  /* la séquence terminal ne fait plus démarrer le jeu directement : elle
+     cède la place à l'écran-titre, où le choix de la langue déclenche
+     réellement le calcul de la route et le lancement de la boucle
+     d'animation (cf. startGame ci-dessous). */
   function finish(){
     bootEl.classList.add('hidden');
-    setTimeout(function(){ bootEl.style.display='none'; }, 900);
+    setTimeout(function(){
+      bootEl.style.display = 'none';
+      titleEl.style.display = 'flex';
+    }, 900);
   }
   bootEl.addEventListener('click', finish);
   nextLine();
 
-  /* calcul du plan de vol AVANT le premier rendu : le vaisseau sait où il
-     va dès le départ, et les portiques sont tracés d'emblée sur tout le
-     trajet. `true` = orienter le nez sur la courbe (départ uniquement). */
-  computeRoute(shipRig.position, new THREE.Vector3(0,0,-1), true);
+  document.querySelectorAll('.lang-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      LANG = btn.getAttribute('data-lang');
+      applyLanguage();
+      titleEl.classList.add('hidden');
+      setTimeout(function(){ titleEl.style.display = 'none'; }, 650);
+      startGame();
+    });
+  });
 
-  refreshField(STAR_CELL, STAR_RADIUS, starField, buildStarCell);
-  refreshField(NEBULA_CELL, NEBULA_RADIUS, nebulaField, buildNebulaCell);
-  animate();
+  function startGame(){
+    /* calcul du plan de vol AVANT le premier rendu : le vaisseau sait où il
+       va dès le départ, et les portiques sont tracés d'emblée sur tout le
+       trajet. `true` = orienter le nez sur la courbe (départ uniquement). */
+    computeRoute(shipRig.position, new THREE.Vector3(0,0,-1), true);
+
+    refreshField(STAR_CELL, STAR_RADIUS, starField, buildStarCell);
+    refreshField(NEBULA_CELL, NEBULA_RADIUS, nebulaField, buildNebulaCell);
+    animate();
+  }
 })();
 </script>
 </body>
