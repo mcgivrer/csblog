@@ -75,7 +75,7 @@
 
   /* ---------- plan de vol ---------- */
   .hud-route{
-    position:absolute; left:18px; top:210px; width:230px;
+    position:absolute; left:18px; top:210px; width:300px;
     padding:10px 0 8px;
     max-height:calc(100vh - 280px);
     display:flex; flex-direction:column;
@@ -87,16 +87,25 @@
   }
   .route-title .amber{ color:var(--amber); }
   .route-list{ overflow:hidden; padding:6px 0 0; }
+  /* Gabarit DEUX LIGNES : le nom du port occupe sa propre ligne en pleine
+     largeur (seul le numéro reste en préfixe), la désignation stellaire
+     passe en dessous, plus petite. Sur une seule ligne, nom et désignation
+     se partageaient la largeur et le nom était tronqué dès qu'il dépassait
+     une centaine de pixels — ce que la seule augmentation de largeur du
+     panneau n'aurait pas suffi à corriger. */
   .route-leg{
-    display:flex; align-items:baseline; gap:8px;
+    display:grid;
+    grid-template-columns:18px 1fr;
+    grid-template-areas:'num nm' '.  dd';
+    gap:0 8px;
     padding:5px 14px;
     font-family:'JetBrains Mono',monospace; font-size:11px;
     color:var(--muted-2);
     border-left:2px solid transparent;
   }
-  .route-leg .num{ font-size:9px; color:var(--muted-2); min-width:16px; }
-  .route-leg .nm{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .route-leg .dd{ font-size:9px; opacity:0.7; }
+  .route-leg .num{ grid-area:num; font-size:9px; color:var(--muted-2); line-height:1.5; }
+  .route-leg .nm{ grid-area:nm; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; line-height:1.35; }
+  .route-leg .dd{ grid-area:dd; font-size:9px; opacity:0.7; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; line-height:1.3; }
   /* étape franchie */
   .route-leg.done{ color:var(--muted-2); opacity:0.42; }
   .route-leg.done .nm{ text-decoration:line-through; }
@@ -361,7 +370,7 @@
   <div id="starLabels"></div>
   <div class="hud-top">
     <span><span class="amber" id="topBrand">NAVIGATION QUANTIQUE</span> &nbsp;//&nbsp; <span id="shipName" class="mono">R.S.C. VENTARIS</span></span>
-    <span><span id="seedLabel">SEED</span>&nbsp;<span id="seedVal" class="mono amber">—</span>&nbsp;&nbsp;<span class="live" id="onlineLabel">EN LIGNE</span></span>
+    <span><span id="creditsLabel">CRÉDITS</span>&nbsp;<span id="creditsVal" class="mono">10 000</span>&nbsp;&nbsp;&nbsp;<span id="seedLabel">SEED</span>&nbsp;<span id="seedVal" class="mono amber">—</span>&nbsp;&nbsp;<span class="live" id="onlineLabel">EN LIGNE</span></span>
   </div>
 
   <div class="hud-mode auto mono" id="modeBadge">AUTOPILOTE</div>
@@ -456,7 +465,7 @@ const I18N = {
     lblEngineTemp: 'TEMPÉRATURE MOTEUR', lblPropulsion: 'PROPULSION', lblEngineCmd: 'COMMANDES MOTEUR',
     lblRadioChannel: 'CANAL RADIO', radioMuteTitle: 'Couper le son du canal radio',
     badge_auto: 'AUTOPILOTE', badge_manual: 'MANUEL', badge_orbit: 'MISE EN ORBITE',
-    hint_main: '\u2191\u2193\u2190\u2192 / Z Q S D \u2014 orientation\u00a0 \u00b7 \u00a0A / E \u2014 roulis\u00a0 \u00b7 \u00a0MAJ \u2014 propulsion\u00a0 \u00b7 \u00a0glisser la souris \u2014 viser\u00a0 \u00b7 \u00a0CTRL+souris \u2014 regard libre\u00a0 \u00b7 \u00a0TAB \u2014 canal radio\u00a0 \u00b7 \u00a0H \u2014 masquer',
+    hint_main: '\u2191\u2193\u2190\u2192 / Z Q S D \u2014 orientation\u00a0 \u00b7 \u00a0E / R \u2014 roulis\u00a0 \u00b7 \u00a0MAJ \u2014 propulsion\u00a0 \u00b7 \u00a0glisser la souris \u2014 viser\u00a0 \u00b7 \u00a0CTRL+souris \u2014 regard libre\u00a0 \u00b7 \u00a0F3 \u2014 cam\u00e9ra\u00a0 \u00b7 \u00a0TAB \u2014 canal radio\u00a0 \u00b7 \u00a0F10 \u2014 voix\u00a0 \u00b7 \u00a0H \u2014 masquer',
     hint_arrival: 'ESPACE \u2014 abr\u00e9ger la man\u0153uvre (travelling acc\u00e9l\u00e9r\u00e9)',
     veille: 'veille', reactors14: 'R\u00c9ACTEURS 1-4', rcsLabel: 'RCS',
     rcs_yawP:'LACET +', rcs_yawN:'LACET \u2212', rcs_pitchP:'TANGAGE +', rcs_pitchN:'TANGAGE \u2212', rcs_rollP:'ROULIS +', rcs_rollN:'ROULIS \u2212',
@@ -470,7 +479,7 @@ const I18N = {
     nebula_emission:'N\u00e9buleuse en \u00e9mission', nebula_hii:'R\u00e9gion HII', nebula_dark:'N\u00e9buleuse obscure',
     nebula_planetary:'N\u00e9buleuse plan\u00e9taire', nebula_supernova:'R\u00e9manent de supernova', nebula_nursery:'Pouponni\u00e8re stellaire',
     nebula_reflection:'N\u00e9buleuse par r\u00e9flexion', nebula_molecular:'Nuage mol\u00e9culaire', nebula_oiii:'N\u00e9buleuse en \u00e9mission OIII',
-    ttsLang: 'fr-FR', noRoute: 'Aucune route'
+    ttsLang: 'fr-FR', noRoute: 'Aucune route', creditsLabel: 'CRÉDITS'
   },
   en: {
     title_sub: 'Choose a language',
@@ -480,7 +489,7 @@ const I18N = {
     lblEngineTemp: 'ENGINE TEMPERATURE', lblPropulsion: 'PROPULSION', lblEngineCmd: 'ENGINE COMMANDS',
     lblRadioChannel: 'RADIO CHANNEL', radioMuteTitle: 'Mute the radio channel',
     badge_auto: 'AUTOPILOT', badge_manual: 'MANUAL', badge_orbit: 'ORBITAL INSERTION',
-    hint_main: '\u2191\u2193\u2190\u2192 / W A S D \u2014 orientation\u00a0 \u00b7 \u00a0Q / E \u2014 roll\u00a0 \u00b7 \u00a0SHIFT \u2014 thrust\u00a0 \u00b7 \u00a0drag mouse \u2014 aim\u00a0 \u00b7 \u00a0CTRL+mouse \u2014 free look\u00a0 \u00b7 \u00a0TAB \u2014 radio channel\u00a0 \u00b7 \u00a0H \u2014 hide',
+    hint_main: '\u2191\u2193\u2190\u2192 / W A S D \u2014 orientation\u00a0 \u00b7 \u00a0E / R \u2014 roll\u00a0 \u00b7 \u00a0SHIFT \u2014 thrust\u00a0 \u00b7 \u00a0drag mouse \u2014 aim\u00a0 \u00b7 \u00a0CTRL+mouse \u2014 free look\u00a0 \u00b7 \u00a0F3 \u2014 camera\u00a0 \u00b7 \u00a0TAB \u2014 radio channel\u00a0 \u00b7 \u00a0F10 \u2014 voice\u00a0 \u00b7 \u00a0H \u2014 hide',
     hint_arrival: 'SPACE \u2014 skip ahead (fast travelling)',
     veille: 'standby', reactors14: 'REACTORS 1-4', rcsLabel: 'RCS',
     rcs_yawP:'YAW +', rcs_yawN:'YAW \u2212', rcs_pitchP:'PITCH +', rcs_pitchN:'PITCH \u2212', rcs_rollP:'ROLL +', rcs_rollN:'ROLL \u2212',
@@ -494,7 +503,7 @@ const I18N = {
     nebula_emission:'Emission nebula', nebula_hii:'HII region', nebula_dark:'Dark nebula',
     nebula_planetary:'Planetary nebula', nebula_supernova:'Supernova remnant', nebula_nursery:'Stellar nursery',
     nebula_reflection:'Reflection nebula', nebula_molecular:'Molecular cloud', nebula_oiii:'OIII emission nebula',
-    ttsLang: 'en-US', noRoute: 'No route'
+    ttsLang: 'en-US', noRoute: 'No route', creditsLabel: 'CREDITS'
   },
   de: {
     title_sub: 'Sprache wählen',
@@ -504,7 +513,7 @@ const I18N = {
     lblEngineTemp: 'TRIEBWERKSTEMPERATUR', lblPropulsion: 'ANTRIEB', lblEngineCmd: 'TRIEBWERKSSTEUERUNG',
     lblRadioChannel: 'FUNKKANAL', radioMuteTitle: 'Funkkanal stummschalten',
     badge_auto: 'AUTOPILOT', badge_manual: 'MANUELL', badge_orbit: 'ORBITEINSCHUSS',
-    hint_main: '\u2191\u2193\u2190\u2192 / W A S D \u2014 Ausrichtung\u00a0 \u00b7 \u00a0Q / E \u2014 Rollen\u00a0 \u00b7 \u00a0SHIFT \u2014 Schub\u00a0 \u00b7 \u00a0Maus ziehen \u2014 Zielen\u00a0 \u00b7 \u00a0STRG+Maus \u2014 freie Sicht\u00a0 \u00b7 \u00a0TAB \u2014 Funkkanal\u00a0 \u00b7 \u00a0H \u2014 ausblenden',
+    hint_main: '\u2191\u2193\u2190\u2192 / W A S D \u2014 Ausrichtung\u00a0 \u00b7 \u00a0E / R \u2014 Rollen\u00a0 \u00b7 \u00a0SHIFT \u2014 Schub\u00a0 \u00b7 \u00a0Maus ziehen \u2014 Zielen\u00a0 \u00b7 \u00a0STRG+Maus \u2014 freie Sicht\u00a0 \u00b7 \u00a0F3 \u2014 Kamera\u00a0 \u00b7 \u00a0TAB \u2014 Funkkanal\u00a0 \u00b7 \u00a0F10 \u2014 Stimme\u00a0 \u00b7 \u00a0H \u2014 ausblenden',
     hint_arrival: 'LEERTASTE \u2014 Man\u00f6ver abk\u00fcrzen (schneller Kameraflug)',
     veille: 'Standby', reactors14: 'TRIEBWERKE 1-4', rcsLabel: 'RCS',
     rcs_yawP:'GIEREN +', rcs_yawN:'GIEREN \u2212', rcs_pitchP:'NICKEN +', rcs_pitchN:'NICKEN \u2212', rcs_rollP:'ROLLEN +', rcs_rollN:'ROLLEN \u2212',
@@ -518,7 +527,7 @@ const I18N = {
     nebula_emission:'Emissionsnebel', nebula_hii:'HII-Region', nebula_dark:'Dunkelnebel',
     nebula_planetary:'Planetarischer Nebel', nebula_supernova:'Supernova-\u00dcberrest', nebula_nursery:'Sternentstehungsgebiet',
     nebula_reflection:'Reflexionsnebel', nebula_molecular:'Molek\u00fcelwolke', nebula_oiii:'OIII-Emissionsnebel',
-    ttsLang: 'de-DE', noRoute: 'Keine Route'
+    ttsLang: 'de-DE', noRoute: 'Keine Route', creditsLabel: 'GUTHABEN'
   },
   es: {
     title_sub: 'Elige un idioma',
@@ -528,7 +537,7 @@ const I18N = {
     lblEngineTemp: 'TEMPERATURA DE MOTORES', lblPropulsion: 'PROPULSI\u00d3N', lblEngineCmd: 'CONTROL DE MOTORES',
     lblRadioChannel: 'CANAL DE RADIO', radioMuteTitle: 'Silenciar el canal de radio',
     badge_auto: 'PILOTO AUTOM\u00c1TICO', badge_manual: 'MANUAL', badge_orbit: 'INSERCI\u00d3N ORBITAL',
-    hint_main: '\u2191\u2193\u2190\u2192 / W A S D \u2014 orientaci\u00f3n\u00a0 \u00b7 \u00a0Q / E \u2014 alabeo\u00a0 \u00b7 \u00a0MAY\u00daS \u2014 propulsi\u00f3n\u00a0 \u00b7 \u00a0arrastrar rat\u00f3n \u2014 apuntar\u00a0 \u00b7 \u00a0CTRL+rat\u00f3n \u2014 vista libre\u00a0 \u00b7 \u00a0TAB \u2014 canal de radio\u00a0 \u00b7 \u00a0H \u2014 ocultar',
+    hint_main: '\u2191\u2193\u2190\u2192 / W A S D \u2014 orientaci\u00f3n\u00a0 \u00b7 \u00a0E / R \u2014 alabeo\u00a0 \u00b7 \u00a0MAY\u00daS \u2014 propulsi\u00f3n\u00a0 \u00b7 \u00a0arrastrar rat\u00f3n \u2014 apuntar\u00a0 \u00b7 \u00a0CTRL+rat\u00f3n \u2014 vista libre\u00a0 \u00b7 \u00a0F3 \u2014 c\u00e1mara\u00a0 \u00b7 \u00a0TAB \u2014 canal de radio\u00a0 \u00b7 \u00a0F10 \u2014 voz\u00a0 \u00b7 \u00a0H \u2014 ocultar',
     hint_arrival: 'ESPACIO \u2014 abreviar la maniobra (travelling acelerado)',
     veille: 'reposo', reactors14: 'REACTORES 1-4', rcsLabel: 'RCS',
     rcs_yawP:'GUI\u00d1ADA +', rcs_yawN:'GUI\u00d1ADA \u2212', rcs_pitchP:'CABECEO +', rcs_pitchN:'CABECEO \u2212', rcs_rollP:'ALABEO +', rcs_rollN:'ALABEO \u2212',
@@ -542,7 +551,7 @@ const I18N = {
     nebula_emission:'Nebulosa de emisi\u00f3n', nebula_hii:'Regi\u00f3n HII', nebula_dark:'Nebulosa oscura',
     nebula_planetary:'Nebulosa planetaria', nebula_supernova:'Remanente de supernova', nebula_nursery:'Vivero estelar',
     nebula_reflection:'Nebulosa de reflexi\u00f3n', nebula_molecular:'Nube molecular', nebula_oiii:'Nebulosa de emisi\u00f3n OIII',
-    ttsLang: 'es-ES', noRoute: 'Sin ruta'
+    ttsLang: 'es-ES', noRoute: 'Sin ruta', creditsLabel: 'CRÉDITOS'
   }
 };
 function t(key){
@@ -686,7 +695,7 @@ function applyLanguage(){
     lblSpeed:'lblSpeed', lblSector:'lblSector', lblHeading:'lblHeading',
     lblFlightPlan:'lblFlightPlan', lblNearest:'lblNearest',
     lblEngineTemp:'lblEngineTemp', lblPropulsion:'lblPropulsion', lblEngineCmd:'lblEngineCmd',
-    lblRadioChannel:'lblRadioChannel'
+    lblRadioChannel:'lblRadioChannel', creditsLabel:'creditsLabel'
   };
   Object.keys(map).forEach(function(id){
     const el = document.getElementById(id);
@@ -3356,6 +3365,24 @@ window.addEventListener('keydown', function(e){
     const panel = document.getElementById('radioPanel');
     if(panel){ panel.classList.toggle('visible'); repositionRadioPanel(); }
   }
+  /* F3 — passe au mode de caméra suivant (remplace l'ancien double appui
+     sur CTRL). preventDefault : F3 ouvre la recherche dans certains
+     navigateurs. */
+  if(e.code === 'F3'){
+    e.preventDefault();
+    cameraMode = (cameraMode+1) % CAMERA_MODES.length;
+    flashCameraModeLabel();
+  }
+  /* F10 — coupe/rétablit la voix de synthèse. Agit sur le MÊME état que le
+     bouton muet du panneau radio (une seule source de vérité) : l'icône du
+     bouton doit donc être resynchronisée ici aussi. */
+  if(e.code === 'F10'){
+    e.preventDefault();
+    radioMuted = !radioMuted;
+    const btn = document.getElementById('radioMuteBtn');
+    if(btn) btn.textContent = radioMuted ? '\u{1F507}' : '\u{1F50A}';
+    if(radioMuted && window.speechSynthesis){ window.speechSynthesis.cancel(); radioSpeaking = false; }
+  }
 });
 window.addEventListener('keyup', function(e){ keys[e.code] = false; });
 
@@ -3371,8 +3398,6 @@ let dragging=false, lastPX=0, lastPY=0, dragYaw=0, dragPitch=0;
    distinguer correctement 1, 2 ou 3 appuis d'une seule séquence. */
 let camOrbitYaw=0, camOrbitPitch=0;
 let ctrlDownAt=0, ctrlDragged=false;
-let ctrlTapCount=0, ctrlTapTimer=null;
-const CTRL_TAP_GAP = 380;
 const CAMERA_MODES = ['tracking','sequence','distant'];
 let cameraMode = 0;
 /* mode 'distant' : succession de plans fixes (coupes franches, pas de
@@ -3408,18 +3433,6 @@ function pickDistantShot(elapsed){
   distantShotState.until = elapsed + 6 + Math.random()*4;
 }
 
-function finalizeCtrlTaps(){
-  if(ctrlTapCount === 1){
-    camOrbitYaw = 0; camOrbitPitch = 0;
-  } else if(ctrlTapCount === 2){
-    cameraMode = (cameraMode+1) % CAMERA_MODES.length;
-    flashCameraModeLabel();
-  } else if(ctrlTapCount >= 3){
-    cameraMode = 0;
-    flashCameraModeLabel();
-  }
-  ctrlTapCount = 0;
-}
 let cameraModeFlashTimer = null;
 function flashCameraModeLabel(){
   const el = document.getElementById('cameraModeFlash');
@@ -3440,10 +3453,14 @@ window.addEventListener('keydown', function(e){
 window.addEventListener('keyup', function(e){
   if(e.code==='ControlLeft'||e.code==='ControlRight'){
     const heldFor = performance.now() - ctrlDownAt;
+    /* Un appui court sur CTRL recentre simplement le regard libre. Le
+       comptage d'appuis rapprochés (1/2/3 appuis pour changer de mode
+       caméra) a été retiré au profit de F3 : CTRL retrouve un rôle unique
+       et sans ambiguïté, et l'action est immédiate — plus besoin d'attendre
+       une fenêtre de temps pour savoir si un second appui va suivre. */
     if(!ctrlDragged && heldFor < 400){
-      ctrlTapCount++;
-      if(ctrlTapTimer) clearTimeout(ctrlTapTimer);
-      ctrlTapTimer = setTimeout(finalizeCtrlTaps, CTRL_TAP_GAP);
+      camOrbitYaw = 0;
+      camOrbitPitch = 0;
     }
   }
 });
@@ -3496,6 +3513,36 @@ let arrivalTimeScale = 1;             /* lu par updateShuttles(), hors de update
 const CUTAWAY_DURATION = 4.2;         /* plan large sur le prélèvement, à chaque navette */
 const ORBIT_CAPTURE_TIME = 1.3;       /* fondu d'entrée sur le cercle d'orbite */
 
+/* =========================================================================
+   ÉCONOMIE — crédits
+   Chaque escale livre 1 à 5 conteneurs, répartis entre les navettes
+   réellement larguées. Point important de cohérence : c'est CETTE
+   répartition qui alimente à la fois le dialogue radio (qui annonce un
+   nombre de conteneurs par navette) et le gain de crédits — un second
+   tirage indépendant ferait dire à l'équipage des chiffres sans rapport
+   avec ce qui est effectivement crédité.
+   ========================================================================= */
+let credits = 10000;
+let creditsFlashTimer = null;
+function formatCredits(n){
+  try { return Math.round(n).toLocaleString(t('ttsLang') || 'fr-FR'); }
+  catch(e){ return String(Math.round(n)); }
+}
+function refreshCreditsDisplay(flash){
+  const el = document.getElementById('creditsVal');
+  if(!el) return;
+  el.textContent = formatCredits(credits);
+  if(flash){
+    el.style.color = 'var(--amber)';
+    if(creditsFlashTimer) clearTimeout(creditsFlashTimer);
+    creditsFlashTimer = setTimeout(function(){ el.style.color = ''; }, 1500);
+  }
+}
+function addCredits(amount){
+  credits = Math.max(0, credits + amount);
+  refreshCreditsDisplay(amount > 0);
+}
+
 const orbitState = {
   active:false, planet:null, center:new THREE.Vector3(),
   radius:0, U:new THREE.Vector3(), V:new THREE.Vector3(), N:new THREE.Vector3(),
@@ -3504,6 +3551,8 @@ const orbitState = {
   spawnFractions:[0.08,0.30,0.52],
   radioScript:[], radioIdx:0,
   voiceGender:{ship:'male', tower:'female'},
+  /* répartition des conteneurs par navette + prix unitaire de l'escale */
+  cargoSplit:[], unitPrice:0, creditsPaid:false,
   cutawayUntil:-1   /* valeur de pauseTimer jusqu'à laquelle le plan large reste actif */
 };
 
@@ -3529,7 +3578,9 @@ function buildRadioScript(planet){
   /* 2. coordination des transferts de conteneurs, calée sur les navettes */
   orbitState.spawnFractions.forEach(function(f, i){
     const label = R.shuttleLabel(i+1);
-    const n = 1 + Math.floor(rng()*2);
+    /* le nombre annoncé est celui RÉELLEMENT attribué à cette navette */
+    const n = orbitState.cargoSplit[i] || 0;
+    if(n <= 0) return;   /* navette sans fret : pas d'annonce de largage */
     msgs.push({t:f+0.015, from:'ship', label:ship, text: pick(R.dropoff(tower,ship,label,n))});
     msgs.push({t:f+0.06, from:'tower', label:tower, text: pick(R.dropoffReply(label))});
   });
@@ -3711,6 +3762,17 @@ function startOrbitDelivery(planet){
      Le genre de chaque voix est tiré au hasard à chaque échange — équipage
      et tour peuvent être masculins, féminins, ou l'un de chaque, sans
      schéma fixe d'un appel à l'autre. */
+  /* cargaison de l'escale : 1 à 5 conteneurs au total, répartis sur les
+     navettes larguées (ex. 5 sur 3 navettes -> 2/2/1). Tiré AVANT
+     buildRadioScript, qui lit cette répartition pour ses annonces. */
+  const nShuttles = orbitState.spawnFractions.length;
+  const totalCargo = 1 + Math.floor(Math.random()*5);
+  const split = new Array(nShuttles).fill(0);
+  for(let c=0;c<totalCargo;c++) split[c % nShuttles]++;
+  orbitState.cargoSplit = split;
+  orbitState.unitPrice = 180 + Math.floor(Math.random()*241);  /* 180 à 420 crédits */
+  orbitState.creditsPaid = false;
+
   orbitState.voiceGender = {
     ship:  Math.random() < 0.5 ? 'male' : 'female',
     tower: Math.random() < 0.5 ? 'male' : 'female'
@@ -3793,6 +3855,14 @@ function updateShuttles(dt){
       scene.remove(s.group);
       disposePlanetGroup(s.group);
       orbitState.shuttles.splice(i,1);
+      /* Le gain est versé quand le DERNIER conteneur touche le sol, pas au
+         début de la manœuvre : toutes les navettes doivent avoir été
+         larguées ET avoir atterri. */
+      if(!orbitState.creditsPaid && orbitState.spawned.every(Boolean) && orbitState.shuttles.length === 0){
+        const total = orbitState.cargoSplit.reduce(function(a,b){ return a+b; }, 0);
+        addCredits(total * orbitState.unitPrice);
+        orbitState.creditsPaid = true;
+      }
     }
   }
 }
@@ -4628,6 +4698,7 @@ function animate(){
     btn.addEventListener('click', function(){
       LANG = btn.getAttribute('data-lang');
       applyLanguage();
+      refreshCreditsDisplay(false);
       titleEl.classList.add('hidden');
       setTimeout(function(){ titleEl.style.display = 'none'; }, 650);
       startGame();
