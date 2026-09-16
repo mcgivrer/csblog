@@ -313,6 +313,87 @@
     .hud-hint{ font-size:9px; padding:6px 10px; max-width:90vw; white-space:normal; text-align:center; }
   }
 
+  /* =========================================================================
+     CONTRÔLE TACTILE (smartphone/tablette) — §15 de la spec v2.1.
+     Détection par capacité de pointage (pointer:coarse), pas par taille
+     d'écran : un ordinateur portable à petite fenêtre n'est pas une tablette.
+     Aucune maquette antérieure retrouvée pour ce chantier — première
+     implémentation, pas la reprise d'un travail déjà validé.
+     ========================================================================= */
+  .touch-mode .hud-hint{ display:none !important; } /* aide clavier hors-sujet au tactile */
+
+  /* en portrait, les panneaux d'info restent masqués par défaut (pas la
+     place de les garder ouverts en continu) — révélés un par un via le
+     menu ☰. En paysage, on laisse le comportement desktop existant
+     (largeurs déjà réduites par les @media ci-dessus). */
+  .touch-mode.portrait-touch .hud-left,
+  .touch-mode.portrait-touch .hud-route,
+  .touch-mode.portrait-touch .hud-right,
+  .touch-mode.portrait-touch .hud-engines,
+  .touch-mode.portrait-touch .hud-telemetry,
+  .touch-mode.portrait-touch .hud-temp{
+    display:none !important;
+  }
+  .touch-mode.portrait-touch .hud-left.panel-open{ display:block !important; top:60px !important; }
+  .touch-mode.portrait-touch .hud-route.panel-open{ display:block !important; top:60px !important; }
+  .touch-mode.portrait-touch .hud-right.panel-open{ display:block !important; top:60px !important; }
+  .touch-mode.portrait-touch .hud-engines.panel-open{ display:flex !important; }
+  .touch-mode.portrait-touch .hud-telemetry.panel-open{ display:block !important; }
+  .touch-mode.portrait-touch .hud-temp.panel-open{ display:block !important; }
+  /* le canal radio reste joignable au tactile même sous les 900px où le
+     desktop le masque entièrement — priorité de sélecteur, pas d'ordre */
+  .touch-mode .hud-radio.visible{ display:flex !important; }
+
+  .touch-controls{ position:fixed; inset:0; z-index:4; pointer-events:none; display:none; }
+  .touch-mode .touch-controls{ display:block; }
+  .touch-btn{
+    position:absolute; pointer-events:auto; touch-action:none;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(15,26,48,0.82); border:1.5px solid var(--line); border-radius:9px;
+    color:var(--cyan); font-family:'JetBrains Mono',monospace; -webkit-tap-highlight-color:transparent;
+    user-select:none;
+  }
+  .touch-btn:active, .touch-btn.active{ border-color:var(--cyan); background:rgba(94,234,212,0.16); }
+  #touchMenuBtn{ top:14px; left:14px; width:38px; height:38px; font-size:16px; }
+  #touchRadioBtn{ top:14px; right:14px; width:38px; height:38px; font-size:16px; }
+  #touchCamBtn{ bottom:26px; font-size:11px; letter-spacing:0.05em; width:60px; height:44px; }
+  .portrait-touch #touchCamBtn{ right:96px; bottom:150px; }
+  .landscape-touch #touchCamBtn{ right:150px; bottom:26px; }
+  #touchRollMinus, #touchRollPlus{ width:46px; height:46px; font-size:17px; }
+  .portrait-touch #touchRollMinus{ left:190px; bottom:150px; }
+  .portrait-touch #touchRollPlus{ left:244px; bottom:150px; }
+  .landscape-touch #touchRollMinus{ left:172px; bottom:26px; }
+  .landscape-touch #touchRollPlus{ left:220px; bottom:26px; }
+  #touchBoostBtn{
+    border-radius:50%; border-color:var(--amber-dim); color:var(--amber);
+    font-size:11px; letter-spacing:0.04em;
+  }
+  #touchBoostBtn.active{ background:rgba(255,180,84,0.18); border-color:var(--amber); }
+  .portrait-touch #touchBoostBtn{ width:78px; height:78px; right:22px; bottom:118px; }
+  .landscape-touch #touchBoostBtn{ width:64px; height:64px; right:22px; bottom:20px; }
+  #touchJoyBase{
+    border-radius:50%; background:rgba(15,26,48,0.55); border:2px solid var(--line);
+  }
+  .portrait-touch #touchJoyBase{ width:132px; height:132px; left:22px; bottom:110px; }
+  .landscape-touch #touchJoyBase{ width:108px; height:108px; left:22px; bottom:20px; }
+  #touchJoyNub{
+    position:absolute; top:50%; left:50%; width:46%; height:46%; border-radius:50%;
+    background:rgba(94,234,212,0.22); border:1.5px solid var(--cyan);
+    transform:translate(-50%,-50%); pointer-events:none;
+  }
+  #touchPanelMenu{
+    position:absolute; top:58px; left:14px; width:200px;
+    background:rgba(15,26,48,0.92); border:1.5px solid var(--line); border-radius:8px;
+    padding:6px; display:none; flex-direction:column; gap:2px; pointer-events:auto;
+    font-family:'JetBrains Mono',monospace; font-size:11px;
+  }
+  #touchPanelMenu.open{ display:flex; }
+  #touchPanelMenu button{
+    background:none; border:1px solid transparent; border-radius:5px; color:var(--muted);
+    padding:7px 8px; text-align:left; font:inherit; -webkit-tap-highlight-color:transparent;
+  }
+  #touchPanelMenu button.on{ color:var(--cyan); border-color:var(--line); background:rgba(94,234,212,0.08); }
+
   /* ---------- écran de démarrage ---------- */
   #boot{
     position:fixed; inset:0; z-index:5; background:var(--bg);
@@ -423,6 +504,19 @@
     <div class="radio-title"><span id="lblRadioChannel">CANAL RADIO</span><span><button class="radio-mute" id="radioMuteBtn" title="Couper le son du canal radio">🔊</button><span class="dot">●</span></span></div>
     <div class="radio-log" id="radioLog"></div>
   </div>
+
+  <!-- contrôles tactiles — masqués par défaut (touch-mode ajoutée en JS
+       si un pointeur grossier est détecté), §15 de la spec v2.1 -->
+  <div class="touch-controls mono" id="touchControls">
+    <button class="touch-btn" id="touchMenuBtn" title="Panneaux">☰</button>
+    <div id="touchPanelMenu"></div>
+    <button class="touch-btn" id="touchRadioBtn" title="Canal radio">📻</button>
+    <button class="touch-btn" id="touchCamBtn">CAM</button>
+    <button class="touch-btn" id="touchRollMinus">⟲</button>
+    <button class="touch-btn" id="touchRollPlus">⟳</button>
+    <button class="touch-btn" id="touchBoostBtn">BOOST</button>
+    <div class="touch-btn" id="touchJoyBase"><div id="touchJoyNub"></div></div>
+  </div>
 </div>
 
 <div id="boot">
@@ -479,7 +573,7 @@ const I18N = {
     nebula_emission:'N\u00e9buleuse en \u00e9mission', nebula_hii:'R\u00e9gion HII', nebula_dark:'N\u00e9buleuse obscure',
     nebula_planetary:'N\u00e9buleuse plan\u00e9taire', nebula_supernova:'R\u00e9manent de supernova', nebula_nursery:'Pouponni\u00e8re stellaire',
     nebula_reflection:'N\u00e9buleuse par r\u00e9flexion', nebula_molecular:'Nuage mol\u00e9culaire', nebula_oiii:'N\u00e9buleuse en \u00e9mission OIII',
-    ttsLang: 'fr-FR', noRoute: 'Aucune route', creditsLabel: 'CRÉDITS'
+    ttsLang: 'fr-FR', noRoute: 'Aucune route', creditsLabel: 'CRÉDITS', menuNavPanel: 'Vitesse / cap'
   },
   en: {
     title_sub: 'Choose a language',
@@ -503,7 +597,7 @@ const I18N = {
     nebula_emission:'Emission nebula', nebula_hii:'HII region', nebula_dark:'Dark nebula',
     nebula_planetary:'Planetary nebula', nebula_supernova:'Supernova remnant', nebula_nursery:'Stellar nursery',
     nebula_reflection:'Reflection nebula', nebula_molecular:'Molecular cloud', nebula_oiii:'OIII emission nebula',
-    ttsLang: 'en-US', noRoute: 'No route', creditsLabel: 'CREDITS'
+    ttsLang: 'en-US', noRoute: 'No route', creditsLabel: 'CREDITS', menuNavPanel: 'Speed / heading'
   },
   de: {
     title_sub: 'Sprache wählen',
@@ -527,7 +621,7 @@ const I18N = {
     nebula_emission:'Emissionsnebel', nebula_hii:'HII-Region', nebula_dark:'Dunkelnebel',
     nebula_planetary:'Planetarischer Nebel', nebula_supernova:'Supernova-\u00dcberrest', nebula_nursery:'Sternentstehungsgebiet',
     nebula_reflection:'Reflexionsnebel', nebula_molecular:'Molek\u00fcelwolke', nebula_oiii:'OIII-Emissionsnebel',
-    ttsLang: 'de-DE', noRoute: 'Keine Route', creditsLabel: 'GUTHABEN'
+    ttsLang: 'de-DE', noRoute: 'Keine Route', creditsLabel: 'GUTHABEN', menuNavPanel: 'Geschwindigkeit / Kurs'
   },
   es: {
     title_sub: 'Elige un idioma',
@@ -551,7 +645,7 @@ const I18N = {
     nebula_emission:'Nebulosa de emisi\u00f3n', nebula_hii:'Regi\u00f3n HII', nebula_dark:'Nebulosa oscura',
     nebula_planetary:'Nebulosa planetaria', nebula_supernova:'Remanente de supernova', nebula_nursery:'Vivero estelar',
     nebula_reflection:'Nebulosa de reflexi\u00f3n', nebula_molecular:'Nube molecular', nebula_oiii:'Nebulosa de emisi\u00f3n OIII',
-    ttsLang: 'es-ES', noRoute: 'Sin ruta', creditsLabel: 'CRÉDITOS'
+    ttsLang: 'es-ES', noRoute: 'Sin ruta', creditsLabel: 'CRÉDITOS', menuNavPanel: 'Velocidad / rumbo'
   }
 };
 function t(key){
@@ -3601,29 +3695,43 @@ window.addEventListener('keydown', function(e){
      preventDefault : Tab déplacerait sinon le focus clavier sur la page. */
   if(e.code === 'Tab'){
     e.preventDefault();
-    const panel = document.getElementById('radioPanel');
-    if(panel){ panel.classList.toggle('visible'); repositionRadioPanel(); }
+    toggleRadioPanel();
   }
   /* F3 — passe au mode de caméra suivant (remplace l'ancien double appui
      sur CTRL). preventDefault : F3 ouvre la recherche dans certains
      navigateurs. */
   if(e.code === 'F3'){
     e.preventDefault();
-    cameraMode = (cameraMode+1) % CAMERA_MODES.length;
-    flashCameraModeLabel();
+    nextCameraMode();
   }
   /* F10 — coupe/rétablit la voix de synthèse. Agit sur le MÊME état que le
      bouton muet du panneau radio (une seule source de vérité) : l'icône du
      bouton doit donc être resynchronisée ici aussi. */
   if(e.code === 'F10'){
     e.preventDefault();
-    radioMuted = !radioMuted;
-    const btn = document.getElementById('radioMuteBtn');
-    if(btn) btn.textContent = radioMuted ? '\u{1F507}' : '\u{1F50A}';
-    if(radioMuted && window.speechSynthesis){ window.speechSynthesis.cancel(); radioSpeaking = false; }
+    toggleVoiceMute();
   }
 });
 window.addEventListener('keyup', function(e){ keys[e.code] = false; });
+
+/* ---------- fonctions partagées clavier/tactile ----------
+   Extraites du gestionnaire keydown pour que les boutons tactiles (§15 de
+   la spec) déclenchent EXACTEMENT la même action que leur touche, sans
+   dupliquer la logique. */
+function toggleRadioPanel(){
+  const panel = document.getElementById('radioPanel');
+  if(panel){ panel.classList.toggle('visible'); repositionRadioPanel(); }
+}
+function nextCameraMode(){
+  cameraMode = (cameraMode+1) % CAMERA_MODES.length;
+  flashCameraModeLabel();
+}
+function toggleVoiceMute(){
+  radioMuted = !radioMuted;
+  const btn = document.getElementById('radioMuteBtn');
+  if(btn) btn.textContent = radioMuted ? '\u{1F507}' : '\u{1F50A}';
+  if(radioMuted && window.speechSynthesis){ window.speechSynthesis.cancel(); radioSpeaking = false; }
+}
 
 let dragging=false, lastPX=0, lastPY=0, dragYaw=0, dragPitch=0;
 /* caméra libre : Ctrl + glisser oriente la vue autour du vaisseau sans
@@ -3709,7 +3817,11 @@ window.addEventListener('pointermove', function(e){
   if(!dragging) return;
   const dx = e.clientX-lastPX, dy = e.clientY-lastPY;
   lastPX=e.clientX; lastPY=e.clientY;
-  if(e.ctrlKey){
+  /* au tactile (§15.1), le pilotage passe par le joystick virtuel : un
+     doigt qui glisse sur la vue 3D ne fait donc QUE regarder autour, sans
+     modificateur à maintenir (CTRL n'a pas d'équivalent tactile naturel) —
+     même branche que le regard libre CTRL+souris du bureau. */
+  if(e.ctrlKey || e.pointerType === 'touch'){
     ctrlDragged = true;
     camOrbitYaw   -= dx*0.0032;
     camOrbitPitch  = THREE.MathUtils.clamp(camOrbitPitch - dy*0.0032, -1.3, 1.3);
@@ -3719,6 +3831,150 @@ window.addEventListener('pointermove', function(e){
   dragPitch = -dy*0.0022;
   lastInputTime = performance.now();
 });
+
+/* =========================================================================
+   CONTRÔLE TACTILE — §15 de la spec v2.1. Détection par capacité de
+   pointage plutôt que par taille d'écran (un ordinateur portable dans une
+   petite fenêtre n'est pas une tablette) ; recalculée à chaque changement
+   d'orientation puisqu'un appareil peut basculer en cours de partie.
+   Les boutons pilotent les MÊMES variables (`keys[...]`) que le clavier :
+   aucune logique de vol nouvelle, updateFlight() ne voit pas la différence. */
+(function initTouchControls(){
+  const isTouchCapable = window.matchMedia('(pointer: coarse)').matches;
+  if(!isTouchCapable) return;
+  document.body.classList.add('touch-mode');
+
+  function applyOrientation(){
+    const portrait = window.innerHeight >= window.innerWidth;
+    document.body.classList.toggle('portrait-touch', portrait);
+    document.body.classList.toggle('landscape-touch', !portrait);
+  }
+  applyOrientation();
+  window.addEventListener('resize', applyOrientation);
+  if(window.screen && window.screen.orientation){
+    window.screen.orientation.addEventListener('change', applyOrientation);
+  }
+
+  /* ---------- joystick virtuel : pitch/lacet, mappé sur les mêmes codes
+     que les flèches — pas de valeur analogique, updateFlight() ne lit de
+     toute façon que des booléens (-1/0/+1), inutile d'en inventer une. */
+  const base = document.getElementById('touchJoyBase');
+  const nub = document.getElementById('touchJoyNub');
+  let joyPointerId = null;
+  const DEADZONE = 0.32;
+  function resetJoyKeys(){
+    keys['ArrowUp'] = keys['ArrowDown'] = keys['ArrowLeft'] = keys['ArrowRight'] = false;
+    nub.style.transform = 'translate(-50%,-50%)';
+  }
+  function updateJoyFromEvent(e){
+    const rect = base.getBoundingClientRect();
+    const cx = rect.left + rect.width/2, cy = rect.top + rect.height/2;
+    const r = rect.width/2;
+    let nx = (e.clientX - cx) / r, ny = (e.clientY - cy) / r;
+    const mag = Math.hypot(nx, ny);
+    if(mag > 1){ nx /= mag; ny /= mag; }
+    nub.style.transform = 'translate(calc(-50% + ' + (nx*r*0.55) + 'px), calc(-50% + ' + (ny*r*0.55) + 'px))';
+    keys['ArrowUp']    = ny < -DEADZONE;
+    keys['ArrowDown']  = ny >  DEADZONE;
+    keys['ArrowLeft']  = nx < -DEADZONE;
+    keys['ArrowRight'] = nx >  DEADZONE;
+    lastInputTime = performance.now();
+  }
+  base.addEventListener('pointerdown', function(e){
+    e.preventDefault();
+    joyPointerId = e.pointerId;
+    base.setPointerCapture(e.pointerId);
+    updateJoyFromEvent(e);
+  });
+  base.addEventListener('pointermove', function(e){
+    if(e.pointerId !== joyPointerId) return;
+    updateJoyFromEvent(e);
+  });
+  function endJoy(e){
+    if(joyPointerId !== null && e.pointerId !== joyPointerId) return;
+    joyPointerId = null;
+    resetJoyKeys();
+  }
+  base.addEventListener('pointerup', endJoy);
+  base.addEventListener('pointercancel', endJoy);
+
+  /* ---------- boutons maintenus : roulis (E/R) et boost (ESPACE) ---------- */
+  function bindHoldButton(id, code){
+    const btn = document.getElementById(id);
+    if(!btn) return;
+    btn.addEventListener('pointerdown', function(e){
+      e.preventDefault();
+      btn.setPointerCapture(e.pointerId);
+      keys[code] = true;
+      btn.classList.add('active');
+      lastInputTime = performance.now();
+    });
+    function release(e){
+      keys[code] = false;
+      btn.classList.remove('active');
+    }
+    btn.addEventListener('pointerup', release);
+    btn.addEventListener('pointercancel', release);
+  }
+  bindHoldButton('touchRollMinus', 'KeyR');
+  bindHoldButton('touchRollPlus', 'KeyE');
+  bindHoldButton('touchBoostBtn', 'Space');
+
+  /* ---------- boutons ponctuels : caméra (F3) et canal radio (TAB) ----------
+     Réutilisent exactement les fonctions du clavier — pas de logique
+     dupliquée entre les deux moyens de contrôle. */
+  const camBtn = document.getElementById('touchCamBtn');
+  if(camBtn) camBtn.addEventListener('pointerdown', function(e){ e.preventDefault(); nextCameraMode(); });
+  const radioBtn = document.getElementById('touchRadioBtn');
+  if(radioBtn) radioBtn.addEventListener('pointerdown', function(e){ e.preventDefault(); toggleRadioPanel(); });
+
+  /* ---------- menu déroulant des panneaux (§12/§15) : chaque bouton
+     bascule un panneau via la classe .panel-open, lue par le CSS
+     .touch-mode.portrait-touch — en paysage les panneaux restent visibles
+     par défaut, le menu permet simplement de les masquer si besoin. */
+  const PANEL_TOGGLES = [
+    {id:'hud-left',      label:function(){ return t('menuNavPanel'); } },
+    {id:'hud-route',     label:function(){ return t('lblFlightPlan'); } },
+    {id:'hud-right',     label:function(){ return t('lblNearest'); } },
+    {id:'hud-temp',      label:function(){ return t('lblEngineTemp'); } },
+    {id:'hud-engines',   label:function(){ return t('lblPropulsion'); } },
+    {id:'hud-telemetry', label:function(){ return t('lblEngineCmd'); } },
+  ];
+  const menuBtn = document.getElementById('touchMenuBtn');
+  const menuList = document.getElementById('touchPanelMenu');
+  function refreshMenuList(){
+    menuList.innerHTML = '';
+    PANEL_TOGGLES.forEach(function(p){
+      const el = document.querySelector('.' + p.id);
+      if(!el) return;
+      const isOn = el.classList.contains('panel-open');
+      const b = document.createElement('button');
+      b.textContent = (isOn ? '\u25CF ' : '\u25CB ') + p.label();
+      b.className = isOn ? 'on' : '';
+      b.addEventListener('pointerdown', function(e){
+        e.preventDefault();
+        el.classList.toggle('panel-open');
+        refreshMenuList();
+      });
+      menuList.appendChild(b);
+    });
+    const radioPanel = document.getElementById('radioPanel');
+    const radioOn = radioPanel && radioPanel.classList.contains('visible');
+    const rb = document.createElement('button');
+    rb.textContent = (radioOn ? '\u25CF ' : '\u25CB ') + t('lblRadioChannel');
+    rb.className = radioOn ? 'on' : '';
+    rb.addEventListener('pointerdown', function(e){ e.preventDefault(); toggleRadioPanel(); refreshMenuList(); });
+    menuList.appendChild(rb);
+  }
+  if(menuBtn){
+    menuBtn.addEventListener('pointerdown', function(e){
+      e.preventDefault();
+      const open = menuList.classList.toggle('open');
+      menuBtn.classList.toggle('active', open);
+      if(open) refreshMenuList();
+    });
+  }
+})();
 
 let manual = false;
 let lastInputTime = 0;
@@ -3960,11 +4216,92 @@ function speakRadioLine(entry){
   if(!btn) return;
   btn.addEventListener('click', function(e){
     e.stopPropagation();
-    radioMuted = !radioMuted;
-    btn.textContent = radioMuted ? '🔇' : '🔊';
-    if(radioMuted && window.speechSynthesis){ window.speechSynthesis.cancel(); radioSpeaking = false; }
+    toggleVoiceMute();
   });
 })();
+
+/* =========================================================================
+   DIALOGUES RADIO PAR IA EMBARQUÉE (Gemini Nano) — §14 de la spec v2.1.
+   Principe : le script par gabarits ci-dessus (buildRadioScript) reste la
+   SEULE source de vérité affichée par défaut — c'est aussi, sans code
+   supplémentaire, le repli automatique si Gemini Nano est absent,
+   indisponible, ou trop lent. Cette IA ne fait qu'essayer de RÉÉCRIRE
+   chaque réplique déjà présente, en tâche de fond, sans jamais bloquer
+   ni retarder l'affichage : un dépassement de délai (2 s) ou une erreur
+   laisse simplement le texte du gabarit en place, silencieusement.
+   Aucun appel réseau : l'inférence tourne en local dans le navigateur,
+   même principe que SpeechSynthesis déjà utilisée pour la voix (§12.3). */
+let llmAvailability = 'unchecked';   /* 'unchecked' | 'available' | 'unavailable' */
+async function checkLLMAvailability(){
+  try{
+    if(!('LanguageModel' in self)){ llmAvailability = 'unavailable'; return; }
+    const a = await LanguageModel.availability();
+    /* couvre l'ancien ET le nouveau nommage de l'API — encore instable
+       d'une version de Chrome à l'autre au moment d'écrire ce code */
+    llmAvailability = (a === 'available' || a === 'readily') ? 'available' : 'unavailable';
+  }catch(e){
+    llmAvailability = 'unavailable';
+  }
+}
+checkLLMAvailability();
+
+/* une identité par interlocuteur (§14.2) : ton et vocabulaire distincts,
+   fournis en instruction système à sa PROPRE session — plutôt qu'un seul
+   modèle générique appelé plusieurs fois, qui produirait des répliques
+   interchangeables entre équipage et tour de contrôle. */
+const LLM_PERSONAS = {
+  ship: {
+    fr: "Tu es le capitaine d'un cargo spatial. Ton direct, professionnel, phrases courtes. Réponds par une seule phrase courte, sans guillemets ni mise en forme.",
+    en: 'You are the captain of a cargo starship. Direct, professional tone, short sentences. Reply with a single short sentence, no quotes or formatting.',
+    de: 'Du bist der Kapitän eines Frachtraumschiffs. Direkt, professionell, kurze Sätze. Antworte mit einem einzigen kurzen Satz, ohne Anführungszeichen oder Formatierung.',
+    es: 'Eres el capitán de un carguero espacial. Tono directo y profesional, frases cortas. Responde con una sola frase corta, sin comillas ni formato.'
+  },
+  tower: {
+    fr: 'Tu es un contrôleur du trafic d\u2019un port spatial. Ton protocolaire, débit posé, formules consacrées. Réponds par une seule phrase courte, sans guillemets ni mise en forme.',
+    en: 'You are a starport traffic controller. Formal, measured tone, standard phrasing. Reply with a single short sentence, no quotes or formatting.',
+    de: 'Du bist ein Fluglotse eines Raumhafens. Förmlich, ruhiger Tonfall, feste Formulierungen. Antworte mit einem einzigen kurzen Satz, ohne Anführungszeichen oder Formatierung.',
+    es: 'Eres un controlador de tráfico de un puerto espacial. Tono protocolario, ritmo pausado, fórmulas habituales. Responde con una sola frase corta, sin comillas ni formato.'
+  }
+};
+const llmSessions = {};
+async function getLLMSession(persona){
+  if(llmSessions[persona]) return llmSessions[persona];
+  const dict = LLM_PERSONAS[persona] || LLM_PERSONAS.ship;
+  const sysPrompt = dict[LANG] || dict.fr;
+  const session = await LanguageModel.create({ initialPrompts: [{role:'system', content: sysPrompt}] });
+  llmSessions[persona] = session;
+  return session;
+}
+function llmPromptFor(entry, planet){
+  return 'Contexte : ' + entry.label + ' vient de dire, pendant l\u2019approche du port de '
+    + planet.cityName + ' : "' + entry.text + '". Reformule ce message dans ton propre style, '
+    + 'en gardant le même sens et les mêmes informations concrètes (nombres, noms).';
+}
+/* lance la réécriture de chaque réplique en arrière-plan, dès la
+   construction du script — bien avant l'affichage du premier message
+   (§14.5) — et abandonne silencieusement toute réponse qui arriverait
+   après que CE message précis a déjà été affiché avec son texte de repli. */
+function enhanceRadioScriptWithLLM(script, planet, gen){
+  if(llmAvailability !== 'available') return;
+  script.forEach(function(entry, idx){
+    (async function(){
+      try{
+        const session = await getLLMSession(entry.from);
+        const prompt = llmPromptFor(entry, planet);
+        const timeout = new Promise(function(_, reject){ setTimeout(function(){ reject(new Error('timeout')); }, 2000); });
+        const text = await Promise.race([session.prompt(prompt), timeout]);
+        if(orbitState.radioGen !== gen) return;      /* nouvelle escale entre-temps */
+        if(orbitState.radioIdx > idx) return;         /* déjà affiché avec le repli */
+        const cleaned = String(text).trim().replace(/^["\u201c\u201d]|["\u201c\u201d]$/g, '');
+        if(cleaned) entry.text = cleaned;
+      }catch(e){
+        /* silencieux : le texte du gabarit déjà en place reste affiché,
+           c'est tout l'intérêt de ne jamais l'effacer avant d'avoir un
+           remplacement confirmé */
+      }
+    })();
+  });
+}
 
 function startOrbitDelivery(planet){
   /* nettoyage défensif d'un éventuel reliquat de navettes non arrivées */
@@ -4024,6 +4361,12 @@ function startOrbitDelivery(planet){
   };
   orbitState.radioScript = buildRadioScript(planet);
   orbitState.radioIdx = 0;
+  /* réécriture IA en tâche de fond (§14) : orbitState.radioGen identifie
+     cette escale précise, pour que toute réponse tardive d'une escale
+     précédente (dépassée ou abandonnée) ne vienne jamais écraser le script
+     de la nouvelle. */
+  orbitState.radioGen = (orbitState.radioGen||0) + 1;
+  enhanceRadioScriptWithLLM(orbitState.radioScript, planet, orbitState.radioGen);
   const radioLog = document.getElementById('radioLog');
   if(radioLog) radioLog.innerHTML = '';
   const radioPanel = document.getElementById('radioPanel');
