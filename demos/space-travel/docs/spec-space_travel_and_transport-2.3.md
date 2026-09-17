@@ -111,14 +111,17 @@ Porte-conteneurs low-poly en deux blocs : une nacelle cargo à claire-voie à l'
 
 ## 5. Navigation — plan de vol
 
-![Panneau de plan de vol élargi](images/img-005.jpg)
+![Panneau de plan de vol](images/img-005.jpg)
 
 **Correctif v2.1 — largeur du panneau.** Mesuré dans le code : le panneau ne faisait que 230 px de large, avec numéro/nom/désignation stellaire sur une seule ligne — largement insuffisant face aux noms de ports générés, d'où des troncatures fréquentes. Deux ajustements combinés : élargissement modéré à 300 px, **et** passage à un gabarit deux lignes par étape (nom en pleine largeur, désignation stellaire en dessous, atténuée). La troncature reste en filet de sécurité pour les rares noms encore trop longs.
+
+**Révision v2.3 — retour à 230 px.** Demande explicite de resserrer le panneau. Revenir à la largeur d'origine n'a **pas** réintroduit le problème de troncature que la v2.1 avait corrigé : c'est le passage au gabarit deux lignes, gardé intact, qui faisait le vrai travail (un nom trop long occupe sa propre ligne plutôt que d'être compressé à côté du numéro et de la désignation). La largeur en elle-même n'était qu'un des deux leviers.
 
 ```mermaid
 flowchart LR
     A["Avant : 230 px,<br/>1 ligne par étape"] --> B["v2.1 : 300 px,<br/>2 lignes par étape"]
-    B --> C{Nom encore<br/>trop long ?}
+    B --> F["v2.3 : 230 px,<br/>2 lignes conservées"]
+    F --> C{Nom encore<br/>trop long ?}
     C -->|non, cas courant| D[Affichage complet]
     C -->|oui, rare| E[Troncature ellipsis<br/>— filet de sécurité]
 ```
@@ -142,6 +145,8 @@ La route est planifiée via une courbe de Catmull-Rom passant par chaque étoile
 À chaque étape (pas seulement la dernière), le vaisseau ralentit à l'approche, se met en orbite, et livre sa cargaison.
 
 ![Mise en orbite et livraison](images/img-009.jpg)
+
+*Navette en vol avec sa traînée de propulseur (§17.2) alignée sur son axe de déplacement réel — pas sur l'orientation du nez, qui peut diverger pendant la phase courbée de l'approche. Panneau services portuaires (§16) ouvert au premier plan.*
 
 ```mermaid
 sequenceDiagram
@@ -174,7 +179,9 @@ La coupure franche (pour les trois premières séquences) a été vérifiée par
 
 **Nouveauté v2.1 — crédits.** 1 à 5 conteneurs tirés par escale, répartis entre les navettes réellement larguées — et c'est cette même répartition qui alimente le dialogue radio, pour que l'équipage n'annonce jamais un chiffre sans rapport avec ce qui est effectivement crédité. Gain versé au moment où le dernier conteneur atterrit. Solde initial de 10 000 crédits, affiché dans la barre supérieure à gauche de `SEED`.
 
-![Crédits et canal radio](images/img-010.jpg)
+![Empilement objet proche → services portuaires → canal radio](images/img-010.jpg)
+
+*Ordre d'empilement inversé en v2.3 (§17.1) : les services portuaires (§16) se placent désormais entre « objet le plus proche » et le canal radio, plutôt que l'inverse — un chevauchement dynamique avait été repéré dans l'ancien ordre.*
 
 ```mermaid
 flowchart TD
@@ -234,6 +241,8 @@ stateDiagram-v2
 ```
 
 `ÉCHAP`, `P` ou `PAUSE` gèle entièrement la simulation (route, rotation, températures, navettes) et suspend la synthèse vocale sans l'annuler (`speechSynthesis.pause()`, pas `cancel()`). `ESPACE`/`ENTRÉE` reprend exactement où le jeu en était ; `ÉCHAP` depuis la pause renvoie à l'écran-titre.
+
+![Overlay du mode Pause](images/img-021.jpg)
 
 **Écarts par rapport à la version précédente de cette spec :**
 - **Pas de renommage** de `ARRIVAL_PAUSE`/`paused` : le risque de confusion signalé était réel mais purement documentaire (portées JS distinctes, aucun conflit effectif) — un nouveau flag au nom sans ambiguïté (`gamePaused`) suffisait, pour un coût et un risque de régression bien moindres qu'un renommage traversant tout le fichier.
@@ -364,14 +373,23 @@ Le simulateur reposait entièrement sur clavier + souris (§4). Un jeu de contr�
 | Joystick virtuel (bas gauche) | Flèches / ZQSD — tangage et lacet | ✅ |
 | Boutons ⟲ / ⟳ | E / R — roulis | ✅ |
 | Bouton BOOST, maintenu | MAJ / ESPACE — propulsion | ✅ |
-| Glisser un doigt sur la vue 3D | Glisser la souris — visée fine → devient regard libre au tactile | ✅ |
+| Bouton 👁, maintenu | CTRL + glisser — regard libre *(§17.3 : n'est plus automatique)* | ✅ |
+| Glisser un doigt sur la vue 3D | Glisser la souris — visée fine → regard libre UNIQUEMENT si 👁 est maintenu | ✅ |
 | Barre d'icônes du HUD (bas, centrée) | `F1`-`F9` + `H` — bascule panneaux, radio, services, caméra, aide (§12) | ✅ |
 
 **Superseded** : le menu ☰ (liste déroulante textuelle) et l'icône radio 📻 séparée, décrits dans une version antérieure de cette section, ont été entièrement retirés et remplacés par la barre d'icônes unifiée du §12 — mêmes boutons qu'au bureau, également en bas (cf. §17.3 pour l'aller-retour sur ce choix de position).
 
+![Smartphone en portrait — contrôles tactiles en overlay](images/img-026.jpg)
+
+*Capture prise sous émulation d'appareil Chromium (iPhone 13, tactile). On y voit l'ensemble des commandes de vol (joystick, roulis, boost, regard 👁) et la barre d'icônes du HUD tout en bas, ainsi que le message radio de bienvenue et une étiquette de vaisseau avec son anneau de cible.*
+
 ### 15.3 Disposition paysage (tablette) — mise à jour : unifiée avec §12
 
-**Superseded** par l'implémentation de la barre de contrôle du HUD (§12) : l'ancien menu ☰ tactile séparé, décrit dans une version antérieure de cette section, a été entièrement retiré et remplacé par la même barre d'icônes SVG que le bureau — mêmes icônes, même logique d'activation, seule la position change (haut plutôt que bas-gauche, le bas étant occupé par le joystick et les commandes de vol). Voir §12 pour le détail ; cette section n'a donc plus de mécanisme propre à documenter.
+**Superseded** par l'implémentation de la barre de contrôle du HUD (§12) : l'ancien menu ☰ tactile séparé, décrit dans une version antérieure de cette section, a été entièrement retiré et remplacé par la même barre d'icônes SVG que le bureau — mêmes icônes, même logique d'activation. La position a changé deux fois en cours de route (haut, puis de nouveau en bas — §17.3) ; elle reste désormais alignée sur le bureau dans les deux orientations.
+
+![Tablette en paysage — panneaux complets et contrôles tactiles](images/img-027.jpg)
+
+*Capture prise sous émulation d'appareil Chromium (iPad Pro 11", tactile, paysage). Les panneaux d'info restent visibles par défaut dans cette orientation (plus de place qu'en portrait) ; les commandes de vol occupent le bas de l'écran, la barre d'icônes du HUD centrée sous elles.*
 
 ### 15.4 Disposition selon l'orientation — implémentée
 
@@ -426,6 +444,10 @@ Lot de corrections et d'améliorations remontées après une première passe de 
 **Icône caméra dynamique** : trois symboles distincts selon le mode actif (poursuite / plan-séquence / plans lointains), remplaçant un pictogramme générique unique.
 
 **Aide clavier en overlay centré** (touche `H`) : remplace l'ancienne bande fixe en bas d'écran par un panneau centré, même famille visuelle que le mode Pause (coins ambrés, fond assombri). Contenu généré dynamiquement depuis la liste des boutons du HUD (§12), donc toujours synchronisé avec elle.
+
+![Overlay d'aide, généré depuis la barre du HUD](images/img-022.jpg)
+
+*Un doublon a été repéré directement sur cette capture lors de sa prise (la touche `H` listée deux fois) et corrigé dans la foulée : l'aide s'auto-listait une première fois via la boucle générique des boutons du HUD, puis une seconde fois via sa ligne de description dédiée.*
 
 **Largeur du panneau « Plan de vol »** réduite de 300 à 230px.
 
