@@ -1,3 +1,29 @@
+<!--
+  Voyage Spatial / Space Travel & Transport
+  Version 2.3 — 17 septembre 2026
+  Spec de référence : spec-space_travel_and_transport-2.3.md
+
+  MIT License
+  Copyright (c) 2026 Frédéric Delorme <frederic.delorme@gmail.com>
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+-->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -75,7 +101,7 @@
 
   /* ---------- plan de vol ---------- */
   .hud-route{
-    position:absolute; left:18px; top:210px; width:300px;
+    position:absolute; left:18px; top:210px; width:230px;
     padding:10px 0 8px;
     max-height:calc(100vh - 280px);
     display:flex; flex-direction:column;
@@ -133,6 +159,9 @@
   .v{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--ink); font-weight:500; }
 
   .hud-right .k{ margin-bottom:8px; }
+  .obj-body{ display:flex; gap:10px; align-items:flex-start; margin-top:2px; }
+  .obj-icon{ flex:none; width:52px; height:52px; border-radius:50%; background:rgba(0,0,0,0.25); }
+  .obj-text{ flex:1; min-width:0; }
   .obj-name{ font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--amber); line-height:1.25; min-height:20px; }
   .obj-meta{ font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--cyan); margin-top:6px; line-height:1.7; }
   .obj-meta sub{ font-size:8px; }
@@ -149,6 +178,45 @@
   }
   .hud-mode.manual{ color:var(--amber); border-color:var(--amber-dim); }
   .hud-mode.auto{ color:var(--cyan); }
+
+  /* ---------- croix de fermeture, commune à tous les panneaux ---------- */
+  .panel-close-btn{
+    position:absolute; top:3px; right:3px; z-index:1; pointer-events:auto;
+    width:16px; height:16px; padding:0; display:flex; align-items:center; justify-content:center;
+    background:none; border:none; color:var(--muted-2); font-size:13px; line-height:1;
+    cursor:pointer; font-family:'JetBrains Mono',monospace;
+  }
+  .panel-close-btn:hover{ color:#ff6b57; }
+
+  /* ---------- aide clavier — overlay centré (amélioration, remplace
+     l'ancienne bande fixe en bas d'écran) ---------- */
+  #helpOverlay{
+    position:fixed; inset:0; z-index:6; display:flex; align-items:center; justify-content:center;
+    background:rgba(2,5,12,0.72); backdrop-filter:blur(2px);
+    opacity:0; pointer-events:none; transition:opacity .2s ease;
+  }
+  #helpOverlay.visible{ opacity:1; pointer-events:auto; }
+  .help-panel{
+    position:relative; border:1px solid var(--line);
+    background:linear-gradient(180deg, rgba(94,234,212,0.05), transparent 60%), rgba(15,26,48,0.94);
+    padding:26px 34px 20px; max-width:640px; width:90vw; max-height:82vh; overflow:auto;
+  }
+  .help-panel::before, .help-panel::after{
+    content:""; position:absolute; width:14px; height:14px; border:1.5px solid var(--amber);
+  }
+  .help-panel::before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }
+  .help-panel::after{ bottom:-1px; right:-1px; border-left:none; border-top:none; }
+  .help-title{
+    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:15px;
+    letter-spacing:0.14em; color:var(--amber); margin-bottom:16px; text-align:center;
+  }
+  .help-grid{ display:grid; grid-template-columns:auto 1fr; gap:8px 16px; font-size:12px; }
+  .help-grid .hk{
+    font-family:'JetBrains Mono',monospace; color:var(--cyan); white-space:nowrap;
+    border:1px solid var(--line); border-radius:3px; padding:1px 7px; text-align:center; height:fit-content;
+  }
+  .help-grid .hv{ color:var(--ink); align-self:center; }
+  .help-foot{ margin-top:16px; text-align:center; font-size:10px; color:var(--muted-2); letter-spacing:0.05em; }
 
   /* ---------- rangée basse : température · propulsion · commandes ----------
      Les trois panneaux vivaient séparément (dont un flottant, projeté en 3D
@@ -241,6 +309,19 @@
     display:flex; justify-content:space-between; align-items:center;
   }
   .radio-title .dot{ color:var(--cyan); animation:blink 1.8s infinite; }
+  .llm-indicator{
+    display:inline-block; position:relative; margin-right:7px; font-size:12px;
+    opacity:0.35; filter:grayscale(1); transition:opacity .3s ease, filter .3s ease;
+    pointer-events:auto; cursor:default;
+  }
+  .llm-indicator.active{
+    opacity:1; filter:none;
+    text-shadow:0 0 5px rgba(94,234,212,0.7);
+  }
+  .llm-indicator.inactive::after{
+    content:''; position:absolute; left:-1px; top:50%; width:calc(100% + 2px); height:1.5px;
+    background:var(--muted-2); transform:translateY(-50%) rotate(-42deg);
+  }
   .radio-mute{
     pointer-events:auto; cursor:pointer;
     background:none; border:1px solid var(--line); color:var(--muted-2);
@@ -253,14 +334,49 @@
     font-size:10.5px; line-height:1.4;
     opacity:0; transform:translateY(4px);
     animation:radioIn .4s ease forwards;
+    display:flex; align-items:flex-start; gap:6px;
   }
   @keyframes radioIn{ to{ opacity:1; transform:translateY(0); } }
+  .radio-avatar{
+    flex:none; width:15px; height:15px; margin-top:1px;
+    stroke:currentColor; stroke-width:1.8; fill:none; stroke-linecap:round; stroke-linejoin:round;
+  }
+  .radio-line.tower .radio-avatar{ color:var(--cyan); }
+  .radio-line.ship .radio-avatar{ color:var(--amber); }
   .radio-line .who{ font-weight:700; letter-spacing:0.04em; margin-right:5px; }
   .radio-line.tower .who{ color:var(--cyan); }
   .radio-line.ship .who{ color:var(--amber); }
   .radio-line .txt{ color:var(--ink); }
   @media (max-width:900px){ .hud-radio{ display:none !important; } }
   @media (prefers-reduced-motion: reduce){ .radio-line{ animation:none; opacity:1; transform:none; } }
+
+  /* ---------- services portuaires (#9, palier 1) ---------- */
+  .hud-port{
+    position:absolute; right:18px; top:230px; width:300px;
+    padding:10px 12px 12px;
+    display:none; flex-direction:column; gap:9px;
+    opacity:0; transition:opacity .5s ease;
+  }
+  .hud-port.visible{ display:flex; opacity:1; }
+  .port-title{
+    font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted-2);
+    border-bottom:1px solid var(--line); padding-bottom:6px;
+  }
+  .port-row{ display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--ink); }
+  .port-dots{ color:var(--cyan); letter-spacing:0.12em; font-size:12px; }
+  .port-buy-btn{
+    pointer-events:auto; cursor:pointer; width:100%;
+    background:none; border:1px solid var(--amber-dim); color:var(--amber);
+    font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.05em;
+    padding:8px 6px; transition:border-color .15s ease, background .15s ease;
+  }
+  .port-buy-btn:hover{ border-color:var(--amber); background:rgba(255,180,84,0.12); }
+  .port-buy-btn.port-disabled{
+    cursor:default; color:var(--muted-2); border-color:var(--line); background:none;
+  }
+  .port-buy-btn.port-maxed{
+    cursor:default; color:var(--cyan); border-color:var(--line); background:none;
+  }
 
   /* ---------- étiquettes des étoiles connues, projetées en écran ---------- */
   #starLabels{ position:fixed; inset:0; z-index:2; pointer-events:none; overflow:hidden; }
@@ -303,6 +419,17 @@
   .planet-label.is-port .star-text{ color:var(--ink); font-weight:700; }
   .planet-label.is-port .star-ring{ border-color:var(--ink); animation:blink 1.6s infinite; }
 
+  /* ---------- étiquettes de vaisseaux (cargo + navettes) — amélioration
+     demandée : même vocabulaire (cercle + flèche + texte), mais l'anneau
+     doit ENTOURER l'objet, donc dimensionné dynamiquement selon sa taille
+     apparente à l'écran plutôt que fixe comme pour étoiles/planètes (dont
+     la taille angulaire reste toujours minuscule). Largeur/hauteur de
+     l'anneau, position de la flèche et du texte sont donc fixées en ligne
+     par projectShipLabel plutôt que par cette règle, qui ne pose ici que
+     la couleur (vert, troisième teinte distincte de cyan/ambre). ---------- */
+  .ship-label .star-ring{ border-color:#3ddc84; box-shadow:0 0 4px rgba(61,220,132,0.5); }
+  .ship-label .star-arrow{ background:#3ddc84; }
+  .ship-label .star-text{ color:#3ddc84; text-shadow:0 0 6px rgba(61,220,132,0.6), 0 1px 3px rgba(0,0,0,0.85); }
   .moon-label .star-ring{ width:9px; height:9px; border-color:var(--muted-2); box-shadow:none; }
   .moon-label .star-arrow{ background:var(--muted-2); height:10px; }
   .moon-label .star-text{ top:-17px; font-size:9.5px; color:var(--muted); text-shadow:0 1px 3px rgba(0,0,0,0.85); }
@@ -322,27 +449,51 @@
      ========================================================================= */
   .touch-mode .hud-hint{ display:none !important; } /* aide clavier hors-sujet au tactile */
 
-  /* en portrait, les panneaux d'info restent masqués par défaut (pas la
-     place de les garder ouverts en continu) — révélés un par un via le
-     menu ☰. En paysage, on laisse le comportement desktop existant
-     (largeurs déjà réduites par les @media ci-dessus). */
-  .touch-mode.portrait-touch .hud-left,
-  .touch-mode.portrait-touch .hud-route,
-  .touch-mode.portrait-touch .hud-right,
-  .touch-mode.portrait-touch .hud-engines,
-  .touch-mode.portrait-touch .hud-telemetry,
-  .touch-mode.portrait-touch .hud-temp{
-    display:none !important;
-  }
-  .touch-mode.portrait-touch .hud-left.panel-open{ display:block !important; top:60px !important; }
-  .touch-mode.portrait-touch .hud-route.panel-open{ display:block !important; top:60px !important; }
-  .touch-mode.portrait-touch .hud-right.panel-open{ display:block !important; top:60px !important; }
-  .touch-mode.portrait-touch .hud-engines.panel-open{ display:flex !important; }
-  .touch-mode.portrait-touch .hud-telemetry.panel-open{ display:block !important; }
-  .touch-mode.portrait-touch .hud-temp.panel-open{ display:block !important; }
-  /* le canal radio reste joignable au tactile même sous les 900px où le
-     desktop le masque entièrement — priorité de sélecteur, pas d'ordre */
+  /* Visibilité des 7 panneaux d'info, PILOTÉE PAR LA BARRE D'ICÔNES DU HUD
+     (§12) — un mécanisme UNIQUE, valable aussi bien au clavier/souris qu'au
+     tactile : .panel-hidden masque, son absence montre. Par défaut les
+     panneaux sont visibles partout SAUF en portrait tactile, où le script
+     d'initialisation les masque tous au démarrage (pas la place de les
+     garder ouverts en continu) — révélés un par un via la même barre.
+     Remplace l'ancien mécanisme .panel-open, propre au tactile seul, qui
+     dupliquait ce que fait maintenant la barre unifiée. */
+  .panel-hidden{ display:none !important; }
+  /* le canal radio garde SA PROPRE bascule (.visible, ouverte/fermée
+     automatiquement à chaque escale) — mais reste joignable au tactile
+     même sous les 900px où le desktop le masque entièrement */
   .touch-mode .hud-radio.visible{ display:flex !important; }
+
+  /* ---------- barre d'icônes du HUD (§12) — unifiée bureau + tactile ----------
+     Bureau ET tactile : fixe EN BAS, toujours visible (demande explicite —
+     l'ancien choix de la remonter en haut au tactile est abandonné). Les
+     commandes de pilotage (joystick, roulis, boost, regard) sont donc
+     décalées plus haut pour lui laisser la place, cf. plus bas. */
+  #hudIconBar{
+    position:fixed; z-index:3; display:flex; gap:6px; pointer-events:auto;
+    left:18px; bottom:18px;
+  }
+  .touch-mode #hudIconBar{ left:50%; bottom:8px; transform:translateX(-50%); gap:3px; }
+  .hud-icon-btn{
+    position:relative; width:34px; height:34px; padding:0;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(15,26,48,0.78); border:1px solid var(--line); cursor:pointer;
+    color:var(--muted); -webkit-tap-highlight-color:transparent; touch-action:none;
+    transition:border-color .15s ease, color .15s ease, background .15s ease;
+  }
+  .hud-icon-btn::before, .hud-icon-btn::after{
+    content:""; position:absolute; width:6px; height:6px; border:1.2px solid var(--amber);
+    opacity:0; transition:opacity .15s ease;
+  }
+  .hud-icon-btn::before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }
+  .hud-icon-btn::after{ bottom:-1px; right:-1px; border-left:none; border-top:none; }
+  .hud-icon-btn svg{ width:18px; height:18px; stroke:currentColor; stroke-width:1.6; fill:none; stroke-linecap:round; stroke-linejoin:round; }
+  .hud-icon-btn:hover{ border-color:var(--muted); color:var(--ink); }
+  .hud-icon-btn.active{ color:var(--cyan); border-color:var(--cyan); background:rgba(94,234,212,0.1); }
+  .hud-icon-btn.active::before, .hud-icon-btn.active::after{ opacity:1; }
+  .hud-icon-btn.disabled{ opacity:0.32; cursor:default; }
+  .hud-icon-btn.disabled:hover{ border-color:var(--line); color:var(--muted); }
+  .touch-mode .hud-icon-btn{ width:27px; height:27px; }
+  .touch-mode .hud-icon-btn svg{ width:14px; height:14px; }
 
   .touch-controls{ position:fixed; inset:0; z-index:4; pointer-events:none; display:none; }
   .touch-mode .touch-controls{ display:block; }
@@ -354,45 +505,70 @@
     user-select:none;
   }
   .touch-btn:active, .touch-btn.active{ border-color:var(--cyan); background:rgba(94,234,212,0.16); }
-  #touchMenuBtn{ top:14px; left:14px; width:38px; height:38px; font-size:16px; }
-  #touchRadioBtn{ top:14px; right:14px; width:38px; height:38px; font-size:16px; }
-  #touchCamBtn{ bottom:26px; font-size:11px; letter-spacing:0.05em; width:60px; height:44px; }
-  .portrait-touch #touchCamBtn{ right:96px; bottom:150px; }
-  .landscape-touch #touchCamBtn{ right:150px; bottom:26px; }
-  #touchRollMinus, #touchRollPlus{ width:46px; height:46px; font-size:17px; }
-  .portrait-touch #touchRollMinus{ left:190px; bottom:150px; }
-  .portrait-touch #touchRollPlus{ left:244px; bottom:150px; }
-  .landscape-touch #touchRollMinus{ left:172px; bottom:26px; }
-  .landscape-touch #touchRollPlus{ left:220px; bottom:26px; }
+  /* décalées vers le haut (+44px environ) par rapport à la version
+     précédente, pour laisser la barre d'icônes tenir tout en bas */
+  #touchRollMinus, #touchRollPlus{ width:44px; height:44px; font-size:16px; }
+  .portrait-touch #touchRollMinus{ left:190px; bottom:196px; }
+  .portrait-touch #touchRollPlus{ left:244px; bottom:196px; }
+  .landscape-touch #touchRollMinus{ left:172px; bottom:70px; }
+  .landscape-touch #touchRollPlus{ left:220px; bottom:70px; }
   #touchBoostBtn{
     border-radius:50%; border-color:var(--amber-dim); color:var(--amber);
     font-size:11px; letter-spacing:0.04em;
   }
   #touchBoostBtn.active{ background:rgba(255,180,84,0.18); border-color:var(--amber); }
-  .portrait-touch #touchBoostBtn{ width:78px; height:78px; right:22px; bottom:118px; }
-  .landscape-touch #touchBoostBtn{ width:64px; height:64px; right:22px; bottom:20px; }
+  .portrait-touch #touchBoostBtn{ width:74px; height:74px; right:22px; bottom:164px; }
+  .landscape-touch #touchBoostBtn{ width:60px; height:60px; right:22px; bottom:64px; }
   #touchJoyBase{
     border-radius:50%; background:rgba(15,26,48,0.55); border:2px solid var(--line);
   }
-  .portrait-touch #touchJoyBase{ width:132px; height:132px; left:22px; bottom:110px; }
-  .landscape-touch #touchJoyBase{ width:108px; height:108px; left:22px; bottom:20px; }
+  .portrait-touch #touchJoyBase{ width:126px; height:126px; left:22px; bottom:156px; }
+  .landscape-touch #touchJoyBase{ width:100px; height:100px; left:22px; bottom:64px; }
   #touchJoyNub{
     position:absolute; top:50%; left:50%; width:46%; height:46%; border-radius:50%;
     background:rgba(94,234,212,0.22); border:1.5px solid var(--cyan);
     transform:translate(-50%,-50%); pointer-events:none;
   }
-  #touchPanelMenu{
-    position:absolute; top:58px; left:14px; width:200px;
-    background:rgba(15,26,48,0.92); border:1.5px solid var(--line); border-radius:8px;
-    padding:6px; display:none; flex-direction:column; gap:2px; pointer-events:auto;
-    font-family:'JetBrains Mono',monospace; font-size:11px;
+  /* bouton de regard libre — équivalent tactile de CTRL+souris (amélioration
+     demandée, remplace le glisser-sans-modificateur qui n'avait pas
+     d'affordance visuelle propre) : maintenu enfoncé, il autorise le
+     glisser-regard sur la vue 3D, exactement comme CTRL maintenu au clavier. */
+  #touchLookBtn{ font-size:15px; }
+  #touchLookBtn.active{ border-color:var(--cyan); background:rgba(94,234,212,0.18); color:var(--cyan); }
+  .portrait-touch #touchLookBtn{ width:50px; height:50px; left:217px; bottom:250px; }
+  .landscape-touch #touchLookBtn{ width:44px; height:44px; left:196px; bottom:124px; }
+
+  /* ---------- mode Pause (§11) ---------- */
+  body.game-paused *{ animation-play-state: paused !important; }
+  #pauseOverlay{
+    position:fixed; inset:0; z-index:7; display:flex; align-items:center; justify-content:center;
+    background:rgba(2,5,12,0.78); backdrop-filter:blur(2px);
+    opacity:0; pointer-events:none; transition:opacity .25s ease;
   }
-  #touchPanelMenu.open{ display:flex; }
-  #touchPanelMenu button{
-    background:none; border:1px solid transparent; border-radius:5px; color:var(--muted);
-    padding:7px 8px; text-align:left; font:inherit; -webkit-tap-highlight-color:transparent;
+  #pauseOverlay.visible{ opacity:1; pointer-events:auto; }
+  .pause-panel{
+    position:relative; border:1px solid var(--line);
+    background:linear-gradient(180deg, rgba(94,234,212,0.05), transparent 60%), rgba(15,26,48,0.92);
+    padding:34px 46px; display:flex; flex-direction:column; align-items:center; gap:14px; min-width:300px;
   }
-  #touchPanelMenu button.on{ color:var(--cyan); border-color:var(--line); background:rgba(94,234,212,0.08); }
+  .pause-panel::before, .pause-panel::after{
+    content:""; position:absolute; width:14px; height:14px; border:1.5px solid var(--amber);
+  }
+  .pause-panel::before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }
+  .pause-panel::after{ bottom:-1px; right:-1px; border-left:none; border-top:none; }
+  .pause-title{
+    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:26px;
+    letter-spacing:0.16em; color:var(--amber);
+  }
+  .pause-sub{ font-size:12px; color:var(--muted); letter-spacing:0.05em; margin-top:-8px; }
+  .pause-btn{
+    width:100%; padding:11px 20px; background:none; border:1px solid var(--line); color:var(--ink);
+    font-family:'JetBrains Mono',monospace; font-size:13px; letter-spacing:0.08em; cursor:pointer;
+    transition:border-color .15s ease, background .15s ease; text-align:center;
+  }
+  .pause-btn:hover{ border-color:var(--cyan); background:rgba(94,234,212,0.1); color:var(--cyan); }
+  .pause-btn-quit:hover{ border-color:#ff6b57; background:rgba(255,107,87,0.1); color:#ff6b57; }
+  .pause-hint{ font-size:10px; color:var(--muted-2); letter-spacing:0.04em; margin-top:4px; }
 
   /* ---------- écran de démarrage ---------- */
   #boot{
@@ -458,42 +634,62 @@
   <div class="hud-mode mono" id="cameraModeFlash" style="top:96px; display:none; opacity:0; transition:opacity .5s ease;"></div>
 
   <div class="panel hud-left">
+    <button class="panel-close-btn" data-panel-cls="hud-left" title="Fermer">×</button>
     <div class="row"><span class="k" id="lblSpeed">Vitesse</span><span class="v" id="speedVal">0 u/s</span></div>
     <div class="row"><span class="k" id="lblSector">Secteur</span><span class="v" id="sectorVal">0 · 0 · 0</span></div>
     <div class="row"><span class="k" id="lblHeading">Cap</span><span class="v" id="headingVal">000°</span></div>
   </div>
 
   <div class="panel hud-route" id="routePanel">
+    <button class="panel-close-btn" data-panel-cls="hud-route" title="Fermer">×</button>
     <div class="route-title"><span id="lblFlightPlan">Plan de vol</span> <span class="amber" id="routeProgress">—</span></div>
     <div class="route-list" id="routeList"></div>
   </div>
 
   <div class="panel hud-right" id="nearestPanel">
+    <button class="panel-close-btn" data-panel-cls="hud-right" title="Fermer">×</button>
     <div class="k mono" id="lblNearest">OBJET LE PLUS PROCHE</div>
-    <div class="obj-name" id="nearName">—</div>
-    <div class="obj-meta" id="nearMeta">—</div>
+    <div class="obj-body">
+      <canvas class="obj-icon" id="nearIcon" width="52" height="52"></canvas>
+      <div class="obj-text">
+        <div class="obj-name" id="nearName">—</div>
+        <div class="obj-meta" id="nearMeta">—</div>
+      </div>
+    </div>
   </div>
 
-  <div class="hud-hint mono" id="hint">
-    ↑↓←→ / Z Q S D — orientation&nbsp; · &nbsp;A / E — roulis&nbsp; · &nbsp;MAJ — propulsion&nbsp; · &nbsp;glisser la souris — viser&nbsp; · &nbsp;CTRL+souris — regard libre&nbsp; · &nbsp;TAB — canal radio&nbsp; · &nbsp;H — masquer
-  </div>
   <div class="hud-hint mono" id="arrivalHint" style="display:none; bottom:52px;">
     ESPACE — abréger la manœuvre (travelling accéléré)
+  </div>
+
+  <!-- aide clavier — overlay centré, même famille visuelle que le mode
+       Pause (amélioration : remplace l'ancienne bande fixe en bas d'écran,
+       peu lisible et qui empiétait sur la vue) -->
+  <div id="helpOverlay" class="mono">
+    <div class="help-panel">
+      <button class="panel-close-btn" data-panel-cls="__help__" title="Fermer">×</button>
+      <div class="help-title" id="lblHelpTitle">AIDE — COMMANDES</div>
+      <div class="help-grid" id="helpGrid"></div>
+      <div class="help-foot" id="lblHelpFoot">H — masquer cette aide</div>
+    </div>
   </div>
 
   <!-- rangée basse : température, propulsion, commandes moteur -->
   <div class="hud-bottom-row">
     <div class="panel hud-temp mono" id="tempPanel">
+      <button class="panel-close-btn" data-panel-cls="hud-temp" title="Fermer">×</button>
       <div class="tm-title" id="lblEngineTemp">TEMPÉRATURE MOTEUR</div>
       <div id="tempBody"></div>
     </div>
 
     <div class="panel hud-engines" id="enginesPanel">
+      <button class="panel-close-btn" data-panel-cls="hud-engines" title="Fermer">×</button>
       <div class="engines-title mono" id="lblPropulsion">PROPULSION</div>
       <div class="engines-row" id="enginesRow"></div>
     </div>
 
     <div class="panel hud-telemetry mono" id="telemetryPanel">
+      <button class="panel-close-btn" data-panel-cls="hud-telemetry" title="Fermer">×</button>
       <div class="tm-title" id="lblEngineCmd">COMMANDES MOTEUR</div>
       <div id="telemetryBody"></div>
     </div>
@@ -501,21 +697,46 @@
 
   <!-- canal radio : échanges équipage / contrôle du port pendant l'approche -->
   <div class="panel hud-radio mono" id="radioPanel">
-    <div class="radio-title"><span id="lblRadioChannel">CANAL RADIO</span><span><button class="radio-mute" id="radioMuteBtn" title="Couper le son du canal radio">🔊</button><span class="dot">●</span></span></div>
+    <button class="panel-close-btn" data-panel-cls="__radio__" title="Fermer">×</button>
+    <div class="radio-title"><span id="lblRadioChannel">CANAL RADIO</span><span><span class="llm-indicator inactive" id="llmIndicator" title="Détection de l’IA embarquée en cours…">🧠</span><button class="radio-mute" id="radioMuteBtn" title="Couper le son du canal radio">🔊</button><span class="dot">●</span></span></div>
     <div class="radio-log" id="radioLog"></div>
   </div>
+
+  <!-- services portuaires (#9, palier 1) : mini-fonction réelle et
+       autonome, indépendante du système de réparations du palier 2 (pas
+       encore implémenté) — amélioration payante et permanente des
+       propulseurs, seul débouché actuel pour les crédits accumulés. -->
+  <div class="panel hud-port mono" id="portPanel">
+    <button class="panel-close-btn" data-panel-cls="__port__" title="Fermer">×</button>
+    <div class="port-title"><span id="lblPortServices">SERVICES PORTUAIRES</span></div>
+    <div class="port-row">
+      <span id="lblSpeedUpgrade">Propulseurs</span>
+      <span class="port-dots" id="portLevelDots"></span>
+    </div>
+    <button class="port-buy-btn" id="portBuyBtn"></button>
+  </div>
+
+  <!-- barre d'icônes du HUD (§12) — unifiée bureau + tactile, générée en JS -->
+  <div id="hudIconBar" class="mono"></div>
 
   <!-- contrôles tactiles — masqués par défaut (touch-mode ajoutée en JS
        si un pointeur grossier est détecté), §15 de la spec v2.1 -->
   <div class="touch-controls mono" id="touchControls">
-    <button class="touch-btn" id="touchMenuBtn" title="Panneaux">☰</button>
-    <div id="touchPanelMenu"></div>
-    <button class="touch-btn" id="touchRadioBtn" title="Canal radio">📻</button>
-    <button class="touch-btn" id="touchCamBtn">CAM</button>
     <button class="touch-btn" id="touchRollMinus">⟲</button>
     <button class="touch-btn" id="touchRollPlus">⟳</button>
     <button class="touch-btn" id="touchBoostBtn">BOOST</button>
+    <button class="touch-btn" id="touchLookBtn" title="Maintenir pour regarder autour">👁</button>
     <div class="touch-btn" id="touchJoyBase"><div id="touchJoyNub"></div></div>
+  </div>
+</div>
+
+<div id="pauseOverlay" class="mono">
+  <div class="pause-panel">
+    <div class="pause-title" id="pauseTitle">PAUSE</div>
+    <div class="pause-sub" id="pauseSub">Simulation suspendue</div>
+    <button class="pause-btn" id="pauseResumeBtn">▶ <span id="pauseResumeLbl">REPRENDRE</span></button>
+    <button class="pause-btn pause-btn-quit" id="pauseQuitBtn">⏻ <span id="pauseQuitLbl">QUITTER — ÉCRAN-TITRE</span></button>
+    <div class="pause-hint" id="pauseHint">ESPACE / ENTRÉE — reprendre &nbsp;·&nbsp; ÉCHAP — quitter</div>
   </div>
 </div>
 
@@ -560,7 +781,7 @@ const I18N = {
     lblRadioChannel: 'CANAL RADIO', radioMuteTitle: 'Couper le son du canal radio',
     badge_auto: 'AUTOPILOTE', badge_manual: 'MANUEL', badge_orbit: 'MISE EN ORBITE',
     hint_main: '\u2191\u2193\u2190\u2192 / Z Q S D \u2014 orientation\u00a0 \u00b7 \u00a0E / R \u2014 roulis\u00a0 \u00b7 \u00a0MAJ \u2014 propulsion\u00a0 \u00b7 \u00a0glisser la souris \u2014 viser\u00a0 \u00b7 \u00a0CTRL+souris \u2014 regard libre\u00a0 \u00b7 \u00a0F3 \u2014 cam\u00e9ra\u00a0 \u00b7 \u00a0TAB \u2014 canal radio\u00a0 \u00b7 \u00a0F10 \u2014 voix\u00a0 \u00b7 \u00a0H \u2014 masquer',
-    hint_arrival: 'ESPACE / \u00c9CHAP \u2014 abr\u00e9ger la man\u0153uvre (travelling acc\u00e9l\u00e9r\u00e9)',
+    hint_arrival: 'ESPACE \u2014 abr\u00e9ger la man\u0153uvre (travelling acc\u00e9l\u00e9r\u00e9)',
     veille: 'veille', reactors14: 'R\u00c9ACTEURS 1-4', rcsLabel: 'RCS',
     rcs_yawP:'LACET +', rcs_yawN:'LACET \u2212', rcs_pitchP:'TANGAGE +', rcs_pitchN:'TANGAGE \u2212', rcs_rollP:'ROULIS +', rcs_rollN:'ROULIS \u2212',
     portPrefix: 'Port de ', cityOf: 'Ville de ', navTarget: ' \u00b7 cible de navigation',
@@ -573,7 +794,7 @@ const I18N = {
     nebula_emission:'N\u00e9buleuse en \u00e9mission', nebula_hii:'R\u00e9gion HII', nebula_dark:'N\u00e9buleuse obscure',
     nebula_planetary:'N\u00e9buleuse plan\u00e9taire', nebula_supernova:'R\u00e9manent de supernova', nebula_nursery:'Pouponni\u00e8re stellaire',
     nebula_reflection:'N\u00e9buleuse par r\u00e9flexion', nebula_molecular:'Nuage mol\u00e9culaire', nebula_oiii:'N\u00e9buleuse en \u00e9mission OIII',
-    ttsLang: 'fr-FR', noRoute: 'Aucune route', creditsLabel: 'CRÉDITS', menuNavPanel: 'Vitesse / cap'
+    ttsLang: 'fr-FR', noRoute: 'Aucune route', creditsLabel: 'CRÉDITS', menuNavPanel: 'Vitesse / cap', pauseTitle: 'PAUSE', pauseSub: 'Simulation suspendue', pauseResumeLbl: 'REPRENDRE', pauseQuitLbl: 'QUITTER \u2014 \u00c9CRAN-TITRE', pauseHint: 'ESPACE / ENTR\u00c9E \u2014 reprendre \u00b7 \u00c9CHAP \u2014 quitter', lblPortServices: 'SERVICES PORTUAIRES', lblSpeedUpgrade: 'Propulseurs', portUpgradeBtn: 'AM\u00c9LIORER', portMaxLevel: 'NIVEAU MAXIMAL', lblHelpTitle: 'AIDE \u2014 COMMANDES', lblHelpFoot: 'H \u2014 masquer cette aide', hk_move: '\u2191\u2193\u2190\u2192 / ZQSD', hlp_move: 'Orientation (tangage / lacet)', hk_roll: 'E / R', hlp_roll: 'Roulis', hk_thrust: 'MAJ / ESPACE', hlp_thrust: 'Propulsion', hk_aim: 'Glisser la souris', hlp_aim: 'Vis\u00e9e fine', hk_freelook: 'CTRL + glisser', hlp_freelook: 'Regard libre', hlp_voice: 'Coupe/r\u00e9tablit la voix', hlp_skip: 'Abr\u00e8ge la man\u0153uvre / reprend la pause', hlp_pause: 'Met le jeu en pause', hlp_help: 'Affiche/masque cette aide', llmChecking: 'Détection de l\u2019IA embarquée en cours\u2026', llmActive: 'IA embarquée (Gemini Nano) active \u2014 dialogues générés dynamiquement', llmInactive: 'IA embarquée indisponible \u2014 dialogues par gabarits', shuttleLabelGeneric: 'NAVETTE'
   },
   en: {
     title_sub: 'Choose a language',
@@ -584,7 +805,7 @@ const I18N = {
     lblRadioChannel: 'RADIO CHANNEL', radioMuteTitle: 'Mute the radio channel',
     badge_auto: 'AUTOPILOT', badge_manual: 'MANUAL', badge_orbit: 'ORBITAL INSERTION',
     hint_main: '\u2191\u2193\u2190\u2192 / W A S D \u2014 orientation\u00a0 \u00b7 \u00a0E / R \u2014 roll\u00a0 \u00b7 \u00a0SHIFT \u2014 thrust\u00a0 \u00b7 \u00a0drag mouse \u2014 aim\u00a0 \u00b7 \u00a0CTRL+mouse \u2014 free look\u00a0 \u00b7 \u00a0F3 \u2014 camera\u00a0 \u00b7 \u00a0TAB \u2014 radio channel\u00a0 \u00b7 \u00a0F10 \u2014 voice\u00a0 \u00b7 \u00a0H \u2014 hide',
-    hint_arrival: 'SPACE / ESC \u2014 skip ahead (fast travelling)',
+    hint_arrival: 'SPACE \u2014 skip ahead (fast travelling)',
     veille: 'standby', reactors14: 'REACTORS 1-4', rcsLabel: 'RCS',
     rcs_yawP:'YAW +', rcs_yawN:'YAW \u2212', rcs_pitchP:'PITCH +', rcs_pitchN:'PITCH \u2212', rcs_rollP:'ROLL +', rcs_rollN:'ROLL \u2212',
     portPrefix: 'Port of ', cityOf: 'City of ', navTarget: ' \u00b7 navigation target',
@@ -597,7 +818,7 @@ const I18N = {
     nebula_emission:'Emission nebula', nebula_hii:'HII region', nebula_dark:'Dark nebula',
     nebula_planetary:'Planetary nebula', nebula_supernova:'Supernova remnant', nebula_nursery:'Stellar nursery',
     nebula_reflection:'Reflection nebula', nebula_molecular:'Molecular cloud', nebula_oiii:'OIII emission nebula',
-    ttsLang: 'en-US', noRoute: 'No route', creditsLabel: 'CREDITS', menuNavPanel: 'Speed / heading'
+    ttsLang: 'en-US', noRoute: 'No route', creditsLabel: 'CREDITS', menuNavPanel: 'Speed / heading', pauseTitle: 'PAUSED', pauseSub: 'Simulation suspended', pauseResumeLbl: 'RESUME', pauseQuitLbl: 'QUIT \u2014 TITLE SCREEN', pauseHint: 'SPACE / ENTER \u2014 resume \u00b7 ESC \u2014 quit', lblPortServices: 'PORT SERVICES', lblSpeedUpgrade: 'Thrusters', portUpgradeBtn: 'UPGRADE', portMaxLevel: 'MAX LEVEL', lblHelpTitle: 'HELP \u2014 CONTROLS', lblHelpFoot: 'H \u2014 hide this help', hk_move: '\u2191\u2193\u2190\u2192 / WASD', hlp_move: 'Orientation (pitch / yaw)', hk_roll: 'E / R', hlp_roll: 'Roll', hk_thrust: 'SHIFT / SPACE', hlp_thrust: 'Thrust', hk_aim: 'Drag mouse', hlp_aim: 'Fine aim', hk_freelook: 'CTRL + drag', hlp_freelook: 'Free look', hlp_voice: 'Mute/unmute voice', hlp_skip: 'Skip maneuver / resume from pause', hlp_pause: 'Pause the game', hlp_help: 'Show/hide this help', llmChecking: 'Detecting on-device AI\u2026', llmActive: 'On-device AI (Gemini Nano) active \u2014 dialogue generated dynamically', llmInactive: 'On-device AI unavailable \u2014 template dialogue', shuttleLabelGeneric: 'SHUTTLE'
   },
   de: {
     title_sub: 'Sprache wählen',
@@ -608,7 +829,7 @@ const I18N = {
     lblRadioChannel: 'FUNKKANAL', radioMuteTitle: 'Funkkanal stummschalten',
     badge_auto: 'AUTOPILOT', badge_manual: 'MANUELL', badge_orbit: 'ORBITEINSCHUSS',
     hint_main: '\u2191\u2193\u2190\u2192 / W A S D \u2014 Ausrichtung\u00a0 \u00b7 \u00a0E / R \u2014 Rollen\u00a0 \u00b7 \u00a0SHIFT \u2014 Schub\u00a0 \u00b7 \u00a0Maus ziehen \u2014 Zielen\u00a0 \u00b7 \u00a0STRG+Maus \u2014 freie Sicht\u00a0 \u00b7 \u00a0F3 \u2014 Kamera\u00a0 \u00b7 \u00a0TAB \u2014 Funkkanal\u00a0 \u00b7 \u00a0F10 \u2014 Stimme\u00a0 \u00b7 \u00a0H \u2014 ausblenden',
-    hint_arrival: 'LEERTASTE / ESC \u2014 Man\u00f6ver abk\u00fcrzen (schneller Kameraflug)',
+    hint_arrival: 'LEERTASTE \u2014 Man\u00f6ver abk\u00fcrzen (schneller Kameraflug)',
     veille: 'Standby', reactors14: 'TRIEBWERKE 1-4', rcsLabel: 'RCS',
     rcs_yawP:'GIEREN +', rcs_yawN:'GIEREN \u2212', rcs_pitchP:'NICKEN +', rcs_pitchN:'NICKEN \u2212', rcs_rollP:'ROLLEN +', rcs_rollN:'ROLLEN \u2212',
     portPrefix: 'Hafen von ', cityOf: 'Stadt ', navTarget: ' \u00b7 Navigationsziel',
@@ -621,7 +842,7 @@ const I18N = {
     nebula_emission:'Emissionsnebel', nebula_hii:'HII-Region', nebula_dark:'Dunkelnebel',
     nebula_planetary:'Planetarischer Nebel', nebula_supernova:'Supernova-\u00dcberrest', nebula_nursery:'Sternentstehungsgebiet',
     nebula_reflection:'Reflexionsnebel', nebula_molecular:'Molek\u00fcelwolke', nebula_oiii:'OIII-Emissionsnebel',
-    ttsLang: 'de-DE', noRoute: 'Keine Route', creditsLabel: 'GUTHABEN', menuNavPanel: 'Geschwindigkeit / Kurs'
+    ttsLang: 'de-DE', noRoute: 'Keine Route', creditsLabel: 'GUTHABEN', menuNavPanel: 'Geschwindigkeit / Kurs', pauseTitle: 'PAUSE', pauseSub: 'Simulation angehalten', pauseResumeLbl: 'FORTSETZEN', pauseQuitLbl: 'BEENDEN \u2014 TITELBILDSCHIRM', pauseHint: 'LEERTASTE / EINGABE \u2014 fortsetzen \u00b7 ESC \u2014 beenden', lblPortServices: 'HAFENDIENSTE', lblSpeedUpgrade: 'Triebwerke', portUpgradeBtn: 'AUFR\u00dcSTEN', portMaxLevel: 'MAXIMALSTUFE', lblHelpTitle: 'HILFE \u2014 STEUERUNG', lblHelpFoot: 'H \u2014 Hilfe ausblenden', hk_move: '\u2191\u2193\u2190\u2192 / WASD', hlp_move: 'Ausrichtung (Nicken / Gieren)', hk_roll: 'E / R', hlp_roll: 'Rollen', hk_thrust: 'SHIFT / LEERTASTE', hlp_thrust: 'Schub', hk_aim: 'Maus ziehen', hlp_aim: 'Feinzielen', hk_freelook: 'STRG + ziehen', hlp_freelook: 'Freie Sicht', hlp_voice: 'Stimme stumm-/freischalten', hlp_skip: 'Man\u00f6ver abk\u00fcrzen / Pause fortsetzen', hlp_pause: 'Spiel pausieren', hlp_help: 'Diese Hilfe ein-/ausblenden', llmChecking: 'Geräteinterne KI wird erkannt\u2026', llmActive: 'Geräteinterne KI (Gemini Nano) aktiv \u2014 Dialoge dynamisch erzeugt', llmInactive: 'Geräteinterne KI nicht verfügbar \u2014 Dialoge aus Vorlagen', shuttleLabelGeneric: 'FÄHRE'
   },
   es: {
     title_sub: 'Elige un idioma',
@@ -632,7 +853,7 @@ const I18N = {
     lblRadioChannel: 'CANAL DE RADIO', radioMuteTitle: 'Silenciar el canal de radio',
     badge_auto: 'PILOTO AUTOM\u00c1TICO', badge_manual: 'MANUAL', badge_orbit: 'INSERCI\u00d3N ORBITAL',
     hint_main: '\u2191\u2193\u2190\u2192 / W A S D \u2014 orientaci\u00f3n\u00a0 \u00b7 \u00a0E / R \u2014 alabeo\u00a0 \u00b7 \u00a0MAY\u00daS \u2014 propulsi\u00f3n\u00a0 \u00b7 \u00a0arrastrar rat\u00f3n \u2014 apuntar\u00a0 \u00b7 \u00a0CTRL+rat\u00f3n \u2014 vista libre\u00a0 \u00b7 \u00a0F3 \u2014 c\u00e1mara\u00a0 \u00b7 \u00a0TAB \u2014 canal de radio\u00a0 \u00b7 \u00a0F10 \u2014 voz\u00a0 \u00b7 \u00a0H \u2014 ocultar',
-    hint_arrival: 'ESPACIO / ESC \u2014 abreviar la maniobra (travelling acelerado)',
+    hint_arrival: 'ESPACIO \u2014 abreviar la maniobra (travelling acelerado)',
     veille: 'reposo', reactors14: 'REACTORES 1-4', rcsLabel: 'RCS',
     rcs_yawP:'GUI\u00d1ADA +', rcs_yawN:'GUI\u00d1ADA \u2212', rcs_pitchP:'CABECEO +', rcs_pitchN:'CABECEO \u2212', rcs_rollP:'ALABEO +', rcs_rollN:'ALABEO \u2212',
     portPrefix: 'Puerto de ', cityOf: 'Ciudad de ', navTarget: ' \u00b7 destino de navegaci\u00f3n',
@@ -645,7 +866,7 @@ const I18N = {
     nebula_emission:'Nebulosa de emisi\u00f3n', nebula_hii:'Regi\u00f3n HII', nebula_dark:'Nebulosa oscura',
     nebula_planetary:'Nebulosa planetaria', nebula_supernova:'Remanente de supernova', nebula_nursery:'Vivero estelar',
     nebula_reflection:'Nebulosa de reflexi\u00f3n', nebula_molecular:'Nube molecular', nebula_oiii:'Nebulosa de emisi\u00f3n OIII',
-    ttsLang: 'es-ES', noRoute: 'Sin ruta', creditsLabel: 'CRÉDITOS', menuNavPanel: 'Velocidad / rumbo'
+    ttsLang: 'es-ES', noRoute: 'Sin ruta', creditsLabel: 'CRÉDITOS', menuNavPanel: 'Velocidad / rumbo', pauseTitle: 'PAUSA', pauseSub: 'Simulaci\u00f3n suspendida', pauseResumeLbl: 'REANUDAR', pauseQuitLbl: 'SALIR \u2014 PANTALLA DE INICIO', pauseHint: 'ESPACIO / INTRO \u2014 reanudar \u00b7 ESC \u2014 salir', lblPortServices: 'SERVICIOS PORTUARIOS', lblSpeedUpgrade: 'Propulsores', portUpgradeBtn: 'MEJORAR', portMaxLevel: 'NIVEL M\u00c1XIMO', lblHelpTitle: 'AYUDA \u2014 CONTROLES', lblHelpFoot: 'H \u2014 ocultar esta ayuda', hk_move: '\u2191\u2193\u2190\u2192 / WASD', hlp_move: 'Orientaci\u00f3n (cabeceo / gui\u00f1ada)', hk_roll: 'E / R', hlp_roll: 'Alabeo', hk_thrust: 'MAY\u00daS / ESPACIO', hlp_thrust: 'Propulsi\u00f3n', hk_aim: 'Arrastrar rat\u00f3n', hlp_aim: 'Punter\u00eda fina', hk_freelook: 'CTRL + arrastrar', hlp_freelook: 'Vista libre', hlp_voice: 'Silencia/activa la voz', hlp_skip: 'Abreviar maniobra / reanudar pausa', hlp_pause: 'Pausa el juego', hlp_help: 'Muestra/oculta esta ayuda', llmChecking: 'Detectando IA integrada\u2026', llmActive: 'IA integrada (Gemini Nano) activa \u2014 diálogos generados dinámicamente', llmInactive: 'IA integrada no disponible \u2014 diálogos por plantilla', shuttleLabelGeneric: 'NAVE'
   }
 };
 function t(key){
@@ -692,6 +913,13 @@ const RADIO_TEMPLATES = {
     thanksReply: function(tower,ship){ return [
       'Merci '+tower+', à la prochaine rotation.',
       'Bien reçu, merci pour l\u2019accueil. '+ship+' reprend sa route.'
+    ]; },
+    /* message de bienvenue du capitaine, joué une seule fois au tout
+       début de la partie (amélioration demandée) — pas de tour de
+       contrôle impliquée, juste l'équipage qui prend l'air. */
+    welcome: function(ship){ return [
+      'Ici le capitaine. Tous les systèmes du '+ship+' répondent, équipage au complet. On appareille.',
+      'Poste de pilotage à l\u2019équipage : '+ship+' parée, cap sur la première étape.'
     ]; }
   },
   en: {
@@ -720,6 +948,9 @@ const RADIO_TEMPLATES = {
     ]; },
     thanksReply: function(tower,ship){ return [
       'Thanks '+tower+', see you next rotation.'
+    ]; },
+    welcome: function(ship){ return [
+      'This is the captain speaking. All systems on the '+ship+' are green, full crew aboard. Let\u2019s get underway.'
     ]; }
   },
   de: {
@@ -748,6 +979,9 @@ const RADIO_TEMPLATES = {
     ]; },
     thanksReply: function(tower,ship){ return [
       'Danke '+tower+', bis zur nächsten Rotation.'
+    ]; },
+    welcome: function(ship){ return [
+      'Hier spricht der Kapitän. Alle Systeme der '+ship+' funktionieren einwandfrei, volle Besatzung an Bord. Los geht\u2019s.'
     ]; }
   },
   es: {
@@ -776,6 +1010,9 @@ const RADIO_TEMPLATES = {
     ]; },
     thanksReply: function(tower,ship){ return [
       'Gracias '+tower+', hasta la próxima rotación.'
+    ]; },
+    welcome: function(ship){ return [
+      'Habla el capitán. Todos los sistemas del '+ship+' en verde, tripulación al completo. Zarpamos.'
     ]; }
   }
 };
@@ -789,14 +1026,21 @@ function applyLanguage(){
     lblSpeed:'lblSpeed', lblSector:'lblSector', lblHeading:'lblHeading',
     lblFlightPlan:'lblFlightPlan', lblNearest:'lblNearest',
     lblEngineTemp:'lblEngineTemp', lblPropulsion:'lblPropulsion', lblEngineCmd:'lblEngineCmd',
-    lblRadioChannel:'lblRadioChannel', creditsLabel:'creditsLabel'
+    lblRadioChannel:'lblRadioChannel', creditsLabel:'creditsLabel',
+    lblPortServices:'lblPortServices', lblSpeedUpgrade:'lblSpeedUpgrade'
   };
   Object.keys(map).forEach(function(id){
     const el = document.getElementById(id);
     if(el) el.textContent = t(map[id]);
   });
-  const hint = document.getElementById('hint');
-  if(hint) hint.textContent = t('hint_main');
+  if(typeof buildHelpGrid === 'function') buildHelpGrid();
+  updateLLMIndicator();
+  const pauseMap = { pauseTitle:'pauseTitle', pauseSub:'pauseSub', pauseResumeLbl:'pauseResumeLbl', pauseQuitLbl:'pauseQuitLbl', pauseHint:'pauseHint' };
+  Object.keys(pauseMap).forEach(function(id){
+    const el = document.getElementById(id);
+    if(el) el.textContent = t(pauseMap[id]);
+  });
+  if(typeof refreshPortPanel === 'function') refreshPortPanel();
   const arrivalHint = document.getElementById('arrivalHint');
   if(arrivalHint) arrivalHint.textContent = t('hint_arrival');
   const muteBtn = document.getElementById('radioMuteBtn');
@@ -1051,6 +1295,7 @@ window.addEventListener('resize', function(){
   renderer.setSize(window.innerWidth, window.innerHeight);
   camera.aspect = window.innerWidth/window.innerHeight;
   camera.updateProjectionMatrix();
+  if(typeof repositionAllPanels === 'function') repositionAllPanels();
 });
 
 /* lumière d'appoint très faible : l'espace n'a pas d'éclairage ambiant réel,
@@ -1307,6 +1552,57 @@ const MOON_LABEL_POOL = [];
 for(let i=0;i<10;i++) PLANET_LABEL_POOL.push(createPoolLabel('planet'));
 for(let i=0;i<10;i++) MOON_LABEL_POOL.push(createPoolLabel('moon'));
 
+/* ---------- étiquettes de vaisseaux (cargo + navettes), amélioration
+   demandée ---------- */
+const SHIP_LABEL_POOL = [];
+for(let i=0;i<6;i++) SHIP_LABEL_POOL.push(createPoolLabel('ship'));
+const SHIP_LABEL_MIN_DIST = 18;   /* trop près, l'anneau engloutirait l'écran */
+function projectShipLabel(pool, idx, worldPos, worldRadius, text){
+  if(idx >= pool.length) return idx+1;
+  const el = pool[idx];
+  const toObj = _lblNdc.copy(worldPos).sub(camera.position);
+  const dist = toObj.length();
+  const camF = _pfForward.set(0,0,-1).applyQuaternion(camera.quaternion);
+  if(toObj.dot(camF) <= 0 || dist < SHIP_LABEL_MIN_DIST){ el.style.display = 'none'; return idx+1; }
+  _lblNdc.copy(worldPos).project(camera);
+  const sx = (_lblNdc.x*0.5+0.5)*window.innerWidth;
+  const sy = (1-(_lblNdc.y*0.5+0.5))*window.innerHeight;
+  const margin = 100;
+  if(sx < -margin || sx > window.innerWidth+margin || sy < -margin || sy > window.innerHeight+margin){
+    el.style.display = 'none';
+    return idx+1;
+  }
+  /* taille de l'anneau = taille apparente réelle de l'objet à l'écran
+     (projection d'un rayon à cette distance, via le champ de vision
+     vertical de la caméra) — c'est ce qui fait que le cercle « entoure »
+     le vaisseau plutôt que d'être une simple pastille fixe. */
+  const vFOV = camera.fov * Math.PI/180;
+  const pxPerUnit = (window.innerHeight/2) / (dist*Math.tan(vFOV/2));
+  const ringSize = THREE.MathUtils.clamp(worldRadius*2.3*pxPerUnit, 16, 260);
+  const ringR = ringSize/2;
+  el.style.display = 'block';
+  el.style.left = sx+'px';
+  el.style.top = sy+'px';
+  el.className = 'star-label ship-label';
+  const ring = el.querySelector('.star-ring');
+  ring.style.width = ringSize+'px';
+  ring.style.height = ringSize+'px';
+  const arrow = el.querySelector('.star-arrow');
+  arrow.style.top = (-ringR)+'px';
+  const txt = el.querySelector('.star-text');
+  txt.style.top = (-ringR-13)+'px';
+  txt.textContent = text;
+  return idx+1;
+}
+function updateShipLabels(){
+  let idx = 0;
+  idx = projectShipLabel(SHIP_LABEL_POOL, idx, shipRig.position, SHIP_LABEL_RADIUS, SHIP_REGISTRY);
+  orbitState.shuttles.forEach(function(s){
+    idx = projectShipLabel(SHIP_LABEL_POOL, idx, s.group.position, SHUTTLE_LABEL_RADIUS, t('shuttleLabelGeneric'));
+  });
+  for(;idx<SHIP_LABEL_POOL.length;idx++) SHIP_LABEL_POOL[idx].style.display = 'none';
+}
+
 const PLANET_LABEL_RANGE = 3400;   /* au-delà, la planète n'est pas encore « connue » */
 const PORT_LABEL_RANGE = 1400;     /* distance à partir de laquelle le nom du port remplace celui de la planète */
 const MOON_LABEL_RANGE = 1300;
@@ -1508,6 +1804,11 @@ const SHIP_REGISTRY = (function(){
   return prefixes[Math.floor(rng()*prefixes.length)] + '-' +
          String(Math.floor(rng()*89)+10);
 })();
+/* rayons approximatifs utilisés UNIQUEMENT pour dimensionner l'anneau des
+   étiquettes de vaisseau (amélioration) — pas des rayons de collision,
+   juste de quoi entourer visuellement chaque silhouette. */
+const SHIP_LABEL_RADIUS = 22;
+const SHUTTLE_LABEL_RADIUS = 2.2;
 
 (function buildShip(){
   const rng = rngFor(SEED+':ship');
@@ -2006,7 +2307,11 @@ const SHIP_REGISTRY = (function(){
   });
   const dockFloor = new THREE.Mesh(new THREE.PlaneGeometry(4.0, 3.2), dockGlowMat);
   dockFloor.rotation.x = Math.PI/2;
-  dockFloor.position.set(0, dockY-0.02, dockZ);
+  /* décalage franc sous la face inférieure du cadre (dockRim descend
+     jusqu'à dockY-0.02) : les deux étaient exactement coplanaires,
+     provoquant un scintillement (z-fighting) sur toute la surface —
+     bug remonté en jeu. 0.06 au lieu de 0.02 les sépare nettement. */
+  dockFloor.position.set(0, dockY-0.06, dockZ);
   aft.add(dockFloor);
   window.__dockGlow = { mat:dockGlowMat, baseIntensity:2.8 };
 
@@ -2552,6 +2857,67 @@ const PLANET_KINDS = [
 ];
 const HABITABLE_KIND_COUNT = 2;   /* océanique, continental — indices 0,1 */
 
+/* ---------- icône du panneau « objet le plus proche » (amélioration
+   demandée) : un canvas 2D léger plutôt qu'un second rendu 3D — bien
+   moins coûteux, et amplement suffisant pour reconnaître le TYPE d'objet
+   d'un coup d'œil (teinte + ombrage), sans dupliquer tout un pipeline de
+   rendu pour une vignette de 52px. Redessiné seulement au rythme de
+   rafraîchissement du panneau (throttlé à 350ms dans updateHud). ---------- */
+const PLANET_KIND_COLORS = {
+  ocean:       ['#123a63', '#5eb8e0'],
+  continental: ['#2e4a26', '#c9a86a'],
+  desert:      ['#7a4f22', '#e8c088'],
+  ice:         ['#7fa8c0', '#f0fbff'],
+  volcanic:    ['#3a0f0a', '#ff7a3d'],
+  gas:         ['#8a5a28', '#e8c896']
+};
+function renderNearestIcon(kind, options){
+  const el = document.getElementById('nearIcon');
+  if(!el) return;
+  const ctx = el.getContext('2d');
+  const w = el.width, h = el.height;
+  ctx.clearRect(0,0,w,h);
+  const cx=w/2, cy=h/2, r=w/2-2;
+  if(kind === 'planet'){
+    const colors = PLANET_KIND_COLORS[options.key] || PLANET_KIND_COLORS.continental;
+    const grad = ctx.createRadialGradient(cx-r*0.35, cy-r*0.35, r*0.08, cx, cy, r);
+    grad.addColorStop(0, colors[1]);
+    grad.addColorStop(1, colors[0]);
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fillStyle=grad; ctx.fill();
+    if(options.gas){
+      /* bandes horizontales, façon géante gazeuse */
+      ctx.save();
+      ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.clip();
+      ctx.globalAlpha = 0.28;
+      for(let i=-2;i<=2;i++){
+        ctx.fillStyle = (i%2===0) ? colors[0] : colors[1];
+        ctx.fillRect(0, cy+i*r*0.38-r*0.11, w, r*0.2);
+      }
+      ctx.restore();
+    }
+    /* terminateur jour/nuit — même esprit que l'éclairage réel des planètes */
+    const shadow = ctx.createRadialGradient(cx+r*0.55,cy+r*0.55,0,cx+r*0.55,cy+r*0.55,r*1.5);
+    shadow.addColorStop(0,'rgba(0,0,0,0.6)'); shadow.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fillStyle=shadow; ctx.fill();
+  } else if(kind === 'star'){
+    const c = options.color;
+    const hex = 'rgb('+Math.round(c.r*255)+','+Math.round(c.g*255)+','+Math.round(c.b*255)+')';
+    const grad = ctx.createRadialGradient(cx,cy,0,cx,cy,r);
+    grad.addColorStop(0,'#ffffff'); grad.addColorStop(0.4,hex); grad.addColorStop(1,hex);
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fillStyle=grad; ctx.fill();
+  } else {
+    /* nébuleuse : dégradé diffus, sans contour net */
+    const type = options.type;
+    const hexA = '#'+type.colorA.toString(16).padStart(6,'0');
+    const hexB = '#'+type.colorB.toString(16).padStart(6,'0');
+    const grad = ctx.createRadialGradient(cx,cy,0,cx,cy,r);
+    grad.addColorStop(0,hexA); grad.addColorStop(1,hexB);
+    ctx.globalAlpha = 0.85;
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fillStyle=grad; ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
 function generateSystemData(leg){
   const rng = rngFor(SEED+':system:'+leg.cell);
   const count = 2 + Math.floor(rng()*2);        /* 2 ou 3 planètes */
@@ -2583,21 +2949,20 @@ function generateSystemData(leg){
     kinds.push({kind:kind, radius:radius, isHab:isHab});
   }
   /* Marge de sécurité minimale entre deux orbites, PAS l'écart total (les
-     deux rayons sont déjà ajoutés séparément ci-dessous) — volontairement
-     modeste : une marge généreuse ici gonflerait la longueur totale de la
-     route bien au-delà du hop étoile-à-étoile qui la détermine par ailleurs
-     (constaté : jusqu'à 40 000 unités de route, ~16 min de croisière,
-     largement responsable de l'impression que l'arrivée ne se déclenche
-     jamais). */
+     deux rayons sont déjà ajoutés séparément ci-dessous). Élargie (bug
+     remonté en jeu : planètes perçues comme trop proches) par rapport à
+     la version précédente, plus modeste pour ne pas gonfler le temps de
+     croisière — CRUISE_SPEED_BASE est augmentée en proportion (cf. plus
+     bas) pour compenser l'allongement des systèmes. */
   /* Espacement inspiré des systèmes réels (les orbites s'écartent de façon
      croissante, pas à intervalles fixes) sans viser une échelle réaliste
      littérale — à l'échelle UA réelle, un aller-retour dans un seul système
      prendrait des heures. Le nombre d'étapes de la route (réduit à 6, cf.
      computeRoute) absorbe le coût de cet espacement plus généreux sur le
      temps de trajet total. */
-  const GAP_MIN = 260, GAP_RANGE = 360;
-  const ORBIT_GROWTH = 1.55;   /* chaque orbite est ~1,5× la précédente, comme dans un vrai système */
-  let orbit = 550 + rng()*300;
+  const GAP_MIN = 400, GAP_RANGE = 480;
+  const ORBIT_GROWTH = 1.65;   /* chaque orbite est ~1,65× la précédente, comme dans un vrai système */
+  let orbit = 780 + rng()*380;
   for(let i=0;i<count;i++){
     if(i > 0){
       /* deux contraintes combinées : une croissance géométrique (esprit
@@ -3140,7 +3505,12 @@ function disposePlanetGroup(grp){
    d'un rendu temps réel sur un shader relativement riche. ---------- */
 function ensureSystemsBuilt(){
   const keep = new Set();
-  [ROUTE.index, ROUTE.index+1].forEach(function(i){
+  /* Fenêtre élargie (était [index, index+1] seulement) : un système déjà
+     dépassé (index-1) ou encore à deux étapes (index+2) reste construit —
+     bug remonté en jeu, des planètes listées au plan de vol restaient
+     purement et simplement absentes de la scène (aucun maillage) tant
+     qu'on n'était pas rendu à l'étape immédiatement précédente. */
+  [ROUTE.index-1, ROUTE.index, ROUTE.index+1, ROUTE.index+2].forEach(function(i){
     if(i>=0 && i<ROUTE.legs.length) keep.add(i);
   });
   keep.forEach(function(i){
@@ -3532,7 +3902,12 @@ function computeRoute(origin, heading, alignShip){
      n'empêche la courbe de repasser plus près juste avant ou après. On
      vérifie donc après coup, et si besoin on éloigne le point d'approche
      encore plus de l'étoile (donc de la planète, le long du même axe) puis
-     on redessine la courbe — jusqu'à ce que la marge soit sûre. */
+     on redessine la courbe — jusqu'à ce que la marge soit sûre.
+     Corrige aussi un bug distinct remonté en jeu : l'ÉTOILE de l'étape,
+     elle, n'était jusqu'ici JAMAIS vérifiée (seules les planètes
+     l'étaient) — le vaisseau pouvait purement et simplement la traverser.
+     Même correctif, même axe : s'éloigner de la planète éloigne aussi de
+     son étoile. */
   for(let attempt=0; attempt<10; attempt++){
     const SAMPLES = 300;
     const pts = [];
@@ -3541,18 +3916,34 @@ function computeRoute(origin, heading, alignShip){
     ROUTE.legs.forEach(function(leg){
       const hab = leg.planet;
       if(!hab) return;
-      let bestD = Infinity;
+      let bestDPlanet = Infinity, bestDStar = Infinity;
       for(let i=0;i<pts.length;i++){
-        const d = pts[i].distanceTo(hab.position);
-        if(d < bestD) bestD = d;
+        const dP = pts[i].distanceTo(hab.position);
+        if(dP < bestDPlanet) bestDPlanet = dP;
+        /* l'ÉTOILE elle-même n'était jusqu'ici JAMAIS vérifiée : seules les
+           planètes l'étaient — bug remonté en jeu, le vaisseau pouvait
+           traverser l'étoile de l'étape en cours. Rayon visuel réel de
+           l'étoile (même formule que buildStarCell, cohérence oblige). */
+        const dS = pts[i].distanceTo(leg.starPosition);
+        if(dS < bestDStar) bestDStar = dS;
       }
-      const safe = hab.radius + 130;
-      if(bestD < safe){
+      const safePlanet = hab.radius + 130;
+      const starCoreR = 1.4 * Math.pow(leg.star.radius, 0.42);
+      const safeStar = starCoreR + 220;
+      const deficitPlanet = safePlanet - bestDPlanet;
+      const deficitStar = safeStar - bestDStar;
+      /* un seul et même geste corrige les deux contraintes : éloigner le
+         point d'approche du système, le long de l'axe étoile→planète déjà
+         utilisé — cet axe s'éloigne à la fois de l'étoile (par definition)
+         et de la planète (qu'il continue de longer). On applique le plus
+         grand déficit constaté des deux. */
+      const deficit = Math.max(deficitPlanet, deficitStar);
+      if(deficit > 0){
         const outward = hab.position.clone().sub(leg.starPosition).normalize();
         const currentOffset = leg.position.distanceTo(hab.position);
         /* on comble le manque effectivement constaté, avec une marge —
            plus robuste qu'un pas fixe face à un déficit parfois important */
-        leg.position = hab.position.clone().addScaledVector(outward, currentOffset + (safe-bestD) + 260);
+        leg.position = hab.position.clone().addScaledVector(outward, currentOffset + deficit + 260);
         adjusted = true;
       }
     });
@@ -3663,31 +4054,45 @@ function computeRoute(origin, heading, alignShip){
 }
 const keys = {};
 window.addEventListener('keydown', function(e){
-  keys[e.code] = true;
-  if(e.code === 'KeyH'){
-    const hint = document.getElementById('hint');
-    hint.style.opacity = (hint.style.opacity === '0') ? '1' : '0';
-  }
   /* abrégé de la manœuvre d'orbite/livraison : le reste de la séquence se
      joue en accéléré (travelling rapide) plutôt que d'être coupé net —
-     les navettes et le canal radio restent visibles, juste comprimés. */
+     les navettes et le canal radio restent visibles, juste comprimés.
+     ÉCHAP n'abrège plus depuis l'introduction du mode Pause (§11) : elle
+     est désormais LA touche pause, sans exception ni double emploi selon
+     la phase — ESPACE/ENTRÉE restent seuls pour l'abrégé, ce qu'ils
+     faisaient déjà. */
   if(e.code === 'Space'){
     /* empêche le défilement de la page (comportement par défaut du
        navigateur pour Espace) — pertinent aussi bien pour la propulsion
        en vol normal que pour l'abrégé pendant l'approche */
     e.preventDefault();
+    if(gamePaused){ resumeGame(); return; }
     if(flightPhase === 'ARRIVAL_PAUSE') arrivalSkip = true;
   }
-  if(e.code === 'Enter' && flightPhase === 'ARRIVAL_PAUSE'){
-    arrivalSkip = true;
+  if(e.code === 'Enter'){
+    if(gamePaused){ resumeGame(); return; }
+    if(flightPhase === 'ARRIVAL_PAUSE') arrivalSkip = true;
   }
-  /* ÉCHAP abrège également la manœuvre (chargement, largage, RETOUR des
-     navettes au dock), au même titre qu'ESPACE/ENTRÉE — demande explicite,
-     bien qu'ÉCHAP soit par ailleurs réservée au futur mode Pause (§13 de
-     la spec) : cette double affectation devra être revue quand ce dernier
-     sera implémenté, puisqu'ÉCHAP n'a pour l'instant aucun autre usage. */
-  if(e.code === 'Escape' && flightPhase === 'ARRIVAL_PAUSE'){
-    arrivalSkip = true;
+  /* ÉCHAP / P / PAUSE — mode Pause (§11). Diagramme d'états de la spec :
+     Jeu → Paused sur ÉCHAP/P/PAUSE ; Paused → Jeu sur ESPACE/ENTRÉE
+     (ci-dessus) ; Paused → écran-titre sur ÉCHAP UNIQUEMENT (P/PAUSE
+     n'ont alors aucun effet — pas de bascule retour par ces deux-là). */
+  if(e.code === 'Escape' || e.code === 'KeyP' || e.code === 'Pause'){
+    e.preventDefault();
+    if(gamePaused){
+      if(e.code === 'Escape') quitToTitle();
+    } else {
+      enterPause();
+    }
+    return;
+  }
+  if(gamePaused) return;   /* aucune autre touche n'agit tant que le jeu est en pause */
+  keys[e.code] = true;
+  if(e.code === 'KeyH'){
+    /* passe par activateHudBarItem comme le bouton d'aide de la barre —
+       une seule logique, jamais dupliquée entre clavier et bouton */
+    const helpItem = HUD_BAR_ITEMS.find(function(it){ return it.kind === 'help'; });
+    if(helpItem) activateHudBarItem(helpItem);
   }
   /* TAB bascule directement l'affichage du canal radio, à tout moment —
      un simple interrupteur, pas une préférence qui viendrait interférer
@@ -3697,12 +4102,16 @@ window.addEventListener('keydown', function(e){
     e.preventDefault();
     toggleRadioPanel();
   }
-  /* F3 — passe au mode de caméra suivant (remplace l'ancien double appui
-     sur CTRL). preventDefault : F3 ouvre la recherche dans certains
-     navigateurs. */
-  if(e.code === 'F3'){
-    e.preventDefault();
-    nextCameraMode();
+  /* F1 à F9 — bascule chacune des icônes de la barre du HUD (§12), dans
+     leur ordre d'affichage (remplace l'ancienne affectation dédiée de F3
+     à la caméra, désormais F9 comme les autres icônes — une seule
+     numérotation, plus simple à retenir et à documenter dans l'aide). */
+  if(e.code.length === 2 && e.code[0] === 'F' && e.code >= 'F1' && e.code <= 'F9'){
+    const idx = Number(e.code.slice(1)) - 1;
+    if(HUD_BAR_ITEMS[idx]){
+      e.preventDefault();
+      activateHudBarItem(HUD_BAR_ITEMS[idx]);
+    }
   }
   /* F10 — coupe/rétablit la voix de synthèse. Agit sur le MÊME état que le
      bouton muet du panneau radio (une seule source de vérité) : l'icône du
@@ -3721,6 +4130,7 @@ window.addEventListener('keyup', function(e){ keys[e.code] = false; });
 function toggleRadioPanel(){
   const panel = document.getElementById('radioPanel');
   if(panel){ panel.classList.toggle('visible'); repositionRadioPanel(); }
+  if(typeof refreshHudIconBar === 'function') refreshHudIconBar();
 }
 function nextCameraMode(){
   cameraMode = (cameraMode+1) % CAMERA_MODES.length;
@@ -3733,7 +4143,59 @@ function toggleVoiceMute(){
   if(radioMuted && window.speechSynthesis){ window.speechSynthesis.cancel(); radioSpeaking = false; }
 }
 
+/* =========================================================================
+   MODE PAUSE — §11 de la spec v2.1.
+   Gel total : animate() (plus bas) ne fait plus qu'afficher l'image figée
+   tant que gamePaused est vrai — aucune mise à jour de simulation, aucune
+   navette, aucun chrono radio n'avance. La superposition plein écran
+   bloque aussi, par simple empilement (z-index), tout clic ou glisser sur
+   le canevas ou les contrôles tactiles en dessous : nul besoin de garde
+   supplémentaire dans ces gestionnaires-là.
+   gameStarted évite qu'une pression sur ÉCHAP pendant le générique ou
+   l'écran-titre ne déclenche quoi que ce soit avant que la partie existe
+   vraiment. */
+let gamePaused = false;
+let gameStarted = false;
+function enterPause(){
+  if(gamePaused || !gameStarted) return;
+  gamePaused = true;
+  document.body.classList.add('game-paused');
+  const overlay = document.getElementById('pauseOverlay');
+  if(overlay) overlay.classList.add('visible');
+  /* suspend la voix SANS l'annuler (contrairement au bouton muet) — elle
+     reprend au même mot à la sortie de pause, quand le navigateur le
+     permet ; à défaut, un échec silencieux ne casse rien d'autre. */
+  if(window.speechSynthesis){
+    try{ window.speechSynthesis.pause(); }catch(e){}
+  }
+}
+function resumeGame(){
+  if(!gamePaused) return;
+  gamePaused = false;
+  document.body.classList.remove('game-paused');
+  const overlay = document.getElementById('pauseOverlay');
+  if(overlay) overlay.classList.remove('visible');
+  if(window.speechSynthesis){
+    try{ window.speechSynthesis.resume(); }catch(e){}
+  }
+}
+function quitToTitle(){
+  /* recharge complète plutôt qu'une remise à zéro manuelle de dizaines de
+     variables globales interdépendantes (ROUTE, orbitState, crédits,
+     orientation du vaisseau...) — le rechargement garantit un état
+     entièrement propre ET une graine neuve (SEED dérive de Date.now()),
+     exactement ce que demande la spec ("nouvelle graine à la prochaine
+     sélection de langue"), sans le risque d'oublier une variable au
+     passage. */
+  window.location.reload();
+}
+
 let dragging=false, lastPX=0, lastPY=0, dragYaw=0, dragPitch=0;
+/* bouton de regard libre tactile (amélioration demandée, équivalent de
+   CTRL maintenu au clavier) — maintenu enfoncé pour autoriser le
+   glisser-regard ; remplace l'ancien « tout glisser tactile regarde »,
+   qui n'avait aucune affordance visuelle dédiée. */
+let touchLookHeld = false;
 /* caméra libre : Ctrl + glisser oriente la vue autour du vaisseau sans
    toucher au pilotage — un simple regard autour de soi, pas une commande.
    Un appui court sur Ctrl bascule ensuite entre plusieurs MODES de
@@ -3818,15 +4280,17 @@ window.addEventListener('pointermove', function(e){
   const dx = e.clientX-lastPX, dy = e.clientY-lastPY;
   lastPX=e.clientX; lastPY=e.clientY;
   /* au tactile (§15.1), le pilotage passe par le joystick virtuel : un
-     doigt qui glisse sur la vue 3D ne fait donc QUE regarder autour, sans
-     modificateur à maintenir (CTRL n'a pas d'équivalent tactile naturel) —
+     doigt qui glisse sur la vue 3D regarde autour UNIQUEMENT si le bouton
+     dédié est maintenu (équivalent tactile de CTRL) — corrige un manque
+     d'affordance remonté en jeu (« le bouton de regard n'existe plus »),
      même branche que le regard libre CTRL+souris du bureau. */
-  if(e.ctrlKey || e.pointerType === 'touch'){
+  if(e.ctrlKey || (e.pointerType === 'touch' && touchLookHeld)){
     ctrlDragged = true;
     camOrbitYaw   -= dx*0.0032;
     camOrbitPitch  = THREE.MathUtils.clamp(camOrbitPitch - dy*0.0032, -1.3, 1.3);
     return;   /* ne pilote pas le vaisseau pendant un regard libre */
   }
+  if(e.pointerType === 'touch') return;   /* tactile sans le bouton de regard maintenu : ni pilotage ni regard — le joystick reste la seule commande de vol */
   dragYaw = -dx*0.0022;
   dragPitch = -dy*0.0022;
   lastInputTime = performance.now();
@@ -3839,6 +4303,193 @@ window.addEventListener('pointermove', function(e){
    d'orientation puisqu'un appareil peut basculer en cours de partie.
    Les boutons pilotent les MÊMES variables (`keys[...]`) que le clavier :
    aucune logique de vol nouvelle, updateFlight() ne voit pas la différence. */
+/* =========================================================================
+   BARRE D'ICÔNES DU HUD — §12 de la spec v2.1. Un mécanisme UNIQUE pour le
+   bureau ET le tactile (fusionnée avec l'ancien menu ☰ tactile, qui
+   dupliquait la même idée avec un rendu différent) : 7 bascules de
+   panneaux + 1 bouton caméra (double de F3), tous générés depuis la même
+   liste, avec les mêmes icônes SVG et la même fonction d'activation —
+   seule la POSITION change entre bureau (bas-gauche, fixe) et tactile
+   (haut, le bas étant occupé par le joystick et les commandes de vol).
+   ========================================================================= */
+const HUD_ICONS = {
+  speed:  '<path d="M4 18a8 8 0 1 1 16 0"/><path d="M12 18l3.5-5.5" stroke-linecap="round"/><circle cx="12" cy="18" r="1.4" fill="currentColor" stroke="none"/>',
+  route:  '<path d="M4 19c4-9 8 3 16-14" stroke-dasharray="2.5 3"/><circle cx="4" cy="19" r="1.6" fill="currentColor" stroke="none"/><circle cx="20" cy="5" r="1.6" fill="currentColor" stroke="none"/>',
+  target: '<circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/>',
+  temp:   '<path d="M13 4a1.6 1.6 0 0 0-3.2 0v8.7a3.6 3.6 0 1 0 3.2 0V4z"/><circle cx="11.4" cy="17.5" r="1.5" fill="currentColor" stroke="none"/>',
+  flame:  '<path d="M12 3c1.8 3.4-2.4 4.6-2.4 8a2.4 2.4 0 0 0 4.8 0c0-1.6-.8-2.4-.8-4 1.6.9 2.6 3.2 2.6 5a4.2 4.2 0 0 1-8.4 0C7.8 8 12 6.5 12 3z"/>',
+  sliders:'<path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="1.7" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="10" cy="18" r="1.7" fill="currentColor" stroke="none"/>',
+  radio:  '<path d="M12 21v-9M8.5 21h7"/><circle cx="12" cy="8.2" r="2.2"/><path d="M8.6 10a5.4 5.4 0 0 1 6.8 0M5.8 6.6a9.4 9.4 0 0 1 12.4 0" stroke-linecap="round"/>',
+  port:   '<path d="M4 20h16M6 20V10l6-5 6 5v10"/><path d="M9.5 20v-6h5v6"/>',
+  /* caméra : trois symboles distincts, un par mode (§ amélioration —
+     l'icône reflète le mode ACTIF plutôt qu'un pictogramme générique) */
+  cam_tracking: '<rect x="3" y="7.5" width="18" height="12" rx="2"/><path d="M8.5 7.5l1.6-2.5h3.8l1.6 2.5"/><circle cx="12" cy="13.5" r="3.2"/>',
+  cam_sequence: '<circle cx="12" cy="12" r="7" stroke-dasharray="2.4 2.6"/><circle cx="12" cy="5" r="1.6" fill="currentColor" stroke="none"/><path d="M12 12l4 2.3" stroke-linecap="round"/>',
+  cam_distant:  '<path d="M3 17l6-8 4 5 3-4 5 6"/><circle cx="12" cy="12" r="9"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.3 9.2a2.7 2.7 0 1 1 3.8 2.4c-.7.35-1.1.9-1.1 1.7v.4" stroke-linecap="round"/><circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none"/>'
+};
+const HUD_BAR_ITEMS = [
+  { cls:'hud-left',      icon:'speed',   labelKey:'menuNavPanel',    kind:'panel'  },
+  { cls:'hud-route',     icon:'route',   labelKey:'lblFlightPlan',   kind:'panel'  },
+  { cls:'hud-right',     icon:'target',  labelKey:'lblNearest',      kind:'panel'  },
+  { cls:'hud-temp',      icon:'temp',    labelKey:'lblEngineTemp',   kind:'panel'  },
+  { cls:'hud-engines',   icon:'flame',   labelKey:'lblPropulsion',   kind:'panel'  },
+  { cls:'hud-telemetry', icon:'sliders', labelKey:'lblEngineCmd',    kind:'panel'  },
+  { cls:null,            icon:'radio',   labelKey:'lblRadioChannel', kind:'radio'  },
+  { cls:null,            icon:'port',    labelKey:'lblPortServices', kind:'port'   },
+  { cls:null,            icon:'camera',  labelKey:null,              kind:'camera' },
+  /* aide (amélioration demandée) : ajoutée dans la MÊME barre plutôt qu'un
+     bouton séparé, pour une seule et unique zone de contrôle — mais avec
+     un raccourci FIXE ('H', déjà établi) plutôt que le F-suivant
+     automatique (F10), qui entrerait en conflit avec la coupure de voix
+     déjà affectée à F10. */
+  { cls:null,            icon:'help',    labelKey:'lblHelpTitle',    kind:'help', hotkey:'H' }
+];
+/* #9 (bug remonté en jeu) : le panneau services portuaires n'est
+   activable que près d'une planète-port ou pendant une livraison en
+   cours — sinon l'icône reste visible mais inerte, plutôt que de
+   proposer un service sans objet. */
+function isNearPortService(){
+  if(orbitState.active) return true;
+  let near = false;
+  ROUTE.builtSystems.forEach(function(grp, i){
+    const leg = ROUTE.legs[i];
+    if(leg && leg.planet && shipRig.position.distanceTo(leg.planet.position) < leg.planet.radius*4){
+      near = true;
+    }
+  });
+  return near;
+}
+/* action déclenchée par un bouton de la barre — factorisée pour être
+   réutilisée à l'identique par les raccourcis F1-F9 (amélioration). */
+function activateHudBarItem(item){
+  if(item.kind === 'panel'){
+    const el = document.querySelector('.'+item.cls);
+    if(el) el.classList.toggle('panel-hidden');
+    repositionAllPanels();
+  } else if(item.kind === 'radio'){
+    toggleRadioPanel();
+  } else if(item.kind === 'port'){
+    if(!isNearPortService()) return;   /* icône inerte hors zone/livraison */
+    const el = document.getElementById('portPanel');
+    if(el){ el.classList.toggle('visible'); if(el.classList.contains('visible')) refreshPortPanel(); }
+  } else if(item.kind === 'camera'){
+    nextCameraMode();
+  } else if(item.kind === 'help'){
+    const el = document.getElementById('helpOverlay');
+    if(el) el.classList.toggle('visible');
+  }
+  refreshHudIconBar();
+}
+function refreshHudIconBar(){
+  HUD_BAR_ITEMS.forEach(function(item){
+    if(!item.el) return;
+    let active = false, disabled = false;
+    if(item.kind === 'panel'){
+      const el = document.querySelector('.'+item.cls);
+      active = !!(el && !el.classList.contains('panel-hidden'));
+    } else if(item.kind === 'radio'){
+      const el = document.getElementById('radioPanel');
+      active = !!(el && el.classList.contains('visible'));
+    } else if(item.kind === 'port'){
+      const el = document.getElementById('portPanel');
+      active = !!(el && el.classList.contains('visible'));
+      disabled = !isNearPortService();
+      if(disabled && active){
+        /* la fenêtre d'activation s'est refermée (le vaisseau s'est
+           éloigné) pendant que le panneau était ouvert : on le referme
+           plutôt que de laisser un service inaccessible affiché */
+        el.classList.remove('visible'); active = false;
+      }
+    } else if(item.kind === 'camera'){
+      item.el.querySelector('svg').innerHTML = HUD_ICONS['cam_'+CAMERA_MODES[cameraMode]];
+    } else if(item.kind === 'help'){
+      const el = document.getElementById('helpOverlay');
+      active = !!(el && el.classList.contains('visible'));
+    }
+    item.el.classList.toggle('active', active);
+    item.el.classList.toggle('disabled', disabled);
+    const label = item.kind === 'camera'
+      ? t('cameraLabel') + t('cam_'+CAMERA_MODES[cameraMode])
+      : (item.labelKey ? t(item.labelKey) : '');
+    item.el.title = label + (item.hotkey ? '  [' + item.hotkey + ']' : '');
+  });
+}
+/* aide clavier (§ amélioration) — construite dynamiquement à partir de
+   HUD_BAR_ITEMS pour les touches F1-F9, plutôt que dupliquée en dur :
+   toujours synchronisée avec la barre d'icônes, même si son contenu
+   change plus tard (paliers suivants). */
+function buildHelpGrid(){
+  const grid = document.getElementById('helpGrid');
+  if(!grid) return;
+  const rows = [
+    [t('hk_move'), t('hlp_move')],
+    [t('hk_roll'), t('hlp_roll')],
+    [t('hk_thrust'), t('hlp_thrust')],
+    [t('hk_aim'), t('hlp_aim')],
+    [t('hk_freelook'), t('hlp_freelook')]
+  ];
+  HUD_BAR_ITEMS.forEach(function(item){
+    const label = item.kind === 'camera' ? t('cameraLabel').replace(/[\s\u2014]+$/,'') : (item.labelKey ? t(item.labelKey) : '');
+    rows.push([item.hotkey, label]);
+  });
+  rows.push(['F10', t('hlp_voice')]);
+  rows.push(['ESPACE / ENTR\u00c9E', t('hlp_skip')]);
+  rows.push(['\u00c9CHAP / P', t('hlp_pause')]);
+  rows.push(['H', t('hlp_help')]);
+  grid.innerHTML = rows.map(function(r){
+    return '<div class="hk">'+r[0]+'</div><div class="hv">'+r[1]+'</div>';
+  }).join('');
+}
+/* croix de fermeture — un seul gestionnaire délégué pour tous les
+   panneaux (amélioration) plutôt qu'un écouteur par panneau : chaque
+   bouton porte juste sa cible dans data-panel-cls, y compris les cas
+   spéciaux (radio/services/aide) qui n'utilisent pas .panel-hidden. */
+document.addEventListener('click', function(e){
+  const btn = e.target.closest('.panel-close-btn');
+  if(!btn) return;
+  e.stopPropagation();
+  const cls = btn.dataset.panelCls;
+  if(cls === '__radio__'){
+    toggleRadioPanel();
+  } else if(cls === '__port__'){
+    const el = document.getElementById('portPanel');
+    if(el) el.classList.remove('visible');
+    if(typeof refreshHudIconBar === 'function') refreshHudIconBar();
+  } else if(cls === '__help__'){
+    const el = document.getElementById('helpOverlay');
+    if(el) el.classList.remove('visible');
+    if(typeof refreshHudIconBar === 'function') refreshHudIconBar();
+  } else {
+    const el = document.querySelector('.'+cls);
+    if(el) el.classList.add('panel-hidden');
+    if(typeof repositionAllPanels === 'function') repositionAllPanels();
+    if(typeof refreshHudIconBar === 'function') refreshHudIconBar();
+  }
+});
+
+(function initHudIconBar(){
+  const bar = document.getElementById('hudIconBar');
+  if(!bar) return;
+  HUD_BAR_ITEMS.forEach(function(item, idx){
+    if(!item.hotkey) item.hotkey = 'F' + (idx+1);   /* F1..F9, dans l'ordre — l'aide fixe déjà la sienne à 'H' */
+    const btn = document.createElement('button');
+    btn.className = 'hud-icon-btn';
+    btn.innerHTML = '<svg viewBox="0 0 24 24">'+HUD_ICONS[item.icon]+'</svg>';
+    btn.addEventListener('pointerdown', function(e){
+      e.preventDefault();
+      activateHudBarItem(item);
+    });
+    bar.appendChild(btn);
+    item.el = btn;
+  });
+  /* pas d'appel à refreshHudIconBar() ici : orbitState/ROUTE (lus par
+     isNearPortService) ne sont déclarés que plus bas dans le script — ce
+     premier rafraîchissement est fait depuis startGame(), une fois tout
+     le script chargé. */
+})();
+
+
 (function initTouchControls(){
   const isTouchCapable = window.matchMedia('(pointer: coarse)').matches;
   if(!isTouchCapable) return;
@@ -3904,7 +4555,11 @@ window.addEventListener('pointermove', function(e){
     if(!btn) return;
     btn.addEventListener('pointerdown', function(e){
       e.preventDefault();
-      btn.setPointerCapture(e.pointerId);
+      /* try/catch défensif : setPointerCapture peut lever si l'id de
+         pointeur n'est plus actif (relâchement très rapide, multi-doigts) —
+         une exception ici ne doit jamais empêcher la mise à jour de l'état
+         qui suit. */
+      try{ btn.setPointerCapture(e.pointerId); }catch(err){}
       keys[code] = true;
       btn.classList.add('active');
       lastInputTime = performance.now();
@@ -3920,59 +4575,37 @@ window.addEventListener('pointermove', function(e){
   bindHoldButton('touchRollPlus', 'KeyE');
   bindHoldButton('touchBoostBtn', 'Space');
 
-  /* ---------- boutons ponctuels : caméra (F3) et canal radio (TAB) ----------
-     Réutilisent exactement les fonctions du clavier — pas de logique
-     dupliquée entre les deux moyens de contrôle. */
-  const camBtn = document.getElementById('touchCamBtn');
-  if(camBtn) camBtn.addEventListener('pointerdown', function(e){ e.preventDefault(); nextCameraMode(); });
-  const radioBtn = document.getElementById('touchRadioBtn');
-  if(radioBtn) radioBtn.addEventListener('pointerdown', function(e){ e.preventDefault(); toggleRadioPanel(); });
-
-  /* ---------- menu déroulant des panneaux (§12/§15) : chaque bouton
-     bascule un panneau via la classe .panel-open, lue par le CSS
-     .touch-mode.portrait-touch — en paysage les panneaux restent visibles
-     par défaut, le menu permet simplement de les masquer si besoin. */
-  const PANEL_TOGGLES = [
-    {id:'hud-left',      label:function(){ return t('menuNavPanel'); } },
-    {id:'hud-route',     label:function(){ return t('lblFlightPlan'); } },
-    {id:'hud-right',     label:function(){ return t('lblNearest'); } },
-    {id:'hud-temp',      label:function(){ return t('lblEngineTemp'); } },
-    {id:'hud-engines',   label:function(){ return t('lblPropulsion'); } },
-    {id:'hud-telemetry', label:function(){ return t('lblEngineCmd'); } },
-  ];
-  const menuBtn = document.getElementById('touchMenuBtn');
-  const menuList = document.getElementById('touchPanelMenu');
-  function refreshMenuList(){
-    menuList.innerHTML = '';
-    PANEL_TOGGLES.forEach(function(p){
-      const el = document.querySelector('.' + p.id);
-      if(!el) return;
-      const isOn = el.classList.contains('panel-open');
-      const b = document.createElement('button');
-      b.textContent = (isOn ? '\u25CF ' : '\u25CB ') + p.label();
-      b.className = isOn ? 'on' : '';
-      b.addEventListener('pointerdown', function(e){
-        e.preventDefault();
-        el.classList.toggle('panel-open');
-        refreshMenuList();
-      });
-      menuList.appendChild(b);
-    });
-    const radioPanel = document.getElementById('radioPanel');
-    const radioOn = radioPanel && radioPanel.classList.contains('visible');
-    const rb = document.createElement('button');
-    rb.textContent = (radioOn ? '\u25CF ' : '\u25CB ') + t('lblRadioChannel');
-    rb.className = radioOn ? 'on' : '';
-    rb.addEventListener('pointerdown', function(e){ e.preventDefault(); toggleRadioPanel(); refreshMenuList(); });
-    menuList.appendChild(rb);
-  }
-  if(menuBtn){
-    menuBtn.addEventListener('pointerdown', function(e){
+  /* bouton de regard libre — pas un keys[code] comme les précédents (rien
+     à voir avec le clavier), juste un booléen lu par le gestionnaire de
+     glisser du canevas. */
+  (function bindLookButton(){
+    const btn = document.getElementById('touchLookBtn');
+    if(!btn) return;
+    btn.addEventListener('pointerdown', function(e){
       e.preventDefault();
-      const open = menuList.classList.toggle('open');
-      menuBtn.classList.toggle('active', open);
-      if(open) refreshMenuList();
+      try{ btn.setPointerCapture(e.pointerId); }catch(err){}
+      touchLookHeld = true;
+      btn.classList.add('active');
     });
+    function release(){ touchLookHeld = false; btn.classList.remove('active'); }
+    btn.addEventListener('pointerup', release);
+    btn.addEventListener('pointercancel', release);
+  })();
+
+  /* les 7 panneaux d'info sont maintenant pilotés par la barre d'icônes
+     unifiée du HUD (§12, cf. initHudIconBar plus bas) — plus de menu
+     déroulant ni de boutons dédiés séparés ici. En portrait seulement, on
+     pré-ferme les 6 panneaux (hors canal radio, qui garde sa propre
+     bascule automatique) : pas la place de les garder tous ouverts en
+     continu sur un écran de smartphone. */
+  if(document.body.classList.contains('portrait-touch')){
+    ['hud-left','hud-route','hud-right','hud-temp','hud-engines','hud-telemetry'].forEach(function(cls){
+      const el = document.querySelector('.'+cls);
+      if(el) el.classList.add('panel-hidden');
+    });
+    /* pas de refreshHudIconBar() ici non plus, même raison que dans
+       initHudIconBar juste au-dessus — le premier rafraîchissement aura
+       lieu depuis startGame(). */
   }
 })();
 
@@ -3983,8 +4616,25 @@ const rcsDemand = {yaw:0, pitch:0, roll:0};
 /* niveau d'allumage lissé de chaque tuyère (montée vive, extinction douce) */
 const rcsLevel = {yawP:0, yawN:0, pitchP:0, pitchN:0, rollP:0, rollN:0};
 const IDLE_MS = 3200;
-const CRUISE_SPEED = 42, BOOST_MULT = 3.1;
-let currentSpeed = CRUISE_SPEED;
+const CRUISE_SPEED_BASE = 56, BOOST_MULT = 3.1;   /* 42→56 (+33%) : compense
+   l'allongement des systèmes planétaires (bug #1) pour garder un temps de
+   croisière comparable — sans quoi l'espacement plus généreux à lui seul
+   aurait rallongé chaque trajet d'autant. */
+let currentSpeed = CRUISE_SPEED_BASE;
+/* amélioration « Propulseurs » — services portuaires (#9, palier 1) :
+   chaque niveau augmente durablement la vitesse de croisière effective.
+   Autonome vis-à-vis du palier 2 (dégâts/réparations, pas encore
+   implémenté) : un vrai gain de gameplay dès maintenant, pas une coquille
+   qui attend un système inexistant. */
+let speedUpgradeLevel = 0;
+const SPEED_UPGRADE_STEP = 0.09;   /* +9% de vitesse de croisière par niveau */
+const SPEED_UPGRADE_MAX = 4;
+function effectiveCruiseSpeed(){
+  return CRUISE_SPEED_BASE * (1 + speedUpgradeLevel*SPEED_UPGRADE_STEP);
+}
+function speedUpgradeCost(level){
+  return Math.round(3200 * Math.pow(1.55, level));
+}
 const CAM_OFFSET = new THREE.Vector3(0, 12, 46);
 let camPos = new THREE.Vector3(0, 12, 46);
 let camLook = new THREE.Vector3(0,0,-40);
@@ -4006,7 +4656,10 @@ const ARRIVAL_FF_SCALE = 4.5;         /* facteur d'accélération en mode abrég
 let arrivalSkip = false;              /* déclenché par la touche d'abrégé (Entrée) */
 let arrivalTimeScale = 1;             /* lu par updateShuttles(), hors de updateFlight */
 const CUTAWAY_DURATION = 7.4;         /* chargement (3.4s) + suivi du départ (4.0s) — cf. SHUTTLE_CLOSEUP_DURATION plus bas ; reste sous l'écart entre deux largages (~7.9s) pour ne jamais chevaucher le suivant */
-const ORBIT_CAPTURE_TIME = 1.3;       /* fondu d'entrée sur le cercle d'orbite */
+const ORBIT_CAPTURE_TIME = 5.5;       /* fondu d'entrée sur le cercle d'orbite — allongé
+                                          (était 1.3s : un cargo de cette masse "s'insérait"
+                                          en orbite en un claquement de doigts, ressenti comme
+                                          bien trop brutal — bug remonté en jeu) */
 
 /* =========================================================================
    ÉCONOMIE — crédits
@@ -4036,6 +4689,7 @@ function refreshCreditsDisplay(flash){
 function addCredits(amount){
   credits = Math.max(0, credits + amount);
   refreshCreditsDisplay(amount > 0);
+  if(typeof refreshPortPanel === 'function') refreshPortPanel();
 }
 
 const orbitState = {
@@ -4062,6 +4716,23 @@ const orbitState = {
    des transferts de conteneurs (calée sur les largages de navettes),
    échange technique sur les navettes, puis remerciements de clôture.
    ========================================================================= */
+/* message de bienvenue du capitaine — amélioration demandée : joué une
+   seule fois, juste après le premier calcul de route (startGame), avant
+   toute escale. Réutilise le même panneau/la même voix que le reste du
+   canal radio plutôt qu'un mécanisme séparé. */
+function showWelcomeMessage(){
+  const R = RADIO_TEMPLATES[LANG] || RADIO_TEMPLATES.fr;
+  if(!R.welcome) return;
+  const rng = rngFor(SEED+':welcome');
+  const text = R.welcome(SHIP_REGISTRY)[Math.floor(rng()*R.welcome(SHIP_REGISTRY).length)];
+  const radioLog = document.getElementById('radioLog');
+  if(radioLog) radioLog.innerHTML = '';
+  const radioPanel = document.getElementById('radioPanel');
+  if(radioPanel) radioPanel.classList.add('visible');
+  repositionRadioPanel();
+  if(typeof refreshHudIconBar === 'function') refreshHudIconBar();
+  appendRadioLine({ from:'ship', label:SHIP_REGISTRY, text:text });
+}
 function buildRadioScript(planet){
   const rng = rngFor(SEED+':radio:'+planet.seedNoise);
   function pick(arr){ return arr[Math.floor(rng()*arr.length)]; }
@@ -4097,20 +4768,103 @@ function buildRadioScript(planet){
 }
 function repositionRadioPanel(){
   const panel = document.getElementById('radioPanel');
+  const port = document.getElementById('portPanel');
   const nearest = document.getElementById('nearestPanel');
-  if(!panel || !nearest) return;
-  /* calculé dynamiquement contre le bas RÉEL du panneau « objet le plus
-     proche » (sa hauteur varie avec la longueur des textes) plutôt qu'un
-     décalage fixe, qui finissait par le chevaucher. */
-  const rect = nearest.getBoundingClientRect();
+  if(!panel) return;
+  /* le canal radio s'empile maintenant SOUS les services portuaires (ordre
+     inversé, demande explicite) quand ce dernier est affiché ; sinon il
+     reprend sa place historique sous « objet le plus proche ». Calculé
+     dynamiquement contre le bas RÉEL de l'ancre (sa hauteur varie avec le
+     contenu) plutôt qu'un décalage fixe, qui finissait par chevaucher. */
+  const anchor = (port && getComputedStyle(port).display !== 'none') ? port : nearest;
+  if(!anchor) return;
+  const rect = anchor.getBoundingClientRect();
   panel.style.top = Math.round(rect.bottom + 14) + 'px';
 }
+function repositionPortPanel(){
+  const panel = document.getElementById('portPanel');
+  const nearest = document.getElementById('nearestPanel');
+  if(!panel || !nearest) return;
+  /* services portuaires EN PREMIER, juste sous « objet le plus proche »
+     (ordre inversé par rapport à avant — demande explicite) ; le canal
+     radio se recale ensuite à sa suite, cf. repositionRadioPanel. Bug
+     corrigé au passage : les deux panneaux n'étaient repositionnés QUE
+     lors de l'ouverture, jamais quand le contenu de l'un des deux
+     grandissait ensuite (le journal radio, notamment) — d'où le
+     chevauchement remonté en jeu. Chaque fonction redéclenche maintenant
+     l'autre. */
+  const rect = nearest.getBoundingClientRect();
+  panel.style.top = Math.round(rect.bottom + 14) + 'px';
+  repositionRadioPanel();
+}
+/* bug remonté en jeu : « le positionnement des panneaux se chevauche par
+   moment » — la colonne de gauche (hud-left → hud-route) avait, elle, un
+   décalage FIXE en CSS (top:210px), jamais recalculé quand hud-left change
+   de hauteur réelle (retour à la ligne sur petit écran, panneau masqué via
+   la barre du HUD, changement de langue…). Même patron que la colonne de
+   droite : mesurer le bas RÉEL de l'ancre plutôt que deviner une valeur
+   fixe. Un seul point d'entrée regroupe désormais TOUT le repositionnement
+   de la pile de panneaux, pour être sûr qu'aucune combinaison de panneaux
+   affichés/masqués ne puisse laisser une ancienne position obsolète. */
+function repositionRoutePanel(){
+  const left = document.querySelector('.hud-left');
+  const route = document.getElementById('routePanel');
+  if(!route) return;
+  if(left && getComputedStyle(left).display !== 'none'){
+    route.style.top = Math.round(left.getBoundingClientRect().bottom + 14) + 'px';
+  } else {
+    route.style.top = '64px';   /* hud-left masquée : reprend sa position d'origine */
+  }
+}
+function repositionAllPanels(){
+  repositionRoutePanel();
+  repositionPortPanel();   /* enchaîne déjà repositionRadioPanel() */
+}
+function refreshPortPanel(){
+  const dots = document.getElementById('portLevelDots');
+  const btn = document.getElementById('portBuyBtn');
+  if(!dots || !btn) return;
+  let dotsStr = '';
+  for(let i=0;i<SPEED_UPGRADE_MAX;i++){ dotsStr += (i < speedUpgradeLevel ? '\u25CF' : '\u25CB') + ' '; }
+  dots.textContent = dotsStr.trim();
+  btn.classList.remove('port-disabled', 'port-maxed');
+  if(speedUpgradeLevel >= SPEED_UPGRADE_MAX){
+    btn.textContent = t('portMaxLevel');
+    btn.classList.add('port-maxed');
+  } else {
+    const cost = speedUpgradeCost(speedUpgradeLevel);
+    btn.textContent = t('portUpgradeBtn') + ' \u2014 ' + formatCredits(cost) + ' CR';
+    if(credits < cost) btn.classList.add('port-disabled');
+  }
+  repositionPortPanel();
+}
+function buySpeedUpgrade(){
+  if(speedUpgradeLevel >= SPEED_UPGRADE_MAX) return;
+  const cost = speedUpgradeCost(speedUpgradeLevel);
+  if(credits < cost) return;
+  addCredits(-cost);
+  speedUpgradeLevel++;
+  refreshPortPanel();
+}
+(function initPortPanel(){
+  const btn = document.getElementById('portBuyBtn');
+  if(btn) btn.addEventListener('click', function(e){ e.stopPropagation(); buySpeedUpgrade(); });
+})();
+const RADIO_AVATARS = {
+  /* silhouette de capitaine (ambre) et d'antenne de tour (cyan) —
+     amélioration demandée : identifier l'interlocuteur d'un coup d'œil,
+     même vocabulaire de trait que les icônes de la barre du HUD. */
+  ship:  '<circle cx="12" cy="8" r="4.2"/><path d="M4.5 20.5c0-4.4 3.3-7 7.5-7s7.5 2.6 7.5 7"/>',
+  tower: '<path d="M9 21V10.5l3-7.5 3 7.5V21"/><path d="M5.5 21h13"/><circle cx="12" cy="5.5" r="1.3" fill="currentColor" stroke="none"/>'
+};
 function appendRadioLine(entry){
   const log = document.getElementById('radioLog');
   if(!log) return;
   const div = document.createElement('div');
   div.className = 'radio-line ' + entry.from;
-  div.innerHTML = '<span class="who">['+entry.label+']</span><span class="txt">'+entry.text+'</span>';
+  const avatarSvg = RADIO_AVATARS[entry.from] || RADIO_AVATARS.ship;
+  div.innerHTML = '<svg class="radio-avatar" viewBox="0 0 24 24">'+avatarSvg+'</svg>'
+    + '<span class="who">['+entry.label+']</span><span class="txt">'+entry.text+'</span>';
   log.appendChild(div);
   while(log.children.length > 6) log.removeChild(log.firstChild);
   repositionRadioPanel();
@@ -4219,6 +4973,12 @@ function speakRadioLine(entry){
     toggleVoiceMute();
   });
 })();
+(function initPauseButtons(){
+  const resumeBtn = document.getElementById('pauseResumeBtn');
+  const quitBtn = document.getElementById('pauseQuitBtn');
+  if(resumeBtn) resumeBtn.addEventListener('click', function(e){ e.stopPropagation(); resumeGame(); });
+  if(quitBtn) quitBtn.addEventListener('click', function(e){ e.stopPropagation(); quitToTitle(); });
+})();
 
 /* =========================================================================
    DIALOGUES RADIO PAR IA EMBARQUÉE (Gemini Nano) — §14 de la spec v2.1.
@@ -4241,9 +5001,24 @@ async function checkLLMAvailability(){
     llmAvailability = (a === 'available' || a === 'readily') ? 'available' : 'unavailable';
   }catch(e){
     llmAvailability = 'unavailable';
+  }finally{
+    updateLLMIndicator();
   }
 }
 checkLLMAvailability();
+
+/* icône cerveau du panneau radio : active (pleine, lumineuse) quand l'IA
+   embarquée est détectée et effectivement utilisée pour les dialogues,
+   barrée (grisée, biffée) sinon — seul indicateur visible de la voie
+   employée, sans quoi le joueur ne peut pas savoir laquelle est active. */
+function updateLLMIndicator(){
+  const el = document.getElementById('llmIndicator');
+  if(!el) return;
+  const active = llmAvailability === 'available';
+  el.classList.toggle('active', active);
+  el.classList.toggle('inactive', !active);
+  el.title = llmAvailability === 'unchecked' ? t('llmChecking') : (active ? t('llmActive') : t('llmInactive'));
+}
 
 /* une identité par interlocuteur (§14.2) : ton et vocabulaire distincts,
    fournis en instruction système à sa PROPRE session — plutôt qu'un seul
@@ -4305,7 +5080,10 @@ function enhanceRadioScriptWithLLM(script, planet, gen){
 
 function startOrbitDelivery(planet){
   /* nettoyage défensif d'un éventuel reliquat de navettes non arrivées */
-  orbitState.shuttles.forEach(function(s){ scene.remove(s.group); disposePlanetGroup(s.group); });
+  orbitState.shuttles.forEach(function(s){
+    scene.remove(s.group); disposePlanetGroup(s.group);
+    if(s.trail){ scene.remove(s.trail); s.trail.geometry.dispose(); s.trail.material.dispose(); }
+  });
   orbitState.shuttles.length = 0;
   orbitState.spawned = [false,false,false];
 
@@ -4371,7 +5149,16 @@ function startOrbitDelivery(planet){
   if(radioLog) radioLog.innerHTML = '';
   const radioPanel = document.getElementById('radioPanel');
   if(radioPanel) radioPanel.classList.add('visible');
+  if(typeof refreshHudIconBar === 'function') refreshHudIconBar();
+  /* services portuaires (#9, palier 1) : n'est plus auto-affiché avec la
+     radio — le panneau est désormais piloté UNIQUEMENT par sa propre
+     icône dans la barre du HUD (§12), activable dès qu'on est en
+     livraison OU à proximité d'une planète-port (cf. isNearPortService).
+     On rafraîchit son contenu quand même ici, au cas où il serait déjà
+     ouvert (le coût du trajet peut changer avec le niveau atteint). */
+  if(typeof refreshPortPanel === 'function') refreshPortPanel();
   repositionRadioPanel();
+  repositionPortPanel();
   const arrivalHint = document.getElementById('arrivalHint');
   if(arrivalHint) arrivalHint.style.display = 'block';
 }
@@ -4405,6 +5192,7 @@ function buildContainerMesh(){
    ensuite par le bras de chargement (cf. buildShipArm / updateLoadingArm).
    Convention d'axe identique au vaisseau principal : -Z = avant.
    ========================================================================= */
+const SHUTTLE_TRAIL_LEN = 9;    /* traînée du propulseur — amélioration demandée */
 function buildShuttle(){
   const g = new THREE.Group();
 
@@ -4483,7 +5271,25 @@ function buildShuttle(){
   navLight(0x3ddc84, [ 0.34, 0.05, 0.7], 1.1, 0);
   navLight(0xffffff, [0, 0.24, 1.3], 0.7, 0.35);
 
-  return {group:g, glow:glow, clampGroup:clampGroup, navLights:navLights, hasCargo:false};
+  /* traînée du propulseur principal (amélioration demandée, pour mieux
+     suivre les navettes en vol) : une polyligne en coordonnées MONDE —
+     ajoutée à la scène, pas au groupe de la navette, sinon ses propres
+     points historiques subiraient le déplacement courant en plus de
+     l'ancien. Fondu obtenu par assombrissement des couleurs en mélange
+     additif (queue plus sombre → se noie dans le noir spatial) plutôt
+     qu'un canal alpha par sommet, que LineBasicMaterial ne gère pas. */
+  const trailGeom = new THREE.BufferGeometry();
+  const trailPosArr = new Float32Array(SHUTTLE_TRAIL_LEN*3);
+  const trailColArr = new Float32Array(SHUTTLE_TRAIL_LEN*3);
+  trailGeom.setAttribute('position', new THREE.BufferAttribute(trailPosArr, 3));
+  trailGeom.setAttribute('color', new THREE.BufferAttribute(trailColArr, 3));
+  const trailMat = new THREE.LineBasicMaterial({
+    vertexColors:true, blending:THREE.AdditiveBlending, transparent:true, depthWrite:false, opacity:0.85
+  });
+  const trail = new THREE.Line(trailGeom, trailMat);
+  trail.frustumCulled = false;
+
+  return {group:g, glow:glow, clampGroup:clampGroup, navLights:navLights, hasCargo:false, trail:trail};
 }
 /* Catalogue de séquences de plans pour le départ d'une navette (§15.2/15.3
    de la spec) : un gros plan sur le dock au largage, puis un style de suivi
@@ -4536,6 +5342,7 @@ function startShuttleLoading(withCutaway){
   sh.group.position.copy(dockPos);
   sh.group.quaternion.copy(shipRig.quaternion);
   scene.add(sh.group);
+  scene.add(sh.trail);
 
   const container = buildContainerMesh();
   const stagePos = new THREE.Vector3();
@@ -4630,10 +5437,24 @@ function launchLoadedShuttle(sh, id, dockPos, camSeq){
     .normalize().multiplyScalar(50 + Math.random()*70);
   orbitState.shuttles.push({
     id:id, group:sh.group, glow:sh.glow, navLights:sh.navLights,
+    trail:sh.trail, trailHistory:[],
     startPos:dockPos.clone(), t:0, duration:11+Math.random()*3, arcOffset:arcOffset,
     camSeq:camSeq, phase:'outbound'
   });
 }
+
+/* chorégraphie du départ (amélioration demandée) : plutôt qu'un simple
+   lerp direct vers la cible dès l'instant zéro, le départ suit trois temps
+   bien identifiés — chute hors de la baie (repère du VAISSEAU, qui bouge
+   pendant toute la manœuvre d'orbite), éloignement progressif, puis seulement
+   alors mise en cap vers le port cible. */
+const OUTBOUND_DROP_FRAC = 0.12;    /* fraction du trajet : chute hors baie */
+const OUTBOUND_CLEAR_FRAC = 0.32;   /* fraction du trajet : fin d'éloignement */
+const OUTBOUND_DROP_DIST = 14;      /* unités parcourues à la verticale du dock */
+const OUTBOUND_CLEAR_DIST = 55;     /* éloignement supplémentaire avant le cap */
+const _shipDown = new THREE.Vector3();
+const _dockPosNow = new THREE.Vector3();
+const _clearPos = new THREE.Vector3();
 
 const _shuttleTarget = new THREE.Vector3();
 function updateShuttles(dt, elapsed){
@@ -4658,14 +5479,47 @@ function updateShuttles(dt, elapsed){
       _shuttleTarget.copy(shipRig.position);
     }
 
-    const pos = s.startPos.clone().lerp(_shuttleTarget, ease);
-    const arc = Math.sin(Math.PI*f);
-    pos.addScaledVector(s.arcOffset, arc);
+    let pos, lookDir;
+    if(s.phase === 'outbound'){
+      /* repère du vaisseau réévalué CHAQUE image : le cargo est en train
+         de manœuvrer en orbite pendant tout ce temps, la chute et
+         l'éloignement doivent rester solidaires de sa position/orientation
+         RÉELLE au moment présent, pas d'un instantané figé au largage. */
+      _shipDown.set(0,-1,0).applyQuaternion(shipRig.quaternion);
+      if(window.shipDockAnchor) window.shipDockAnchor.getWorldPosition(_dockPosNow);
+      else _dockPosNow.copy(shipRig.position);
+
+      if(f < OUTBOUND_DROP_FRAC){
+        /* phase 1 : translation verticale pure, part du centre du dock */
+        const t2 = f/OUTBOUND_DROP_FRAC, e2 = t2*t2*(3-2*t2);
+        pos = _dockPosNow.clone().addScaledVector(_shipDown, OUTBOUND_DROP_DIST*e2);
+        lookDir = _shipDown;
+      } else if(f < OUTBOUND_CLEAR_FRAC){
+        /* phase 2 : poursuite du même axe, la navette s'éloigne encore du cargo */
+        const t2 = (f-OUTBOUND_DROP_FRAC)/(OUTBOUND_CLEAR_FRAC-OUTBOUND_DROP_FRAC), e2 = t2*t2*(3-2*t2);
+        pos = _dockPosNow.clone().addScaledVector(_shipDown, OUTBOUND_DROP_DIST + OUTBOUND_CLEAR_DIST*e2);
+        lookDir = _shipDown;
+      } else {
+        /* phase 3 : dégagée du cargo, la navette amorce enfin sa descente
+           vers le port — même lerp+arc qu'avant, mais reparti du point de
+           dégagement plutôt que du dock lui-même */
+        _clearPos.copy(_dockPosNow).addScaledVector(_shipDown, OUTBOUND_DROP_DIST + OUTBOUND_CLEAR_DIST);
+        const t2 = (f-OUTBOUND_CLEAR_FRAC)/(1-OUTBOUND_CLEAR_FRAC), e2 = t2*t2*(3-2*t2);
+        pos = _clearPos.clone().lerp(_shuttleTarget, e2);
+        pos.addScaledVector(s.arcOffset, Math.sin(Math.PI*t2));
+        lookDir = _shuttleTarget.clone().sub(pos);
+      }
+    } else {
+      /* retour au dock : trajet inchangé, un simple lerp+arc suffit —
+         la chorégraphie de départ ne concerne que la SORTIE de la baie */
+      pos = s.startPos.clone().lerp(_shuttleTarget, ease);
+      pos.addScaledVector(s.arcOffset, Math.sin(Math.PI*f));
+      lookDir = _shuttleTarget.clone().sub(pos);
+    }
     s.group.position.copy(pos);
 
-    const lookDir = _shuttleTarget.clone().sub(pos);
     if(lookDir.lengthSq() > 1e-6){
-      const m4 = new THREE.Matrix4().lookAt(new THREE.Vector3(0,0,0), lookDir.normalize(), new THREE.Vector3(0,1,0));
+      const m4 = new THREE.Matrix4().lookAt(new THREE.Vector3(0,0,0), lookDir.clone().normalize(), new THREE.Vector3(0,1,0));
       s.group.quaternion.setFromRotationMatrix(m4);
     }
     /* rétrécissement + fondu en fin de trajectoire : simulation d'un
@@ -4673,6 +5527,49 @@ function updateShuttles(dt, elapsed){
     const shrink = f > 0.82 ? THREE.MathUtils.mapLinear(f, 0.82, 1, 1, 0.12) : 1;
     s.group.scale.setScalar(shrink);
     s.glow.material.opacity = shrink;
+
+    /* traînée du propulseur — historique de positions MONDE du moteur,
+       le plus récent en tête ; la géométrie se met à jour en place
+       plutôt que d'être reconstruite (un seul Float32Array, réécrit).
+       Bug corrigé : le point moteur était décalé selon l'orientation DU
+       NEZ (s.group.quaternion), qui vise la cible en ligne droite pendant
+       la phase 3 — alors que la trajectoire réelle suit un arc (sinus).
+       Les deux axes divergent nettement au sommet de l'arc, donnant une
+       traînée visiblement désaxée par rapport au déplacement effectif.
+       Calculé maintenant à partir du DÉPLACEMENT RÉEL d'une image à
+       l'autre (position actuelle − position précédente), qui coïncide
+       par construction avec l'axe de déplacement, quelle que soit
+       l'orientation du modèle. */
+    if(s.trail){
+      let engineWorld;
+      if(s.lastTrailPos){
+        const vel = pos.clone().sub(s.lastTrailPos);
+        if(vel.lengthSq() > 1e-6){
+          engineWorld = pos.clone().addScaledVector(vel.normalize(), -1.95*shrink);
+        }
+      }
+      /* première image, ou vaisseau ponctuellement immobile (dt≈0) :
+         retombe sur l'orientation du modèle, faute de mieux */
+      if(!engineWorld){
+        engineWorld = pos.clone().addScaledVector(
+          new THREE.Vector3(0,0,1).applyQuaternion(s.group.quaternion), 1.95*shrink
+        );
+      }
+      s.lastTrailPos = pos.clone();
+      s.trailHistory.unshift(engineWorld);
+      if(s.trailHistory.length > SHUTTLE_TRAIL_LEN) s.trailHistory.length = SHUTTLE_TRAIL_LEN;
+      const posAttr = s.trail.geometry.attributes.position;
+      const colAttr = s.trail.geometry.attributes.color;
+      for(let k=0;k<SHUTTLE_TRAIL_LEN;k++){
+        const p = s.trailHistory[k] || engineWorld;
+        posAttr.array[k*3]=p.x; posAttr.array[k*3+1]=p.y; posAttr.array[k*3+2]=p.z;
+        const fade = (1 - k/(SHUTTLE_TRAIL_LEN-1)) * shrink;
+        const c = fade*fade;
+        colAttr.array[k*3]=0.30*c; colAttr.array[k*3+1]=0.68*c; colAttr.array[k*3+2]=0.82*c;
+      }
+      posAttr.needsUpdate = true;
+      colAttr.needsUpdate = true;
+    }
 
     /* feux de navigation : cycle propre, indépendant du reste */
     (s.navLights||[]).forEach(function(nl){
@@ -4706,6 +5603,7 @@ function updateShuttles(dt, elapsed){
         /* retour terminé : amerrissage au dock */
         scene.remove(s.group);
         disposePlanetGroup(s.group);
+        if(s.trail){ scene.remove(s.trail); s.trail.geometry.dispose(); s.trail.material.dispose(); }
         orbitState.shuttles.splice(i,1);
       }
     }
@@ -4997,7 +5895,7 @@ function updateFlight(dt, elapsed){
         approachScale = THREE.MathUtils.lerp(0.28, 1, t);
       }
     }
-    const targetSpeed = CRUISE_SPEED * (boosting ? BOOST_MULT : 1) * approachScale;
+    const targetSpeed = effectiveCruiseSpeed() * (boosting ? BOOST_MULT : 1) * approachScale;
     currentSpeed += (targetSpeed-currentSpeed)*Math.min(1, dt*2.2);
     forward = new THREE.Vector3(0,0,-1).applyQuaternion(shipRig.quaternion);
     shipRig.position.addScaledVector(forward, currentSpeed*dt);
@@ -5013,7 +5911,7 @@ function updateFlight(dt, elapsed){
   /* puissance affichée = ratio de la vitesse de consigne réellement établie
      sur la vitesse maximale ; c'est la même grandeur physique qui pilote
      déjà le déplacement, donc jauges et mouvement ne peuvent pas diverger */
-  const enginePowerBase = THREE.MathUtils.clamp(currentSpeed/(CRUISE_SPEED*BOOST_MULT), 0, 1);
+  const enginePowerBase = THREE.MathUtils.clamp(currentSpeed/(effectiveCruiseSpeed()*BOOST_MULT), 0, 1);
   const mainPowers = [];
   (window.__engineGlows||[]).forEach(function(g, i){
     g.scale.set(glowScale,glowScale,1);
@@ -5114,7 +6012,19 @@ function updateFlight(dt, elapsed){
          (catalogue de 4, §15 de la spec) ----------
          « travelling » excepté, les trois autres séquences comportent une
          COUPURE FRANCHE (pas un fondu) entre le gros plan et le suivi —
-         cutawayCut n'autorise ce saut qu'une fois par largage. */
+         cutawayCut n'autorise ce saut qu'une fois par largage.
+
+         Correctif (bugs remontés en jeu) : le suivi utilisait les axes
+         PROPRES du vaisseau (shipRight/shipUp/shipFwd), recalculés à
+         chaque image depuis son orientation réelle — or le vaisseau
+         tourne en continu pendant toute la mise en orbite (son nez doit
+         suivre la tangente de la trajectoire circulaire). La caméra de
+         suivi héritait donc de ce balayage permanent, ce qui donnait une
+         image mal centrée et instable (« tremblement »). Le suivi
+         s'ancre maintenant sur le repère STABLE de l'orbite (os.U/V/N,
+         fixé une fois pour toute l'escale) plutôt que sur des axes qui
+         tournent sous la caméra. Les distances ont aussi été resserrées :
+         la navette, trop petite à l'écran, restait à peine identifiable. */
       const shuttle = os.shuttles.find(function(s){ return s.id === os.cutawayShuttleId; });
       const dockPos = new THREE.Vector3();
       if(window.shipDockAnchor) window.shipDockAnchor.getWorldPosition(dockPos);
@@ -5122,6 +6032,12 @@ function updateFlight(dt, elapsed){
       const shipUp = new THREE.Vector3(0,1,0).applyQuaternion(shipRig.quaternion);
       const shipRight = new THREE.Vector3(1,0,0).applyQuaternion(shipRig.quaternion);
       const shipFwd = new THREE.Vector3(0,0,-1).applyQuaternion(shipRig.quaternion);
+      /* repère stable de l'orbite (ne tourne pas avec le vaisseau) —
+         orienté de façon cohérente avec shipRight/shipUp au moment du
+         largage, pour que la séquence tirée garde le même « sens » visuel
+         qu'avant ce correctif. */
+      const stableRight = os.U.clone().multiplyScalar(os.U.dot(shipRight) >= 0 ? 1 : -1);
+      const stableUp    = os.N.clone().multiplyScalar(os.N.dot(shipUp)    >= 0 ? 1 : -1);
       const shuttlePos = shuttle ? shuttle.group.position : dockPos;
       const seq = os.cutawaySeq || 'lateral';
 
@@ -5141,40 +6057,46 @@ function updateFlight(dt, elapsed){
         .addScaledVector(shipRight, 9).addScaledVector(shipUp, -1.5).addScaledVector(shipFwd, 5);
       const closeUpLook = loadMidpoint;
 
-      let desiredPos, desiredLook, lerpRate;
+      let desiredPos, desiredLook, lerpRate, lookLerpRate;
 
       if(seq === 'travelling'){
-        /* pas de coupure : un seul mouvement continu du gros plan au suivi lointain */
-        const farPos = dockPos.clone().addScaledVector(shipRight, 90).addScaledVector(shipUp, 34);
+        /* pas de coupure : un seul mouvement continu du gros plan au suivi
+           rapproché — distance divisée par plus de 2 par rapport à avant */
+        const farPos = dockPos.clone().addScaledVector(stableRight, 38).addScaledVector(stableUp, 15);
         const t = Math.min(1, p / CUTAWAY_DURATION);
         const ease = t*t*(3-2*t);
         desiredPos = closeUpPos.clone().lerp(farPos, ease);
         desiredLook = closeUpLook.clone().lerp(shuttlePos, ease);
-        lerpRate = 3.2;
+        lerpRate = 3.2; lookLerpRate = 3.2;
       } else if(closeT < 1){
         /* phase de gros plan, commune aux trois séquences à coupure */
         desiredPos = closeUpPos;
         desiredLook = closeUpLook;   /* même cadrage de chargement quelle que soit la séquence tirée */
-        lerpRate = 7;
+        lerpRate = 7; lookLerpRate = 7;
       } else {
-        /* phase de suivi, propre à chaque séquence — la coupure elle-même
-           (saut instantané) est appliquée juste après ce bloc */
+        /* phase de suivi, propre à chaque séquence — ancrée sur le repère
+           stable de l'orbite, pas sur les axes rotatifs du vaisseau. La
+           coupure elle-même (saut instantané) est appliquée juste après
+           ce bloc. */
         if(seq === 'face'){
           /* suivi latéral large : le port de destination entre progressivement dans le cadre */
-          desiredPos = dockPos.clone().addScaledVector(shipRight, 100).addScaledVector(shipUp, 10);
+          desiredPos = dockPos.clone().addScaledVector(stableRight, 42).addScaledVector(stableUp, 6);
           const target = orbitState.planet ? orbitState.planet.position : shuttlePos;
           desiredLook = shuttlePos.clone().lerp(target, 0.3);
         } else if(seq === 'shoulder'){
-          /* plan fixe SOLIDAIRE DU VAISSEAU : la navette s'éloigne dans le cadre */
+          /* plan fixe SOLIDAIRE DE L'ORBITE (plus du vaisseau) : la navette s'éloigne dans le cadre */
           desiredPos = dockPos.clone()
-            .addScaledVector(shipRight, 34).addScaledVector(shipUp, 14).addScaledVector(shipFwd, 8);
+            .addScaledVector(stableRight, 15).addScaledVector(stableUp, 6).addScaledVector(shipFwd, 4);
           desiredLook = shuttlePos;
         } else {
-          /* « lateral » : suivi à distance, légèrement en hauteur-arrière */
-          desiredPos = shuttlePos.clone().addScaledVector(shipRight, 60).addScaledVector(shipUp, 40);
+          /* « lateral » : suivi à distance rapprochée, légèrement en hauteur-arrière */
+          desiredPos = shuttlePos.clone().addScaledVector(stableRight, 26).addScaledVector(stableUp, 17);
           desiredLook = shuttlePos;
         }
-        lerpRate = 2.0;
+        /* suivi plus réactif qu'avant (2.0 → 4.5) : la navette, en pleine
+           accélération sur son arc, sortait du cadre le temps que la
+           caméra la rattrape — d'où l'impression de cadrage décentré. */
+        lerpRate = 4.5; lookLerpRate = 6;
       }
 
       /* coupure franche : au premier passage en phase de suivi, on saute
@@ -5187,7 +6109,7 @@ function updateFlight(dt, elapsed){
 
       camPos.lerp(desiredPos, Math.min(1, dt*lerpRate));
       camera.position.copy(camPos);
-      camLook.lerp(desiredLook, Math.min(1, dt*lerpRate));
+      camLook.lerp(desiredLook, Math.min(1, dt*lookLerpRate));
       camera.up.set(0,1,0);
       camera.lookAt(camLook);
     } else {
@@ -5233,6 +6155,9 @@ function updateFlight(dt, elapsed){
       arrivalTimeScale = 1;
       const radioPanel = document.getElementById('radioPanel');
       if(radioPanel) radioPanel.classList.remove('visible');
+      /* le panneau services portuaires n'est plus lié au cycle de vie de
+         l'escale (cf. startOrbitDelivery) — on ne le referme plus ici,
+         le joueur garde la main via son icône dédiée. */
       const arrivalHint = document.getElementById('arrivalHint');
       if(arrivalHint) arrivalHint.style.display = 'none';
       if(window.speechSynthesis) window.speechSynthesis.cancel();
@@ -5411,6 +6336,7 @@ function updateHud(now){
     if(pl.moonCount) meta += ' · '+pl.moonCount+' '+(pl.moonCount>1?t('satellites'):t('satellite'));
     meta += '<br>'+(nearestDist).toFixed(0)+' u';
     document.getElementById('nearMeta').innerHTML = meta;
+    renderNearestIcon('planet', {key:pl.kind.key, gas:pl.kind.gas});
   } else if(nearest){
     document.getElementById('nearName').textContent = nearest.name;
     const distPc = (nearestDist/38).toFixed(2);
@@ -5425,13 +6351,30 @@ function updateHud(now){
         'L ' + (s.lum < 0.01 ? s.lum.toExponential(1) : s.lum.toFixed(2)) + ' L☉ · ' +
         'm<sub>v</sub> ' + mag.toFixed(1) + '<br>' +
         distPc + ' pc';
+      renderNearestIcon('star', {color:s.color});
     } else {
-      document.getElementById('nearMeta').innerHTML = t('nebula_'+(nearest.typeIdx!==undefined?NEBULA_TYPES[nearest.typeIdx].key:'emission')) + ' · ' + distPc + ' pc';
+      const typeIdx = nearest.typeIdx!==undefined ? nearest.typeIdx : 0;
+      document.getElementById('nearMeta').innerHTML = t('nebula_'+NEBULA_TYPES[typeIdx].key) + ' · ' + distPc + ' pc';
+      renderNearestIcon('nebula', {type:NEBULA_TYPES[typeIdx]});
     }
   } else {
     document.getElementById('nearName').textContent = '—';
     document.getElementById('nearMeta').textContent = t('interstellarSpace');
+    const el = document.getElementById('nearIcon');
+    if(el) el.getContext('2d').clearRect(0,0,el.width,el.height);
   }
+  /* icône « services portuaires » : sa disponibilité dépend de la
+     position du vaisseau, réévaluée en continu (bug #9 : elle doit se
+     désactiver dès qu'on s'éloigne, pas seulement s'activer). */
+  if(typeof refreshHudIconBar === 'function') refreshHudIconBar();
+  /* bug remonté en jeu : les panneaux se chevauchaient « par moment » —
+     leur contenu (donc leur hauteur réelle) change au fil du temps
+     (texte de l'objet le plus proche, longueur du plan de vol…) sans que
+     leur empilement ne soit jamais recalculé après le premier affichage.
+     Rafraîchi ici au même rythme que le reste du panneau (throttle
+     350ms ci-dessus) plutôt qu'uniquement sur les événements ponctuels
+     (ouverture, redimensionnement, bascule d'un panneau). */
+  if(typeof repositionAllPanels === 'function') repositionAllPanels();
 }
 
 /* =========================================================================
@@ -5470,6 +6413,17 @@ function animate(){
   const dt = Math.min(clock.getDelta(), 0.1);
   const elapsed = clock.getElapsedTime();
 
+  /* mode Pause (§11) : on continue d'appeler clock.getDelta() ci-dessus à
+     CHAQUE image (y compris en pause) pour absorber le temps écoulé —
+     sans quoi la reprise verrait un dt géant d'un coup, faisant sauter le
+     vaisseau, les navettes et tous les chronos en même temps. En dessous,
+     en revanche, plus rien n'avance : image figée, tout le reste de cette
+     fonction est sauté. */
+  if(gamePaused){
+    renderer.render(scene, camera);
+    return;
+  }
+
   updateFlight(dt, elapsed);
 
   chunkAccum += dt;
@@ -5504,6 +6458,7 @@ function animate(){
      hôte, dérive des nuages, orbite des satellites */
   updatePlanetSystems(dt, elapsed);
   updateCelestialLabels();
+  updateShipLabels();
 
   /* navettes de livraison : indépendantes de la phase de vol, pour qu'une
      navette encore en approche termine son trajet même si le vaisseau
@@ -5626,6 +6581,7 @@ function animate(){
   });
 
   function startGame(){
+    gameStarted = true;
     /* calcul du plan de vol AVANT le premier rendu : le vaisseau sait où il
        va dès le départ, et les portiques sont tracés d'emblée sur tout le
        trajet. `true` = orienter le nez sur la courbe (départ uniquement). */
@@ -5633,6 +6589,12 @@ function animate(){
 
     refreshField(STAR_CELL, STAR_RADIUS, starField, buildStarCell);
     refreshField(NEBULA_CELL, NEBULA_RADIUS, nebulaField, buildNebulaCell);
+    /* premier rafraîchissement de la barre d'icônes — différé jusqu'ici
+       (cf. commentaires dans initHudIconBar/initTouchControls) car il
+       dépend d'orbitState et ROUTE, tous deux déclarés après ces IIFE. */
+    if(typeof refreshHudIconBar === 'function') refreshHudIconBar();
+    if(typeof repositionAllPanels === 'function') repositionAllPanels();
+    showWelcomeMessage();
     animate();
   }
 })();
