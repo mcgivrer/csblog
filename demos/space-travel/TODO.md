@@ -1,6 +1,14 @@
 # Todo
 
-## 2026/09/16
+##  Démarche
+
+Aide-moi à raffiner ces besoins et correctifs :
+
+1. Fait des propositions,
+2. Mets à jour la spécification Markdown: ajouter des illustrations (images au format SVG ou captures réelles du navigateur, suivant le besoin)  et des diagrammes si nécessaire,
+3. Procède à l'implémentation.
+
+## 2026/09/16 - v2.4
 
 ### Bugs
 
@@ -8,7 +16,7 @@
 - Certaines planètes dans le plan de vol sont parfois invisibles lors du rendu, il faut corriger cela.
 - le panel des Services portuaires se superpose à celui du canal radio, inverse les. Ajoute une icone "Service Portuaire" qui sera activable uniquement si proche d'une planete proposant ces services oubien si la livraison est en cours.
 
-### Améliorations
+### Améliorations pour la v2.4
 
 - Ajouter une icône de fermeture sur chaque panneau (croix), à coordonner avec la barre d'icônes.
 - Pour chaque icône d'activation des panels, assigner une touche de fonction de <kbd>F1</kbd> à <kbd>F8</kbd> (refaire l'affectation) (revoir l'aide)
@@ -23,10 +31,26 @@
 - Ajouter une trainée au propulseur principal des navettes pour mieux les suivre.
 - Prévoir l'affichage de la map de l'univers en overlay, activable  avec la touche <kbd>M</kbd>, faire des propositions visuelles (2D, 3D, navigable ou pas, etc.)
 
-##  Démarche
+## 2026/09/18 - v2.5
 
-Aide-moi à raffiner ces besoins et correctifs :
+### Améliorations pour la v2.5
 
-1. Fait des propositions,
-2. Mets à jour la spécification Markdown: ajouter des illustrations (images au format SVG ou captures réelles du navigateur, suivant le besoin)  et des diagrammes si nécessaire,
-3. Procède à l'implémentation.
+- Pour la touche <kbd>I</kbd> déjà site dans la doc pour la réparation, la remplacer par la touche <kbd>J</kbd>.
+  
+- Modifier la spec pour intégrer la gestion de la **consommation de carburant**. Ce carburant pourra être acheter dans les port spatiaux lors des escales. Attention a bien estimer les quantités de carburant initiale pour ne pas laisser le joueur en panne dès le première étape. Il doit pouvoir faire de 1 a 3 itinéraires, en fonction de sa consommation (regime moteur).
+
+- Cela vient avec un mécanisme d'**évolution des systèmes de propulsion** principale qui fournira le **saut quantique** (réfléchir à un effet visuel) qui permettra au vaisseau de sauter directement a proximité d'une étoile ou d'une planète, en la choisissant sur la carte stellaire.
+- Cette **carte** est à mettre en place sur la touche <kbd>M</kbd>.
+- Le **saut quantique** pourra d'acquérir lors des étapes dans ports spatiaux.
+
+- Il faut maintenant également définir un **nouveau type de port**, les **ports orbitaux** gravitant autour d'une planète. Les ports ne seront pas toujours sur les planètes, mais dans l'espace.  Créer un nombre restreint de modèle 3d de ports orbitaux lors de la génération initiale et en créer des instances dans certains systèmes planétaire.
+
+- Pour la prochaine génération de la spec (2.6) : il faudra la faire par défaut **en anglais**, et refaire toutes les captures d'écran (laptop, tablette et smartphone)  pour que le texte dans le jeu soit en anglais.
+
+- **Revoir la position des différents panels en mode smartphone** pour qu'ils soient tous affichés au même endroit, mais ils sont alors exclusifs.
+
+### Retour de la documentation (français et anglais) 
+
+- Dans le chapitre 9, peux-tu préciser la mécanique de génération avec quelques paragraphes et quelques formules de mathématiques expliquant le principe du générateur à graine.
+- Pour le chapitre 22, proposer les maquettes en wireframing pour l'affichage de la consommation de carburant
+- Pour le chapitre 23, proposer un maquette en wireframing de l'affichage de la carte en 3D, les décisions de détails visuels seront prises à l'implémentation.

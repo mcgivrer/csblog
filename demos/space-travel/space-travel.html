@@ -1,7 +1,10 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
 <!--
   Voyage Spatial / Space Travel & Transport
-  Version 2.3 — 17 septembre 2026
-  Spec de référence : spec-space_travel_and_transport-2.3.md
+  Version 2.4 — 17 septembre 2026
+  Spec de référence : spec-space_travel_and_transport-2.4.md
 
   MIT License
   Copyright (c) 2026 Frédéric Delorme <frederic.delorme@gmail.com>
@@ -24,9 +27,6 @@
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
   SOFTWARE.
 -->
-<!DOCTYPE html>
-<html lang="fr">
-<head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Voyage spatial — Navigation quantique</title>
@@ -44,6 +44,12 @@
     --amber:#ffb454;
     --amber-dim:#a97a3d;
     --cyan:#5eead4;
+    /* étapes de l'itinéraire (§ amélioration v2.4) : vert = à venir, bleu =
+       franchie — délibérément hors de la paire ambre/cyan de la charte,
+       pour un code couleur d'état à trois valeurs (vert/bleu/ambre-en-cours)
+       qui ne se confonde pas avec les accents de marque déjà en usage. */
+    --nav-upcoming:#4ade80;
+    --nav-done:#5b9dff;
   }
   *{box-sizing:border-box;}
   html,body{
@@ -294,6 +300,51 @@
   .hud-temp .tm-warm{ color:var(--amber); }
   .hud-temp .tm-hot{ color:#ff6b57; }
   @media (max-width:900px){ .hud-temp{ display:none !important; } }
+
+  /* ---------- itinéraire (§ amélioration v2.4) — bas droite, juste
+     au-dessus de la barre d'icônes du HUD. Fenêtre glissante d'étapes
+     espacées régulièrement (comme le plan de vol) plutôt qu'à l'échelle
+     réelle des distances : certaines étoiles sont à peine plus loin que la
+     précédente, d'autres à l'autre bout de la carte — un tracé proportionnel
+     rendrait la plupart des étapes illisibles, collées les unes aux autres. */
+  .hud-itinerary{ right:18px; bottom:58px; width:220px; padding:10px 14px 12px; }
+  @media (max-width:900px){ .hud-itinerary{ display:none !important; } }
+  .touch-mode .hud-itinerary{ display:none !important; }   /* chevauche joystick/boost en tactile, cf. commentaire JS */
+  .itin-track{ position:relative; height:20px; margin-top:10px; }
+  .itin-line{ position:absolute; left:6px; right:6px; top:50%; height:2px; background:var(--line); transform:translateY(-50%); }
+  .itin-step{
+    position:absolute; top:50%; width:9px; height:9px; border-radius:50%;
+    transform:translate(-50%,-50%); background:var(--bg);
+    border:1.6px solid var(--nav-upcoming); transition:left 0.2s ease;
+  }
+  .itin-step.done{ border-color:var(--nav-done); background:var(--nav-done); }
+  .itin-step.current{
+    width:12px; height:12px; border-color:var(--amber); background:var(--amber);
+    box-shadow:0 0 0 3px rgba(255,180,84,0.25);
+  }
+  .itin-ship{
+    position:absolute; top:50%; width:7px; height:7px; border-radius:50%;
+    background:var(--ink); transform:translate(-50%,-50%);
+    box-shadow:0 0 6px 1px rgba(232,237,245,0.85);
+    transition:left 0.25s linear; pointer-events:none;
+  }
+
+  /* ---------- orientation / point de Lagrange (§ amélioration v2.4) — bas
+     gauche. Le point visé n'est pas simulé en toute rigueur (les masses
+     réelles des planètes générées ne sont pas modélisées) : c'est un point
+     fixe placé sur l'axe étoile→planète de l'étape en cours, à 92% de la
+     distance en partant de l'étoile — une approximation assumée de L1,
+     suffisante pour donner un cap et une distance à suivre, pas une
+     simulation à N corps. */
+  .hud-lagrange{ left:18px; bottom:58px; width:196px; padding:10px 14px 12px; }
+  @media (max-width:900px){ .hud-lagrange{ display:none !important; } }
+  .touch-mode .hud-lagrange{ display:none !important; }
+  .lagrange-body{ display:flex; align-items:center; gap:12px; margin-top:8px; }
+  .lagrange-dial{ width:52px; height:52px; flex:none; }
+  #lagrangeNeedle{ transform-origin:30px 30px; transition:transform 0.15s linear; }
+  .lagrange-info{ display:flex; flex-direction:column; gap:3px; min-width:0; }
+  .lagrange-dist{ font-family:'JetBrains Mono',monospace; font-size:15px; font-weight:700; color:var(--amber); }
+  .lagrange-name{ font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--muted-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
   /* ---------- canal radio — échanges équipage / contrôle du port ---------- */
   .hud-radio{
@@ -716,6 +767,38 @@
     <button class="port-buy-btn" id="portBuyBtn"></button>
   </div>
 
+  <!-- itinéraire (§ amélioration v2.4) : bas droite, au-dessus de la barre
+       d'icônes — point représentant le vaisseau + étapes vert/bleu -->
+  <div class="panel hud-itinerary mono" id="itineraryPanel">
+    <button class="panel-close-btn" data-panel-cls="hud-itinerary" title="Fermer">×</button>
+    <div class="tm-title" id="lblItinerary">ITINÉRAIRE</div>
+    <div class="itin-track" id="itinTrack">
+      <div class="itin-line"></div>
+      <div class="itin-ship" id="itinShip"></div>
+    </div>
+  </div>
+
+  <!-- orientation / point de Lagrange (§ amélioration v2.4) : bas gauche -->
+  <div class="panel hud-lagrange mono" id="lagrangePanel">
+    <button class="panel-close-btn" data-panel-cls="hud-lagrange" title="Fermer">×</button>
+    <div class="tm-title" id="lblLagrange">POINT DE LAGRANGE</div>
+    <div class="lagrange-body">
+      <svg class="lagrange-dial" viewBox="0 0 60 60">
+        <circle cx="30" cy="30" r="26" fill="none" stroke="var(--line)" stroke-width="1.5"/>
+        <path d="M30 6v8" stroke="var(--muted-2)" stroke-width="1.5"/>
+        <g id="lagrangeNeedle">
+          <path d="M30 30L30 10" stroke="var(--amber)" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="30" cy="10" r="2.6" fill="var(--amber)" stroke="none"/>
+        </g>
+        <circle cx="30" cy="30" r="1.8" fill="var(--muted-2)" stroke="none"/>
+      </svg>
+      <div class="lagrange-info">
+        <div class="lagrange-dist" id="lagrangeDist">— u</div>
+        <div class="lagrange-name" id="lagrangeName">—</div>
+      </div>
+    </div>
+  </div>
+
   <!-- barre d'icônes du HUD (§12) — unifiée bureau + tactile, générée en JS -->
   <div id="hudIconBar" class="mono"></div>
 
@@ -725,7 +808,7 @@
     <button class="touch-btn" id="touchRollMinus">⟲</button>
     <button class="touch-btn" id="touchRollPlus">⟳</button>
     <button class="touch-btn" id="touchBoostBtn">BOOST</button>
-    <button class="touch-btn" id="touchLookBtn" title="Maintenir pour regarder autour">👁</button>
+    <button class="touch-btn" id="touchLookBtn" title="Maintenir pour regarder autour">📷</button>
     <div class="touch-btn" id="touchJoyBase"><div id="touchJoyNub"></div></div>
   </div>
 </div>
@@ -777,6 +860,7 @@ const I18N = {
     topBrand: 'NAVIGATION QUANTIQUE', seedLabel: 'SEED', onlineLabel: 'EN LIGNE',
     lblSpeed: 'Vitesse', lblSector: 'Secteur', lblHeading: 'Cap',
     lblFlightPlan: 'Plan de vol', lblNearest: 'OBJET LE PLUS PROCHE',
+    lblItinerary: 'ITINÉRAIRE', lblLagrange: 'POINT DE LAGRANGE',
     lblEngineTemp: 'TEMPÉRATURE MOTEUR', lblPropulsion: 'PROPULSION', lblEngineCmd: 'COMMANDES MOTEUR',
     lblRadioChannel: 'CANAL RADIO', radioMuteTitle: 'Couper le son du canal radio',
     badge_auto: 'AUTOPILOTE', badge_manual: 'MANUEL', badge_orbit: 'MISE EN ORBITE',
@@ -801,6 +885,7 @@ const I18N = {
     topBrand: 'QUANTUM NAVIGATION', seedLabel: 'SEED', onlineLabel: 'ONLINE',
     lblSpeed: 'Speed', lblSector: 'Sector', lblHeading: 'Heading',
     lblFlightPlan: 'Flight plan', lblNearest: 'NEAREST OBJECT',
+    lblItinerary: 'ITINERARY', lblLagrange: 'LAGRANGE POINT',
     lblEngineTemp: 'ENGINE TEMPERATURE', lblPropulsion: 'PROPULSION', lblEngineCmd: 'ENGINE COMMANDS',
     lblRadioChannel: 'RADIO CHANNEL', radioMuteTitle: 'Mute the radio channel',
     badge_auto: 'AUTOPILOT', badge_manual: 'MANUAL', badge_orbit: 'ORBITAL INSERTION',
@@ -825,6 +910,7 @@ const I18N = {
     topBrand: 'QUANTENNAVIGATION', seedLabel: 'SEED', onlineLabel: 'ONLINE',
     lblSpeed: 'Geschwindigkeit', lblSector: 'Sektor', lblHeading: 'Kurs',
     lblFlightPlan: 'Flugplan', lblNearest: 'N\u00c4CHSTES OBJEKT',
+    lblItinerary: 'ROUTE', lblLagrange: 'LAGRANGE-PUNKT',
     lblEngineTemp: 'TRIEBWERKSTEMPERATUR', lblPropulsion: 'ANTRIEB', lblEngineCmd: 'TRIEBWERKSSTEUERUNG',
     lblRadioChannel: 'FUNKKANAL', radioMuteTitle: 'Funkkanal stummschalten',
     badge_auto: 'AUTOPILOT', badge_manual: 'MANUELL', badge_orbit: 'ORBITEINSCHUSS',
@@ -849,6 +935,7 @@ const I18N = {
     topBrand: 'NAVEGACI\u00d3N CU\u00c1NTICA', seedLabel: 'SEED', onlineLabel: 'EN L\u00cdNEA',
     lblSpeed: 'Velocidad', lblSector: 'Sector', lblHeading: 'Rumbo',
     lblFlightPlan: 'Plan de vuelo', lblNearest: 'OBJETO M\u00c1S CERCANO',
+    lblItinerary: 'ITINERARIO', lblLagrange: 'PUNTO DE LAGRANGE',
     lblEngineTemp: 'TEMPERATURA DE MOTORES', lblPropulsion: 'PROPULSI\u00d3N', lblEngineCmd: 'CONTROL DE MOTORES',
     lblRadioChannel: 'CANAL DE RADIO', radioMuteTitle: 'Silenciar el canal de radio',
     badge_auto: 'PILOTO AUTOM\u00c1TICO', badge_manual: 'MANUAL', badge_orbit: 'INSERCI\u00d3N ORBITAL',
@@ -1025,6 +1112,7 @@ function applyLanguage(){
     topBrand:'topBrand', seedLabel:'seedLabel', onlineLabel:'onlineLabel',
     lblSpeed:'lblSpeed', lblSector:'lblSector', lblHeading:'lblHeading',
     lblFlightPlan:'lblFlightPlan', lblNearest:'lblNearest',
+    lblItinerary:'lblItinerary', lblLagrange:'lblLagrange',
     lblEngineTemp:'lblEngineTemp', lblPropulsion:'lblPropulsion', lblEngineCmd:'lblEngineCmd',
     lblRadioChannel:'lblRadioChannel', creditsLabel:'creditsLabel',
     lblPortServices:'lblPortServices', lblSpeedUpgrade:'lblSpeedUpgrade'
@@ -3817,6 +3905,95 @@ function refreshRoutePanel(){
 }
 
 /* =========================================================================
+   ITINÉRAIRE + POINT DE LAGRANGE (§ amélioration v2.4)
+   ========================================================================= */
+
+/* Pastilles de la piste — régénérées seulement quand ROUTE.index change
+   (fenêtre glissante, comme le plan de vol) : pas la peine de reconstruire
+   tout le DOM à chaque image alors que seul le point-vaisseau bouge en
+   continu entre deux régénérations. */
+const ITIN_WINDOW = 6;
+function refreshItineraryDots(){
+  const track = document.getElementById('itinTrack');
+  if(!track) return;
+  track.querySelectorAll('.itin-step').forEach(function(el){ el.remove(); });
+  if(!ROUTE.legs.length) return;
+  const start = Math.max(0, Math.min(ROUTE.index-2, ROUTE.legs.length-ITIN_WINDOW));
+  const count = Math.min(ITIN_WINDOW, ROUTE.legs.length-start);
+  for(let i=0;i<count;i++){
+    const idx = start+i;
+    const dot = document.createElement('div');
+    dot.className = 'itin-step' + (idx < ROUTE.index ? ' done' : (idx === ROUTE.index ? ' current' : ''));
+    dot.style.left = (count>1 ? (i/(count-1))*100 : 0)+'%';
+    dot.title = ROUTE.legs[idx].portName || ROUTE.legs[idx].name;
+    track.appendChild(dot);
+  }
+  track.dataset.start = start;
+  track.dataset.count = count;
+}
+/* Point-vaisseau : appelé à chaque image (pas throttlé comme le reste de
+   updateHud) pour un déplacement fluide, interpolé entre l'étape en cours
+   et la suivante via l'abscisse curviligne ROUTE.s déjà maintenue par le
+   suivi de route (§ pilotage automatique) — aucun nouveau calcul de fond,
+   juste sa lecture. */
+function updateItineraryShip(){
+  const panel = document.querySelector('.hud-itinerary');
+  const ship = document.getElementById('itinShip');
+  const track = document.getElementById('itinTrack');
+  if(!panel || !ship || !track || panel.classList.contains('panel-hidden')) return;
+  if(!ROUTE.legs.length || !ROUTE.legS.length){ ship.style.left = '0%'; return; }
+  const start = Number(track.dataset.start||0);
+  const count = Number(track.dataset.count||1);
+  const idx = Math.min(ROUTE.index, ROUTE.legs.length-1);
+  const startS = idx>0 ? ROUTE.legS[idx-1] : 0;
+  const endS = ROUTE.legS[idx] !== undefined ? ROUTE.legS[idx] : ROUTE.length;
+  const legFrac = endS>startS ? THREE.MathUtils.clamp((ROUTE.s-startS)/(endS-startS), 0, 1) : 0;
+  const localIdx = THREE.MathUtils.clamp(idx-start, 0, count-1);
+  const frac = count>1 ? (localIdx+legFrac)/(count-1) : 0;
+  ship.style.left = (THREE.MathUtils.clamp(frac,0,1)*100)+'%';
+}
+
+/* Point de Lagrange approximatif (L1) de l'étape en cours : sur l'axe
+   étoile→planète cible, à 92% de la distance en partant de l'étoile — une
+   approximation assumée (cf. commentaire CSS de .hud-lagrange), pas un
+   calcul à N corps : les planètes générées n'ont pas de masse simulée dont
+   tirer un vrai point de libration. */
+const LAGRANGE_FRACTION = 0.92;
+function computeLagrangePoint(leg){
+  if(!leg || !leg.planet || !leg.starPosition) return null;
+  const dir = leg.planet.position.clone().sub(leg.starPosition);
+  const dist = dir.length();
+  if(dist < 1) return leg.planet.position.clone();
+  dir.normalize();
+  return leg.starPosition.clone().addScaledVector(dir, dist*LAGRANGE_FRACTION);
+}
+const _lagTmp = new THREE.Vector3();
+function updateLagrangePanel(){
+  const panel = document.querySelector('.hud-lagrange');
+  if(!panel || panel.classList.contains('panel-hidden')) return;
+  const distEl = document.getElementById('lagrangeDist');
+  const nameEl = document.getElementById('lagrangeName');
+  const needle = document.getElementById('lagrangeNeedle');
+  if(!distEl || !nameEl || !needle) return;
+  const leg = ROUTE.legs[ROUTE.index];
+  const lp = computeLagrangePoint(leg);
+  if(!lp){
+    distEl.textContent = '—';
+    nameEl.textContent = t('noRoute');
+    return;
+  }
+  const forward = new THREE.Vector3(0,0,-1).applyQuaternion(shipRig.quaternion);
+  const heading = ((Math.atan2(forward.x, -forward.z)*180/Math.PI)+360)%360;
+  _lagTmp.copy(lp).sub(shipRig.position);
+  const dist = _lagTmp.length();
+  const targetHeading = ((Math.atan2(_lagTmp.x, -_lagTmp.z)*180/Math.PI)+360)%360;
+  const relBearing = (targetHeading-heading+360)%360;
+  needle.style.transform = 'rotate('+relBearing.toFixed(1)+'deg)';
+  distEl.textContent = Math.round(dist)+' u';
+  nameEl.textContent = 'L1 · '+leg.name;
+}
+
+/* =========================================================================
    8. COMMANDES DE VOL — dérive automatique par défaut, prise de contrôle
       au clavier (ZQSD / flèches / AE) ou à la souris (glisser)
    ========================================================================= */
@@ -3848,7 +4025,7 @@ function computeRoute(origin, heading, alignShip){
      indépendamment de ROUTE.index (qui sert à l'affichage du plan de vol)
      pour éviter tout conflit d'ordre entre les deux seuils. */
   ROUTE.nextDelivery = 0;
-  if(!ROUTE.legs.length){ ROUTE.curve = null; ROUTE.length = 0; refreshRoutePanel(); return; }
+  if(!ROUTE.legs.length){ ROUTE.curve = null; ROUTE.length = 0; refreshRoutePanel(); refreshItineraryDots(); return; }
 
   /* génération des systèmes planétaires : la cible réelle de chaque étape
      devient la planète habitable (son port spatial), pas l'étoile elle-même.
@@ -4051,6 +4228,7 @@ function computeRoute(origin, heading, alignShip){
   }
   ensureSystemsBuilt();
   refreshRoutePanel();
+  refreshItineraryDots();
 }
 const keys = {};
 window.addEventListener('keydown', function(e){
@@ -4093,6 +4271,17 @@ window.addEventListener('keydown', function(e){
        une seule logique, jamais dupliquée entre clavier et bouton */
     const helpItem = HUD_BAR_ITEMS.find(function(it){ return it.kind === 'help'; });
     if(helpItem) activateHudBarItem(helpItem);
+  }
+  /* I / L — itinéraire et point de Lagrange (§ amélioration v2.4), mêmes
+     touches fixes que H : passent par activateHudBarItem, jamais dupliquées
+     entre clavier et bouton de la barre. */
+  if(e.code === 'KeyI'){
+    const it = HUD_BAR_ITEMS.find(function(x){ return x.cls === 'hud-itinerary'; });
+    if(it) activateHudBarItem(it);
+  }
+  if(e.code === 'KeyL'){
+    const it = HUD_BAR_ITEMS.find(function(x){ return x.cls === 'hud-lagrange'; });
+    if(it) activateHudBarItem(it);
   }
   /* TAB bascule directement l'affichage du canal radio, à tout moment —
      un simple interrupteur, pas une préférence qui viendrait interférer
@@ -4326,6 +4515,14 @@ const HUD_ICONS = {
   cam_tracking: '<rect x="3" y="7.5" width="18" height="12" rx="2"/><path d="M8.5 7.5l1.6-2.5h3.8l1.6 2.5"/><circle cx="12" cy="13.5" r="3.2"/>',
   cam_sequence: '<circle cx="12" cy="12" r="7" stroke-dasharray="2.4 2.6"/><circle cx="12" cy="5" r="1.6" fill="currentColor" stroke="none"/><path d="M12 12l4 2.3" stroke-linecap="round"/>',
   cam_distant:  '<path d="M3 17l6-8 4 5 3-4 5 6"/><circle cx="12" cy="12" r="9"/>',
+  /* itinéraire (§ amélioration v2.4) : un repère de position sur un tracé
+     pointillé — distinct de « route » (juste un trait entre deux points),
+     pour ne pas confondre le plan de vol textuel et ce mini-suivi visuel. */
+  itinerary: '<path d="M3 15h5.5M15.5 15H21" stroke-dasharray="2.5 3"/><circle cx="12" cy="15" r="1.8" fill="currentColor" stroke="none"/><path d="M12 3.5a4 4 0 0 1 4 4c0 3-4 7.5-4 7.5s-4-4.5-4-7.5a4 4 0 0 1 4-4z"/><circle cx="12" cy="7.3" r="1.3" fill="currentColor" stroke="none"/>',
+  /* point de Lagrange : boussole (cadran + aiguille) plutôt qu'un pictogramme
+     orbital littéral — c'est l'ORIENTATION relative qui est montrée, pas la
+     géométrie à N corps elle-même */
+  lagrange: '<circle cx="12" cy="12" r="8.5"/><path d="M12 5L14 12L12 19L10 12Z" fill="currentColor" stroke="none"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.3 9.2a2.7 2.7 0 1 1 3.8 2.4c-.7.35-1.1.9-1.1 1.7v.4" stroke-linecap="round"/><circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none"/>'
 };
 const HUD_BAR_ITEMS = [
@@ -4338,6 +4535,14 @@ const HUD_BAR_ITEMS = [
   { cls:null,            icon:'radio',   labelKey:'lblRadioChannel', kind:'radio'  },
   { cls:null,            icon:'port',    labelKey:'lblPortServices', kind:'port'   },
   { cls:null,            icon:'camera',  labelKey:null,              kind:'camera' },
+  /* itinéraire et point de Lagrange (§ amélioration v2.4) : deux nouveaux
+     panneaux, ajoutés APRÈS camera plutôt qu'entremêlés aux six premiers
+     panneaux d'info — F1-F9 sont affectés par POSITION dans ce tableau
+     (cf. le gestionnaire keydown plus bas, indexé sur e.code), donc tout
+     insertion avant radio/port/camera aurait décalé leurs raccourcis F7-F9.
+     Comme l'aide (H), ceux-ci prennent une touche FIXE plutôt qu'un F-slot. */
+  { cls:'hud-itinerary', icon:'itinerary', labelKey:'lblItinerary',  kind:'panel', hotkey:'I' },
+  { cls:'hud-lagrange',  icon:'lagrange',  labelKey:'lblLagrange',   kind:'panel', hotkey:'L' },
   /* aide (amélioration demandée) : ajoutée dans la MÊME barre plutôt qu'un
      bouton séparé, pour une seule et unique zone de contrôle — mais avec
      un raccourci FIXE ('H', déjà établi) plutôt que le F-suivant
@@ -4430,6 +4635,10 @@ function buildHelpGrid(){
     [t('hk_freelook'), t('hlp_freelook')]
   ];
   HUD_BAR_ITEMS.forEach(function(item){
+    /* l'aide se décrit elle-même juste en dessous (« Affiche/masque cette
+       aide ») — l'inclure ici aussi ferait doublon sur la touche H, comme
+       repéré sur une capture d'écran de la spec (§17.3). */
+    if(item.kind === 'help') return;
     const label = item.kind === 'camera' ? t('cameraLabel').replace(/[\s\u2014]+$/,'') : (item.labelKey ? t(item.labelKey) : '');
     rows.push([item.hotkey, label]);
   });
@@ -4599,7 +4808,7 @@ document.addEventListener('click', function(e){
      bascule automatique) : pas la place de les garder tous ouverts en
      continu sur un écran de smartphone. */
   if(document.body.classList.contains('portrait-touch')){
-    ['hud-left','hud-route','hud-right','hud-temp','hud-engines','hud-telemetry'].forEach(function(cls){
+    ['hud-left','hud-route','hud-right','hud-temp','hud-engines','hud-telemetry','hud-itinerary','hud-lagrange'].forEach(function(cls){
       const el = document.querySelector('.'+cls);
       if(el) el.classList.add('panel-hidden');
     });
@@ -4819,6 +5028,35 @@ function repositionRoutePanel(){
 function repositionAllPanels(){
   repositionRoutePanel();
   repositionPortPanel();   /* enchaîne déjà repositionRadioPanel() */
+  repositionCornerBottomPanels();
+}
+/* évite le chevauchement entre les deux panneaux bas-coin (itinéraire,
+   Lagrange, §21) et la rangée basse CENTRÉE (température/propulsion/
+   commandes, §8) — repéré sur une capture d'écran de documentation à
+   1100px de large : la rangée centrée peut s'étendre assez pour mordre
+   sur leur emplacement habituel, alors qu'à 1280px l'un et l'autre
+   semblaient avoir assez de marge. On les remonte au-dessus d'elle plutôt
+   que de les laisser se chevaucher. Repositionnement dynamique (mesuré),
+   pas un simple seuil de largeur fixe : la largeur de la rangée centrée
+   dépend aussi de QUELS panneaux elle contient à l'instant. */
+function repositionCornerBottomPanels(){
+  const row = document.querySelector('.hud-bottom-row');
+  const itin = document.querySelector('.hud-itinerary');
+  const lag = document.querySelector('.hud-lagrange');
+  if(!row) return;
+  if(itin) itin.style.bottom = '';
+  if(lag) lag.style.bottom = '';
+  const rowRect = row.getBoundingClientRect();
+  const MARGIN = 14;
+  const liftBottom = (window.innerHeight - rowRect.top) + MARGIN;
+  if(itin && !itin.classList.contains('panel-hidden')){
+    const itinRect = itin.getBoundingClientRect();
+    if(itinRect.left < rowRect.right + MARGIN) itin.style.bottom = liftBottom+'px';
+  }
+  if(lag && !lag.classList.contains('panel-hidden')){
+    const lagRect = lag.getBoundingClientRect();
+    if(lagRect.right > rowRect.left - MARGIN) lag.style.bottom = liftBottom+'px';
+  }
 }
 function refreshPortPanel(){
   const dots = document.getElementById('portLevelDots');
@@ -5742,7 +5980,7 @@ function updateFlight(dt, elapsed){
 
       let idx = 0;
       while(idx < ROUTE.legS.length-1 && ROUTE.s > ROUTE.legS[idx] - 120) idx++;
-      if(idx !== ROUTE.index){ ROUTE.index = idx; refreshRoutePanel(); ensureSystemsBuilt(); }
+      if(idx !== ROUTE.index){ ROUTE.index = idx; refreshRoutePanel(); refreshItineraryDots(); ensureSystemsBuilt(); }
 
       /* mise en orbite/livraison à CHAQUE étape de l'itinéraire, pas
          seulement à la fin : dès que le vaisseau approche le point
@@ -6295,6 +6533,13 @@ function updateHud(now){
   const forward = new THREE.Vector3(0,0,-1).applyQuaternion(shipRig.quaternion);
   const heading = ((Math.atan2(forward.x, -forward.z)*180/Math.PI)+360)%360;
   document.getElementById('headingVal').textContent = String(Math.round(heading)).padStart(3,'0')+'°';
+  /* itinéraire (point-vaisseau) et point de Lagrange (§ v2.4) : hors du
+     throttle ci-dessous comme vitesse/secteur/cap juste au-dessus — un
+     point qui saute par paliers de 350ms serait visiblement saccadé,
+     contrairement à un texte qui change peu d'une image à l'autre. Chaque
+     fonction sort tout de suite si son panneau est masqué. */
+  updateItineraryShip();
+  updateLagrangePanel();
 
   if(now - lastHudUpdate < 350) return;
   lastHudUpdate = now;
