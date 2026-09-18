@@ -3,8 +3,8 @@
 <head>
 <!--
   Voyage Spatial / Space Travel & Transport
-  Version 2.4 — 17 septembre 2026
-  Spec de référence : spec-space_travel_and_transport-2.4.md
+  Version 2.6 — 18 septembre 2026
+  Spec de référence : spec-space_travel_and_transport-2.6.md
 
   MIT License
   Copyright (c) 2026 Frédéric Delorme <frederic.delorme@gmail.com>
@@ -280,6 +280,16 @@
   }
   .gauge-pct{ font-size:7.5px; color:var(--muted); }
   .gauge-sep{ width:1px; height:28px; align-self:flex-end; background:var(--line); margin:0 2px; }
+  /* carburant (§22) : cinquième jauge, même famille visuelle que M1-M4
+     (Option B des maquettes filaires — fusionné avec PROPULSION plutôt
+     qu'un panneau dédié, pour ne pas multiplier les fenêtres alors que les
+     deux se lisent au même moment). Vert par défaut, ambre puis rouge sous
+     les seuils définis en §22.4 (25% / 10%), via une classe plutôt qu'un
+     recalcul de couleur en JS à chaque image. */
+  .gauge.fuel .gauge-track{ width:18px; height:42px; }
+  .gauge.fuel .gauge-fill{ background:linear-gradient(0deg, #1d7a4a, #4ade80); }
+  .gauge.fuel.warn .gauge-fill{ background:linear-gradient(0deg, var(--amber-dim), var(--amber)); }
+  .gauge.fuel.crit .gauge-fill{ background:linear-gradient(0deg, #7a1d1d, #ef4444); }
   @media (max-width:900px){ .hud-engines{ display:none; } }
 
   /* ---------- commandes moteur — panneau fixe, plus flottant projeté ---------- */
@@ -779,6 +789,11 @@
       <span class="port-dots" id="portLevelDots"></span>
     </div>
     <button class="port-buy-btn" id="portBuyBtn"></button>
+    <div class="port-row" id="fuelPortRow">
+      <span id="lblFuelService">Carburant</span>
+      <span class="port-dots" id="fuelPortPct"></span>
+    </div>
+    <button class="port-buy-btn" id="fuelBuyBtn"></button>
   </div>
 
   <!-- itinéraire (§ amélioration v2.4) : bas droite, au-dessus de la barre
@@ -892,7 +907,7 @@ const I18N = {
     nebula_emission:'N\u00e9buleuse en \u00e9mission', nebula_hii:'R\u00e9gion HII', nebula_dark:'N\u00e9buleuse obscure',
     nebula_planetary:'N\u00e9buleuse plan\u00e9taire', nebula_supernova:'R\u00e9manent de supernova', nebula_nursery:'Pouponni\u00e8re stellaire',
     nebula_reflection:'N\u00e9buleuse par r\u00e9flexion', nebula_molecular:'Nuage mol\u00e9culaire', nebula_oiii:'N\u00e9buleuse en \u00e9mission OIII',
-    ttsLang: 'fr-FR', noRoute: 'Aucune route', creditsLabel: 'CRÉDITS', menuNavPanel: 'Vitesse / cap', pauseTitle: 'PAUSE', pauseSub: 'Simulation suspendue', pauseResumeLbl: 'REPRENDRE', pauseQuitLbl: 'QUITTER \u2014 \u00c9CRAN-TITRE', pauseHint: 'ESPACE / ENTR\u00c9E \u2014 reprendre \u00b7 \u00c9CHAP \u2014 quitter', lblPortServices: 'SERVICES PORTUAIRES', lblSpeedUpgrade: 'Propulseurs', portUpgradeBtn: 'AM\u00c9LIORER', portMaxLevel: 'NIVEAU MAXIMAL', lblHelpTitle: 'AIDE \u2014 COMMANDES', lblHelpFoot: 'H \u2014 masquer cette aide', hk_move: '\u2191\u2193\u2190\u2192 / ZQSD', hlp_move: 'Orientation (tangage / lacet)', hk_roll: 'E / R', hlp_roll: 'Roulis', hk_thrust: 'MAJ / ESPACE', hlp_thrust: 'Propulsion', hk_aim: 'Glisser la souris', hlp_aim: 'Vis\u00e9e fine', hk_freelook: 'CTRL + glisser', hlp_freelook: 'Regard libre', hlp_voice: 'Coupe/r\u00e9tablit la voix', hlp_skip: 'Abr\u00e8ge la man\u0153uvre / reprend la pause', hlp_pause: 'Met le jeu en pause', hlp_help: 'Affiche/masque cette aide', llmChecking: 'Détection de l\u2019IA embarquée en cours\u2026', llmActive: 'IA embarquée (Gemini Nano) active \u2014 dialogues générés dynamiquement', llmInactive: 'IA embarquée indisponible \u2014 dialogues par gabarits', shuttleLabelGeneric: 'NAVETTE'
+    ttsLang: 'fr-FR', noRoute: 'Aucune route', creditsLabel: 'CRÉDITS', menuNavPanel: 'Vitesse / cap', pauseTitle: 'PAUSE', pauseSub: 'Simulation suspendue', pauseResumeLbl: 'REPRENDRE', pauseQuitLbl: 'QUITTER \u2014 \u00c9CRAN-TITRE', pauseHint: 'ESPACE / ENTR\u00c9E \u2014 reprendre \u00b7 \u00c9CHAP \u2014 quitter', lblPortServices: 'SERVICES PORTUAIRES', lblSpeedUpgrade: 'Propulseurs', portUpgradeBtn: 'AM\u00c9LIORER', portMaxLevel: 'NIVEAU MAXIMAL', lblFuelService: 'Carburant', portFuelBtn: 'RAVITAILLER', portFuelFull: 'PLEIN', lblFuel: 'CARBURANT', lblHelpTitle: 'AIDE \u2014 COMMANDES', lblHelpFoot: 'H \u2014 masquer cette aide', hk_move: '\u2191\u2193\u2190\u2192 / ZQSD', hlp_move: 'Orientation (tangage / lacet)', hk_roll: 'E / R', hlp_roll: 'Roulis', hk_thrust: 'MAJ / ESPACE', hlp_thrust: 'Propulsion', hk_aim: 'Glisser la souris', hlp_aim: 'Vis\u00e9e fine', hk_freelook: 'CTRL + glisser', hlp_freelook: 'Regard libre', hlp_voice: 'Coupe/r\u00e9tablit la voix', hlp_skip: 'Abr\u00e8ge la man\u0153uvre / reprend la pause', hlp_pause: 'Met le jeu en pause', hlp_help: 'Affiche/masque cette aide', llmChecking: 'Détection de l\u2019IA embarquée en cours\u2026', llmActive: 'IA embarquée (Gemini Nano) active \u2014 dialogues générés dynamiquement', llmInactive: 'IA embarquée indisponible \u2014 dialogues par gabarits', shuttleLabelGeneric: 'NAVETTE'
   },
   en: {
     title_sub: 'Choose a language',
@@ -917,7 +932,7 @@ const I18N = {
     nebula_emission:'Emission nebula', nebula_hii:'HII region', nebula_dark:'Dark nebula',
     nebula_planetary:'Planetary nebula', nebula_supernova:'Supernova remnant', nebula_nursery:'Stellar nursery',
     nebula_reflection:'Reflection nebula', nebula_molecular:'Molecular cloud', nebula_oiii:'OIII emission nebula',
-    ttsLang: 'en-US', noRoute: 'No route', creditsLabel: 'CREDITS', menuNavPanel: 'Speed / heading', pauseTitle: 'PAUSED', pauseSub: 'Simulation suspended', pauseResumeLbl: 'RESUME', pauseQuitLbl: 'QUIT \u2014 TITLE SCREEN', pauseHint: 'SPACE / ENTER \u2014 resume \u00b7 ESC \u2014 quit', lblPortServices: 'PORT SERVICES', lblSpeedUpgrade: 'Thrusters', portUpgradeBtn: 'UPGRADE', portMaxLevel: 'MAX LEVEL', lblHelpTitle: 'HELP \u2014 CONTROLS', lblHelpFoot: 'H \u2014 hide this help', hk_move: '\u2191\u2193\u2190\u2192 / WASD', hlp_move: 'Orientation (pitch / yaw)', hk_roll: 'E / R', hlp_roll: 'Roll', hk_thrust: 'SHIFT / SPACE', hlp_thrust: 'Thrust', hk_aim: 'Drag mouse', hlp_aim: 'Fine aim', hk_freelook: 'CTRL + drag', hlp_freelook: 'Free look', hlp_voice: 'Mute/unmute voice', hlp_skip: 'Skip maneuver / resume from pause', hlp_pause: 'Pause the game', hlp_help: 'Show/hide this help', llmChecking: 'Detecting on-device AI\u2026', llmActive: 'On-device AI (Gemini Nano) active \u2014 dialogue generated dynamically', llmInactive: 'On-device AI unavailable \u2014 template dialogue', shuttleLabelGeneric: 'SHUTTLE'
+    ttsLang: 'en-US', noRoute: 'No route', creditsLabel: 'CREDITS', menuNavPanel: 'Speed / heading', pauseTitle: 'PAUSED', pauseSub: 'Simulation suspended', pauseResumeLbl: 'RESUME', pauseQuitLbl: 'QUIT \u2014 TITLE SCREEN', pauseHint: 'SPACE / ENTER \u2014 resume \u00b7 ESC \u2014 quit', lblPortServices: 'PORT SERVICES', lblSpeedUpgrade: 'Thrusters', portUpgradeBtn: 'UPGRADE', portMaxLevel: 'MAX LEVEL', lblFuelService: 'Fuel', portFuelBtn: 'REFUEL', portFuelFull: 'FULL', lblFuel: 'FUEL', lblHelpTitle: 'HELP \u2014 CONTROLS', lblHelpFoot: 'H \u2014 hide this help', hk_move: '\u2191\u2193\u2190\u2192 / WASD', hlp_move: 'Orientation (pitch / yaw)', hk_roll: 'E / R', hlp_roll: 'Roll', hk_thrust: 'SHIFT / SPACE', hlp_thrust: 'Thrust', hk_aim: 'Drag mouse', hlp_aim: 'Fine aim', hk_freelook: 'CTRL + drag', hlp_freelook: 'Free look', hlp_voice: 'Mute/unmute voice', hlp_skip: 'Skip maneuver / resume from pause', hlp_pause: 'Pause the game', hlp_help: 'Show/hide this help', llmChecking: 'Detecting on-device AI\u2026', llmActive: 'On-device AI (Gemini Nano) active \u2014 dialogue generated dynamically', llmInactive: 'On-device AI unavailable \u2014 template dialogue', shuttleLabelGeneric: 'SHUTTLE'
   },
   de: {
     title_sub: 'Sprache wählen',
@@ -942,7 +957,7 @@ const I18N = {
     nebula_emission:'Emissionsnebel', nebula_hii:'HII-Region', nebula_dark:'Dunkelnebel',
     nebula_planetary:'Planetarischer Nebel', nebula_supernova:'Supernova-\u00dcberrest', nebula_nursery:'Sternentstehungsgebiet',
     nebula_reflection:'Reflexionsnebel', nebula_molecular:'Molek\u00fcelwolke', nebula_oiii:'OIII-Emissionsnebel',
-    ttsLang: 'de-DE', noRoute: 'Keine Route', creditsLabel: 'GUTHABEN', menuNavPanel: 'Geschwindigkeit / Kurs', pauseTitle: 'PAUSE', pauseSub: 'Simulation angehalten', pauseResumeLbl: 'FORTSETZEN', pauseQuitLbl: 'BEENDEN \u2014 TITELBILDSCHIRM', pauseHint: 'LEERTASTE / EINGABE \u2014 fortsetzen \u00b7 ESC \u2014 beenden', lblPortServices: 'HAFENDIENSTE', lblSpeedUpgrade: 'Triebwerke', portUpgradeBtn: 'AUFR\u00dcSTEN', portMaxLevel: 'MAXIMALSTUFE', lblHelpTitle: 'HILFE \u2014 STEUERUNG', lblHelpFoot: 'H \u2014 Hilfe ausblenden', hk_move: '\u2191\u2193\u2190\u2192 / WASD', hlp_move: 'Ausrichtung (Nicken / Gieren)', hk_roll: 'E / R', hlp_roll: 'Rollen', hk_thrust: 'SHIFT / LEERTASTE', hlp_thrust: 'Schub', hk_aim: 'Maus ziehen', hlp_aim: 'Feinzielen', hk_freelook: 'STRG + ziehen', hlp_freelook: 'Freie Sicht', hlp_voice: 'Stimme stumm-/freischalten', hlp_skip: 'Man\u00f6ver abk\u00fcrzen / Pause fortsetzen', hlp_pause: 'Spiel pausieren', hlp_help: 'Diese Hilfe ein-/ausblenden', llmChecking: 'Geräteinterne KI wird erkannt\u2026', llmActive: 'Geräteinterne KI (Gemini Nano) aktiv \u2014 Dialoge dynamisch erzeugt', llmInactive: 'Geräteinterne KI nicht verfügbar \u2014 Dialoge aus Vorlagen', shuttleLabelGeneric: 'FÄHRE'
+    ttsLang: 'de-DE', noRoute: 'Keine Route', creditsLabel: 'GUTHABEN', menuNavPanel: 'Geschwindigkeit / Kurs', pauseTitle: 'PAUSE', pauseSub: 'Simulation angehalten', pauseResumeLbl: 'FORTSETZEN', pauseQuitLbl: 'BEENDEN \u2014 TITELBILDSCHIRM', pauseHint: 'LEERTASTE / EINGABE \u2014 fortsetzen \u00b7 ESC \u2014 beenden', lblPortServices: 'HAFENDIENSTE', lblSpeedUpgrade: 'Triebwerke', portUpgradeBtn: 'AUFR\u00dcSTEN', portMaxLevel: 'MAXIMALSTUFE', lblFuelService: 'Treibstoff', portFuelBtn: 'AUFTANKEN', portFuelFull: 'VOLL', lblFuel: 'TREIBSTOFF', lblHelpTitle: 'HILFE \u2014 STEUERUNG', lblHelpFoot: 'H \u2014 Hilfe ausblenden', hk_move: '\u2191\u2193\u2190\u2192 / WASD', hlp_move: 'Ausrichtung (Nicken / Gieren)', hk_roll: 'E / R', hlp_roll: 'Rollen', hk_thrust: 'SHIFT / LEERTASTE', hlp_thrust: 'Schub', hk_aim: 'Maus ziehen', hlp_aim: 'Feinzielen', hk_freelook: 'STRG + ziehen', hlp_freelook: 'Freie Sicht', hlp_voice: 'Stimme stumm-/freischalten', hlp_skip: 'Man\u00f6ver abk\u00fcrzen / Pause fortsetzen', hlp_pause: 'Spiel pausieren', hlp_help: 'Diese Hilfe ein-/ausblenden', llmChecking: 'Geräteinterne KI wird erkannt\u2026', llmActive: 'Geräteinterne KI (Gemini Nano) aktiv \u2014 Dialoge dynamisch erzeugt', llmInactive: 'Geräteinterne KI nicht verfügbar \u2014 Dialoge aus Vorlagen', shuttleLabelGeneric: 'FÄHRE'
   },
   es: {
     title_sub: 'Elige un idioma',
@@ -967,7 +982,7 @@ const I18N = {
     nebula_emission:'Nebulosa de emisi\u00f3n', nebula_hii:'Regi\u00f3n HII', nebula_dark:'Nebulosa oscura',
     nebula_planetary:'Nebulosa planetaria', nebula_supernova:'Remanente de supernova', nebula_nursery:'Vivero estelar',
     nebula_reflection:'Nebulosa de reflexi\u00f3n', nebula_molecular:'Nube molecular', nebula_oiii:'Nebulosa de emisi\u00f3n OIII',
-    ttsLang: 'es-ES', noRoute: 'Sin ruta', creditsLabel: 'CRÉDITOS', menuNavPanel: 'Velocidad / rumbo', pauseTitle: 'PAUSA', pauseSub: 'Simulaci\u00f3n suspendida', pauseResumeLbl: 'REANUDAR', pauseQuitLbl: 'SALIR \u2014 PANTALLA DE INICIO', pauseHint: 'ESPACIO / INTRO \u2014 reanudar \u00b7 ESC \u2014 salir', lblPortServices: 'SERVICIOS PORTUARIOS', lblSpeedUpgrade: 'Propulsores', portUpgradeBtn: 'MEJORAR', portMaxLevel: 'NIVEL M\u00c1XIMO', lblHelpTitle: 'AYUDA \u2014 CONTROLES', lblHelpFoot: 'H \u2014 ocultar esta ayuda', hk_move: '\u2191\u2193\u2190\u2192 / WASD', hlp_move: 'Orientaci\u00f3n (cabeceo / gui\u00f1ada)', hk_roll: 'E / R', hlp_roll: 'Alabeo', hk_thrust: 'MAY\u00daS / ESPACIO', hlp_thrust: 'Propulsi\u00f3n', hk_aim: 'Arrastrar rat\u00f3n', hlp_aim: 'Punter\u00eda fina', hk_freelook: 'CTRL + arrastrar', hlp_freelook: 'Vista libre', hlp_voice: 'Silencia/activa la voz', hlp_skip: 'Abreviar maniobra / reanudar pausa', hlp_pause: 'Pausa el juego', hlp_help: 'Muestra/oculta esta ayuda', llmChecking: 'Detectando IA integrada\u2026', llmActive: 'IA integrada (Gemini Nano) activa \u2014 diálogos generados dinámicamente', llmInactive: 'IA integrada no disponible \u2014 diálogos por plantilla', shuttleLabelGeneric: 'NAVE'
+    ttsLang: 'es-ES', noRoute: 'Sin ruta', creditsLabel: 'CRÉDITOS', menuNavPanel: 'Velocidad / rumbo', pauseTitle: 'PAUSA', pauseSub: 'Simulaci\u00f3n suspendida', pauseResumeLbl: 'REANUDAR', pauseQuitLbl: 'SALIR \u2014 PANTALLA DE INICIO', pauseHint: 'ESPACIO / INTRO \u2014 reanudar \u00b7 ESC \u2014 salir', lblPortServices: 'SERVICIOS PORTUARIOS', lblSpeedUpgrade: 'Propulsores', portUpgradeBtn: 'MEJORAR', portMaxLevel: 'NIVEL M\u00c1XIMO', lblFuelService: 'Combustible', portFuelBtn: 'REPOSTAR', portFuelFull: 'LLENO', lblFuel: 'COMBUSTIBLE', lblHelpTitle: 'AYUDA \u2014 CONTROLES', lblHelpFoot: 'H \u2014 ocultar esta ayuda', hk_move: '\u2191\u2193\u2190\u2192 / WASD', hlp_move: 'Orientaci\u00f3n (cabeceo / gui\u00f1ada)', hk_roll: 'E / R', hlp_roll: 'Alabeo', hk_thrust: 'MAY\u00daS / ESPACIO', hlp_thrust: 'Propulsi\u00f3n', hk_aim: 'Arrastrar rat\u00f3n', hlp_aim: 'Punter\u00eda fina', hk_freelook: 'CTRL + arrastrar', hlp_freelook: 'Vista libre', hlp_voice: 'Silencia/activa la voz', hlp_skip: 'Abreviar maniobra / reanudar pausa', hlp_pause: 'Pausa el juego', hlp_help: 'Muestra/oculta esta ayuda', llmChecking: 'Detectando IA integrada\u2026', llmActive: 'IA integrada (Gemini Nano) activa \u2014 diálogos generados dinámicamente', llmInactive: 'IA integrada no disponible \u2014 diálogos por plantilla', shuttleLabelGeneric: 'NAVE'
   }
 };
 function t(key){
@@ -1129,7 +1144,7 @@ function applyLanguage(){
     lblItinerary:'lblItinerary', lblLagrange:'lblLagrange',
     lblEngineTemp:'lblEngineTemp', lblPropulsion:'lblPropulsion', lblEngineCmd:'lblEngineCmd',
     lblRadioChannel:'lblRadioChannel', creditsLabel:'creditsLabel',
-    lblPortServices:'lblPortServices', lblSpeedUpgrade:'lblSpeedUpgrade'
+    lblPortServices:'lblPortServices', lblSpeedUpgrade:'lblSpeedUpgrade', lblFuelService:'lblFuelService', lblFuel:'lblFuel'
   };
   Object.keys(map).forEach(function(id){
     const el = document.getElementById(id);
@@ -2558,6 +2573,21 @@ window.__gaugeEls = {main:[], rcs:[]};
   window.__gaugeEls.rcs = (window.__rcs||[]).map(function(t,i){
     return {fill: document.getElementById('rcsFill'+i), thruster: t};
   });
+
+  /* carburant (§22) : même rangée, séparée par le même trait que les RCS
+     des réacteurs principaux — pas un panneau à part (cf. commentaire CSS
+     ci-dessus). */
+  const fuelSep = document.createElement('div');
+  fuelSep.className = 'gauge-sep';
+  row.appendChild(fuelSep);
+  const fuelEl = document.createElement('div');
+  fuelEl.className = 'gauge fuel';
+  fuelEl.id = 'fuelGauge';
+  fuelEl.innerHTML =
+    '<div class="gauge-pct" id="fuelPct">100%</div>' +
+    '<div class="gauge-track"><div class="gauge-fill" id="fuelFill"></div></div>' +
+    '<div class="gauge-label" id="lblFuel">CARBURANT</div>';
+  row.appendChild(fuelEl);
 })();
 
 /* =========================================================================
@@ -4858,6 +4888,42 @@ function effectiveCruiseSpeed(){
 function speedUpgradeCost(level){
   return Math.round(3200 * Math.pow(1.55, level));
 }
+
+/* =========================================================================
+   CARBURANT (§22) — jauge, consommation liée au régime moteur,
+   ravitaillement en escale.
+   ========================================================================= */
+/* Réservoir de départ dimensionné contre les constantes RÉELLES du
+   générateur de routes (§22.1) : un saut mesure 700-1500 u (HOP_MIN/MAX,
+   findNextWaypoint), ~1100 u en moyenne ; une route compte 3-12 étapes
+   (legCount), ~7,5 en moyenne — soit ~8000 u par itinéraire complet en
+   croisière économique. 24 000 u ≈ 3 itinéraires à ce régime. */
+const FUEL_CAPACITY = 24000;
+let fuel = FUEL_CAPACITY;
+/* sous ce ratio vitesse/croisière, aucun surcoût : une amélioration
+   Propulseurs (ci-dessus) ne change donc PAS le coût en carburant d'un
+   trajet, seulement sa durée — cf. §22.2. Au-delà (boost), l'exposant 1,5
+   fait grimper vite le coût : un trajet intégralement boosté coûterait
+   ≈ 5,46× la référence (BOOST_MULT^1.5), plus qu'un réservoir plein —
+   délibéré, le boost soutenu doit rester un appoint, pas un régime de
+   croisière. */
+const FUEL_CONSUMPTION_EXPONENT = 1.5;
+/* à sec, le vaisseau n'est pas totalement immobilisé (ce qui bloquerait
+   la partie sans espoir de rejoindre un port) : le boost devient
+   indisponible et la croisière tombe à ce ratio — de quoi se traîner
+   jusqu'à l'escale la plus proche, pas de quoi continuer normalement.
+   Ce comportement à vide n'était pas détaillé dans la proposition
+   d'origine (§22) ; choisi ici pour rester jouable plutôt que de bloquer
+   la partie. */
+const FUEL_EMPTY_SPEED_SCALE = 0.2;
+/* tarif du ravitaillement (§22.3) : facturé uniquement sur le volume
+   manquant, jamais un forfait fixe. */
+const FUEL_PRICE_PER_UNIT = 0.20;
+/* seuils d'alerte HUD (§22.4), proposition de départ à ajuster en playtest */
+const FUEL_WARN_RATIO = 0.25, FUEL_CRIT_RATIO = 0.10;
+function fuelRefuelCost(){
+  return Math.ceil((FUEL_CAPACITY - fuel) * FUEL_PRICE_PER_UNIT);
+}
 const CAM_OFFSET = new THREE.Vector3(0, 12, 46);
 let camPos = new THREE.Vector3(0, 12, 46);
 let camLook = new THREE.Vector3(0,0,-40);
@@ -5052,24 +5118,83 @@ function repositionAllPanels(){
    semblaient avoir assez de marge. On les remonte au-dessus d'elle plutôt
    que de les laisser se chevaucher. Repositionnement dynamique (mesuré),
    pas un simple seuil de largeur fixe : la largeur de la rangée centrée
-   dépend aussi de QUELS panneaux elle contient à l'instant. */
+   dépend aussi de QUELS panneaux elle contient à l'instant.
+
+   Bug remonté en jeu (v2.6, ajout du carburant §22) : le panneau ITINÉRAIRE
+   peut AUSSI chevaucher la pile de droite (objet proche → services
+   portuaires → canal radio) sur une fenêtre basse — la pile s'est allongée
+   avec la ligne carburant. Un premier correctif calculait le rehaussement
+   nécessaire pour CHAQUE obstacle indépendamment puis gardait le plus
+   grand des deux (Math.max) : ça suffit tant que « rehausser assez pour
+   dégager le plus haut des deux obstacles » dégage AUSSI l'autre — faux ici,
+   puisque la pile de droite est elle-même haute sur l'écran (elle part du
+   HUD tout en haut) : un rehaussement dicté par la rangée du bas peut
+   remonter l'itinéraire pile AU MILIEU de cette pile plutôt que
+   d'en sortir. D'où une boucle courte qui revérifie la position réelle
+   après chaque ajustement, contre les DEUX obstacles à chaque passage,
+   plutôt qu'un calcul unique supposé valable d'un coup. */
 function repositionCornerBottomPanels(){
   const row = document.querySelector('.hud-bottom-row');
   const itin = document.querySelector('.hud-itinerary');
   const lag = document.querySelector('.hud-lagrange');
-  if(!row) return;
-  if(itin) itin.style.bottom = '';
-  if(lag) lag.style.bottom = '';
-  const rowRect = row.getBoundingClientRect();
   const MARGIN = 14;
-  const liftBottom = (window.innerHeight - rowRect.top) + MARGIN;
-  if(itin && !itin.classList.contains('panel-hidden')){
-    const itinRect = itin.getBoundingClientRect();
-    if(itinRect.left < rowRect.right + MARGIN) itin.style.bottom = liftBottom+'px';
-  }
-  if(lag && !lag.classList.contains('panel-hidden')){
+
+  if(lag) lag.style.bottom = '';
+  if(row && lag && !lag.classList.contains('panel-hidden')){
+    const rowRect = row.getBoundingClientRect();
     const lagRect = lag.getBoundingClientRect();
-    if(lagRect.right > rowRect.left - MARGIN) lag.style.bottom = liftBottom+'px';
+    if(lagRect.right > rowRect.left - MARGIN){
+      lag.style.bottom = ((window.innerHeight - rowRect.top) + MARGIN)+'px';
+    }
+  }
+
+  if(!itin || itin.classList.contains('panel-hidden')) return;
+  itin.style.bottom = '';
+  for(let pass=0; pass<3; pass++){
+    let moved = false;
+    if(row){
+      const rowRect = row.getBoundingClientRect();
+      const itinRect = itin.getBoundingClientRect();
+      const overlapsRow = itinRect.left < rowRect.right + MARGIN && itinRect.bottom > rowRect.top - MARGIN;
+      if(overlapsRow){
+        itin.style.bottom = ((window.innerHeight - rowRect.top) + MARGIN)+'px';
+        moved = true;
+      }
+    }
+    let stackBottom = 0, stackTop = Infinity;
+    ['nearestPanel','portPanel','radioPanel'].forEach(function(id){
+      const el = document.getElementById(id);
+      if(!el || el.classList.contains('panel-hidden')) return;
+      if(getComputedStyle(el).display === 'none') return;
+      const r = el.getBoundingClientRect();
+      if(r.bottom > stackBottom) stackBottom = r.bottom;
+      if(r.top < stackTop) stackTop = r.top;
+    });
+    if(stackBottom > 0){
+      const itinRect = itin.getBoundingClientRect();
+      const overlapsStack = itinRect.top < stackBottom + MARGIN && itinRect.bottom > stackTop - MARGIN;
+      if(overlapsStack){
+        /* déjà sous le bas de la pile (cas courant) → juste dégager son bas ;
+           déjà remonté AU-DESSUS de son haut (poussé là par la rangée du
+           bas, cas rare mais celui qui a motivé cette boucle) → dégager
+           son haut à la place, pas son bas, sans quoi on repousserait
+           l'itinéraire droit dans la pile plutôt que hors d'elle. */
+        const clearBelow = window.innerHeight - stackBottom - MARGIN - itinRect.height;
+        const clearAbove = window.innerHeight - stackTop + MARGIN;
+        const current = parseFloat(itin.style.bottom) || 0;
+        let next = current < clearBelow ? clearBelow : clearAbove;
+        /* garde-fou (fenêtre extrêmement basse, plusieurs panneaux ouverts
+           à la fois) : ne jamais pousser le panneau au point de dépasser le
+           HAUT de l'écran — un résidu de chevauchement, panneau entièrement
+           visible, reste préférable à un panneau à moitié hors champ. Pas
+           de solution parfaite dans ce cas extrême, un compromis assumé. */
+        const minBottom = window.innerHeight - itinRect.height - 60;
+        if(next > minBottom) next = minBottom;
+        itin.style.bottom = next+'px';
+        moved = true;
+      }
+    }
+    if(!moved) break;
   }
 }
 function refreshPortPanel(){
@@ -5088,7 +5213,27 @@ function refreshPortPanel(){
     btn.textContent = t('portUpgradeBtn') + ' \u2014 ' + formatCredits(cost) + ' CR';
     if(credits < cost) btn.classList.add('port-disabled');
   }
+  refreshFuelPortRow();
   repositionPortPanel();
+}
+/* ravitaillement (§22.3) : même panneau, même mécanisme d'activation que
+   le reste des services portuaires (isNearPortService) — pas de condition
+   séparée à maintenir. Facturé uniquement sur le volume manquant. */
+function refreshFuelPortRow(){
+  const pctEl = document.getElementById('fuelPortPct');
+  const btn = document.getElementById('fuelBuyBtn');
+  if(!pctEl || !btn) return;
+  const ratio = fuel / FUEL_CAPACITY;
+  pctEl.textContent = Math.round(ratio*100)+'%';
+  btn.classList.remove('port-disabled', 'port-maxed');
+  if(fuel >= FUEL_CAPACITY - 0.5){
+    btn.textContent = t('portFuelFull');
+    btn.classList.add('port-maxed');
+  } else {
+    const cost = fuelRefuelCost();
+    btn.textContent = t('portFuelBtn') + ' \u2014 ' + formatCredits(cost) + ' CR';
+    if(credits < cost) btn.classList.add('port-disabled');
+  }
 }
 function buySpeedUpgrade(){
   if(speedUpgradeLevel >= SPEED_UPGRADE_MAX) return;
@@ -5098,9 +5243,19 @@ function buySpeedUpgrade(){
   speedUpgradeLevel++;
   refreshPortPanel();
 }
+function buyFuel(){
+  if(fuel >= FUEL_CAPACITY - 0.5) return;
+  const cost = fuelRefuelCost();
+  if(credits < cost) return;
+  addCredits(-cost);
+  fuel = FUEL_CAPACITY;
+  refreshPortPanel();
+}
 (function initPortPanel(){
   const btn = document.getElementById('portBuyBtn');
   if(btn) btn.addEventListener('click', function(e){ e.stopPropagation(); buySpeedUpgrade(); });
+  const fuelBtn = document.getElementById('fuelBuyBtn');
+  if(fuelBtn) fuelBtn.addEventListener('click', function(e){ e.stopPropagation(); buyFuel(); });
 })();
 const RADIO_AVATARS = {
   /* silhouette de capitaine (ambre) et d'antenne de tour (cyan) —
@@ -6198,10 +6353,26 @@ function updateFlight(dt, elapsed){
         approachScale = THREE.MathUtils.lerp(0.28, 1, t);
       }
     }
-    const targetSpeed = effectiveCruiseSpeed() * (boosting ? BOOST_MULT : 1) * approachScale;
+    const targetSpeed = effectiveCruiseSpeed()
+      * (boosting && fuel > 0 ? BOOST_MULT : 1)
+      * approachScale
+      * (fuel > 0 ? 1 : FUEL_EMPTY_SPEED_SCALE);
     currentSpeed += (targetSpeed-currentSpeed)*Math.min(1, dt*2.2);
     forward = new THREE.Vector3(0,0,-1).applyQuaternion(shipRig.quaternion);
-    shipRig.position.addScaledVector(forward, currentSpeed*dt);
+    const fuelDist = currentSpeed*dt;
+    shipRig.position.addScaledVector(forward, fuelDist);
+
+    /* consommation (§22.2) : proportionnelle à la distance ET au régime —
+       pas seulement à la distance seule, sans quoi une amélioration
+       Propulseurs coûterait plus cher en carburant pour rien. Seule la
+       croisière normale (cette branche) consomme ; la manœuvre d'orbite
+       (branche « paused » ci-dessus) suit son propre mouvement paramétrique,
+       hors du champ du calcul de §22.1. */
+    const cruiseRef = effectiveCruiseSpeed();
+    if(fuel > 0 && cruiseRef > 0 && fuelDist > 0){
+      const regime = currentSpeed / cruiseRef;
+      fuel = Math.max(0, fuel - fuelDist * Math.pow(regime, FUEL_CONSUMPTION_EXPONENT));
+    }
   }
 
   const speedlines = document.getElementById('speedlines');
@@ -6272,6 +6443,21 @@ function updateFlight(dt, elapsed){
   (window.__gaugeEls.rcs||[]).forEach(function(g){
     if(g.fill) g.fill.style.height = Math.round((g.thruster.currentLevel||0)*100)+'%';
   });
+
+  /* jauge carburant (§22.4) : classe warn/crit sous les seuils plutôt qu'une
+     couleur recalculée en JS à chaque image (cf. règles CSS .gauge.fuel). */
+  const fuelPctEl = document.getElementById('fuelPct');
+  const fuelFillEl = document.getElementById('fuelFill');
+  const fuelGaugeEl = document.getElementById('fuelGauge');
+  if(fuelFillEl){
+    const fuelRatio = fuel / FUEL_CAPACITY;
+    fuelFillEl.style.height = Math.round(fuelRatio*100)+'%';
+    if(fuelPctEl) fuelPctEl.textContent = Math.round(fuelRatio*100)+'%';
+    if(fuelGaugeEl){
+      fuelGaugeEl.classList.toggle('crit', fuelRatio < FUEL_CRIT_RATIO);
+      fuelGaugeEl.classList.toggle('warn', fuelRatio >= FUEL_CRIT_RATIO && fuelRatio < FUEL_WARN_RATIO);
+    }
+  }
 
   /* ---------- dialogue de télémétrie : commandes envoyées aux moteurs ---------- */
   updateTelemetryPanel(mainPowers, boosting);
