@@ -205,7 +205,7 @@
   .help-panel{
     position:relative; border:1px solid var(--line);
     background:linear-gradient(180deg, rgba(94,234,212,0.05), transparent 60%), rgba(15,26,48,0.94);
-    padding:26px 34px 20px; max-width:640px; width:90vw; max-height:82vh; overflow:auto;
+    padding:26px 34px 20px; max-width:920px; width:92vw; max-height:82vh; overflow:auto;
   }
   .help-panel::before, .help-panel::after{
     content:""; position:absolute; width:14px; height:14px; border:1.5px solid var(--amber);
@@ -216,7 +216,21 @@
     font-family:'JetBrains Mono',monospace; font-weight:700; font-size:15px;
     letter-spacing:0.14em; color:var(--amber); margin-bottom:16px; text-align:center;
   }
-  .help-grid{ display:grid; grid-template-columns:auto 1fr; gap:8px 16px; font-size:12px; }
+  /* aide sur 2 colonnes (demande explicite) : répartition équilibrée en CSS
+     pur (column-count), pas un découpage manuel du tableau en JS — chaque
+     ligne [touche, description] reste un bloc insécable (break-inside:avoid)
+     pour ne jamais couper une touche de sa description entre les deux
+     colonnes. Gagne environ moitié moins de hauteur qu'une colonne unique. */
+  .help-grid{ column-count:2; column-gap:28px; font-size:12px; }
+  /* repli une colonne sous 680px : repéré sur émulation iPhone — de force,
+     deux colonnes étroites font se chevaucher touche et description plutôt
+     que de gagner de la place (texte plus long que la colonne, §17.2 pour
+     l'esprit déjà suivi : mieux vaut une colonne lisible que deux cassées). */
+  @media (max-width:680px){ .help-grid{ column-count:1; } }
+  .help-row{
+    display:grid; grid-template-columns:auto 1fr; gap:8px 16px; align-items:center;
+    break-inside:avoid; -webkit-column-break-inside:avoid; margin-bottom:8px;
+  }
   .help-grid .hk{
     font-family:'JetBrains Mono',monospace; color:var(--cyan); white-space:nowrap;
     border:1px solid var(--line); border-radius:3px; padding:1px 7px; text-align:center; height:fit-content;
@@ -4647,7 +4661,7 @@ function buildHelpGrid(){
   rows.push(['\u00c9CHAP / P', t('hlp_pause')]);
   rows.push(['H', t('hlp_help')]);
   grid.innerHTML = rows.map(function(r){
-    return '<div class="hk">'+r[0]+'</div><div class="hv">'+r[1]+'</div>';
+    return '<div class="help-row"><div class="hk">'+r[0]+'</div><div class="hv">'+r[1]+'</div></div>';
   }).join('');
 }
 /* croix de fermeture — un seul gestionnaire délégué pour tous les
@@ -5610,6 +5624,57 @@ function startShuttleLoading(withCutaway){
 /* Anime le bras à chaque image tant qu'un chargement est en cours, puis
    lance réellement la navette une fois le conteneur déposé et le bras
    revenu au repos. */
+/* =========================================================================
+   ÉVITEMENT D'OBSTACLES POUR LA CAMÉRA (bug remonté en jeu)
+   ========================================================================= */
+/* Repousse une position de caméra candidate hors de sphères d'exclusion
+   (coque du cargo, planète cible...) plutôt que de laisser le plan
+   traverser leur géométrie. Deux passes, indépendantes :
+   1) si la position elle-même tombe DANS une sphère, la repousse
+      radialement depuis le centre de cette sphère jusqu'à sa surface ;
+   2) si le SEGMENT caméra→cible croise une sphère qui n'est pas la cible
+      elle-même, décale la caméra perpendiculairement à ce segment pour
+      dégager la ligne de mire, sans changer la distance de suivi voulue.
+   Volontairement générique (liste d'obstacles en paramètre, pas figée sur
+   le cargo) : sert à la fois aux séquences de largage de navette et,
+   plus généralement, à tout plan « travelling » qui suit un vaisseau
+   (cargo ou navette) à proximité d'une planète ou d'un autre corps. */
+function clearCameraObstacles(pos, lookAt, obstacles){
+  obstacles.forEach(function(ob){
+    const toPos = pos.clone().sub(ob.center);
+    const d = toPos.length();
+    if(d < ob.radius){
+      if(d < 1e-4) toPos.set(0, 1, 0.0001);
+      pos.copy(ob.center).addScaledVector(toPos.normalize(), ob.radius);
+    }
+  });
+  const toLook = lookAt.clone().sub(pos);
+  const segLen = toLook.length();
+  if(segLen < 1e-4) return pos;
+  const dir = toLook.clone().normalize();
+  obstacles.forEach(function(ob){
+    const toObs = ob.center.clone().sub(pos);
+    const proj = toObs.dot(dir);
+    if(proj <= 0 || proj >= segLen) return;   /* obstacle pas entre caméra et cible */
+    const closest = pos.clone().addScaledVector(dir, proj);
+    const dist = closest.distanceTo(ob.center);
+    if(dist < ob.radius){
+      const lateral = pos.clone().sub(closest);
+      if(lateral.lengthSq() < 1e-6){
+        lateral.copy(dir).cross(new THREE.Vector3(0,1,0));
+        if(lateral.lengthSq() < 1e-6) lateral.set(1,0,0);
+      }
+      lateral.normalize();
+      pos.addScaledVector(lateral, (ob.radius - dist) + 2);
+    }
+  });
+  return pos;
+}
+/* Rayon d'exclusion englobant la coque du cargo (corps arrière + caisson
+   avant + porte-à-faux) — mesuré large plutôt qu'au plus juste, une marge
+   généreuse coûte moins cher qu'un plan qui re-traverse la coque de justesse. */
+const SHIP_HULL_RADIUS = 20;
+
 function updateShuttleLoading(dt){
   const L = orbitState.loading;
   if(!L) return;
@@ -6273,9 +6338,24 @@ function updateFlight(dt, elapsed){
       /* repère stable de l'orbite (ne tourne pas avec le vaisseau) —
          orienté de façon cohérente avec shipRight/shipUp au moment du
          largage, pour que la séquence tirée garde le même « sens » visuel
-         qu'avant ce correctif. */
+         qu'avant ce correctif.
+         Correctif (bug remonté en jeu) : le PLAN RAPPROCHÉ de chargement
+         (closeUpPos, juste en dessous) utilisait encore shipRight/shipUp/
+         shipFwd — vivants, recalculés à chaque image depuis l'orientation
+         RÉELLE du vaisseau — alors que celui-ci tourne en continu pendant
+         toute la manœuvre d'orbite. Le cadrage du gros plan balayait donc
+         un angle totalement différent d'une image à l'autre (vérifié :
+         coque à t=0.2s, tuyères à t=1.5s, coque sous un autre angle à
+         t=3.3s, pour une seule et même prise) — perçu comme un tremblement
+         du vaisseau, et empêchait de voir clairement le dock ou la navette
+         en sortir. Le correctif précédent n'avait stabilisé que le plan de
+         SUIVI (après la coupure) ; le plan RAPPROCHÉ, juste avant, avait le
+         même défaut et n'avait pas été couvert. Un troisième axe stable
+         (stableFwd) complète stableRight/stableUp ci-dessous, sur le même
+         principe. */
       const stableRight = os.U.clone().multiplyScalar(os.U.dot(shipRight) >= 0 ? 1 : -1);
       const stableUp    = os.N.clone().multiplyScalar(os.N.dot(shipUp)    >= 0 ? 1 : -1);
+      const stableFwd   = os.V.clone().multiplyScalar(os.V.dot(shipFwd)   >= 0 ? 1 : -1);
       const shuttlePos = shuttle ? shuttle.group.position : dockPos;
       const seq = os.cutawaySeq || 'lateral';
 
@@ -6292,7 +6372,7 @@ function updateFlight(dt, elapsed){
       else stagePos.copy(dockPos);
       const loadMidpoint = dockPos.clone().lerp(stagePos, 0.5);
       const closeUpPos = loadMidpoint.clone()
-        .addScaledVector(shipRight, 9).addScaledVector(shipUp, -1.5).addScaledVector(shipFwd, 5);
+        .addScaledVector(stableRight, 9).addScaledVector(stableUp, -1.5).addScaledVector(stableFwd, 5);
       const closeUpLook = loadMidpoint;
 
       let desiredPos, desiredLook, lerpRate, lookLerpRate;
@@ -6306,6 +6386,16 @@ function updateFlight(dt, elapsed){
         desiredPos = closeUpPos.clone().lerp(farPos, ease);
         desiredLook = closeUpLook.clone().lerp(shuttlePos, ease);
         lerpRate = 3.2; lookLerpRate = 3.2;
+        /* évitement d'obstacles seulement une fois assez éloigné du cargo
+           (ease > 0.5) : en tout début de mouvement, la caméra EST tout
+           près de la coque par construction (départ sur closeUpPos, cf.
+           bug du plan rapproché plus haut) — l'exclure dès l'obstacle
+           entier ferait sursauter la caméra dès la première image. */
+        if(ease > 0.5){
+          const camObstacles = [{ center: shipRig.position, radius: SHIP_HULL_RADIUS }];
+          if(orbitState.planet) camObstacles.push({ center: orbitState.planet.position, radius: orbitState.planet.radius });
+          clearCameraObstacles(desiredPos, desiredLook, camObstacles);
+        }
       } else if(closeT < 1){
         /* phase de gros plan, commune aux trois séquences à coupure */
         desiredPos = closeUpPos;
@@ -6324,7 +6414,7 @@ function updateFlight(dt, elapsed){
         } else if(seq === 'shoulder'){
           /* plan fixe SOLIDAIRE DE L'ORBITE (plus du vaisseau) : la navette s'éloigne dans le cadre */
           desiredPos = dockPos.clone()
-            .addScaledVector(stableRight, 15).addScaledVector(stableUp, 6).addScaledVector(shipFwd, 4);
+            .addScaledVector(stableRight, 15).addScaledVector(stableUp, 6).addScaledVector(stableFwd, 4);
           desiredLook = shuttlePos;
         } else {
           /* « lateral » : suivi à distance rapprochée, légèrement en hauteur-arrière */
@@ -6335,6 +6425,18 @@ function updateFlight(dt, elapsed){
            accélération sur son arc, sortait du cadre le temps que la
            caméra la rattrape — d'où l'impression de cadrage décentré. */
         lerpRate = 4.5; lookLerpRate = 6;
+
+        /* évitement d'obstacles (bug remonté en jeu) : la cible de ces trois
+           séquences est la NAVETTE, pas le cargo — qui reste pourtant un
+           obstacle massif tout proche du point de départ. Repéré très
+           concrètement en testant chaque séquence : « shoulder » plaçait la
+           caméra à ~17 unités du point d'ancrage, à l'intérieur même de la
+           coque (rayon mesuré ~20). Le cargo est donc traité ici comme un
+           obstacle à contourner, jamais comme la cible — cf. clearCameraObstacles
+           plus haut. La planète cible s'ajoute quand elle existe, même logique. */
+        const camObstacles = [{ center: shipRig.position, radius: SHIP_HULL_RADIUS }];
+        if(orbitState.planet) camObstacles.push({ center: orbitState.planet.position, radius: orbitState.planet.radius });
+        clearCameraObstacles(desiredPos, desiredLook, camObstacles);
       }
 
       /* coupure franche : au premier passage en phase de suivi, on saute
@@ -6416,6 +6518,19 @@ function updateFlight(dt, elapsed){
         .addScaledVector(shipFwd, Math.sin(seqAngle)*seqRadius)
         .addScaledVector(shipUp, seqHeight);
       const desired = shipRig.position.clone().add(offset);
+      /* évitement d'obstacles (bug remonté en jeu, portée générale : « lors
+         de ses travelling, la caméra traverse parfois vaisseau, planète,
+         objet ») : cette orbite tourne à proximité du vaisseau — la cible —
+         mais peut, à certains angles, se retrouver du mauvais côté d'une
+         planète toute proche pendant l'approche. Seule la planète de
+         l'étape en cours entre en jeu ici (le vaisseau LUI-MÊME est la
+         cible, jamais un obstacle pour son propre plan). Vérifié bon marché
+         : ignoré la plupart du temps, une seule planète candidate, pas de
+         parcours de liste. */
+      const seqLeg = ROUTE.legs && ROUTE.legs[ROUTE.index];
+      if(seqLeg && seqLeg.planet && shipRig.position.distanceTo(seqLeg.planet.position) < seqLeg.planet.radius*6){
+        clearCameraObstacles(desired, shipRig.position, [{ center: seqLeg.planet.position, radius: seqLeg.planet.radius }]);
+      }
       camPos.lerp(desired, Math.min(1, dt*2.2));
       camera.position.copy(camPos);
       camLook.lerp(shipRig.position, Math.min(1, dt*2.2));

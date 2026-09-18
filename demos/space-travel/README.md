@@ -32,7 +32,7 @@ python3 -m http.server 8000
 | Interface en français                                                                |
 |--------------------------------------------------------------------------------------|
 | ![Navigation quantique, cargo Orin-17, approche d'un système binaire](./stt-001.jpg) |
-| Interface en anglais |
+| Interface en anglais                                                                 |
 | ![Quantum navigation, cargo Kai-89, plan de vol vers plusieurs ports](./stt-002.jpg) |
 
 ## Commandes
