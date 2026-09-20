@@ -34,7 +34,9 @@ trap 'rm -rf "$TMP"' EXIT
   --user-data-dir="$TMP/profile" --virtual-time-budget=20000 \
   --dump-dom "file://$HTML?seed=$SEED&selftest=1" >"$TMP/dom.html" 2>"$TMP/err.log" || true
 
-ACTUAL="$(sed -n '/<pre id="selftest">/,/<\/pre>/p' "$TMP/dom.html" | sed -e 's/<[^>]*>//g')"
+# le DOM est aplati sur une ligne avant d'extraire : dans la version minifiée,
+# tout le script tient sur une seule ligne, juste avant la balise <pre>
+ACTUAL="$(tr '\n' '\r' < "$TMP/dom.html" | sed -n 's/.*<pre id="selftest">\([^<]*\)<\/pre>.*/\1/p' | tr '\r' '\n')"
 if [ -z "$ACTUAL" ]; then
   echo "Instantané introuvable : le script de la page a échoué. Journal Chrome :" >&2
   tail -20 "$TMP/err.log" >&2
