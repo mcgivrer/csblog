@@ -1728,7 +1728,8 @@ scene.add(starLight);
 const lightState = {
   dir: new THREE.Vector3(0.5,0.8,0.4).normalize(),
   color: new THREE.Color(0xdfe8ff),
-  intensity: 0.8
+  intensity: 0.8,
+  source: null     /* étoile dominante actuelle : exclue du pool de lumières ponctuelles (cf. STAR_FX) */
 };
 const _lightTmpDir = new THREE.Vector3();
 const _lightTmpCol = new THREE.Color();
@@ -1743,6 +1744,7 @@ function updateStarLighting(dt){
     const flux = obj.star.lum/(d*d);
     if(flux > bestScore){ bestScore = flux; best = obj; bestDist = d; }
   });
+  lightState.source = best;
 
   if(best){
     _lightTmpDir.copy(best.mesh.position).sub(shipRig.position).normalize();
@@ -1781,6 +1783,61 @@ function makeGlowTexture(){
   return new THREE.CanvasTexture(c);
 }
 const glowTex = makeGlowTexture();
+
+/* =========================================================================
+   3ter. RENDU DES ÉTOILES — halo, lumière ponctuelle, lens-flare
+   (docs/etude-rendu-etoiles.md). Une étoile est une SOURCE : cœur brillant,
+   halo dont la taille suit son éclat, lumière réelle sur ce qui l'entoure,
+   et, pour les plus éclatantes, les reflets d'un objectif (lens-flare).
+   ?starfx=0 rend les étoiles comme avant, pour comparer ; ?flare=0|1 force
+   le lens-flare (par défaut : écran-titre seulement, pas en jeu).
+   ========================================================================= */
+const STAR_FX = {
+  on: _params.get('starfx') !== '0',
+  /* halo : rayon À L'ÉCRAN (px CSS) du sprite, fonction de l'éclat perçu
+     (cf. animate). Le rayon monde en découle (px × distance) : un halo ne
+     rétrécit donc plus avec l'éloignement, comme le faisait sa taille monde
+     fixe, qui laissait les étoiles lointaines réduites à un point nu. */
+  haloBase: 8, haloGain: 42, haloMin: 9, haloMax: 300,
+  /* cœur : gain de luminance, entre les étoiles peu et très lumineuses */
+  coreGainMin: 1.55, coreGainMax: 2.05,
+  /* pool de lumières ponctuelles : nombre CONSTANT (un changement de nombre
+     de lumières recompile tous les shaders de la scène), intensité 0 au repos */
+  lightCount: 3, lightDecay: 1.4, lightGain: 1.0, lightPeriod: 0.25
+};
+
+/* Texture du halo : cœur très serré, longue queue exponentielle qui s'éteint
+   avant le bord (aucune coupure visible) et, si `spikes`, deux traits de
+   diffraction fins en croix. Générée une fois, partagée. Les points du décor
+   lointain gardent les traits ; le halo des étoiles nommées n'en a pas : sa
+   taille varie de quelques pixels à des milliers (disque résolu), les traits
+   deviendraient alors de larges bandes ; ils sont le rôle du lens-flare. */
+function makeStarHaloTexture(spikes){
+  const S = 256, data = new Uint8Array(S*S*4);
+  for(let y=0;y<S;y++){
+    for(let x=0;x<S;x++){
+      const nx = (x+0.5)/S*2-1, ny = (y+0.5)/S*2-1;
+      const r = Math.sqrt(nx*nx+ny*ny);
+      const edge = 1 - Math.min(1, Math.max(0, (r-0.72)/0.28));
+      const core = Math.exp(-(r*r)/(0.035*0.035));
+      const glow = 0.80*Math.exp(-r/0.085) + 0.30*Math.exp(-r/0.28);
+      const sx = Math.exp(-(ny*ny)/(0.008*0.008))*Math.exp(-Math.abs(nx)/0.30);
+      const sy = Math.exp(-(nx*nx)/(0.008*0.008))*Math.exp(-Math.abs(ny)/0.30);
+      const a = Math.min(1, (core + glow + (spikes ? 0.35*(sx + sy) : 0))*edge);
+      const i = (y*S+x)*4;
+      data[i] = data[i+1] = data[i+2] = 255;
+      data[i+3] = Math.round(a*255);
+    }
+  }
+  const tex = new THREE.DataTexture(data, S, S, THREE.RGBAFormat);
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.generateMipmaps = true;
+  tex.needsUpdate = true;
+  return tex;
+}
+const STAR_HALO_TEX = makeStarHaloTexture(true);    /* points du décor lointain */
+const STAR_GLOW_TEX = makeStarHaloTexture(false);   /* halo des étoiles nommées */
 
 /* ---------- texture de bruit fBm à 4 canaux indépendants ----------
    Repris du principe de nebula.frag : le bruit est PRÉ-CALCULÉ dans une
@@ -1881,6 +1938,7 @@ const STAR_FRAG = `
   uniform float time;
   uniform float granulation;
   uniform float seed;
+  uniform float uGain;   /* > 0 : étoile émissive (cf. STAR_FX) ; absent ou 0 : rendu d'origine, carte stellaire comprise */
 
   float hash(vec3 p){
     p = fract(p*0.3183099 + vec3(0.1,0.2,0.3));
@@ -1908,24 +1966,377 @@ const STAR_FRAG = `
 
     /* assombrissement centre-bord : le bord du disque est plus froid/sombre
        car on y voit des couches plus hautes de la photosphère */
-    float limb = 1.0 - limbU*(1.0 - mu);
+    /* mode émissif (uGain > 0) : disque plus plat et plus lisse, pour qu'il
+       se lise comme une source de lumière et non comme un sol rocheux */
+    float emit = uGain > 0.0 ? 1.0 : 0.0;
+    float limb = 1.0 - limbU*(1.0 - mu)*mix(1.0, 0.6, emit);
 
     /* granulation convective : cellules qui se renouvellent lentement */
     vec3 gp = normalize(vPos)*7.0 + vec3(seed);
     float gran = fbm(gp + vec3(0.0, 0.0, time*0.08));
-    float cells = mix(1.0, 0.80 + 0.40*gran, granulation);
+    float cells = mix(1.0, mix(0.80, 0.90, emit) + mix(0.40, 0.20, emit)*gran, granulation);
 
     /* taches stellaires (zones magnétiques plus froides) */
     float spot = smoothstep(0.62, 0.78, fbm(gp*0.45 + vec3(seed*1.7)));
-    cells *= mix(1.0, 0.55, spot*granulation);
+    cells *= mix(1.0, mix(0.55, 0.80, emit), spot*granulation);
 
     /* le bord paraît plus rouge : les couches hautes rayonnent plus froid */
-    vec3 col = baseColor * limb * cells;
+    float gain = uGain > 0.0 ? uGain : 1.0;
+    vec3 col = baseColor * limb * cells * gain;
     col = mix(col, col*vec3(1.15, 0.80, 0.58), (1.0-mu)*0.55);
+    /* étoile émissive : le centre du disque sature vers le blanc, comme un
+       capteur ébloui, et le bord garde la teinte du corps noir */
+    if(uGain > 0.0) col = mix(col, vec3(1.0, 0.98, 0.94), 0.50*pow(mu, 2.5));
 
     gl_FragColor = vec4(col, 1.0);
   }
 `;
+
+/* ---------- halo des étoiles : couleur, taille à l'écran ---------- */
+/* Teinte du halo : la couleur de corps noir, un peu plus saturée et assombrie
+   avant l'encodage sRGB de sortie, qui la reblanchit sinon (le halo d'une
+   étoile orange sortait gris-blanc). */
+function starHaloColor(c){
+  const l = 0.2126*c.r + 0.7152*c.g + 0.0722*c.b, s = 1.35;
+  const f = function(v){ return Math.pow(Math.min(1, Math.max(0, l + (v - l)*s)), 1.6); };
+  return new THREE.Color(f(c.r), f(c.g), f(c.b));
+}
+/* Taille monde d'un pixel CSS à distance 1 : recalculée une fois par image */
+function starFxBeginFrame(){
+  STAR_FX.pxWorld = 2*Math.tan(THREE.MathUtils.degToRad(camera.fov*0.5))/window.innerHeight;
+}
+/* Halo d'une étoile pour cette image. `perceived` : éclat perçu (0..6, cf.
+   animate). Rayon écran = base + gain × éclat, modulé par le type de l'étoile
+   (haloSize, dérivé de sa luminosité et de sa température : aucun tirage). */
+function starHaloUpdate(o, d, perceived){
+  if(!STAR_FX.on){
+    o.halo.scale.setScalar(o.baseHalo * (0.55 + perceived*0.55));
+    o.halo.material.opacity = THREE.MathUtils.clamp(0.25 + perceived*0.35, 0.15, 1.0);
+    return;
+  }
+  let px = THREE.MathUtils.clamp(STAR_FX.haloBase + STAR_FX.haloGain*perceived,
+                                 STAR_FX.haloMin, STAR_FX.haloMax) * o.haloSize;
+  /* disque résolu (vue rapprochée) : le halo, tenu tout entier dans le
+     disque, y serait invisible. Sa queue doit sortir au-delà du limbe, en
+     couronne : le rayon du sprite vaut alors dix rayons de disque (la
+     lueur intérieure du profil s'y éteint à peu près au limbe). max() :
+     aucun saut lorsque le disque commence à compter. */
+  const discPx = o.baseCore*o.core.scale.x/(Math.max(d, 1)*STAR_FX.pxWorld);
+  if(discPx > 0.05*px) px = Math.min(Math.max(px, discPx*10), 2400);
+  o.halo.scale.setScalar(2*px*d*STAR_FX.pxWorld);
+  /* la couronne d'un très gros disque s'atténue : elle voilerait tout l'écran */
+  o.halo.material.opacity = THREE.MathUtils.clamp(0.55 + 0.10*perceived, 0.5, 1.0) *
+                            (1 - 0.45*THREE.MathUtils.smoothstep(discPx, 40, 300));
+}
+
+/* ---------- lumières ponctuelles : les étoiles brillantes éclairent ----------
+   Un petit pool de PointLight, de nombre CONSTANT (en changer recompilerait
+   les shaders de toute la scène) et d'intensité 0 au repos, réattribué
+   toutes les STAR_FX.lightPeriod secondes aux étoiles les plus lumineuses en
+   vue. Jamais une lumière par étoile (≈ 171 suivies). L'étoile déjà servie
+   par la lumière directionnelle starLight (lightState.source) est exclue, pour
+   ne pas éclairer deux fois. Une lumière qui change d'étoile s'éteint d'abord
+   en fondu : pas de saut visible. Elle éclaire ce que Three.js éclaire
+   (coque, lunes, astéroïdes) ; les shaders maison (planètes, nébuleuses)
+   ont leur propre éclairage et l'ignorent. */
+const STAR_LIGHT_POOL = [];
+const _slCand = [];
+if(STAR_FX.on){
+  for(let i = 0; i < STAR_FX.lightCount; i++){
+    const L = new THREE.PointLight(0xffffff, 0, 1000, STAR_FX.lightDecay);
+    L.userData.obj = null;    /* étoile portée par cette lumière */
+    L.userData.fade = 0;      /* fondu d'entrée / de sortie, 0..1 */
+    L.userData.want = 0;
+    scene.add(L);
+    STAR_LIGHT_POOL.push(L);
+    _slCand.push({o:null, flux:0});
+  }
+}
+let _slTimer = 0;
+function starLightCutoff(lum){ return 900 + 1800*Math.min(1, Math.log10(1 + lum)/3); }
+function starLightVisit(o){
+  if(!o || o === lightState.source) return;
+  const d2 = o.mesh.position.distanceToSquared(camera.position);
+  const cut = starLightCutoff(o.star.lum);
+  if(d2 > cut*cut*1.7) return;             /* trop loin pour éclairer quoi que ce soit ici */
+  const flux = o.star.lum/(d2 + 1);
+  let worst = 0;
+  for(let i = 1; i < _slCand.length; i++) if(_slCand[i].flux < _slCand[worst].flux) worst = i;
+  if(flux > _slCand[worst].flux){ _slCand[worst].o = o; _slCand[worst].flux = flux; }
+}
+function updateStarLights(dt){
+  if(!STAR_FX.on) return;
+  _slTimer -= dt;
+  if(_slTimer <= 0){
+    _slTimer = STAR_FX.lightPeriod;
+    for(let i = 0; i < _slCand.length; i++){ _slCand[i].o = null; _slCand[i].flux = 0; }
+    starField.forEach(starLightVisit);
+    for(let i = 0; i < STAR_LIGHT_POOL.length; i++) STAR_LIGHT_POOL[i].userData.want = 0;
+    for(let j = 0; j < _slCand.length; j++){
+      const c = _slCand[j];
+      if(!c.o) continue;
+      let L = null;
+      for(let i = 0; i < STAR_LIGHT_POOL.length; i++){
+        if(STAR_LIGHT_POOL[i].userData.obj === c.o){ L = STAR_LIGHT_POOL[i]; break; }
+      }
+      if(!L){
+        for(let i = 0; i < STAR_LIGHT_POOL.length; i++){
+          if(STAR_LIGHT_POOL[i].userData.obj === null){
+            L = STAR_LIGHT_POOL[i]; L.userData.obj = c.o; L.userData.fade = 0; break;
+          }
+        }
+      }
+      if(L) L.userData.want = 1;
+    }
+  }
+  const k = Math.min(1, dt*2.5);
+  for(let i = 0; i < STAR_LIGHT_POOL.length; i++){
+    const L = STAR_LIGHT_POOL[i], u = L.userData;
+    u.fade += (u.want - u.fade)*k;
+    if(u.want === 0 && u.fade < 0.02){ u.fade = 0; u.obj = null; }
+    if(!u.obj){ L.intensity = 0; continue; }
+    const s = u.obj.star;
+    L.position.copy(u.obj.mesh.position);
+    L.color.setRGB(s.color.r, s.color.g, s.color.b);
+    L.distance = starLightCutoff(s.lum);
+    L.intensity = u.fade * STAR_FX.lightGain *
+                  Math.min(3.2, Math.max(0.3, 0.30 + 0.75*Math.log10(1 + s.lum)));
+  }
+}
+
+/* ---------- lens-flare : les reflets d'un objectif ----------
+   Passe additive après le rendu de la scène, pour les FLARE.count étoiles les
+   plus éclatantes en vue : starburst à six branches sur l'étoile, anneau de
+   halo à léger décalage chromatique, puis des « ghosts » alignés sur l'axe
+   étoile → centre de l'écran. Chaque élément est un quad en coordonnées
+   d'écran, rempli côté CPU dans des tampons préalloués (aucune allocation
+   par image) et dessiné par un seul shader. L'intensité dépend de l'éclat,
+   de la distance au bord de l'écran, de l'écart à l'axe optique, de la taille
+   du disque (une étoile résolue éblouit moins) et d'une occultation
+   analytique par les planètes et le vaisseau. */
+const FLARE = {
+  /* 'title' : écran-titre seulement ; 'always' : partout (?flare=1) ; 'off' (?flare=0) */
+  mode: _params.get('flare') === '1' ? 'always' : (_params.get('flare') === '0' ? 'off' : 'title'),
+  count: 4,             /* étoiles traitées à chaque image */
+  minPerceived: 0.8,    /* éclat perçu (cf. animate) sous lequel il n'y a pas de flare */
+  fullPerceived: 3.5,   /* éclat perçu donnant l'intensité maximale */
+  strength: 1.0,
+  margin: 1.35          /* facteur d'écran au-delà duquel le flare disparaît */
+};
+/* sorte : 0 starburst, 1 anneau, 2 disque doux, 3 anneau fantôme, 4 hexagone ;
+   k : position sur l'axe centre de l'écran → étoile (1 = sur l'étoile, < 0 =
+   de l'autre côté du centre) ; size : demi-hauteur d'écran ; gain ; teinte */
+const FLARE_ELEMENTS = [
+  {kind:0, k: 1.00, size:0.60, gain:1.00, tint:[1.00,1.00,1.00]},
+  {kind:1, k: 1.00, size:0.30, gain:0.50, tint:[1.00,1.00,1.00]},
+  {kind:2, k: 0.55, size:0.10, gain:0.35, tint:[0.70,0.90,1.00]},
+  {kind:4, k: 0.25, size:0.06, gain:0.30, tint:[1.00,0.80,0.50]},
+  {kind:2, k:-0.35, size:0.14, gain:0.28, tint:[0.60,1.00,0.80]},
+  {kind:3, k:-0.75, size:0.22, gain:0.22, tint:[1.00,0.70,0.90]},
+  {kind:4, k:-1.25, size:0.09, gain:0.30, tint:[0.80,0.80,1.00]},
+  {kind:2, k: 1.70, size:0.16, gain:0.18, tint:[1.00,0.90,0.60]}
+];
+const FLARE_VERT = `
+  attribute vec4 aColor;
+  attribute vec2 aCorner;
+  attribute float aKind;
+  varying vec4 vC;
+  varying vec2 vP;
+  varying float vK;
+  void main(){
+    vC = aColor; vP = aCorner; vK = aKind;
+    gl_Position = vec4(position.xy, 0.0, 1.0);
+  }
+`;
+const FLARE_FRAG = `
+  precision highp float;
+  varying vec4 vC;
+  varying vec2 vP;
+  varying float vK;
+  void main(){
+    float r = length(vP);
+    vec3 rgb = vec3(0.0);
+    if(vK < 0.5){
+      /* starburst : six branches fines (ouverture à six lames), un second
+         jeu plus fin décalé de 30°, et un noyau serré */
+      float ang = atan(vP.y, vP.x);
+      float rays  = pow(abs(cos(ang*3.0)), 28.0);
+      float rays2 = pow(abs(cos(ang*3.0 + 0.5236)), 60.0);
+      rgb = vec3((0.75*rays + 0.35*rays2)*exp(-r*3.2) + 0.9*exp(-r*r*55.0));
+    } else if(vK < 1.5){
+      /* anneau de halo : le rayon varie de ±3,5 % par canal (décalage chromatique) */
+      float w = 0.07;
+      float cr = exp(-pow((r*0.965 - 0.56)/w, 2.0));
+      float cg = exp(-pow((r - 0.56)/w, 2.0));
+      float cb = exp(-pow((r*1.035 - 0.56)/w, 2.0));
+      rgb = vec3(cr, cg, cb)*0.85 + vec3(0.12)*exp(-r*r*5.0);
+    } else if(vK < 2.5){
+      /* ghost : disque doux */
+      rgb = vec3((1.0 - smoothstep(0.55, 1.0, r))*(0.55 + 0.45*(1.0 - r)));
+    } else if(vK < 3.5){
+      /* ghost annulaire */
+      rgb = vec3(exp(-pow((r - 0.72)/0.13, 2.0))*0.9 + 0.25*(1.0 - smoothstep(0.0, 0.9, r)))*vec3(1.0, 0.9, 1.0);
+    } else {
+      /* ghost à l'image de l'ouverture : hexagone doux */
+      float hx = max(abs(vP.x)*0.8660254 + abs(vP.y)*0.5, abs(vP.y));
+      rgb = vec3((1.0 - smoothstep(0.72, 1.0, hx))*0.8);
+    }
+    rgb *= 1.0 - smoothstep(0.85, 1.0, r);
+    gl_FragColor = vec4(rgb*vC.rgb*vC.a, 1.0);
+  }
+`;
+/* Tampons, géométrie, matériau et scène de la passe : créés une fois, jamais par image */
+const flare = (FLARE.mode === 'off' || (!STAR_FX.on && FLARE.mode !== 'always')) ? null : (function(){
+  const N = FLARE.count, E = FLARE_ELEMENTS.length, NQ = N*E;
+  const pos = new Float32Array(NQ*4*3), col = new Float32Array(NQ*4*4);
+  const corner = new Float32Array(NQ*4*2), kind = new Float32Array(NQ*4);
+  const index = new Uint16Array(NQ*6);
+  const cx = [-1, 1, 1, -1], cy = [-1, -1, 1, 1];
+  for(let q = 0; q < NQ; q++){
+    for(let v = 0; v < 4; v++){
+      corner[(q*4+v)*2] = cx[v]; corner[(q*4+v)*2+1] = cy[v];
+      kind[q*4+v] = FLARE_ELEMENTS[q % E].kind;
+    }
+    const b = q*4;
+    index[q*6] = b; index[q*6+1] = b+1; index[q*6+2] = b+2;
+    index[q*6+3] = b; index[q*6+4] = b+2; index[q*6+5] = b+3;
+  }
+  const geo = new THREE.BufferGeometry();
+  const aPos = new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage);
+  const aCol = new THREE.BufferAttribute(col, 4).setUsage(THREE.DynamicDrawUsage);
+  geo.setAttribute('position', aPos);
+  geo.setAttribute('aColor', aCol);
+  geo.setAttribute('aCorner', new THREE.BufferAttribute(corner, 2));
+  geo.setAttribute('aKind', new THREE.BufferAttribute(kind, 1));
+  geo.setIndex(new THREE.BufferAttribute(index, 1));
+  const mat = new THREE.ShaderMaterial({
+    vertexShader: FLARE_VERT, fragmentShader: FLARE_FRAG,
+    transparent:true, depthTest:false, depthWrite:false,
+    blending:THREE.AdditiveBlending, fog:false
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.frustumCulled = false;
+  const sc = new THREE.Scene();
+  sc.add(mesh);
+  return {scene:sc, cam:new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1),
+          pos:pos, col:col, aPos:aPos, aCol:aCol, active:0};
+})();
+
+const _flV = new THREE.Vector3(), _flP = new THREE.Vector3(), _flFwd = new THREE.Vector3();
+const _flSel = [];
+for(let i = 0; i < FLARE.count; i++) _flSel.push({o:null, score:-1, x:0, y:0});
+const _flOcc = new Float32Array(32*4);
+let _flOccN = 0;
+
+function flareVisit(o){
+  if(!o || o.perceived === undefined || o.perceived < FLARE.minPerceived) return;
+  _flV.copy(o.mesh.position).sub(camera.position);
+  if(_flV.dot(_flFwd) <= 0) return;
+  _flP.copy(o.mesh.position).project(camera);
+  if(Math.max(Math.abs(_flP.x), Math.abs(_flP.y)) > FLARE.margin) return;
+  let worst = 0;
+  for(let i = 1; i < _flSel.length; i++) if(_flSel[i].score < _flSel[worst].score) worst = i;
+  const s = _flSel[worst];
+  if(o.perceived > s.score){ s.o = o; s.score = o.perceived; s.x = _flP.x; s.y = _flP.y; }
+}
+function flareAddOccluder(x, y, z, r){
+  if(_flOccN >= 32) return;
+  const b = _flOccN*4;
+  _flOcc[b] = x; _flOcc[b+1] = y; _flOcc[b+2] = z; _flOcc[b+3] = r;
+  _flOccN++;
+}
+function flareCollectPlanets(grp, idx){
+  const leg = ROUTE.legs[idx];
+  if(!leg || !leg.system) return;
+  const pl = leg.system.planets;
+  for(let i = 0; i < pl.length; i++) flareAddOccluder(pl[i].position.x, pl[i].position.y, pl[i].position.z, pl[i].radius);
+}
+/* part de l'étoile masquée par une sphère, 0..1 : le centre de chaque sphère
+   doit se trouver ENTRE la caméra et l'étoile, et le rayon la frôler */
+function flareOcclusion(sp){
+  _flV.copy(sp).sub(camera.position);
+  const len = _flV.length();
+  if(len < 1e-3) return 0;
+  const inv = 1/len, cp = camera.position;
+  let occ = 0;
+  for(let i = 0; i < _flOccN; i++){
+    const b = i*4;
+    const wx = _flOcc[b] - cp.x, wy = _flOcc[b+1] - cp.y, wz = _flOcc[b+2] - cp.z;
+    const t = (wx*_flV.x + wy*_flV.y + wz*_flV.z)*inv;
+    if(t <= 0 || t >= len) continue;
+    const d = Math.sqrt(Math.max(wx*wx + wy*wy + wz*wz - t*t, 0)), R = _flOcc[b+3];
+    occ = Math.max(occ, 1 - THREE.MathUtils.smoothstep(d, R*0.92, R*1.08));
+  }
+  return occ;
+}
+function flareUpdate(){
+  _flFwd.set(0, 0, -1).applyQuaternion(camera.quaternion);
+  for(let i = 0; i < _flSel.length; i++){ _flSel[i].o = null; _flSel[i].score = -1; }
+  starField.forEach(flareVisit);
+  _flOccN = 0;
+  if(shipRig.visible) flareAddOccluder(shipRig.position.x, shipRig.position.y, shipRig.position.z, SHIP_LABEL_RADIUS*1.2);
+  ROUTE.builtSystems.forEach(flareCollectPlanets);
+
+  const aspect = window.innerWidth/window.innerHeight;
+  const halfFov = THREE.MathUtils.degToRad(camera.fov*0.5);
+  const E = FLARE_ELEMENTS.length, pos = flare.pos, col = flare.col;
+  let active = 0;
+  for(let s = 0; s < _flSel.length; s++){
+    const sel = _flSel[s];
+    let I = 0, b = 0, resolved = 0;
+    if(sel.o){
+      b = THREE.MathUtils.clamp((sel.score - FLARE.minPerceived)/(FLARE.fullPerceived - FLARE.minPerceived), 0, 1);
+      const edge = 1 - THREE.MathUtils.smoothstep(Math.max(Math.abs(sel.x), Math.abs(sel.y)), 1.0, FLARE.margin);
+      const off = Math.min(1, Math.sqrt(sel.x*sel.x + sel.y*sel.y)/1.41);
+      /* une étoile dont le disque est résolu éblouit moins qu'un point */
+      const dist = Math.max(sel.o.mesh.position.distanceTo(camera.position), 1);
+      const disc = Math.atan(sel.o.baseCore*sel.o.core.scale.x/dist)/halfFov;
+      resolved = THREE.MathUtils.smoothstep(disc, 0.05, 0.35);
+      I = FLARE.strength*Math.pow(b, 0.8)*edge*(0.6 + 0.4*(1 - off))*(1 - flareOcclusion(sel.o.mesh.position));
+    }
+    for(let e = 0; e < E; e++){
+      /* étoile résolue : le starburst et l'anneau, centrés sur un disque plus
+         grand qu'eux, disparaissent ; les reflets de l'objectif restent */
+      const El = FLARE_ELEMENTS[e], q = s*E + e, p = q*12, c = q*16;
+      const a = El.gain*I*(El.kind < 2 ? 1 - 0.95*resolved : 1 - 0.5*resolved);
+      if(a < 0.004){
+        for(let v = 0; v < 12; v++) pos[p+v] = 0;
+        for(let v = 0; v < 4; v++) col[c+v*4+3] = 0;
+        continue;
+      }
+      const hy = El.size*(0.55 + 0.45*b), hx = hy/aspect;
+      const cx = sel.x*El.k, cy = sel.y*El.k;
+      pos[p]   = cx-hx; pos[p+1]  = cy-hy; pos[p+2]  = 0;
+      pos[p+3] = cx+hx; pos[p+4]  = cy-hy; pos[p+5]  = 0;
+      pos[p+6] = cx+hx; pos[p+7]  = cy+hy; pos[p+8]  = 0;
+      pos[p+9] = cx-hx; pos[p+10] = cy+hy; pos[p+11] = 0;
+      const sc = sel.o.star.color, m = El.kind < 2 ? 0.65 : 0.35;
+      const r = El.tint[0]*(1 - m + m*sc.r), g = El.tint[1]*(1 - m + m*sc.g), bl = El.tint[2]*(1 - m + m*sc.b);
+      for(let v = 0; v < 4; v++){
+        col[c+v*4] = r; col[c+v*4+1] = g; col[c+v*4+2] = bl; col[c+v*4+3] = a;
+      }
+    }
+    if(I >= 0.004) active++;
+  }
+  flare.aPos.needsUpdate = true;
+  flare.aCol.needsUpdate = true;
+  flare.active = active;
+}
+function flareEnabled(){
+  return !!flare && (FLARE.mode === 'always' || (FLARE.mode === 'title' && STAR_FX.on && !gameStarted));
+}
+function renderFlare(){
+  flareUpdate();
+  if(flare.active === 0) return;
+  renderer.autoClear = false;
+  renderer.render(flare.scene, flare.cam);
+  renderer.autoClear = true;
+}
+/* rendu d'une image : la scène, puis le lens-flare quand il est actif */
+function renderFrame(){
+  renderer.render(scene, camera);
+  if(flareEnabled()) renderFlare();
+}
 
 /* ---------- étiquettes DOM des étoiles connues (projetées à l'écran) ---------- */
 const labelContainer = document.getElementById('starLabels');
@@ -2138,7 +2549,7 @@ function buildStarLayer(tag, count, rMin, rMax, sizeScale, opts){
 
   const mat = new THREE.ShaderMaterial({
     uniforms:{
-      map:{value:glowTex},
+      map:{value: opts.map || glowTex},
       uOpacity:{value: opts.opacity!==undefined?opts.opacity:1},
       /* Échelle de taille à l'écran, réglée PAR COUCHE.
          L'ancienne constante unique (300) donnait, aux distances réelles de
@@ -2201,9 +2612,10 @@ buildStarLayer('skybox3', 52000, 1500, 3100, 1.00, {opacity:0.55, pxScale:6200})
 /* couche intermédiaire — donne de la profondeur en volant */
 buildStarLayer('dust', 58000, 700, 2300, 1.10, {opacity:0.62, pxScale:3800});
 /* couche proche supplémentaire : parallaxe marquée au passage */
-buildStarLayer('dust2', 24000, 380, 1100, 0.95, {opacity:0.55, pxScale:2100});
-/* étoiles décoratives proches, statistiquement les plus brillantes du champ */
-buildStarLayer('accent', 900, 500, 2600, 3.0, {opacity:0.95, pxScale:3600});
+buildStarLayer('dust2', 24000, 380, 1100, 0.95, {opacity:0.55, pxScale:2100, map: STAR_FX.on ? STAR_HALO_TEX : null});
+/* étoiles décoratives proches, statistiquement les plus brillantes du champ :
+   texture de halo des étoiles nommées (cœur serré, queue, traits de diffraction) */
+buildStarLayer('accent', 900, 500, 2600, 3.0, {opacity:0.95, pxScale:3600, map: STAR_FX.on ? STAR_HALO_TEX : null});
 
 /* =========================================================================
    5. LE VAISSEAU — PORTE-CONTENEURS SPATIAL (low poly)
@@ -3179,7 +3591,11 @@ function buildStarCell(ix,iy,iz){
       limbU:{value: 0.45 + 0.3*Math.exp(-star.temp/9000)}, /* les étoiles froides s'assombrissent plus au bord */
       time:{value:0},
       granulation:{value: star.temp < 7000 ? 1.0 : 0.25},   /* convection de surface : marquée chez les froides */
-      seed:{value: seedNoise}
+      seed:{value: seedNoise},
+      /* étoile émissive : plus lumineuse, plus éclatante (0 : rendu d'origine) */
+      uGain:{value: STAR_FX.on
+        ? STAR_FX.coreGainMin + (STAR_FX.coreGainMax - STAR_FX.coreGainMin)*Math.min(1, Math.log10(1 + star.lum)/3)
+        : 0}
     }
   });
   const core = new THREE.Mesh(new THREE.SphereGeometry(baseCore, 24, 24), coreMat);
@@ -3188,15 +3604,22 @@ function buildStarCell(ix,iy,iz){
   /* halo : la couronne/diffusion. Sa taille suit la racine de la luminosité
      (rapport flux/surface), sa teinte reste celle du corps noir. */
   const baseHalo = baseCore * (3.0 + 1.6*Math.log10(1 + star.lum));
-  const haloMat = new THREE.SpriteMaterial({map:glowTex, color:color, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending});
+  /* halo : avec le rendu émissif, texture dédiée (cœur serré, longue queue,
+     traits de diffraction), teinte saturée, ni brouillard ni tone-mapping — une
+     étoile lointaine reste éclatante ; sa taille est fixée à l'écran, cf.
+     starHaloUpdate. haloSize dérive de la luminosité et de la température. */
+  const haloMat = STAR_FX.on
+    ? new THREE.SpriteMaterial({map:STAR_GLOW_TEX, color:starHaloColor(star.color), transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, fog:false, toneMapped:false})
+    : new THREE.SpriteMaterial({map:glowTex, color:color, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending});
   const halo = new THREE.Sprite(haloMat);
   halo.scale.setScalar(baseHalo);
   group.add(halo);
+  const haloSize = 0.85 + 0.35*Math.min(1, Math.log10(1 + star.lum)/3) + 0.15*Math.min(1, Math.max(0, (star.temp - 6000)/20000));
 
   scene.add(group);
   const label = createStarLabel(name);
   return {
-    mesh:group, core:core, halo:halo, baseCore:baseCore, baseHalo:baseHalo,
+    mesh:group, core:core, halo:halo, baseCore:baseCore, baseHalo:baseHalo, haloSize:haloSize,
     name:name, star:star, type:star.designation, label:label,
     /* la géométrie du Sprite (commune à tous les Sprites) et glowTex sont
        partagées : seules celles propres à la cellule sont libérées */
@@ -8032,6 +8455,7 @@ function animate(){
          correctement positionnée : la scène ÉTAIT bien cadrée, mais rien
          dedans n'était assez grand pour être vu. */
       const camPosNow = camera.position;
+      starFxBeginFrame();
       starField.forEach(function(o){
         if(!o) return;
         const d = o.mesh.position.distanceTo(camPosNow);
@@ -8042,9 +8466,10 @@ function animate(){
         const mag = apparentMagnitude(o.star.lum, distPc);
         const flux = Math.pow(10, -0.4*(mag-4.0));
         const perceived = THREE.MathUtils.clamp(Math.pow(flux, 0.25), 0.0, 6.0);
-        o.halo.scale.setScalar(o.baseHalo*(0.55+perceived*0.55));
-        o.halo.material.opacity = THREE.MathUtils.clamp(0.25+perceived*0.35, 0.15, 1.0);
+        o.perceived = perceived;
+        starHaloUpdate(o, d, perceived);
       });
+      updateStarLights(dt);
       nebulaField.forEach(function(o){
         if(!o) return;
         o.mesh.material.uniforms.uTime.value = elapsed;
@@ -8055,7 +8480,7 @@ function animate(){
         }
       });
     }
-    renderer.render(scene, camera);
+    renderFrame();
     return;
   }
 
@@ -8087,7 +8512,7 @@ function animate(){
       updateStarMapLabels();
       renderer.render(mapScene, mapCamera);
     } else {
-      renderer.render(scene, camera);
+      renderFrame();
     }
     return;
   }
@@ -8148,6 +8573,7 @@ function animate(){
   const LABEL_RANGE = STAR_PROXIMITY_RANGE * 1.5;
   const winW = window.innerWidth, winH = window.innerHeight;
   const margin = 60;
+  starFxBeginFrame();
   starField.forEach(function(obj){
     if(!obj) return;
     const d = obj.mesh.position.distanceTo(shipPos);
@@ -8168,8 +8594,8 @@ function animate(){
 
     /* le halo grossit avec l'éclat perçu : c'est le "bloom" des étoiles
        brillantes, effet de diffusion dans l'optique comme dans l'œil */
-    obj.halo.scale.setScalar(obj.baseHalo * (0.55 + perceived*0.55));
-    obj.halo.material.opacity = THREE.MathUtils.clamp(0.25 + perceived*0.35, 0.15, 1.0);
+    obj.perceived = perceived;
+    starHaloUpdate(obj, d, perceived);
 
     /* n'étiqueter que les étoiles effectivement détectables (mag < 9) */
     if(d > LABEL_RANGE || mag > 9){ obj.label.style.display = 'none'; return; }
@@ -8191,8 +8617,9 @@ function animate(){
   /* le décor d'étoiles lointaines suit le vaisseau pour rester toujours dense */
   backdrop.position.copy(shipPos);
 
+  updateStarLights(dt);
   updateHud(performance.now());
-  renderer.render(scene, camera);
+  renderFrame();
 }
 
 /* =========================================================================
@@ -8497,6 +8924,72 @@ function animate(){
              ',R6:' + sig(r.R6[0]) + '-' + sig(r.R6[1]));
     out.push('rules.' + name + '=' + Object.keys(scaleRules).filter(function(k){ return scaleRules[k](r); }).length);
   });
+
+  /* rendu des étoiles (docs/etude-rendu-etoiles.md) : pool de lumières de
+     nombre constant, lumières mises en service, passe de lens-flare et
+     occultation. La caméra est placée à 150 u de l'étoile la plus lumineuse
+     du champ, légèrement décentrée ; un bloc de pixels autour de l'étoile est
+     lu avant puis après la passe additive du flare. */
+  out.push('starfx=' + (STAR_FX.on ? 1 : 0));
+  out.push('starLights=' + STAR_LIGHT_POOL.length);
+  out.push('flareMode=' + FLARE.mode);
+  if(STAR_FX.on){
+    refreshField(STAR_CELL, STAR_RADIUS, starField, buildStarCell);
+    let best = null;
+    starField.forEach(function(o){ if(o && (!best || o.star.lum > best.star.lum)) best = o; });
+    const gl = renderer.getContext();
+    gl.getError();
+    const countLights = function(){ let n = 0; scene.traverse(function(o){ if(o.isPointLight) n++; }); return n; };
+    const lightsBefore = countLights();
+    const bp = best.mesh.position;
+    camera.position.copy(bp).addScaledVector(bp.clone().normalize(), -150);
+    camera.lookAt(bp);
+    camera.rotateY(0.18); camera.rotateX(0.07);
+    camera.updateMatrixWorld(true);
+    starFxBeginFrame();
+    starField.forEach(function(o){
+      if(!o) return;
+      const d = o.mesh.position.distanceTo(camera.position);
+      const mag = apparentMagnitude(o.star.lum, Math.max(d/38, 1e-3));
+      o.perceived = THREE.MathUtils.clamp(Math.pow(Math.pow(10, -0.4*(mag - 4.0)), 0.25), 0.0, 6.0);
+      starHaloUpdate(o, d, o.perceived);
+    });
+    for(let i = 0; i < 5; i++) updateStarLights(0.3);
+    let lit = 0;
+    STAR_LIGHT_POOL.forEach(function(L){ if(L.intensity > 0.01) lit++; });
+    out.push('starLightsLit=' + lit);
+    out.push('pointLightsStable=' + (countLights() === lightsBefore ? 1 : 0));
+    if(flare){
+      renderer.render(scene, camera);
+      const ndc = bp.clone().project(camera);
+      const W = gl.drawingBufferWidth, H = gl.drawingBufferHeight, S = 128;
+      const x0 = Math.max(0, Math.min(W - S, Math.round((ndc.x*0.5 + 0.5)*W) - S/2));
+      const y0 = Math.max(0, Math.min(H - S, Math.round((ndc.y*0.5 + 0.5)*H) - S/2));
+      const buf = new Uint8Array(S*S*4);
+      const sumBlock = function(){
+        gl.readPixels(x0, y0, S, S, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+        let t = 0;
+        for(let i = 0; i < buf.length; i += 4) t += buf[i] + buf[i+1] + buf[i+2];
+        return t;
+      };
+      const before = sumBlock();
+      renderFlare();
+      const after = sumBlock();
+      out.push('flareActive=' + flare.active);
+      out.push('flarePixels=' + (after - before > 300 ? 1 : 0));
+      /* occultation : une sphère entre la caméra et l'étoile la masque, la même sphère écartée ne la masque pas */
+      const mid = camera.position.clone().lerp(bp, 0.5);
+      const dirS = bp.clone().sub(camera.position).normalize();
+      const perp = new THREE.Vector3().crossVectors(dirS, new THREE.Vector3(0, 1, 0)).normalize().multiplyScalar(300);
+      _flOccN = 0; flareAddOccluder(mid.x, mid.y, mid.z, 20);
+      const hidden = flareOcclusion(bp);
+      _flOccN = 0; flareAddOccluder(mid.x + perp.x, mid.y + perp.y, mid.z + perp.z, 20);
+      const clear = flareOcclusion(bp);
+      _flOccN = 0;
+      out.push('flareOcclusion=' + (hidden > 0.99 && clear < 0.01 ? 1 : 0));
+    }
+    out.push('glError=' + gl.getError());
+  }
 
   /* sonde de fuite GPU : traverse 60 cellules en ligne droite, en rendant
      à chaque pas ; après 10 pas de mise en régime, le nombre de géométries
