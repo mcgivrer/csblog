@@ -1,0 +1,4 @@
+# Références de selftest.sh (graine TEST). Régénérées par : ./selftest.sh --update
+legs=9
+route=d12a2d50
+i18n=7eb41154

@@ -1192,8 +1192,10 @@ function mulberry32(a){
 }
 function rngFor(tag){ return mulberry32(xmur3(tag)()); }
 
-const SEED = Date.now().toString(36).toUpperCase() + '-' +
-  Math.floor(Math.random()*46656).toString(36).toUpperCase().padStart(3,'0');
+/* graine rejouable : ?seed=XXX dans l'URL, sinon tirée au hasard comme avant */
+const _params = new URLSearchParams(window.location.search);
+const SEED = _params.get('seed') || (Date.now().toString(36).toUpperCase() + '-' +
+  Math.floor(Math.random()*46656).toString(36).toUpperCase().padStart(3,'0'));
 document.getElementById('seedVal').textContent = SEED;
 
 /* =========================================================================
@@ -7143,6 +7145,63 @@ function animate(){
     showWelcomeMessage();
     animate();
   }
+})();
+
+/* =========================================================================
+   AUTO-TEST — actif seulement avec ?seed=XXX&selftest=1 (cf. selftest.sh).
+   Écrit dans #selftest un instantané « clé=valeur » d'une partie
+   déterministe : les empreintes doivent rester identiques d'un refactoring
+   à l'autre ; la sonde de fuite compte les géométries GPU en vol.
+   ========================================================================= */
+(function selfTest(){
+  if(_params.get('selftest') !== '1') return;
+  const out = [];
+  const fnv1a = function(s){
+    let h = 0x811c9dc5;
+    for(let i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+    return (h>>>0).toString(16).padStart(8,'0');
+  };
+  const r2 = function(n){ return Math.round(n*100)/100; };
+  const v3 = function(v){ return [r2(v.x), r2(v.y), r2(v.z)]; };
+
+  /* réamorcé juste avant le calcul : Three.js consomme aussi Math.random
+     (UUID), donc un réglage plus tôt dépendrait du nombre d'objets créés */
+  Math.random = rngFor(SEED + ':selftest-random');
+  computeRoute(shipRig.position, new THREE.Vector3(0,0,-1), true);
+  out.push('seed=' + SEED);
+  out.push('legs=' + ROUTE.legs.length);
+  out.push('route=' + fnv1a(JSON.stringify([
+    r2(ROUTE.length),
+    ROUTE.legS.map(function(s){ return r2(s); }),
+    ROUTE.legs.map(function(l){
+      return [l.name, l.cityName, l.portName, v3(l.starPosition), v3(l.position),
+              l.planet ? [v3(l.planet.position), r2(l.planet.radius)] : null];
+    })
+  ])));
+  out.push('i18n=' + fnv1a(JSON.stringify(I18N)));
+
+  /* sonde de fuite GPU : traverse 60 cellules en ligne droite, en rendant
+     à chaque pas ; après 10 pas de mise en régime, le nombre de géométries
+     enregistrées ne doit plus croître si les cellules quittées sont libérées */
+  let geomWarm = 0;
+  for(let i=1;i<=60;i++){
+    shipRig.position.set(0, 0, -i*STAR_CELL);
+    refreshField(STAR_CELL, STAR_RADIUS, starField, buildStarCell);
+    refreshField(NEBULA_CELL, NEBULA_RADIUS, nebulaField, buildNebulaCell);
+    camera.position.copy(shipRig.position);
+    camera.lookAt(shipRig.position.x, shipRig.position.y, shipRig.position.z - 100);
+    renderer.render(scene, camera);
+    if(i === 10) geomWarm = renderer.info.memory.geometries;
+  }
+  const geomEnd = renderer.info.memory.geometries;
+  out.push('geomWarm=' + geomWarm);
+  out.push('geomEnd=' + geomEnd);
+  out.push('geomGrowth=' + (geomEnd - geomWarm));
+
+  const pre = document.createElement('pre');
+  pre.id = 'selftest';
+  pre.textContent = out.join('\n');
+  document.body.appendChild(pre);
 })();
 </script>
 </body>
