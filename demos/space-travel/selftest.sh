@@ -7,6 +7,9 @@
 #   - les empreintes route, i18n et legs doivent être identiques ;
 #   - si selftest.expected contient geomGrowthMax=N, la croissance du nombre
 #     de géométries GPU pendant la sonde de fuite ne doit pas dépasser N.
+# Puis charge ?selftest=boot : le bouton START doit apparaître à la fin de la
+# séquence de démarrage, et un clic doit lancer la musique (play() appelé dans
+# le gestionnaire du clic) puis afficher l'écran-titre. Sans référence.
 #
 # Usage : ./selftest.sh [--update] [fichier.html]
 #   --update  réécrit les empreintes de référence. À faire seulement après un
@@ -29,14 +32,19 @@ CHROME="${CHROME:-$(command -v google-chrome || command -v chromium || command -
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-"$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
-  --use-angle=swiftshader --enable-unsafe-swiftshader --ignore-gpu-blocklist \
-  --user-data-dir="$TMP/profile" --virtual-time-budget=20000 \
-  --dump-dom "file://$HTML?seed=$SEED&selftest=1" >"$TMP/dom.html" 2>"$TMP/err.log" || true
+# run_page MODE BUDGET : charge la page avec ?selftest=MODE (BUDGET = temps
+# virtuel en ms) et affiche le contenu de <pre id="selftest">
+run_page() {
+  "$CHROME" --headless=new --no-sandbox --disable-dev-shm-usage \
+    --use-angle=swiftshader --enable-unsafe-swiftshader --ignore-gpu-blocklist \
+    --user-data-dir="$TMP/profile" --virtual-time-budget="$2" \
+    --dump-dom "file://$HTML?seed=$SEED&selftest=$1" >"$TMP/dom.html" 2>"$TMP/err.log" || true
+  # le DOM est aplati sur une ligne avant d'extraire : dans la version minifiée,
+  # tout le script tient sur une seule ligne, juste avant la balise <pre>
+  tr '\n' '\r' < "$TMP/dom.html" | sed -n 's/.*<pre id="selftest">\([^<]*\)<\/pre>.*/\1/p' | tr '\r' '\n'
+}
 
-# le DOM est aplati sur une ligne avant d'extraire : dans la version minifiée,
-# tout le script tient sur une seule ligne, juste avant la balise <pre>
-ACTUAL="$(tr '\n' '\r' < "$TMP/dom.html" | sed -n 's/.*<pre id="selftest">\([^<]*\)<\/pre>.*/\1/p' | tr '\r' '\n')"
+ACTUAL="$(run_page 1 20000)"
 if [ -z "$ACTUAL" ]; then
   echo "Instantané introuvable : le script de la page a échoué. Journal Chrome :" >&2
   tail -20 "$TMP/err.log" >&2
@@ -75,4 +83,19 @@ elif [ "$growth" -le "$max" ]; then
 else
   echo "ÉCHEC geomGrowth=$growth > $max : fuite de géométries GPU"; FAIL=1
 fi
+
+BOOT="$(run_page boot 5200)"
+if [ -z "$BOOT" ]; then
+  echo "Parcours de démarrage introuvable : le script de la page a échoué. Journal Chrome :" >&2
+  tail -20 "$TMP/err.log" >&2
+  exit 2
+fi
+echo "--- démarrage ---"
+for kv in startHiddenAtFirst=1 startVisibleAfterLines=1 playCallsOnClick=1 titleShown=1 bootGone=1 titleActive=1; do
+  if printf '%s\n' "$BOOT" | grep -qx "$kv"; then
+    echo "OK    $kv"
+  else
+    echo "ÉCHEC $kv (obtenu : $(printf '%s\n' "$BOOT" | grep "^${kv%%=*}=" || echo absent))"; FAIL=1
+  fi
+done
 exit $FAIL

@@ -773,7 +773,7 @@
   /* ---------- écran de démarrage ---------- */
   #boot{
     position:fixed; inset:0; z-index:5; background:var(--bg);
-    display:flex; align-items:center; justify-content:center;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:34px;
     transition:opacity .8s ease; cursor:pointer;
   }
   #boot.hidden{ opacity:0; pointer-events:none; }
@@ -782,6 +782,18 @@
     line-height:1.9; white-space:pre-wrap; max-width:560px; padding:0 20px;
   }
   #boot .term .amber{ color:var(--amber); }
+  /* bouton START : n'apparaît qu'à la fin de la séquence (classe .ready) ;
+     visibility:hidden le rend aussi non focalisable tant qu'il est caché */
+  #boot .boot-start{
+    padding:12px 46px; background:none; border:1px solid var(--amber); color:var(--amber);
+    font-family:'JetBrains Mono',monospace; font-size:15px; font-weight:700; letter-spacing:0.3em;
+    cursor:pointer; visibility:hidden; opacity:0;
+    transition:opacity .5s ease, background .15s ease;
+  }
+  #boot .boot-start.ready{ visibility:visible; opacity:1; animation:startPulse 2.2s ease-in-out infinite; }
+  #boot .boot-start:hover, #boot .boot-start:focus{ background:rgba(255,180,84,0.14); outline:none; }
+  @keyframes startPulse{ 0%,100%{ box-shadow:0 0 0 rgba(255,180,84,0); } 50%{ box-shadow:0 0 16px rgba(255,180,84,0.35); } }
+  @media (prefers-reduced-motion: reduce){ #boot .boot-start.ready{ animation:none; } }
   #boot .skip{ position:absolute; bottom:24px; font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--muted-2); letter-spacing:0.1em; text-transform:uppercase; }
 
   /* ---------- écran-titre : choix de la langue ---------- */
@@ -1086,7 +1098,8 @@
 
 <div id="boot">
   <div class="term" id="bootTerm"></div>
-  <div class="skip">cliquer pour ignorer</div>
+  <button class="boot-start" id="bootStartBtn" type="button">START</button>
+  <div class="skip" id="bootSkip">cliquer pour ignorer</div>
 </div>
 
 <!-- écran-titre : choix de la langue, affiché juste après l'initialisation,
@@ -6233,11 +6246,11 @@ const musicAudio = new Audio(MUSIC_PATH);
 musicAudio.loop = true;
 musicAudio.volume = musicVolume;
 /* la lecture ne peut démarrer que sur un geste utilisateur (politique
-   autoplay des navigateurs) — le clic qui referme le générique (§11, déjà
-   un vrai geste) sert aussi de déclencheur ici, cf. plus bas dans ce
-   fichier (bootEl.addEventListener). .catch() : un blocage éventuel du
-   navigateur ne doit jamais faire remonter d'erreur bruyante, la musique
-   est un agrément, pas une fonction critique. */
+   autoplay des navigateurs) — le bouton START de l'écran de démarrage sert
+   de déclencheur, cf. plus bas dans ce fichier (startBtn.addEventListener).
+   .catch() : un blocage éventuel du navigateur ne doit jamais faire
+   remonter d'erreur bruyante, la musique est un agrément, pas une fonction
+   critique. */
 function setMusicVolume(v){
   musicVolume = THREE.MathUtils.clamp(v, 0, 1);
   musicAudio.volume = musicVolume;
@@ -8150,19 +8163,30 @@ function animate(){
   ];
   const term = document.getElementById('bootTerm');
   const bootEl = document.getElementById('boot');
+  const startBtn = document.getElementById('bootStartBtn');
+  const skipEl = document.getElementById('bootSkip');
   const titleEl = document.getElementById('titleScreen');
   const langBtns = Array.prototype.slice.call(document.querySelectorAll('.lang-btn'));
-  let li = 0;
-  function nextLine(){
-    if(li >= lines.length){
-      setTimeout(finish, 500);
-      return;
-    }
+  let li = 0, bootReady = false, bootStarted = false;
+  function addLine(){
     const span = document.createElement('div');
     span.textContent = lines[li];
     if(li===1 || li===lines.length-1) span.className='amber';
     term.appendChild(span);
     li++;
+  }
+  /* la séquence n'enchaîne plus toute seule sur l'écran-titre : elle attend
+     le bouton START, un vrai geste utilisateur, qui lance aussi la musique */
+  function showStart(){
+    bootReady = true;
+    skipEl.style.display = 'none';
+    startBtn.classList.add('ready');
+    startBtn.focus();
+  }
+  function nextLine(){
+    if(bootReady) return;
+    if(li >= lines.length){ showStart(); return; }
+    addLine();
     setTimeout(nextLine, 340);
   }
   /* navigation clavier de l'écran-titre (demande utilisateur) : curseur
@@ -8223,17 +8247,6 @@ function animate(){
       bootEl.style.display = 'none';
       titleEl.style.display = 'flex';
       document.body.classList.add('title-active');
-      /* musique dès l'affichage de l'écran-titre (demande utilisateur),
-         pas seulement sur le clic qui l'a amené ici — le générique finit
-         aussi tout seul (setTimeout ci-dessous, sans clic) et doit
-         déclencher la musique de la même façon. Politique autoplay des
-         navigateurs : ne joue effectivement que si un geste utilisateur a
-         déjà eu lieu quelque part avant cet instant (le clic, quand il a
-         eu lieu) — sinon .play() est silencieusement refusée par le
-         navigateur (.catch()), sans quoi ce ne serait plus un agrément
-         mais une erreur bruyante à chaque partie où le joueur n'a pas
-         cliqué pour passer le générique. */
-      musicAudio.play().catch(function(){});
       updateTitleFocusVisual();
       langBtns[titleFocusIndex].focus();
       /* travelling de fond (demande utilisateur) : le monde doit déjà
@@ -8262,7 +8275,24 @@ function animate(){
       animate();
     }, 900);
   }
-  bootEl.addEventListener('click', finish);
+  startBtn.addEventListener('click', function(){
+    if(bootStarted) return;
+    bootStarted = true;
+    /* la musique démarre ICI, dans le gestionnaire du clic : c'est le geste
+       que la politique autoplay exige, et Safari refuse un play() différé.
+       .catch() : un refus du navigateur ou un fichier absent ne doit jamais
+       remonter d'erreur, la musique est un agrément. */
+    musicAudio.play().catch(function(){});
+    finish();
+  });
+  /* un clic ailleurs pendant la séquence l'abrège ; ensuite il redonne le
+     focus au bouton, pour que ENTRÉE et ESPACE le déclenchent */
+  bootEl.addEventListener('click', function(e){
+    if(e.target === startBtn) return;
+    if(bootReady){ startBtn.focus(); return; }
+    while(li < lines.length) addLine();
+    showStart();
+  });
   nextLine();
 
   function startGame(){
@@ -8286,7 +8316,38 @@ function animate(){
    à l'autre ; la sonde de fuite compte les géométries GPU en vol.
    ========================================================================= */
 (function selfTest(){
-  if(_params.get('selftest') !== '1') return;
+  const mode = _params.get('selftest');
+  if(mode !== '1' && mode !== 'boot') return;
+  const publish = function(lines){
+    const pre = document.createElement('pre');
+    pre.id = 'selftest';
+    pre.textContent = lines.join('\n');
+    document.body.appendChild(pre);
+  };
+
+  if(mode === 'boot'){
+    /* parcours de l'écran de démarrage, sans clic réel : play() est remplacé
+       par un compteur, et btn.click() est synchrone — un appel compté juste
+       après a donc bien eu lieu dans le gestionnaire du clic */
+    let plays = 0;
+    HTMLMediaElement.prototype.play = function(){ plays++; return Promise.resolve(); };
+    const btn = document.getElementById('bootStartBtn');
+    const shown = function(){ return getComputedStyle(btn).visibility === 'visible' ? 1 : 0; };
+    const res = ['startHiddenAtFirst=' + (1 - shown())];
+    setTimeout(function(){
+      res.push('startVisibleAfterLines=' + shown());
+      btn.click();
+      res.push('playCallsOnClick=' + plays);
+      setTimeout(function(){
+        res.push('titleShown=' + (document.getElementById('titleScreen').style.display === 'flex' ? 1 : 0));
+        res.push('bootGone=' + (document.getElementById('boot').style.display === 'none' ? 1 : 0));
+        res.push('titleActive=' + (document.body.classList.contains('title-active') ? 1 : 0));
+        publish(res);
+      }, 1500);
+    }, 3000);
+    return;
+  }
+
   const out = [];
   const fnv1a = function(s){
     let h = 0x811c9dc5;
@@ -8330,10 +8391,7 @@ function animate(){
   out.push('geomEnd=' + geomEnd);
   out.push('geomGrowth=' + (geomEnd - geomWarm));
 
-  const pre = document.createElement('pre');
-  pre.id = 'selftest';
-  pre.textContent = out.join('\n');
-  document.body.appendChild(pre);
+  publish(out);
 })();
 </script>
 </body>
