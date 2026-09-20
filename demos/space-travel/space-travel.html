@@ -1106,7 +1106,7 @@
      avant que le vaisseau ne prenne réellement l'air -->
 <div id="titleScreen" style="display:none;">
   <div class="title-inner">
-    <div class="title-eyebrow">// SIMULATION SPATIALE PROCÉDURALE</div>
+    <div class="title-eyebrow" id="titleEyebrow">// SIMULATION SPATIALE PROCÉDURALE</div>
     <div class="title-main">SPACE TRAVEL <span class="amber">&amp;</span> TRANSPORT</div>
     <div class="title-sub" id="titleSub">Choisissez une langue</div>
     <div class="title-langs">
@@ -1132,6 +1132,7 @@ let LANG = 'fr';
 const I18N = {
   fr: {
     title_sub: 'Choisissez une langue',
+    title_eyebrow: '// SIMULATION SPATIALE PROCÉDURALE',
     topBrand: 'NAVIGATION QUANTIQUE', seedLabel: 'SEED', onlineLabel: 'EN LIGNE',
     lblSpeed: 'Vitesse', lblSector: 'Secteur', lblHeading: 'Cap',
     lblFlightPlan: 'Plan de vol', lblNearest: 'OBJET LE PLUS PROCHE',
@@ -1157,6 +1158,7 @@ const I18N = {
   },
   en: {
     title_sub: 'Choose a language',
+    title_eyebrow: '// PROCEDURAL SPACE SIMULATION',
     topBrand: 'QUANTUM NAVIGATION', seedLabel: 'SEED', onlineLabel: 'ONLINE',
     lblSpeed: 'Speed', lblSector: 'Sector', lblHeading: 'Heading',
     lblFlightPlan: 'Flight plan', lblNearest: 'NEAREST OBJECT',
@@ -1182,6 +1184,7 @@ const I18N = {
   },
   de: {
     title_sub: 'Sprache wählen',
+    title_eyebrow: '// PROZEDURALE WELTRAUMSIMULATION',
     topBrand: 'QUANTENNAVIGATION', seedLabel: 'SEED', onlineLabel: 'ONLINE',
     lblSpeed: 'Geschwindigkeit', lblSector: 'Sektor', lblHeading: 'Kurs',
     lblFlightPlan: 'Flugplan', lblNearest: 'N\u00c4CHSTES OBJEKT',
@@ -1207,6 +1210,7 @@ const I18N = {
   },
   es: {
     title_sub: 'Elige un idioma',
+    title_eyebrow: '// SIMULACIÓN ESPACIAL PROCEDURAL',
     topBrand: 'NAVEGACI\u00d3N CU\u00c1NTICA', seedLabel: 'SEED', onlineLabel: 'EN L\u00cdNEA',
     lblSpeed: 'Velocidad', lblSector: 'Sector', lblHeading: 'Rumbo',
     lblFlightPlan: 'Plan de vuelo', lblNearest: 'OBJETO M\u00c1S CERCANO',
@@ -8166,6 +8170,8 @@ function animate(){
   const startBtn = document.getElementById('bootStartBtn');
   const skipEl = document.getElementById('bootSkip');
   const titleEl = document.getElementById('titleScreen');
+  const titleSubEl = document.getElementById('titleSub');
+  const titleEyebrowEl = document.getElementById('titleEyebrow');
   const langBtns = Array.prototype.slice.call(document.querySelectorAll('.lang-btn'));
   let li = 0, bootReady = false, bootStarted = false;
   function addLine(){
@@ -8198,6 +8204,12 @@ function animate(){
   let titleFocusIndex = 0;
   function updateTitleFocusVisual(){
     langBtns.forEach(function(b, i){ b.classList.toggle('focused', i === titleFocusIndex); });
+    /* le texte de l'écran-titre suit la langue sélectionnée, avant même la
+       validation : un simple aperçu, LANG et le reste du jeu ne changent
+       qu'à selectLanguageAndStart */
+    const d = I18N[langBtns[titleFocusIndex].getAttribute('data-lang')];
+    titleEyebrowEl.textContent = d.title_eyebrow;
+    titleSubEl.textContent = d.title_sub;
   }
   function selectLanguageAndStart(btn){
     LANG = btn.getAttribute('data-lang');
@@ -8218,6 +8230,16 @@ function animate(){
        visuel et l'index suivi, pour rester cohérent si le joueur mélange
        Tab et curseurs plutôt que de n'utiliser que l'un des deux. */
     btn.addEventListener('focus', function(){ titleFocusIndex = i; updateTitleFocusVisual(); });
+    /* survol à la souris : même effet que les curseurs, pour n'avoir qu'un
+       seul bouton mis en avant. Ignoré si la souris n'a pas réellement
+       bougé : celle qui reste immobile sous un bouton (le clic sur START
+       vient d'y amener l'écran-titre) ne doit pas changer la langue. */
+    btn.addEventListener('mousemove', function(e){
+      if(i === titleFocusIndex || (!e.movementX && !e.movementY)) return;
+      titleFocusIndex = i;
+      updateTitleFocusVisual();
+      btn.focus();
+    });
   });
   window.addEventListener('keydown', function(e){
     if(titleEl.style.display !== 'flex') return;
@@ -8342,6 +8364,24 @@ function animate(){
         res.push('titleShown=' + (document.getElementById('titleScreen').style.display === 'flex' ? 1 : 0));
         res.push('bootGone=' + (document.getElementById('boot').style.display === 'none' ? 1 : 0));
         res.push('titleActive=' + (document.body.classList.contains('title-active') ? 1 : 0));
+
+        /* le texte de l'écran-titre suit la langue sélectionnée : un focus
+           par langue, sans valider (selectLanguageAndStart lancerait la
+           partie), puis le survol — ignoré si la souris est immobile */
+        const btns = document.querySelectorAll('.lang-btn');
+        const subEl = document.getElementById('titleSub'), eyeEl = document.getElementById('titleEyebrow');
+        const at = function(lang){ return subEl.textContent === I18N[lang].title_sub && eyeEl.textContent === I18N[lang].title_eyebrow ? 1 : 0; };
+        let follows = 1;
+        Array.prototype.forEach.call(btns, function(b){
+          b.dispatchEvent(new Event('focus'));
+          if(!at(b.getAttribute('data-lang'))) follows = 0;
+        });
+        res.push('titleFollowsFocus=' + follows);
+        btns[0].dispatchEvent(new Event('focus'));
+        btns[2].dispatchEvent(new MouseEvent('mousemove', {movementX: 0, movementY: 0}));
+        res.push('hoverIgnoredWhenStill=' + at('fr'));
+        btns[2].dispatchEvent(new MouseEvent('mousemove', {movementX: 4, movementY: 0}));
+        res.push('hoverFollowsRealMove=' + at('de'));
         publish(res);
       }, 1500);
     }, 3000);

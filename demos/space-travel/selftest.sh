@@ -9,7 +9,8 @@
 #     de géométries GPU pendant la sonde de fuite ne doit pas dépasser N.
 # Puis charge ?selftest=boot : le bouton START doit apparaître à la fin de la
 # séquence de démarrage, et un clic doit lancer la musique (play() appelé dans
-# le gestionnaire du clic) puis afficher l'écran-titre. Sans référence.
+# le gestionnaire du clic) puis afficher l'écran-titre, dont les textes suivent
+# la langue sélectionnée (focus, survol). Sans référence.
 #
 # Usage : ./selftest.sh [--update] [fichier.html]
 #   --update  réécrit les empreintes de référence. À faire seulement après un
@@ -91,7 +92,8 @@ if [ -z "$BOOT" ]; then
   exit 2
 fi
 echo "--- démarrage ---"
-for kv in startHiddenAtFirst=1 startVisibleAfterLines=1 playCallsOnClick=1 titleShown=1 bootGone=1 titleActive=1; do
+for kv in startHiddenAtFirst=1 startVisibleAfterLines=1 playCallsOnClick=1 titleShown=1 bootGone=1 titleActive=1 \
+          titleFollowsFocus=1 hoverIgnoredWhenStill=1 hoverFollowsRealMove=1; do
   if printf '%s\n' "$BOOT" | grep -qx "$kv"; then
     echo "OK    $kv"
   else
