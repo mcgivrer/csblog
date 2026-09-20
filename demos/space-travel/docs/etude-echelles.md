@@ -2,7 +2,7 @@
 
 Document de travail séparé de la spécification principale : ce chantier modifie en profondeur les tailles et les distances de tout l'univers, et mérite d'être arbitré avant toute implémentation. Il s'appuie sur [`generation-de-l-univers.md`](./generation-de-l-univers.md), qui décrit le code actuel, et sur des mesures faites en exécutant ce code (méthode au [§12](#12-comment-les-chiffres-ont-été-mesurés)).
 
-**Statut : proposition, non implémentée.** Rien dans le jeu n'a été modifié ; les choix à trancher sont regroupés au [§11](#11-décisions-à-trancher).
+**Statut : décisions arrêtées le 20 septembre 2026, implémentation par paliers.** Les choix retenus sont regroupés au [§11](#11-décisions-retenues) et le déroulement au [§10](#10-plan-par-paliers). Les valeurs des sections 5 à 9 restent des propositions tant que le palier correspondant n'est pas livré.
 
 ---
 
@@ -18,7 +18,7 @@ Document de travail séparé de la spécification principale : ce chantier modif
 - [8. Impact sur l'implémentation actuelle](#8-impact-sur-limplémentation-actuelle)
 - [9. Risques techniques](#9-risques-techniques)
 - [10. Plan par paliers](#10-plan-par-paliers)
-- [11. Décisions à trancher](#11-décisions-à-trancher)
+- [11. Décisions retenues](#11-décisions-retenues)
 - [12. Comment les chiffres ont été mesurés](#12-comment-les-chiffres-ont-été-mesurés)
 
 ---
@@ -287,23 +287,29 @@ Chaque palier est livrable séparément, testable, et n'altère pas le suivant.
 
 | Palier | Contenu | Vérification |
 |---|---|---|
-| **P0 — Profils d'échelle** | Regrouper toutes les constantes du §8 dans une table `SCALE`, choisie par le paramètre d'URL `?scale=` (valeurs `actuel`, `allegee` ou `cible`). Le profil `actuel` reproduit **exactement** le comportement d'aujourd'hui. | `selftest.sh` inchangé ; aucun écart visuel. Un test vérifie, pour chaque profil, les rapports R1 à R6. |
-| **P1 — Génération** | Planètes, rayon visuel de l'étoile, orbites, lunes, ceintures, cellules, sauts, nébuleuses, disque de l'étoile. Le vaisseau ne change pas. | Statistiques de routes sur 24 graines ; plan de système à l'échelle ; nouvelles références de test. |
+| **P0 — Profils d'échelle** | Regrouper toutes les constantes du §8 dans une table `SCALE`, choisie par le paramètre d'URL `?scale=` (valeurs `actuel` ou `allegee` ; `cible` pourra s'ajouter, voir [§11](#11-décisions-retenues)). Le profil `actuel`, par défaut, reproduit **exactement** le comportement d'aujourd'hui. | `selftest.sh` inchangé ; aucun écart visuel. Un test vérifie, pour chaque profil, les rapports R1 à R6. |
+| **P1 — Génération** | Planètes, rayon visuel de l'étoile, orbites, lunes, ceintures, cellules, sauts, nébuleuses, disque de l'étoile, plafond du système des étoiles géantes. Le vaisseau ne change pas. | Statistiques de routes sur 24 graines ; plan de système à l'échelle ; nouvelles références de test. |
 | **P2 — Vitesses et approche** | Vitesse et carburant, zones exprimées en rayons, saut quantique, carte stellaire, portiques. | Durée d'une route conservée (environ 9 min) ; carburant recalculé. |
 | **P3 — Rendu et caméra** | `near` / `far`, brouillard, caméra de poursuite relative, poussière locale, étiquettes. | Captures à plusieurs distances ; absence de scintillement de profondeur. |
 | **P4 — Vaisseau ÷ 4** | Modèle et constantes de caméra, navettes, plans de largage, recadrage de la vue d'ensemble. | Captures des plans de largage ; comparaison avec l'état actuel. |
-| **P5 — Recalage et documentation** | Prix, réglages fins, mise à jour de la spécification et de `generation-de-l-univers.md`. | Partie complète jouée, sur les trois profils. |
+| **P5 — Recalage et documentation** | Prix, réglages fins, mise à jour de la spécification et de `generation-de-l-univers.md`, bascule du profil par défaut sur `allegee` et renouvellement des références du `selftest`. | Partie complète jouée, sur les trois profils. |
 
 P0 est un pur refactoring : il est sans risque visuel et sert de filet de sécurité aux paliers suivants. Il permet aussi de **comparer les profils dans le jeu** en changeant simplement l'URL.
 
-## 11. Décisions à trancher
+## 11. Décisions retenues
 
-1. **Niveau d'ambition.** Allégée d'abord (recommandé : plage numérique raisonnable, gain net sur les six règles), ou Cible directement (plus fidèle, mais exige la précision de profondeur, l'origine flottante et davantage de retouches).
-2. **Taille du vaisseau.** ÷ 4 (13 u de coque, recommandé), ÷ 2, ou inchangée en ne jouant que sur la taille des planètes. Chaque option fixe le rapport R1 et l'ampleur de P4.
-3. **Durée d'une route.** Conserver les 9 minutes actuelles (les vitesses du §5.1 en découlent), ou les allonger pour donner plus de poids aux distances.
-4. **Vue d'ensemble de la mise en orbite.** Accepter un vaisseau minuscule et recadrer, ou exagérer visuellement le vaisseau dans ce seul plan (un facteur d'échelle propre aux cinématiques).
-5. **Systèmes des étoiles géantes.** Plafonner leur taille, ou écarter les étoiles trop proches d'elles.
-6. **Profils sélectionnables.** Garder `?scale=actuel|allegee|cible` dans le jeu livré, ou le réserver à la mise au point.
+Arrêtées le 20 septembre 2026, à partir des six questions posées à l'origine de ce chapitre. Chaque décision retient l'option recommandée par l'étude.
+
+| # | Question | Décision | Conséquence pour le plan |
+|---|---|---|---|
+| 1 | Niveau d'ambition | **Allégée d'abord.** La Cible pourra s'ajouter plus tard comme un simple profil, une fois les risques 1 et 6 du [§9](#9-risques-techniques) traités. | P1 à P5 visent la colonne « Allégée » du [§5.1](#51-le-tableau-comparatif). |
+| 2 | Taille du vaisseau | **÷ 4** : 13 u de coque. | R1 = 69, objectif ≥ 50 atteint. P4 complet ([§8.3](#83-à-suivre-la-taille-du-vaisseau--4)). |
+| 3 | Durée d'une route | **Conserver environ 9 minutes.** | Croisière ≈ 1 200 u/s et boost ≈ 3 700 u/s : les risques 2, 3 et 5 sont à traiter dans P2 et P3. |
+| 4 | Vue d'ensemble de la mise en orbite | **Recadrer**, le vaisseau restant à l'échelle. | Mise en scène des plans serrés dans P4, validée par captures. |
+| 5 | Systèmes des étoiles géantes | **Plafonner le système** : le rayon visuel et la première orbite sont bornés. | Dans P1. Le placement des étoiles et la planification de route ne changent pas. |
+| 6 | Profils sélectionnables | **Garder `?scale=` dans le jeu livré.** | P0 crée les profils `actuel` et `allegee` ; `cible` pourra s'ajouter ensuite sans retoucher le reste. |
+
+Un point de calendrier découle de la dernière décision : le profil par défaut reste **`actuel`** pendant P0 à P4, pour que le jeu et le `selftest` ne changent pas en cours de route. Il bascule sur **`allegee`** au dernier palier (P5), en même temps que les références du `selftest` sont renouvelées.
 
 ## 12. Comment les chiffres ont été mesurés
 
