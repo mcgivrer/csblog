@@ -2896,7 +2896,14 @@ function buildStarCell(ix,iy,iz){
   return {
     mesh:group, core:core, halo:halo, baseCore:baseCore, baseHalo:baseHalo,
     name:name, star:star, type:star.designation, label:label,
-    dispose:function(){ label.remove(); }
+    /* la géométrie du Sprite (commune à tous les Sprites) et glowTex sont
+       partagées : seules celles propres à la cellule sont libérées */
+    dispose:function(){
+      label.remove();
+      core.geometry.dispose();
+      coreMat.dispose();
+      haloMat.dispose();
+    }
   };
 }
 function buildNebulaCell(ix,iy,iz){
@@ -2921,7 +2928,11 @@ function buildNebulaCell(ix,iy,iz){
   mesh.userData.targetFade = 1.0;
   mesh.userData.currentFade = 0;
   scene.add(mesh);
-  return {mesh:mesh, name:name, type:type.name, typeIdx:typeIdx, isNebula:true};
+  return {
+    mesh:mesh, name:name, type:type.name, typeIdx:typeIdx, isNebula:true,
+    /* noiseTex est partagée : seuls la géométrie et le matériau de l'amas sont libérés */
+    dispose:function(){ mesh.geometry.dispose(); mesh.material.dispose(); }
+  };
 }
 
 function refreshField(cellSize, radius, map, buildFn){
