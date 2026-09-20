@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 520" width="980" height="520" font-family="monospace">
+  <title>Hiérarchie des tailles et des distances : aujourd'hui, échelle allégée, échelle cible (axe logarithmique)</title>
+  <rect width="980" height="520" fill="#0b1220"/>
+  <text x="24" y="30" fill="#e8edf5" font-size="16" font-weight="700">Hiérarchie des tailles et des distances</text>
+  <text x="24" y="50" fill="#8ea0c4" font-size="11">médianes, en unités de scène (u), axe logarithmique</text>
+  <circle cx="526" cy="26" r="6" fill="#8ea0c4"/>
+  <text x="538" y="30" fill="#e8edf5" font-size="12">aujourd'hui</text>
+  <circle cx="676" cy="26" r="6" fill="#5eead4"/>
+  <text x="688" y="30" fill="#e8edf5" font-size="12">échelle allégée</text>
+  <circle cx="836" cy="26" r="6" fill="#ffb454"/>
+  <text x="848" y="30" fill="#e8edf5" font-size="12">échelle cible</text>
+  <line x1="290.0" y1="84" x2="290.0" y2="434" stroke="#25375c" stroke-width="1"/>
+  <text x="290.0" y="78" fill="#8ea0c4" font-size="10" text-anchor="middle">1,0</text>
+  <line x1="396.7" y1="84" x2="396.7" y2="434" stroke="#25375c" stroke-width="1"/>
+  <text x="396.7" y="78" fill="#8ea0c4" font-size="10" text-anchor="middle">10</text>
+  <line x1="503.3" y1="84" x2="503.3" y2="434" stroke="#25375c" stroke-width="1"/>
+  <text x="503.3" y="78" fill="#8ea0c4" font-size="10" text-anchor="middle">100</text>
+  <line x1="610.0" y1="84" x2="610.0" y2="434" stroke="#25375c" stroke-width="1"/>
+  <text x="610.0" y="78" fill="#8ea0c4" font-size="10" text-anchor="middle">1 000</text>
+  <line x1="716.7" y1="84" x2="716.7" y2="434" stroke="#25375c" stroke-width="1"/>
+  <text x="716.7" y="78" fill="#8ea0c4" font-size="10" text-anchor="middle">10 000</text>
+  <line x1="823.3" y1="84" x2="823.3" y2="434" stroke="#25375c" stroke-width="1"/>
+  <text x="823.3" y="78" fill="#8ea0c4" font-size="10" text-anchor="middle">100 000</text>
+  <line x1="930.0" y1="84" x2="930.0" y2="434" stroke="#25375c" stroke-width="1"/>
+  <text x="930.0" y="78" fill="#8ea0c4" font-size="10" text-anchor="middle">1 000 000</text>
+  <text x="24" y="115.0" fill="#e8edf5" font-size="12">Vaisseau (longueur de coque)</text>
+  <line x1="408.8" y1="111.0" x2="473.0" y2="111.0" stroke="#8ea0c4" stroke-width="2" opacity="0.5"/>
+  <circle cx="473.0" cy="111.0" r="6" fill="#8ea0c4"/>
+  <circle cx="408.8" cy="111.0" r="6" fill="#5eead4"/>
+  <circle cx="408.8" cy="111.0" r="6" fill="#ffb454"/>
+  <text x="463.0" y="114.5" fill="#8ea0c4" font-size="10" text-anchor="end">52</text>
+  <text x="418.8" y="114.5" fill="#ffb454" font-size="10" text-anchor="start">13</text>
+  <text x="24" y="153.0" fill="#e8edf5" font-size="12">Lune (rayon)</text>
+  <line x1="456.0" y1="149.0" x2="539.0" y2="149.0" stroke="#8ea0c4" stroke-width="2" opacity="0.5"/>
+  <circle cx="456.0" cy="149.0" r="6" fill="#8ea0c4"/>
+  <circle cx="506.9" cy="149.0" r="6" fill="#5eead4"/>
+  <circle cx="539.0" cy="149.0" r="6" fill="#ffb454"/>
+  <text x="446.0" y="152.5" fill="#8ea0c4" font-size="10" text-anchor="end">36</text>
+  <text x="549.0" y="152.5" fill="#ffb454" font-size="10" text-anchor="start">216</text>
+  <text x="24" y="191.0" fill="#e8edf5" font-size="12">Planète rocheuse (rayon)</text>
+  <line x1="522.1" y1="187.0" x2="605.1" y2="187.0" stroke="#8ea0c4" stroke-width="2" opacity="0.5"/>
+  <circle cx="522.1" cy="187.0" r="6" fill="#8ea0c4"/>
+  <circle cx="573.0" cy="187.0" r="6" fill="#5eead4"/>
+  <circle cx="605.1" cy="187.0" r="6" fill="#ffb454"/>
+  <text x="512.1" y="190.5" fill="#8ea0c4" font-size="10" text-anchor="end">150</text>
+  <text x="615.1" y="190.5" fill="#ffb454" font-size="10" text-anchor="start">900</text>
+  <text x="24" y="229.0" fill="#e8edf5" font-size="12">Géante gazeuse (rayon)</text>
+  <line x1="547.4" y1="225.0" x2="630.3" y2="225.0" stroke="#8ea0c4" stroke-width="2" opacity="0.5"/>
+  <circle cx="547.4" cy="225.0" r="6" fill="#8ea0c4"/>
+  <circle cx="598.5" cy="225.0" r="6" fill="#5eead4"/>
+  <circle cx="630.3" cy="225.0" r="6" fill="#ffb454"/>
+  <text x="537.4" y="228.5" fill="#8ea0c4" font-size="10" text-anchor="end">259</text>
+  <text x="640.3" y="228.5" fill="#ffb454" font-size="10" text-anchor="start">1 550</text>
+  <text x="24" y="267.0" fill="#e8edf5" font-size="12">Étoile de type solaire (rayon)</text>
+  <line x1="305.6" y1="263.0" x2="656.0" y2="263.0" stroke="#8ea0c4" stroke-width="2" opacity="0.5"/>
+  <circle cx="305.6" cy="263.0" r="6" fill="#8ea0c4"/>
+  <circle cx="605.1" cy="263.0" r="6" fill="#5eead4"/>
+  <circle cx="656.0" cy="263.0" r="6" fill="#ffb454"/>
+  <text x="295.6" y="266.5" fill="#8ea0c4" font-size="10" text-anchor="end">1,4</text>
+  <text x="666.0" y="266.5" fill="#ffb454" font-size="10" text-anchor="start">2 700</text>
+  <text x="24" y="305.0" fill="#e8edf5" font-size="12">Première orbite</text>
+  <line x1="608.4" y1="301.0" x2="762.7" y2="301.0" stroke="#8ea0c4" stroke-width="2" opacity="0.5"/>
+  <circle cx="608.4" cy="301.0" r="6" fill="#8ea0c4"/>
+  <circle cx="701.4" cy="301.0" r="6" fill="#5eead4"/>
+  <circle cx="762.7" cy="301.0" r="6" fill="#ffb454"/>
+  <text x="598.4" y="304.5" fill="#8ea0c4" font-size="10" text-anchor="end">967</text>
+  <text x="772.7" y="304.5" fill="#ffb454" font-size="10" text-anchor="start">27 000</text>
+  <text x="24" y="343.0" fill="#e8edf5" font-size="12">Orbite la plus lointaine</text>
+  <line x1="654.0" y1="339.0" x2="806.8" y2="339.0" stroke="#8ea0c4" stroke-width="2" opacity="0.5"/>
+  <circle cx="654.0" cy="339.0" r="6" fill="#8ea0c4"/>
+  <circle cx="745.7" cy="339.0" r="6" fill="#5eead4"/>
+  <circle cx="806.8" cy="339.0" r="6" fill="#ffb454"/>
+  <text x="644.0" y="342.5" fill="#8ea0c4" font-size="10" text-anchor="end">2 584</text>
+  <text x="816.8" y="342.5" fill="#ffb454" font-size="10" text-anchor="start">70 000</text>
+  <text x="24" y="381.0" fill="#e8edf5" font-size="12">Étoile voisine la plus proche</text>
+  <line x1="523.3" y1="377.0" x2="830.6" y2="377.0" stroke="#8ea0c4" stroke-width="2" opacity="0.5"/>
+  <circle cx="523.3" cy="377.0" r="6" fill="#8ea0c4"/>
+  <circle cx="769.1" cy="377.0" r="6" fill="#5eead4"/>
+  <circle cx="830.6" cy="377.0" r="6" fill="#ffb454"/>
+  <text x="513.3" y="380.5" fill="#8ea0c4" font-size="10" text-anchor="end">154</text>
+  <text x="840.6" y="380.5" fill="#ffb454" font-size="10" text-anchor="start">117 000</text>
+  <text x="24" y="419.0" fill="#e8edf5" font-size="12">Saut entre deux étapes</text>
+  <line x1="614.6" y1="415.0" x2="873.0" y2="415.0" stroke="#8ea0c4" stroke-width="2" opacity="0.5"/>
+  <circle cx="614.6" cy="415.0" r="6" fill="#8ea0c4"/>
+  <circle cx="811.8" cy="415.0" r="6" fill="#5eead4"/>
+  <circle cx="873.0" cy="415.0" r="6" fill="#ffb454"/>
+  <text x="604.6" y="418.5" fill="#8ea0c4" font-size="10" text-anchor="end">1 104</text>
+  <text x="883.0" y="418.5" fill="#ffb454" font-size="10" text-anchor="start">292 000</text>
+  <text x="24" y="504" fill="#8ea0c4" font-size="11">Aujourd'hui, tout tient sur deux décades ; la cible en occupe cinq.</text>
+</svg>

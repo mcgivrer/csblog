@@ -80,6 +80,7 @@ python3 -m http.server 8000
 | `spec-space-travel-evolution-2.0.md` | Spécification des évolutions à venir (pause, économie, événements aléatoires, interface) |
 | `space-travel-reqs.md`               | Notes de cadrage d'origine                                                               |
 | `docs/generation-de-l-univers.md`    | Génération de l'univers : graine, étoiles, nébuleuses, route, systèmes planétaires       |
+| `docs/etude-echelles.md`             | Étude : révision des échelles (étoiles, planètes, lunes, vaisseau), proposition          |
 
 ## Feuille de route
 
