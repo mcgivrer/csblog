@@ -1453,6 +1453,46 @@ const SEED = _params.get('seed') || (Date.now().toString(36).toUpperCase() + '-'
   Math.floor(Math.random()*46656).toString(36).toUpperCase().padStart(3,'0'));
 document.getElementById('seedVal').textContent = SEED;
 
+/* ---------- échelles : table des profils (docs/etude-echelles.md, palier P0) ----------
+   Un profil regroupe les coefficients qui fixent les tailles et les distances
+   de l'univers généré. Choix : ?scale=actuel|allegee.
+   - « actuel » (défaut) reproduit à l'identique l'univers d'avant la révision :
+     chaque coefficient vaut 1 et les bornes de saut sont celles d'origine, donc
+     les empreintes de selftest.sh ne bougent pas.
+   - « allegee » applique les règles R1 à R6 de l'étude. En construction (P1 à
+     P5) : seule la génération est câblée, les vitesses, la caméra et le rendu
+     ne suivent pas encore, il ne se joue donc pas de bout en bout.
+   Les autres familles de constantes (vitesses, caméra, rendu, vaisseau) entrent
+   dans cette table au palier qui les modifie. */
+const SCALE_PROFILES = {
+  actuel: {
+    planet: 1,       /* K_PLANET : rayon des planètes et des astéroïdes */
+    orbit: 1,        /* K_ORBIT : première orbite, écarts entre orbites, marges des ceintures */
+    star: 1,         /* K_STAR : rayon visuel des étoiles */
+    moonOrbit: {base: 2.2, spread: 1.8, step: 1.4},   /* orbite d'une lune, en rayons de planète : base + aléa × spread + rang × step */
+    starCell: 190,   /* côté d'une cellule d'étoiles (u) */
+    nebulaCell: 1600,/* côté d'une cellule de nébuleuses (u) */
+    nebulaSize: 1,   /* coefficient sur le rayon des nébuleuses */
+    hop: [700, 1500],/* longueur d'un saut entre deux étapes (u) : minimum, maximum */
+    beltCount: 1,    /* coefficient sur l'effectif d'une ceinture d'astéroïdes */
+    ship: 1          /* coefficient sur la taille du vaisseau : câblé au palier P4 */
+  },
+  allegee: {
+    planet: 3,
+    orbit: 7.5,
+    star: 643,       /* étoile de type solaire : 1,4 × 643 = 900 u de rayon */
+    moonOrbit: {base: 6, spread: 8, step: 4},
+    starCell: 39000, /* ≥ 5,4 × la première orbite médiane (R5) */
+    nebulaCell: 328000,
+    nebulaSize: 205,
+    hop: [46800, 124800],   /* 1,2 à 3,2 cellules */
+    beltCount: 2,
+    ship: 0.25       /* coque de 52 u ramenée à 13 u */
+  }
+};
+const SCALE_NAME = Object.prototype.hasOwnProperty.call(SCALE_PROFILES, _params.get('scale')) ? _params.get('scale') : 'actuel';
+const SCALE = SCALE_PROFILES[SCALE_NAME];
+
 /* =========================================================================
    2. GÉNÉRATEUR DE NOMS — mélange de racines grecques, latines, hindi,
       chinoises, françaises, anglaises, russes, espagnoles, portugaises
@@ -3078,8 +3118,8 @@ function buildNebulaCluster(typeDef, rng, opts){
    7. CHAMPS PROCÉDURAUX — étoiles et nébuleuses en cellules déterministes
       (même seed + mêmes coordonnées de cellule => même contenu, toujours)
    ========================================================================= */
-const STAR_CELL = 190, STAR_RADIUS = 3;       // 7x7x7 cellules suivies — champ dense
-const NEBULA_CELL = 1600, NEBULA_RADIUS = 1;  // 3x3x3 cellules suivies (coût GPU maîtrisé)
+const STAR_CELL = SCALE.starCell, STAR_RADIUS = 3;       // 7x7x7 cellules suivies — champ dense
+const NEBULA_CELL = SCALE.nebulaCell, NEBULA_RADIUS = 1; // 3x3x3 cellules suivies (coût GPU maîtrisé)
 const STAR_PROXIMITY_RANGE = STAR_CELL * STAR_RADIUS; // distance à partir de laquelle une étoile grossit/brille
 
 const starField = new Map();
@@ -3128,7 +3168,7 @@ function buildStarCell(ix,iy,iz){
      compresse donc logarithmiquement le rayon physique, ce qui conserve
      l'ORDRE et les rapports perçus (une supergéante reste écrasante face à
      une naine M) tout en restant visible à l'écran. */
-  const baseCore = 1.4 * Math.pow(star.radius, 0.42);
+  const baseCore = SCALE.star * 1.4 * Math.pow(star.radius, 0.42);
   const color = new THREE.Color(star.color.r, star.color.g, star.color.b);
 
   const coreMat = new THREE.ShaderMaterial({
@@ -3182,7 +3222,7 @@ function buildNebulaCell(ix,iy,iz){
 
   const worldCenter = new THREE.Vector3(ix*NEBULA_CELL + offset.x, iy*NEBULA_CELL + offset.y, iz*NEBULA_CELL + offset.z);
   const mesh = buildNebulaCluster(type, rng, {
-    radius: 420 + rng()*480,
+    radius: (420 + rng()*480) * SCALE.nebulaSize,
     puffCount: 55 + Math.floor(rng()*60),
     fade: 0   /* apparition progressive : on démarre invisible, cf. animate() */
   });
@@ -3352,7 +3392,7 @@ function generateSystemData(leg){
     const kind = isHab
       ? PLANET_KINDS[Math.floor(rng()*HABITABLE_KIND_COUNT)]
       : PLANET_KINDS[Math.floor(rng()*PLANET_KINDS.length)];
-    const radius = kind.gas ? (200+rng()*120) : (100+rng()*100);
+    const radius = (kind.gas ? (200+rng()*120) : (100+rng()*100)) * SCALE.planet;
     kinds.push({kind:kind, radius:radius, isHab:isHab});
   }
   /* Marge de sécurité minimale entre deux orbites, PAS l'écart total (les
@@ -3367,9 +3407,9 @@ function generateSystemData(leg){
      prendrait des heures. Le nombre d'étapes de la route (réduit à 6, cf.
      computeRoute) absorbe le coût de cet espacement plus généreux sur le
      temps de trajet total. */
-  const GAP_MIN = 400, GAP_RANGE = 480;
+  const GAP_MIN = 400 * SCALE.orbit, GAP_RANGE = 480 * SCALE.orbit;
   const ORBIT_GROWTH = 1.65;   /* chaque orbite est ~1,65× la précédente, comme dans un vrai système */
-  let orbit = 780 + rng()*380;
+  let orbit = (780 + rng()*380) * SCALE.orbit;
   for(let i=0;i<count;i++){
     if(i > 0){
       /* deux contraintes combinées : une croissance géométrique (esprit
@@ -3437,10 +3477,10 @@ function generateSystemData(leg){
       return {p:p, d:p.position.distanceTo(leg.starPosition)};
     }).sort(function(a,b){ return a.d-b.d; });
     const gapIdx = Math.floor(rng()*(byDist.length-1));
-    const inner = byDist[gapIdx].d + byDist[gapIdx].p.radius + 60;
-    const outer = byDist[gapIdx+1].d - byDist[gapIdx+1].p.radius - 60;
-    if(outer > inner + 150){
-      asteroidBelt = { inner: inner, outer: outer, count: 240 + Math.floor(rng()*260) };
+    const inner = byDist[gapIdx].d + byDist[gapIdx].p.radius + 60 * SCALE.orbit;
+    const outer = byDist[gapIdx+1].d - byDist[gapIdx+1].p.radius - 60 * SCALE.orbit;
+    if(outer > inner + 150 * SCALE.orbit){
+      asteroidBelt = { inner: inner, outer: outer, count: (240 + Math.floor(rng()*260)) * SCALE.beltCount };
     }
   }
 
@@ -3632,7 +3672,7 @@ function buildAsteroidBelt(leg, innerR, outerR, count){
       /* ceinture aplatie : faible dispersion hors du plan, comme dans la réalité */
       const height = (rng()-0.5)*(outerR-innerR)*0.05;
       dummy.position.set(Math.cos(angle)*r, height, Math.sin(angle)*r);
-      const size = 1.1 + rng()*rng()*26;
+      const size = (1.1 + rng()*rng()*26) * SCALE.planet;
       dummy.scale.setScalar(size);
       dummy.rotation.set(rng()*Math.PI*2, rng()*Math.PI*2, rng()*Math.PI*2);
       dummy.updateMatrix();
@@ -3870,7 +3910,7 @@ function buildPlanetSystemMeshes(leg){
       pivot.rotation.x = (moonRng()-0.5)*0.8;
       pivot.rotation.z = moonRng()*Math.PI*2;
       const moonR = p.radius*(0.18+moonRng()*0.12);
-      const orbitR = p.radius*(2.2+moonRng()*1.8+m*1.4);
+      const orbitR = p.radius*(SCALE.moonOrbit.base+moonRng()*SCALE.moonOrbit.spread+m*SCALE.moonOrbit.step);
       const moonMat = new THREE.MeshStandardMaterial({
         color: new THREE.Color().setHSL(0.08, 0.12, 0.45+moonRng()*0.2),
         roughness:0.9, metalness:0.05
@@ -3936,7 +3976,7 @@ function ensureSystemsBuilt(){
   });
 }
 
-const HOP_MIN = 700, HOP_MAX = 1500;   /* longueur d'un saut entre étapes */
+const HOP_MIN = SCALE.hop[0], HOP_MAX = SCALE.hop[1];   /* longueur d'un saut entre étapes */
 
 /* Cherche la meilleure étoile suivante depuis `from`, en privilégiant
    celles alignées sur `heading` et à bonne distance de saut. */
@@ -5338,8 +5378,10 @@ function speedUpgradeCost(level){
    ravitaillement en escale.
    ========================================================================= */
 /* Réservoir de départ dimensionné contre les constantes RÉELLES du
-   générateur de routes (§22.1) : un saut mesure 700-1500 u (HOP_MIN/MAX,
-   findNextWaypoint), ~1100 u en moyenne ; une route compte 3-12 étapes
+   générateur de routes (§22.1) : avec le profil d'échelle « actuel », un saut
+   mesure 700-1500 u (HOP_MIN/MAX, findNextWaypoint), ~1100 u en moyenne ; le
+   réservoir et la vitesse seront recalés sur le profil au palier P2 de
+   docs/etude-echelles.md. Une route compte 3-12 étapes
    (legCount), ~7,5 en moyenne — soit ~8000 u par itinéraire complet en
    croisière économique. 24 000 u ≈ 3 itinéraires à ce régime. */
 const FUEL_CAPACITY = 24000;
@@ -8412,6 +8454,49 @@ function animate(){
     })
   ])));
   out.push('i18n=' + fnv1a(JSON.stringify(I18N)));
+
+  /* échelles : profil actif, puis rapports R1 à R6 (docs/etude-echelles.md §4)
+     calculés depuis les seuls paramètres de chaque profil, pour un système
+     typique : trois planètes (rocheuse 150 u, géante 260 u, rocheuse 150 u,
+     avant coefficient), étoile de type solaire, saut moyen de la plage. Les
+     constantes de l'espacement des orbites (970, 1,65, 400 + 240) sont celles
+     de generateSystemData, recopiées : ce n'est qu'un modèle de la règle.
+     « actuel » ne doit en satisfaire aucune (c'est le constat de l'étude),
+     « allegee » toutes, avec 10 % de tolérance sur les bornes de l'étude. */
+  out.push('scale=' + SCALE_NAME);
+  const scaleRatios = function(P){
+    const rock = 150 * P.planet, gas = 260 * P.planet;
+    const radii = [rock, gas, rock];
+    const star = 1.4 * P.star;
+    const first = 970 * P.orbit;
+    let orbit = first;
+    for(let i = 1; i < radii.length; i++){
+      orbit = Math.max(orbit * 1.65, orbit + radii[i-1] + radii[i] + 640 * P.orbit);
+    }
+    return {
+      R1: 2 * rock / (52 * P.ship),                        /* diamètre d'une rocheuse / coque du vaisseau */
+      R2: star / rock,                                     /* rayon de l'étoile / rayon d'une rocheuse */
+      R3: first / rock,                                    /* première orbite / rayon d'une rocheuse */
+      R4: first / star,                                    /* première orbite / rayon de l'étoile */
+      R5: (P.hop[0] + P.hop[1]) / 2 / orbit,               /* saut moyen / orbite la plus lointaine */
+      R6: [P.moonOrbit.base, P.moonOrbit.base + P.moonOrbit.spread + P.moonOrbit.step]  /* orbite lunaire, en rayons de planète */
+    };
+  };
+  const scaleRules = {
+    R1: function(r){ return r.R1 >= 45; },
+    R2: function(r){ return r.R2 >= 1.8 && r.R2 <= 3.3; },
+    R3: function(r){ return r.R3 >= 13.5; },
+    R4: function(r){ return r.R4 >= 7.2 && r.R4 <= 11; },
+    R5: function(r){ return r.R5 >= 3.6; },
+    R6: function(r){ return r.R6[0] >= 5.4 && r.R6[1] <= 19.8; }
+  };
+  const sig = function(n){ return Number(n.toPrecision(3)); };
+  Object.keys(SCALE_PROFILES).forEach(function(name){
+    const r = scaleRatios(SCALE_PROFILES[name]);
+    out.push('ratios.' + name + '=' + ['R1','R2','R3','R4','R5'].map(function(k){ return k + ':' + sig(r[k]); }).join(',') +
+             ',R6:' + sig(r.R6[0]) + '-' + sig(r.R6[1]));
+    out.push('rules.' + name + '=' + Object.keys(scaleRules).filter(function(k){ return scaleRules[k](r); }).length);
+  });
 
   /* sonde de fuite GPU : traverse 60 cellules en ligne droite, en rendant
      à chaque pas ; après 10 pas de mise en régime, le nombre de géométries

@@ -773,6 +773,8 @@ Cinq **gabarits** de forme sont générés une fois au chargement (`ASTEROID_TEM
 
 ## 11. Paramètres de référence
 
+Les valeurs ci-dessous sont celles du profil d'échelle **`actuel`**, le profil par défaut. Depuis le palier P0 de l'[étude des échelles](./etude-echelles.md), les constantes de génération (côtés de cellule, longueur des sauts, rayons des planètes et des astéroïdes, orbites, lunes, ceintures, rayon visuel des étoiles) sont lues dans la table `SCALE_PROFILES`, où `actuel` reproduit exactement ce tableau et `allegee` applique la révision des échelles.
+
 | Paramètre | Valeur | Rôle |
 |---|---:|---|
 | `STAR_CELL` | 190 u | côté d'une cellule d'étoiles |
@@ -811,6 +813,8 @@ Ouvrir le jeu avec `?seed=` suivi de n'importe quelle chaîne :
 http://localhost:8000/space-travel.html?seed=TEST
 ```
 
+Le paramètre `scale=actuel` (défaut) ou `scale=allegee` choisit le profil d'échelle et se combine avec la graine : `?seed=TEST&scale=allegee`. Le profil `allegee` est en construction : seule la génération est câblée pour l'instant (voir l'[étude des échelles](./etude-echelles.md)).
+
 ### 12.2 Interroger le générateur dans la console
 
 Les fonctions de génération sont globales ; la console des outils de développement permet de les appeler directement (page ouverte avec `?seed=TEST`) :
@@ -832,7 +836,7 @@ ROUTE.legs.map(l => l.name + ' → ' + l.portName)
 
 ### 12.3 Verrouiller la génération
 
-`demos/space-travel/selftest.sh` charge le jeu dans Chrome sans écran (`?seed=TEST&selftest=1`), recalcule la route et compare son empreinte aux références de `selftest.expected` (9 étapes, `route=d12a2d50`). Toute modification involontaire de la génération change cette empreinte.
+`demos/space-travel/selftest.sh` charge le jeu dans Chrome sans écran (`?seed=TEST&selftest=1`), recalcule la route et compare son empreinte aux références de `selftest.expected` (9 étapes, `route=d12a2d50`). Toute modification involontaire de la génération change cette empreinte. Le même script vérifie aussi que le profil par défaut reste `actuel`, que le profil `allegee` satisfait les six règles de hiérarchie de l'étude des échelles et qu'il génère une route différente.
 
 ### 12.4 Comment les chiffres ont été mesurés
 

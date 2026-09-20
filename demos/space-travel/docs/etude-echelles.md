@@ -287,7 +287,7 @@ Chaque palier est livrable séparément, testable, et n'altère pas le suivant.
 
 | Palier | Contenu | Vérification |
 |---|---|---|
-| **P0 — Profils d'échelle** | Regrouper toutes les constantes du §8 dans une table `SCALE`, choisie par le paramètre d'URL `?scale=` (valeurs `actuel` ou `allegee` ; `cible` pourra s'ajouter, voir [§11](#11-décisions-retenues)). Le profil `actuel`, par défaut, reproduit **exactement** le comportement d'aujourd'hui. | `selftest.sh` inchangé ; aucun écart visuel. Un test vérifie, pour chaque profil, les rapports R1 à R6. |
+| **P0 — Profils d'échelle** | Regrouper les constantes de **génération** ([§8.1](#81-à-multiplier-par-un-coefficient-de-génération)) dans une table `SCALE`, choisie par le paramètre d'URL `?scale=` (valeurs `actuel` ou `allegee` ; `cible` pourra s'ajouter, voir [§11](#11-décisions-retenues)). Le profil `actuel`, par défaut, reproduit **exactement** le comportement d'aujourd'hui. Les autres familles (§8.2 à §8.5) entrent dans la table au palier qui les modifie : le `selftest` ne couvre que la génération, et un déplacement mécanique de constantes de caméra ou de vitesse ne serait vérifié par rien. | `selftest.sh` : empreintes inchangées. Un contrôle calcule, pour chaque profil, les rapports R1 à R6 depuis la table (`allegee` doit les satisfaire tous). Un test de fumée charge `?scale=allegee`. |
 | **P1 — Génération** | Planètes, rayon visuel de l'étoile, orbites, lunes, ceintures, cellules, sauts, nébuleuses, disque de l'étoile, plafond du système des étoiles géantes. Le vaisseau ne change pas. | Statistiques de routes sur 24 graines ; plan de système à l'échelle ; nouvelles références de test. |
 | **P2 — Vitesses et approche** | Vitesse et carburant, zones exprimées en rayons, saut quantique, carte stellaire, portiques. | Durée d'une route conservée (environ 9 min) ; carburant recalculé. |
 | **P3 — Rendu et caméra** | `near` / `far`, brouillard, caméra de poursuite relative, poussière locale, étiquettes. | Captures à plusieurs distances ; absence de scintillement de profondeur. |
@@ -295,6 +295,11 @@ Chaque palier est livrable séparément, testable, et n'altère pas le suivant.
 | **P5 — Recalage et documentation** | Prix, réglages fins, mise à jour de la spécification et de `generation-de-l-univers.md`, bascule du profil par défaut sur `allegee` et renouvellement des références du `selftest`. | Partie complète jouée, sur les trois profils. |
 
 P0 est un pur refactoring : il est sans risque visuel et sert de filet de sécurité aux paliers suivants. Il permet aussi de **comparer les profils dans le jeu** en changeant simplement l'URL.
+
+### Avancement
+
+- **P0 livré (20 septembre 2026).** La table `SCALE_PROFILES` (dix paramètres par profil) est lue par la génération : `STAR_CELL`, `NEBULA_CELL` et le rayon des nébuleuses, `HOP_MIN` et `HOP_MAX`, le rayon des planètes et des astéroïdes, la première orbite, les écarts et les marges de ceinture, l'orbite des lunes, l'effectif des ceintures et le rayon visuel des étoiles. Le paramètre `ship` est déjà dans la table, pour le calcul de R1, mais ne sera **câblé qu'en P4**. Mesuré : le profil `actuel` redonne `route=d12a2d50`, `i18n=60a44562` et 9 étapes ; les rapports calculés valent R1 = 5,8 · R2 = 0,009 · R3 = 6,5 · R4 = 693 · R5 = 0,33 pour `actuel` (aucune règle satisfaite) et R1 = 69 · R2 = 2 · R3 = 16 · R4 = 8,1 · R5 = 3,9 · R6 = 6 à 18 pour `allegee` (six règles sur six). Trois mutants du code (paramètre d'URL ignoré, coefficient dérégulé, dérive de 1 % du profil `actuel`) sont bien détectés par le `selftest`.
+- **`allegee` ne se joue pas encore de bout en bout.** Seule la génération est câblée : le rayon visuel des étoiles n'est pas encore borné (P1), l'approche, les dégagements et les vitesses restent ceux d'aujourd'hui (P2), la profondeur de rendu, le brouillard et la caméra aussi (P3), le vaisseau garde ses 52 u (P4). Ce profil sert à mesurer la génération, palier après palier.
 
 ## 11. Décisions retenues
 

@@ -19,6 +19,16 @@ python3 -m http.server 8000
 # puis ouvrir http://localhost:8000/voyage-spatial.html
 ```
 
+## Paramètres d'URL
+
+À ajouter à l'adresse de la page, séparés par `&` (par exemple `…?seed=DEMO&scale=allegee`) :
+
+| Paramètre                         | Effet                                                                                                                                                                                                                                              |
+|-----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `seed=XXX`                        | Fixe la graine de l'univers : la même graine redonne toujours le même univers. Sans ce paramètre, une graine est tirée au hasard et affichée dans la barre du haut.                                                                                  |
+| `scale=actuel` ou `scale=allegee` | Choisit le profil d'échelle des tailles et des distances (défaut : `actuel`). `allegee` est en construction : seule la génération est câblée pour l'instant, voir [`docs/etude-echelles.md`](./docs/etude-echelles.md).                              |
+| `selftest=1` ou `selftest=boot`   | Réservé à `selftest.sh`, le test de non-régression sous Chrome sans écran.                                                                                                                                                                         |
+
 ## Fonctionnalités
 
 - Univers procédural déterministe : la même graine reproduit toujours le même univers.
