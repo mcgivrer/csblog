@@ -3,8 +3,8 @@
 <head>
 <!--
   Voyage Spatial / Space Travel & Transport
-  Version 2.6 — 18 septembre 2026
-  Spec de référence : spec-space_travel_and_transport-2.6.md
+  Version 2.12 — 19 septembre 2026
+  Spec de référence : spec-space_travel_and_transport-2.12.md
 
   MIT License
   Copyright (c) 2026 Frédéric Delorme <frederic.delorme@gmail.com>
@@ -78,6 +78,17 @@
 
   /* ---------- HUD ---------- */
   #hud{ position:fixed; inset:0; z-index:2; pointer-events:none; }
+  /* carte stellaire (§23) : masque le HUD normal ET les étiquettes de
+     ciblage (étoiles/planètes/vaisseaux, #starLabels) pendant que la carte
+     est ouverte — sans ça, ces éléments HTML restent visibles, figés à
+     leur dernière position (la boucle qui les repositionne s'arrête avec
+     le reste du jeu, gamePaused), et se superposent au rendu de la carte
+     plutôt que de laisser un plein écran propre comme la maquette (§23.6). */
+  body.starmap-open #hud, body.starmap-open #starLabels{ display:none; }
+  /* travelling de fond de l'écran-titre (demande utilisateur) : même
+     principe — masque le HUD et les étiquettes pendant que l'écran-titre
+     occupe l'écran, pour un arrière-plan qui ne montre que l'espace généré. */
+  body.title-active #hud, body.title-active #starLabels{ display:none; }
   .panel{
     position:absolute;
     border:1px solid var(--line);
@@ -237,6 +248,120 @@
   }
   .help-grid .hv{ color:var(--ink); align-self:center; }
   .help-foot{ margin-top:16px; text-align:center; font-size:10px; color:var(--muted-2); letter-spacing:0.05em; }
+
+  /* ---------- carte stellaire (§23) — même famille visuelle que Pause/
+     Aide (fond assombri, coins ambrés), plein écran plutôt qu'un panneau
+     centré : le contenu (carte 3D + panneau cible) a besoin de la place. */
+  #starMapOverlay{
+    position:fixed; inset:0; z-index:6; display:flex; align-items:center; justify-content:center;
+    background:transparent; opacity:0; pointer-events:none; transition:opacity .2s ease;
+  }
+  #starMapOverlay.visible{ opacity:1; pointer-events:auto; }
+  .starmap-panel{
+    position:relative; border:1px solid var(--line);
+    background:transparent;
+    width:min(1200px, 94vw); height:min(760px, 90vh);
+    display:flex; flex-direction:column; padding:0;
+  }
+  .starmap-panel::before, .starmap-panel::after{
+    content:""; position:absolute; width:16px; height:16px; border:1.5px solid var(--amber);
+  }
+  .starmap-panel::before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }
+  .starmap-panel::after{ bottom:-1px; right:-1px; border-left:none; border-top:none; }
+  .starmap-titlebar{
+    position:relative; background:rgba(15,26,48,0.94);
+    display:flex; justify-content:space-between; align-items:center;
+    padding:14px 20px; border-bottom:1px solid var(--line);
+  }
+  .starmap-title{ font-weight:700; font-size:15px; letter-spacing:0.12em; color:var(--ink); }
+  .starmap-hint{ font-size:11px; color:var(--muted-2); }
+  .starmap-body{ flex:1; display:flex; gap:16px; padding:16px 20px; min-height:0; }
+  .starmap-viewport{ flex:1; position:relative; border:1px dashed rgba(216,222,233,0.35); min-width:0; background:transparent; }
+  .starmap-side{ width:270px; flex:none; display:flex; flex-direction:column; gap:14px; }
+  .starmap-target-box, .starmap-locked-box{
+    border:1px dashed var(--line); background:rgba(15,26,48,0.94); padding:14px; font-size:12px; color:var(--muted);
+  }
+  .starmap-box-title{ font-weight:700; font-size:12px; letter-spacing:0.08em; color:var(--ink); margin-bottom:10px; }
+  .starmap-empty{ color:var(--muted-2); font-size:11.5px; line-height:1.5; }
+  .starmap-target-name{ font-size:14px; color:var(--ink); margin-bottom:4px; }
+  .starmap-target-line{ font-size:11.5px; color:var(--muted-2); margin-bottom:2px; }
+  .starmap-confirm-btn{
+    width:100%; margin-top:12px; padding:10px; background:transparent;
+    border:1.5px solid var(--amber); color:var(--amber); font-family:'JetBrains Mono',monospace;
+    font-weight:700; font-size:12.5px; letter-spacing:0.06em; cursor:pointer; border-radius:2px;
+  }
+  .starmap-confirm-btn:hover{ background:rgba(255,180,84,0.14); }
+  .starmap-confirm-btn.starmap-disabled{ border-color:var(--muted-2); color:var(--muted-2); cursor:not-allowed; }
+  .starmap-subhint{ margin-top:8px; font-size:9.5px; color:var(--muted-2); text-align:center; }
+  .starmap-legend{
+    position:relative; background:rgba(15,26,48,0.94);
+    display:flex; gap:22px; padding:10px 20px; border-top:1px solid var(--line);
+    font-size:10.5px; color:var(--muted-2);
+  }
+  .starmap-legend .dot{
+    display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align:middle;
+    border:1.5px solid var(--muted-2);
+  }
+  .starmap-legend .dot.built{ background:var(--muted-2); }
+  .starmap-legend .dot.range{ background:none; }
+  .starmap-legend .dot.sel{ border-color:var(--amber); box-shadow:0 0 0 2px rgba(255,180,84,0.25); }
+
+  /* bannière de séquence de saut (§23.5) — même style que .hud-mode, sa
+     propre instance pour ne pas entrer en conflit avec modeBadge, réécrit
+     chaque image par la logique de vol normale. */
+  #jumpBanner{ color:var(--cyan); border-color:#1d7a70; letter-spacing:0.14em; }
+  .jump-vignette{
+    position:fixed; inset:0; z-index:3; pointer-events:none;
+    background:radial-gradient(ellipse at center, transparent 35%, rgba(94,234,212,0.35) 100%);
+    opacity:0; transition:opacity .3s ease;
+  }
+  .jump-flash{
+    position:fixed; inset:0; z-index:7; pointer-events:none;
+    background:#ffffff; opacity:0;
+  }
+  /* ---------- réglage des volumes (demande utilisateur) — même gabarit
+     que .help-panel (fond, coins ambrés), en plus étroit et plus court */
+  #audioOverlay{
+    position:fixed; inset:0; z-index:6; display:flex; align-items:center; justify-content:center;
+    background:rgba(2,5,12,0.75);
+    opacity:0; pointer-events:none; transition:opacity .2s ease;
+  }
+  #audioOverlay.visible{ opacity:1; pointer-events:auto; }
+  .audio-panel{
+    position:relative; border:1px solid var(--line);
+    background:rgba(15,26,48,0.96);
+    padding:26px 30px 18px; width:340px;
+  }
+  .audio-panel::before, .audio-panel::after{
+    content:""; position:absolute; width:14px; height:14px; border:1.5px solid var(--amber);
+  }
+  .audio-panel::before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }
+  .audio-panel::after{ bottom:-1px; right:-1px; border-left:none; border-top:none; }
+  .audio-title{
+    font-weight:700; font-size:15px; letter-spacing:0.12em; color:var(--amber);
+    text-align:center; margin-bottom:20px;
+  }
+  .audio-row{ display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+  .audio-label{ width:70px; font-size:12px; color:var(--ink); flex:none; }
+  .audio-pct{ width:38px; font-size:11px; color:var(--muted); text-align:right; flex:none; }
+  .audio-row input[type="range"]{
+    flex:1; accent-color:var(--amber); height:4px; cursor:pointer;
+  }
+  .audio-foot{ margin-top:8px; text-align:center; font-size:10px; color:var(--muted-2); letter-spacing:0.05em; }
+  /* étiquettes de la carte stellaire : noms d'étoiles (discrets, la
+     sphère+halo déjà colorée est le repère principal) et lettres de
+     grille (repères de coordonnées, cf. demande utilisateur) */
+  #starMapLabels{ position:fixed; inset:0; z-index:6; pointer-events:none; overflow:hidden; }
+  .starmap-label{
+    position:absolute; transform:translate(-50%,4px);
+    font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.04em;
+    color:var(--ink); text-shadow:0 1px 3px rgba(0,0,0,0.9); white-space:nowrap;
+  }
+  .starmap-grid-letter{
+    position:absolute; transform:translate(-50%,-50%);
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:700;
+    color:rgba(255,255,255,0.55); text-shadow:0 1px 2px rgba(0,0,0,0.9);
+  }
 
   /* ---------- rangée basse : température · propulsion · commandes ----------
      Les trois panneaux vivaient séparément (dont un flottant, projeté en 3D
@@ -661,33 +786,59 @@
 
   /* ---------- écran-titre : choix de la langue ---------- */
   #titleScreen{
-    position:fixed; inset:0; z-index:6; background:var(--bg);
+    position:fixed; inset:0; z-index:6; background:transparent;
     display:flex; align-items:center; justify-content:center;
     transition:opacity .6s ease;
   }
   #titleScreen.hidden{ opacity:0; pointer-events:none; }
-  .title-inner{ text-align:center; max-width:640px; padding:0 24px; }
+  /* voile doux derrière le texte/boutons plutôt qu'un fond plein écran
+     opaque (bug corrigé — masquait entièrement le travelling de fond
+     demandé, pourtant bien rendu sous ce voile) : juste assez de contraste
+     pour rester lisible par-dessus un arrière-plan qui varie (étoile
+     brillante, nébuleuse colorée...), sans effacer ce qu'il y a dessous. */
+  .title-inner{
+    text-align:center; max-width:640px; padding:36px 24px;
+    background:radial-gradient(ellipse at center, rgba(11,18,32,0.72) 0%, rgba(11,18,32,0.32) 70%, transparent 100%);
+  }
   .title-eyebrow{
     font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.18em;
-    color:var(--muted-2); margin-bottom:18px;
+    color:var(--muted-2); margin-bottom:18px; text-shadow:0 1px 4px rgba(0,0,0,0.9);
   }
   .title-main{
     font-family:'JetBrains Mono',monospace; font-weight:700; font-size:34px;
     letter-spacing:0.03em; color:var(--ink); margin-bottom:14px;
+    text-shadow:0 2px 8px rgba(0,0,0,0.9);
   }
   .title-main .amber{ color:var(--amber); }
   .title-sub{
     font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--muted);
-    margin-bottom:34px; letter-spacing:0.04em;
+    margin-bottom:34px; letter-spacing:0.04em; text-shadow:0 1px 4px rgba(0,0,0,0.9);
   }
   .title-langs{ display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
+  /* mention légale en bas de l'écran-titre (demande utilisateur) : blanc
+     sur fond transparent, discrète, hors de .title-inner (qui porte son
+     propre voile de fond, §25) pour rester un simple filet de texte. */
+  .title-copyright{
+    position:absolute; left:0; right:0; bottom:16px; text-align:center;
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#ffffff;
+    letter-spacing:0.03em; opacity:0.75; pointer-events:none;
+  }
   .lang-btn{
     font-family:'JetBrains Mono',monospace; cursor:pointer;
-    background:rgba(94,234,212,0.05); border:1px solid var(--line); color:var(--ink);
+    background:rgba(11,18,32,0.75); border:1px solid var(--line); color:var(--ink);
     padding:14px 22px; display:flex; flex-direction:column; align-items:center; gap:6px;
     min-width:96px; transition:border-color .15s ease, background .15s ease;
   }
   .lang-btn:hover{ border-color:var(--cyan); background:rgba(94,234,212,0.12); }
+  /* focus clavier (demande utilisateur) : distinct du survol, pour rester
+     visible même sans souris — bordure ambrée plutôt que la teinte cyan du
+     survol, cohérent avec l'ambre déjà utilisé pour la sélection ailleurs
+     dans le HUD (cercle de sélection de la carte stellaire, §23). */
+  .lang-btn.focused{
+    border-color:var(--amber); background:rgba(255,180,84,0.12);
+    box-shadow:0 0 0 2px rgba(255,180,84,0.35);
+  }
+  .lang-btn:focus{ outline:none; }
   .lang-btn .lang-flag{ font-size:15px; font-weight:700; color:var(--cyan); letter-spacing:0.08em; }
   .lang-btn .lang-name{ font-size:11px; color:var(--muted); }
 </style>
@@ -794,6 +945,11 @@
       <span class="port-dots" id="fuelPortPct"></span>
     </div>
     <button class="port-buy-btn" id="fuelBuyBtn"></button>
+    <div class="port-row" id="jumpPortRow">
+      <span id="lblJumpService">Saut quantique</span>
+      <span class="port-dots" id="jumpPortStatus"></span>
+    </div>
+    <button class="port-buy-btn" id="jumpBuyBtn"></button>
   </div>
 
   <!-- itinéraire (§ amélioration v2.4) : bas droite, au-dessus de la barre
@@ -842,6 +998,82 @@
   </div>
 </div>
 
+<!-- carte stellaire (§23) : même famille visuelle que Pause/Aide (coins
+     ambrés) plutôt qu'un nouveau gabarit d'overlay. Le canevas 3D est le
+     canevas PRINCIPAL du jeu (bascule sur une scène/caméra dédiées
+     pendant que l'overlay est ouvert, cf. animate()) — pas un second
+     contexte WebGL à faire vivre à côté. Placée en dehors de #hud (comme
+     #pauseOverlay juste en dessous) : bug corrigé au passage — imbriquée
+     DANS #hud comme au premier jet, la règle qui masque #hud pendant que
+     la carte est ouverte (cf. CSS) masquait aussi la carte elle-même. -->
+<!-- étiquettes de la carte stellaire (noms + repères lettrés de grille,
+     §23 amélioration) : même technique que #starLabels (projection écran
+     via .project()), conteneur séparé — mise à jour tant que la carte est
+     ouverte, cf. updateStarMapLabels(). Hors de #hud comme starMapOverlay
+     lui-même (bug déjà corrigé une fois pour ce dernier, cf. §23.6). -->
+<div id="starMapLabels"></div>
+<div id="starMapOverlay" class="mono">
+  <div class="starmap-panel">
+    <div class="starmap-titlebar">
+      <span class="starmap-title" id="lblStarMapTitle">CARTE STELLAIRE</span>
+      <span class="starmap-hint" id="lblStarMapHint">M — fermer / reprendre</span>
+      <button class="panel-close-btn" data-panel-cls="__starmap__" title="Fermer">×</button>
+    </div>
+    <div class="starmap-body">
+      <div class="starmap-viewport" id="starMapViewport"></div>
+      <div class="starmap-side">
+        <div class="starmap-target-box">
+          <div class="starmap-box-title" id="lblStarMapTarget">CIBLE SÉLECTIONNÉE</div>
+          <div id="starMapTargetBody">
+            <div class="starmap-empty" id="lblStarMapNone">Aucune cible — cliquez une étoile</div>
+          </div>
+          <button class="starmap-confirm-btn" id="starMapConfirmBtn" style="display:none;"></button>
+          <div class="starmap-subhint" id="lblStarMapDblclick">Double-clic sur une cible = même action</div>
+        </div>
+        <div class="starmap-locked-box" id="starMapLockedBox" style="display:none;">
+          <div class="starmap-box-title" id="lblStarMapLockedTitle">Sans module de saut</div>
+          <div class="starmap-empty" id="lblStarMapLockedBody">Carte consultable en lecture seule — aperçu toujours utile.</div>
+        </div>
+      </div>
+    </div>
+    <div class="starmap-legend">
+      <span><span class="dot built"></span><span id="lblStarMapBuilt">système déjà construit</span></span>
+      <span><span class="dot range"></span><span id="lblStarMapRange">à portée de saut</span></span>
+      <span><span class="dot sel"></span><span id="lblStarMapSel">sélection courante</span></span>
+    </div>
+  </div>
+</div>
+
+<!-- bannière de séquence de saut (§23.5) — élément dédié plutôt que
+     modeBadge, réécrit chaque image par la logique de vol normale. -->
+<div class="hud-mode mono" id="jumpBanner" style="display:none;"></div>
+<!-- halo d'écran du saut (charge/sortie) — même famille que .speedlines
+     (déjà utilisée au boost), poussée plus fort plutôt qu'un nouveau
+     système de rendu à part. -->
+<div class="jump-vignette" id="jumpVignette"></div>
+<div class="jump-flash" id="jumpFlash"></div>
+
+<!-- réglage des volumes (demande utilisateur) : même famille visuelle que
+     les autres overlays (coins ambrés), hors de #hud comme eux tous —
+     cf. le bug déjà rencontré deux fois sur ce point précis (§23.6, §25). -->
+<div id="audioOverlay" class="mono">
+  <div class="audio-panel">
+    <button class="panel-close-btn" data-panel-cls="__audio__" title="Fermer">×</button>
+    <div class="audio-title" id="lblAudioTitle">SON</div>
+    <div class="audio-row">
+      <span class="audio-label" id="lblMusicVolume">Musique</span>
+      <input type="range" id="musicVolumeSlider" min="0" max="100" value="40">
+      <span class="audio-pct" id="musicVolumePct">40%</span>
+    </div>
+    <div class="audio-row">
+      <span class="audio-label" id="lblVoiceVolume">Voix</span>
+      <input type="range" id="voiceVolumeSlider" min="0" max="100" value="85">
+      <span class="audio-pct" id="voiceVolumePct">85%</span>
+    </div>
+    <div class="audio-foot" id="lblAudioFoot">V — masquer ce réglage</div>
+  </div>
+</div>
+
 <div id="pauseOverlay" class="mono">
   <div class="pause-panel">
     <div class="pause-title" id="pauseTitle">PAUSE</div>
@@ -871,6 +1103,7 @@
       <button class="lang-btn" data-lang="es"><span class="lang-flag">ES</span><span class="lang-name">Español</span></button>
     </div>
   </div>
+  <div class="title-copyright" id="titleCopyright">(c) 2026 - game by Frédéric Delorme - music by ScoreStudio from Envato</div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -907,7 +1140,7 @@ const I18N = {
     nebula_emission:'N\u00e9buleuse en \u00e9mission', nebula_hii:'R\u00e9gion HII', nebula_dark:'N\u00e9buleuse obscure',
     nebula_planetary:'N\u00e9buleuse plan\u00e9taire', nebula_supernova:'R\u00e9manent de supernova', nebula_nursery:'Pouponni\u00e8re stellaire',
     nebula_reflection:'N\u00e9buleuse par r\u00e9flexion', nebula_molecular:'Nuage mol\u00e9culaire', nebula_oiii:'N\u00e9buleuse en \u00e9mission OIII',
-    ttsLang: 'fr-FR', noRoute: 'Aucune route', creditsLabel: 'CRÉDITS', menuNavPanel: 'Vitesse / cap', pauseTitle: 'PAUSE', pauseSub: 'Simulation suspendue', pauseResumeLbl: 'REPRENDRE', pauseQuitLbl: 'QUITTER \u2014 \u00c9CRAN-TITRE', pauseHint: 'ESPACE / ENTR\u00c9E \u2014 reprendre \u00b7 \u00c9CHAP \u2014 quitter', lblPortServices: 'SERVICES PORTUAIRES', lblSpeedUpgrade: 'Propulseurs', portUpgradeBtn: 'AM\u00c9LIORER', portMaxLevel: 'NIVEAU MAXIMAL', lblFuelService: 'Carburant', portFuelBtn: 'RAVITAILLER', portFuelFull: 'PLEIN', lblFuel: 'CARBURANT', lblHelpTitle: 'AIDE \u2014 COMMANDES', lblHelpFoot: 'H \u2014 masquer cette aide', hk_move: '\u2191\u2193\u2190\u2192 / ZQSD', hlp_move: 'Orientation (tangage / lacet)', hk_roll: 'E / R', hlp_roll: 'Roulis', hk_thrust: 'MAJ / ESPACE', hlp_thrust: 'Propulsion', hk_aim: 'Glisser la souris', hlp_aim: 'Vis\u00e9e fine', hk_freelook: 'CTRL + glisser', hlp_freelook: 'Regard libre', hlp_voice: 'Coupe/r\u00e9tablit la voix', hlp_skip: 'Abr\u00e8ge la man\u0153uvre / reprend la pause', hlp_pause: 'Met le jeu en pause', hlp_help: 'Affiche/masque cette aide', llmChecking: 'Détection de l\u2019IA embarquée en cours\u2026', llmActive: 'IA embarquée (Gemini Nano) active \u2014 dialogues générés dynamiquement', llmInactive: 'IA embarquée indisponible \u2014 dialogues par gabarits', shuttleLabelGeneric: 'NAVETTE'
+    ttsLang: 'fr-FR', noRoute: 'Aucune route', creditsLabel: 'CRÉDITS', menuNavPanel: 'Vitesse / cap', pauseTitle: 'PAUSE', pauseSub: 'Simulation suspendue', pauseResumeLbl: 'REPRENDRE', pauseQuitLbl: 'QUITTER \u2014 \u00c9CRAN-TITRE', pauseHint: 'ESPACE / ENTR\u00c9E \u2014 reprendre \u00b7 \u00c9CHAP \u2014 quitter', lblPortServices: 'SERVICES PORTUAIRES', lblSpeedUpgrade: 'Propulseurs', portUpgradeBtn: 'AM\u00c9LIORER', portMaxLevel: 'NIVEAU MAXIMAL', lblFuelService: 'Carburant', portFuelBtn: 'RAVITAILLER', portFuelFull: 'PLEIN', lblFuel: 'CARBURANT', lblJumpService: 'Saut quantique', portJumpBtn: 'ACHETER', portJumpAcquired: 'ACQUIS', lblStarMapTitle: 'CARTE STELLAIRE', lblStarMapHint: 'M \u2014 fermer / reprendre', lblStarMapTarget: 'CIBLE S\u00c9LECTIONN\u00c9E', starMapNone: 'Aucune cible \u2014 cliquez une \u00e9toile', lblStarMapDblclick: 'Double-clic sur une cible = m\u00eame action', lblStarMapLockedTitle: 'Sans module de saut', lblStarMapLockedBody: 'Carte consultable en lecture seule \u2014 aper\u00e7u toujours utile.', lblStarMapBuilt: 'syst\u00e8me d\u00e9j\u00e0 construit', lblStarMapRange: '\u00e0 port\u00e9e de saut', lblStarMapSel: 's\u00e9lection courante', lblAudioTitle: 'SON', lblMusicVolume: 'Musique', lblVoiceVolume: 'Voix', lblAudioFoot: 'V \u2014 masquer ce r\u00e9glage', starMapDist: 'Distance :', starMapFuelCost: 'Co\u00fbt carburant :', starMapNeedsModule: 'MODULE REQUIS', starMapNotEnoughFuel: 'CARBURANT INSUFFISANT', starMapConfirm: 'CONFIRMER LE SAUT', jumpBannerText: 'SAUT QUANTIQUE EN COURS', lblHelpTitle: 'AIDE \u2014 COMMANDES', lblHelpFoot: 'H \u2014 masquer cette aide', hk_move: '\u2191\u2193\u2190\u2192 / ZQSD', hlp_move: 'Orientation (tangage / lacet)', hk_roll: 'E / R', hlp_roll: 'Roulis', hk_thrust: 'MAJ / ESPACE', hlp_thrust: 'Propulsion', hk_aim: 'Glisser la souris', hlp_aim: 'Vis\u00e9e fine', hk_freelook: 'CTRL + glisser', hlp_freelook: 'Regard libre', hlp_voice: 'Coupe/r\u00e9tablit la voix', hlp_skip: 'Abr\u00e8ge la man\u0153uvre / reprend la pause', hlp_pause: 'Met le jeu en pause', hlp_help: 'Affiche/masque cette aide', llmChecking: 'Détection de l\u2019IA embarquée en cours\u2026', llmActive: 'IA embarquée (Gemini Nano) active \u2014 dialogues générés dynamiquement', llmInactive: 'IA embarquée indisponible \u2014 dialogues par gabarits', shuttleLabelGeneric: 'NAVETTE'
   },
   en: {
     title_sub: 'Choose a language',
@@ -932,7 +1165,7 @@ const I18N = {
     nebula_emission:'Emission nebula', nebula_hii:'HII region', nebula_dark:'Dark nebula',
     nebula_planetary:'Planetary nebula', nebula_supernova:'Supernova remnant', nebula_nursery:'Stellar nursery',
     nebula_reflection:'Reflection nebula', nebula_molecular:'Molecular cloud', nebula_oiii:'OIII emission nebula',
-    ttsLang: 'en-US', noRoute: 'No route', creditsLabel: 'CREDITS', menuNavPanel: 'Speed / heading', pauseTitle: 'PAUSED', pauseSub: 'Simulation suspended', pauseResumeLbl: 'RESUME', pauseQuitLbl: 'QUIT \u2014 TITLE SCREEN', pauseHint: 'SPACE / ENTER \u2014 resume \u00b7 ESC \u2014 quit', lblPortServices: 'PORT SERVICES', lblSpeedUpgrade: 'Thrusters', portUpgradeBtn: 'UPGRADE', portMaxLevel: 'MAX LEVEL', lblFuelService: 'Fuel', portFuelBtn: 'REFUEL', portFuelFull: 'FULL', lblFuel: 'FUEL', lblHelpTitle: 'HELP \u2014 CONTROLS', lblHelpFoot: 'H \u2014 hide this help', hk_move: '\u2191\u2193\u2190\u2192 / WASD', hlp_move: 'Orientation (pitch / yaw)', hk_roll: 'E / R', hlp_roll: 'Roll', hk_thrust: 'SHIFT / SPACE', hlp_thrust: 'Thrust', hk_aim: 'Drag mouse', hlp_aim: 'Fine aim', hk_freelook: 'CTRL + drag', hlp_freelook: 'Free look', hlp_voice: 'Mute/unmute voice', hlp_skip: 'Skip maneuver / resume from pause', hlp_pause: 'Pause the game', hlp_help: 'Show/hide this help', llmChecking: 'Detecting on-device AI\u2026', llmActive: 'On-device AI (Gemini Nano) active \u2014 dialogue generated dynamically', llmInactive: 'On-device AI unavailable \u2014 template dialogue', shuttleLabelGeneric: 'SHUTTLE'
+    ttsLang: 'en-US', noRoute: 'No route', creditsLabel: 'CREDITS', menuNavPanel: 'Speed / heading', pauseTitle: 'PAUSED', pauseSub: 'Simulation suspended', pauseResumeLbl: 'RESUME', pauseQuitLbl: 'QUIT \u2014 TITLE SCREEN', pauseHint: 'SPACE / ENTER \u2014 resume \u00b7 ESC \u2014 quit', lblPortServices: 'PORT SERVICES', lblSpeedUpgrade: 'Thrusters', portUpgradeBtn: 'UPGRADE', portMaxLevel: 'MAX LEVEL', lblFuelService: 'Fuel', portFuelBtn: 'REFUEL', portFuelFull: 'FULL', lblFuel: 'FUEL', lblJumpService: 'Quantum jump', portJumpBtn: 'BUY', portJumpAcquired: 'ACQUIRED', lblStarMapTitle: 'STAR MAP', lblStarMapHint: 'M \u2014 close / resume', lblStarMapTarget: 'SELECTED TARGET', starMapNone: 'No target \u2014 click a star', lblStarMapDblclick: 'Double-click a target = same action', lblStarMapLockedTitle: 'Without the jump module', lblStarMapLockedBody: 'Map stays browsable read-only \u2014 an overview, still useful.', lblStarMapBuilt: 'already-built system', lblStarMapRange: 'in jump range', lblStarMapSel: 'current selection', lblAudioTitle: 'AUDIO', lblMusicVolume: 'Music', lblVoiceVolume: 'Voice', lblAudioFoot: 'V \u2014 hide this setting', starMapDist: 'Distance:', starMapFuelCost: 'Fuel cost:', starMapNeedsModule: 'MODULE REQUIRED', starMapNotEnoughFuel: 'NOT ENOUGH FUEL', starMapConfirm: 'CONFIRM JUMP', jumpBannerText: 'QUANTUM JUMP IN PROGRESS', lblHelpTitle: 'HELP \u2014 CONTROLS', lblHelpFoot: 'H \u2014 hide this help', hk_move: '\u2191\u2193\u2190\u2192 / WASD', hlp_move: 'Orientation (pitch / yaw)', hk_roll: 'E / R', hlp_roll: 'Roll', hk_thrust: 'SHIFT / SPACE', hlp_thrust: 'Thrust', hk_aim: 'Drag mouse', hlp_aim: 'Fine aim', hk_freelook: 'CTRL + drag', hlp_freelook: 'Free look', hlp_voice: 'Mute/unmute voice', hlp_skip: 'Skip maneuver / resume from pause', hlp_pause: 'Pause the game', hlp_help: 'Show/hide this help', llmChecking: 'Detecting on-device AI\u2026', llmActive: 'On-device AI (Gemini Nano) active \u2014 dialogue generated dynamically', llmInactive: 'On-device AI unavailable \u2014 template dialogue', shuttleLabelGeneric: 'SHUTTLE'
   },
   de: {
     title_sub: 'Sprache wählen',
@@ -957,7 +1190,7 @@ const I18N = {
     nebula_emission:'Emissionsnebel', nebula_hii:'HII-Region', nebula_dark:'Dunkelnebel',
     nebula_planetary:'Planetarischer Nebel', nebula_supernova:'Supernova-\u00dcberrest', nebula_nursery:'Sternentstehungsgebiet',
     nebula_reflection:'Reflexionsnebel', nebula_molecular:'Molek\u00fcelwolke', nebula_oiii:'OIII-Emissionsnebel',
-    ttsLang: 'de-DE', noRoute: 'Keine Route', creditsLabel: 'GUTHABEN', menuNavPanel: 'Geschwindigkeit / Kurs', pauseTitle: 'PAUSE', pauseSub: 'Simulation angehalten', pauseResumeLbl: 'FORTSETZEN', pauseQuitLbl: 'BEENDEN \u2014 TITELBILDSCHIRM', pauseHint: 'LEERTASTE / EINGABE \u2014 fortsetzen \u00b7 ESC \u2014 beenden', lblPortServices: 'HAFENDIENSTE', lblSpeedUpgrade: 'Triebwerke', portUpgradeBtn: 'AUFR\u00dcSTEN', portMaxLevel: 'MAXIMALSTUFE', lblFuelService: 'Treibstoff', portFuelBtn: 'AUFTANKEN', portFuelFull: 'VOLL', lblFuel: 'TREIBSTOFF', lblHelpTitle: 'HILFE \u2014 STEUERUNG', lblHelpFoot: 'H \u2014 Hilfe ausblenden', hk_move: '\u2191\u2193\u2190\u2192 / WASD', hlp_move: 'Ausrichtung (Nicken / Gieren)', hk_roll: 'E / R', hlp_roll: 'Rollen', hk_thrust: 'SHIFT / LEERTASTE', hlp_thrust: 'Schub', hk_aim: 'Maus ziehen', hlp_aim: 'Feinzielen', hk_freelook: 'STRG + ziehen', hlp_freelook: 'Freie Sicht', hlp_voice: 'Stimme stumm-/freischalten', hlp_skip: 'Man\u00f6ver abk\u00fcrzen / Pause fortsetzen', hlp_pause: 'Spiel pausieren', hlp_help: 'Diese Hilfe ein-/ausblenden', llmChecking: 'Geräteinterne KI wird erkannt\u2026', llmActive: 'Geräteinterne KI (Gemini Nano) aktiv \u2014 Dialoge dynamisch erzeugt', llmInactive: 'Geräteinterne KI nicht verfügbar \u2014 Dialoge aus Vorlagen', shuttleLabelGeneric: 'FÄHRE'
+    ttsLang: 'de-DE', noRoute: 'Keine Route', creditsLabel: 'GUTHABEN', menuNavPanel: 'Geschwindigkeit / Kurs', pauseTitle: 'PAUSE', pauseSub: 'Simulation angehalten', pauseResumeLbl: 'FORTSETZEN', pauseQuitLbl: 'BEENDEN \u2014 TITELBILDSCHIRM', pauseHint: 'LEERTASTE / EINGABE \u2014 fortsetzen \u00b7 ESC \u2014 beenden', lblPortServices: 'HAFENDIENSTE', lblSpeedUpgrade: 'Triebwerke', portUpgradeBtn: 'AUFR\u00dcSTEN', portMaxLevel: 'MAXIMALSTUFE', lblFuelService: 'Treibstoff', portFuelBtn: 'AUFTANKEN', portFuelFull: 'VOLL', lblFuel: 'TREIBSTOFF', lblJumpService: 'Quantensprung', portJumpBtn: 'KAUFEN', portJumpAcquired: 'ERWORBEN', lblStarMapTitle: 'STERNENKARTE', lblStarMapHint: 'M \u2014 schlie\u00dfen / fortsetzen', lblStarMapTarget: 'AUSGEW\u00c4HLTES ZIEL', starMapNone: 'Kein Ziel \u2014 klicken Sie einen Stern an', lblStarMapDblclick: 'Doppelklick auf ein Ziel = gleiche Aktion', lblStarMapLockedTitle: 'Ohne Sprungmodul', lblStarMapLockedBody: 'Karte bleibt schreibgesch\u00fctzt einsehbar \u2014 als \u00dcbersicht weiterhin n\u00fctzlich.', lblStarMapBuilt: 'bereits aufgebautes System', lblStarMapRange: 'in Sprungreichweite', lblStarMapSel: 'aktuelle Auswahl', lblAudioTitle: 'TON', lblMusicVolume: 'Musik', lblVoiceVolume: 'Stimme', lblAudioFoot: 'V \u2014 diese Einstellung ausblenden', starMapDist: 'Entfernung:', starMapFuelCost: 'Treibstoffkosten:', starMapNeedsModule: 'MODUL ERFORDERLICH', starMapNotEnoughFuel: 'NICHT GEN\u00dcG TREIBSTOFF', starMapConfirm: 'SPRUNG BEST\u00c4TIGEN', jumpBannerText: 'QUANTENSPRUNG L\u00c4UFT', lblHelpTitle: 'HILFE \u2014 STEUERUNG', lblHelpFoot: 'H \u2014 Hilfe ausblenden', hk_move: '\u2191\u2193\u2190\u2192 / WASD', hlp_move: 'Ausrichtung (Nicken / Gieren)', hk_roll: 'E / R', hlp_roll: 'Rollen', hk_thrust: 'SHIFT / LEERTASTE', hlp_thrust: 'Schub', hk_aim: 'Maus ziehen', hlp_aim: 'Feinzielen', hk_freelook: 'STRG + ziehen', hlp_freelook: 'Freie Sicht', hlp_voice: 'Stimme stumm-/freischalten', hlp_skip: 'Man\u00f6ver abk\u00fcrzen / Pause fortsetzen', hlp_pause: 'Spiel pausieren', hlp_help: 'Diese Hilfe ein-/ausblenden', llmChecking: 'Geräteinterne KI wird erkannt\u2026', llmActive: 'Geräteinterne KI (Gemini Nano) aktiv \u2014 Dialoge dynamisch erzeugt', llmInactive: 'Geräteinterne KI nicht verfügbar \u2014 Dialoge aus Vorlagen', shuttleLabelGeneric: 'FÄHRE'
   },
   es: {
     title_sub: 'Elige un idioma',
@@ -982,7 +1215,7 @@ const I18N = {
     nebula_emission:'Nebulosa de emisi\u00f3n', nebula_hii:'Regi\u00f3n HII', nebula_dark:'Nebulosa oscura',
     nebula_planetary:'Nebulosa planetaria', nebula_supernova:'Remanente de supernova', nebula_nursery:'Vivero estelar',
     nebula_reflection:'Nebulosa de reflexi\u00f3n', nebula_molecular:'Nube molecular', nebula_oiii:'Nebulosa de emisi\u00f3n OIII',
-    ttsLang: 'es-ES', noRoute: 'Sin ruta', creditsLabel: 'CRÉDITOS', menuNavPanel: 'Velocidad / rumbo', pauseTitle: 'PAUSA', pauseSub: 'Simulaci\u00f3n suspendida', pauseResumeLbl: 'REANUDAR', pauseQuitLbl: 'SALIR \u2014 PANTALLA DE INICIO', pauseHint: 'ESPACIO / INTRO \u2014 reanudar \u00b7 ESC \u2014 salir', lblPortServices: 'SERVICIOS PORTUARIOS', lblSpeedUpgrade: 'Propulsores', portUpgradeBtn: 'MEJORAR', portMaxLevel: 'NIVEL M\u00c1XIMO', lblFuelService: 'Combustible', portFuelBtn: 'REPOSTAR', portFuelFull: 'LLENO', lblFuel: 'COMBUSTIBLE', lblHelpTitle: 'AYUDA \u2014 CONTROLES', lblHelpFoot: 'H \u2014 ocultar esta ayuda', hk_move: '\u2191\u2193\u2190\u2192 / WASD', hlp_move: 'Orientaci\u00f3n (cabeceo / gui\u00f1ada)', hk_roll: 'E / R', hlp_roll: 'Alabeo', hk_thrust: 'MAY\u00daS / ESPACIO', hlp_thrust: 'Propulsi\u00f3n', hk_aim: 'Arrastrar rat\u00f3n', hlp_aim: 'Punter\u00eda fina', hk_freelook: 'CTRL + arrastrar', hlp_freelook: 'Vista libre', hlp_voice: 'Silencia/activa la voz', hlp_skip: 'Abreviar maniobra / reanudar pausa', hlp_pause: 'Pausa el juego', hlp_help: 'Muestra/oculta esta ayuda', llmChecking: 'Detectando IA integrada\u2026', llmActive: 'IA integrada (Gemini Nano) activa \u2014 diálogos generados dinámicamente', llmInactive: 'IA integrada no disponible \u2014 diálogos por plantilla', shuttleLabelGeneric: 'NAVE'
+    ttsLang: 'es-ES', noRoute: 'Sin ruta', creditsLabel: 'CRÉDITOS', menuNavPanel: 'Velocidad / rumbo', pauseTitle: 'PAUSA', pauseSub: 'Simulaci\u00f3n suspendida', pauseResumeLbl: 'REANUDAR', pauseQuitLbl: 'SALIR \u2014 PANTALLA DE INICIO', pauseHint: 'ESPACIO / INTRO \u2014 reanudar \u00b7 ESC \u2014 salir', lblPortServices: 'SERVICIOS PORTUARIOS', lblSpeedUpgrade: 'Propulsores', portUpgradeBtn: 'MEJORAR', portMaxLevel: 'NIVEL M\u00c1XIMO', lblFuelService: 'Combustible', portFuelBtn: 'REPOSTAR', portFuelFull: 'LLENO', lblFuel: 'COMBUSTIBLE', lblJumpService: 'Salto cu\u00e1ntico', portJumpBtn: 'COMPRAR', portJumpAcquired: 'ADQUIRIDO', lblStarMapTitle: 'MAPA ESTELAR', lblStarMapHint: 'M \u2014 cerrar / reanudar', lblStarMapTarget: 'OBJETIVO SELECCIONADO', starMapNone: 'Sin objetivo \u2014 haga clic en una estrella', lblStarMapDblclick: 'Doble clic en un objetivo = misma acci\u00f3n', lblStarMapLockedTitle: 'Sin m\u00f3dulo de salto', lblStarMapLockedBody: 'El mapa sigue siendo consultable de solo lectura \u2014 una visi\u00f3n general, a\u00fan as\u00ed \u00fatil.', lblStarMapBuilt: 'sistema ya construido', lblStarMapRange: 'al alcance del salto', lblStarMapSel: 'selecci\u00f3n actual', lblAudioTitle: 'SONIDO', lblMusicVolume: 'M\u00fasica', lblVoiceVolume: 'Voz', lblAudioFoot: 'V \u2014 ocultar este ajuste', starMapDist: 'Distancia:', starMapFuelCost: 'Coste de combustible:', starMapNeedsModule: 'M\u00d3DULO NECESARIO', starMapNotEnoughFuel: 'COMBUSTIBLE INSUFICIENTE', starMapConfirm: 'CONFIRMAR SALTO', jumpBannerText: 'SALTO CU\u00c1NTICO EN CURSO', lblHelpTitle: 'AYUDA \u2014 CONTROLES', lblHelpFoot: 'H \u2014 ocultar esta ayuda', hk_move: '\u2191\u2193\u2190\u2192 / WASD', hlp_move: 'Orientaci\u00f3n (cabeceo / gui\u00f1ada)', hk_roll: 'E / R', hlp_roll: 'Alabeo', hk_thrust: 'MAY\u00daS / ESPACIO', hlp_thrust: 'Propulsi\u00f3n', hk_aim: 'Arrastrar rat\u00f3n', hlp_aim: 'Punter\u00eda fina', hk_freelook: 'CTRL + arrastrar', hlp_freelook: 'Vista libre', hlp_voice: 'Silencia/activa la voz', hlp_skip: 'Abreviar maniobra / reanudar pausa', hlp_pause: 'Pausa el juego', hlp_help: 'Muestra/oculta esta ayuda', llmChecking: 'Detectando IA integrada\u2026', llmActive: 'IA integrada (Gemini Nano) activa \u2014 diálogos generados dinámicamente', llmInactive: 'IA integrada no disponible \u2014 diálogos por plantilla', shuttleLabelGeneric: 'NAVE'
   }
 };
 function t(key){
@@ -1144,7 +1377,12 @@ function applyLanguage(){
     lblItinerary:'lblItinerary', lblLagrange:'lblLagrange',
     lblEngineTemp:'lblEngineTemp', lblPropulsion:'lblPropulsion', lblEngineCmd:'lblEngineCmd',
     lblRadioChannel:'lblRadioChannel', creditsLabel:'creditsLabel',
-    lblPortServices:'lblPortServices', lblSpeedUpgrade:'lblSpeedUpgrade', lblFuelService:'lblFuelService', lblFuel:'lblFuel'
+    lblPortServices:'lblPortServices', lblSpeedUpgrade:'lblSpeedUpgrade', lblFuelService:'lblFuelService', lblFuel:'lblFuel',
+    lblJumpService:'lblJumpService', lblStarMapTitle:'lblStarMapTitle', lblStarMapHint:'lblStarMapHint',
+    lblStarMapTarget:'lblStarMapTarget', lblStarMapDblclick:'lblStarMapDblclick',
+    lblStarMapLockedTitle:'lblStarMapLockedTitle', lblStarMapLockedBody:'lblStarMapLockedBody',
+    lblStarMapBuilt:'lblStarMapBuilt', lblStarMapRange:'lblStarMapRange', lblStarMapSel:'lblStarMapSel',
+    lblAudioTitle:'lblAudioTitle', lblMusicVolume:'lblMusicVolume', lblVoiceVolume:'lblVoiceVolume', lblAudioFoot:'lblAudioFoot'
   };
   Object.keys(map).forEach(function(id){
     const el = document.getElementById(id);
@@ -1884,6 +2122,13 @@ function buildStarLayer(tag, count, rMin, rMax, sizeScale, opts){
   });
   const points = new THREE.Points(geo, mat);
   points.frustumCulled = false;
+  /* garantit ce fond TOUJOURS derrière le reste (demande utilisateur) —
+     un ordre de rendu très bas plutôt que de ne compter que sur le tri
+     par profondeur des objets transparents (fiable en temps normal, mais
+     un filet de sécurité explicite coûte rien et couvre aussi le cas où
+     la caméra cinématique de l'écran-titre s'approche par inadvertance
+     de ce fond, cf. correctif backdrop.position dans animate()). */
+  points.renderOrder = -1000;
   backdrop.add(points);
   return points;
 }
@@ -4288,10 +4533,17 @@ window.addEventListener('keydown', function(e){
        navigateur pour Espace) — pertinent aussi bien pour la propulsion
        en vol normal que pour l'abrégé pendant l'approche */
     e.preventDefault();
+    /* même piège que ÉCHAP ci-dessous (carte stellaire réutilisant
+       gamePaused, §23.3) : sans ce test, ESPACE reprendrait le vol via
+       resumeGame() SANS fermer proprement la carte (overlay toujours
+       affiché, étiquettes jamais nettoyées) — cf. commentaire détaillé
+       plus bas pour ÉCHAP. */
+    if(starMapOpen){ closeStarMap(); return; }
     if(gamePaused){ resumeGame(); return; }
     if(flightPhase === 'ARRIVAL_PAUSE') arrivalSkip = true;
   }
   if(e.code === 'Enter'){
+    if(starMapOpen){ closeStarMap(); return; }
     if(gamePaused){ resumeGame(); return; }
     if(flightPhase === 'ARRIVAL_PAUSE') arrivalSkip = true;
   }
@@ -4301,11 +4553,38 @@ window.addEventListener('keydown', function(e){
      n'ont alors aucun effet — pas de bascule retour par ces deux-là). */
   if(e.code === 'Escape' || e.code === 'KeyP' || e.code === 'Pause'){
     e.preventDefault();
+    /* bug remonté en jeu : la carte stellaire réutilise gamePaused pour
+       geler le vol (§23.3), le même drapeau que la pause générale — donc
+       ÉCHAP, en vérifiant seulement gamePaused, croyait la partie déjà en
+       pause et retournait à l'écran-titre au lieu de fermer la carte. La
+       touche M avait déjà été protégée de ce piège (cf. commentaire
+       ci-dessous), mais pas ÉCHAP/P elles-mêmes, qui passaient encore par
+       le test générique. Sort de la carte en priorité, avant même de
+       regarder gamePaused. */
+    if(starMapOpen){ closeStarMap(); return; }
     if(gamePaused){
       if(e.code === 'Escape') quitToTitle();
     } else {
       enterPause();
     }
+    return;
+  }
+  /* M — carte stellaire (§23.3) : bascule dédiée, distincte d'ÉCHAP/P pour
+     ne pas hériter du « ÉCHAP en pause quitte vers l'écran-titre » — sortir
+     de la carte doit reprendre le vol, jamais recharger la partie. Passe
+     par activateHudBarItem comme H/I/L : jamais dupliquée entre clavier
+     et bouton de la barre.
+     Bug remonté en jeu : ne réagissait pas sur clavier AZERTY. `e.code`
+     donne la position PHYSIQUE de la touche (référence QWERTY), pas le
+     caractère produit — sur AZERTY, la lettre M occupe la position de la
+     touche point-virgule de QWERTY (`Semicolon`), pas celle de son M
+     (bas du clavier, qui produit une virgule en AZERTY). Même principe
+     déjà en place pour ZQSD (keys['KeyZ']||keys['KeyW'] etc.) : on
+     accepte les deux codes plutôt que de supposer un unique clavier. */
+  if(e.code === 'KeyM' || e.code === 'Semicolon'){
+    e.preventDefault();
+    const it = HUD_BAR_ITEMS.find(function(x){ return x.kind === 'starmap'; });
+    if(it) activateHudBarItem(it);
     return;
   }
   if(gamePaused) return;   /* aucune autre touche n'agit tant que le jeu est en pause */
@@ -4325,6 +4604,11 @@ window.addEventListener('keydown', function(e){
   }
   if(e.code === 'KeyL'){
     const it = HUD_BAR_ITEMS.find(function(x){ return x.cls === 'hud-lagrange'; });
+    if(it) activateHudBarItem(it);
+  }
+  /* V — réglage des volumes (demande utilisateur), même principe que H/I/L */
+  if(e.code === 'KeyV'){
+    const it = HUD_BAR_ITEMS.find(function(x){ return x.kind === 'audio'; });
     if(it) activateHudBarItem(it);
   }
   /* TAB bascule directement l'affichage du canal radio, à tout moment —
@@ -4375,6 +4659,24 @@ function toggleVoiceMute(){
   if(btn) btn.textContent = radioMuted ? '\u{1F507}' : '\u{1F50A}';
   if(radioMuted && window.speechSynthesis){ window.speechSynthesis.cancel(); radioSpeaking = false; }
 }
+function toggleAudioPanel(){
+  const el = document.getElementById('audioOverlay');
+  if(el) el.classList.toggle('visible');
+}
+(function initAudioPanel(){
+  const musicSlider = document.getElementById('musicVolumeSlider');
+  const voiceSlider = document.getElementById('voiceVolumeSlider');
+  const musicPct = document.getElementById('musicVolumePct');
+  const voicePct = document.getElementById('voiceVolumePct');
+  if(musicSlider) musicSlider.addEventListener('input', function(){
+    setMusicVolume(musicSlider.value/100);
+    if(musicPct) musicPct.textContent = musicSlider.value+'%';
+  });
+  if(voiceSlider) voiceSlider.addEventListener('input', function(){
+    setVoiceVolume(voiceSlider.value/100);
+    if(voicePct) voicePct.textContent = voiceSlider.value+'%';
+  });
+})();
 
 /* =========================================================================
    MODE PAUSE — §11 de la spec v2.1.
@@ -4389,6 +4691,86 @@ function toggleVoiceMute(){
    vraiment. */
 let gamePaused = false;
 let gameStarted = false;
+/* travelling cinématique de fond de l'écran-titre (demande utilisateur) :
+   vrai une fois le premier monde généré (cf. finish() dans le générique),
+   garde animate() de tenter le moindre calcul avant que shipRig/starField
+   n'aient de quoi produire un plan cohérent. */
+let worldReadyForCinematic = false;
+let titleCineTimer = 0, titleCinePos = null, titleCineLook = null;
+const TITLE_CINE_SHOT_MIN = 14, TITLE_CINE_SHOT_MAX = 24;
+/* choisit une cible au hasard parmi ce qui existe déjà — étoiles, planètes
+   des systèmes déjà construits (ensureSystemsBuilt, via computeRoute),
+   nébuleuses — chacune avec une distance de champ adaptée à sa taille
+   réelle plutôt qu'une même distance pour tout (une nébuleuse est nettement
+   plus grande qu'une planète, s'en approcher pareil la ferait sortir du
+   cadre). */
+function pickCinematicTarget(){
+  const candidates = [];
+  /* distance de champ pour une étoile : PAS proportionnelle à son halo
+     (bug corrigé — donnait des centaines d'unités, où l'étoile n'est
+     plus qu'un point sub-pixel). La taille apparente d'une étoile dans
+     ce jeu vient exclusivement du calcul d'angle appliqué chaque image
+     (baseCore*26/distance, cf. plus haut dans animate()) — une échelle
+     compressée pensée pour un survol RAPPROCHÉ, pas un cadrage lointain.
+     Viser un angle d'environ 3 (baseCore*26/dist=3 → dist=baseCore*8.7)
+     donne un plan net à toute taille d'étoile, grosse ou petite. */
+  starField.forEach(function(o){
+    if(o) candidates.push({pos:o.mesh.position, dist: Math.max(6, o.baseCore*8.7)});
+  });
+  /* les planètes vivent en données sur ROUTE.legs[i].system.planets (p.mesh
+     posé par buildPlanetSystemMeshes) — pas dans les enfants du groupe
+     Three.js lui-même, qui les imbrique dans un sous-groupe par planète
+     sans reporter leurs propriétés (rayon...) dans userData. Plus fiable
+     de repartir de la donnée source que de la deviner depuis la scène. */
+  ROUTE.builtSystems.forEach(function(grp, i){
+    const leg = ROUTE.legs[i];
+    if(!leg || !leg.system) return;
+    leg.system.planets.forEach(function(p){
+      if(p.mesh) candidates.push({pos:p.mesh.getWorldPosition(new THREE.Vector3()), dist: 35 + p.radius*8});
+    });
+  });
+  nebulaField.forEach(function(o){
+    if(o) candidates.push({pos:o.mesh.position, dist: 420});
+  });
+  if(!candidates.length) return null;
+  return candidates[Math.floor(Math.random()*candidates.length)];
+}
+function updateTitleCinematic(dt){
+  titleCineTimer -= dt;
+  if(titleCineTimer <= 0 || !titleCinePos){
+    const target = pickCinematicTarget();
+    if(target){
+      /* bug remonté en jeu (« pas de travelling ARRIÈRE ») : l'ancienne
+         version choisissait une direction d'approche totalement
+         aléatoire autour de la cible — sans lien avec la position
+         actuelle de la caméra, ce qui pouvait très bien la placer
+         derrière son sens de déplacement en cours, obligeant le plan
+         suivant à reculer pour l'atteindre. Corrigé en approchant TOUJOURS
+         la nouvelle cible depuis la position actuelle de la caméra (le
+         long de la droite qui les relie), en s'arrêtant à distance de
+         champ avant de l'atteindre — la caméra n'avance donc jamais que
+         vers l'avant, jamais en arrière, quelle que soit la cible tirée. */
+      const toTarget = target.pos.clone().sub(camPos);
+      const d = toTarget.length();
+      const dir = d > 1e-3 ? toTarget.divideScalar(d) : new THREE.Vector3(0,0,-1);
+      titleCinePos = target.pos.clone().addScaledVector(dir, -target.dist);
+      titleCineLook = target.pos.clone();
+    }
+    titleCineTimer = TITLE_CINE_SHOT_MIN + Math.random()*(TITLE_CINE_SHOT_MAX-TITLE_CINE_SHOT_MIN);
+  }
+  if(titleCinePos){
+    /* très lent (demande utilisateur) : un taux d'interpolation environ
+       15 fois plus faible que la poursuite normale du vaisseau en jeu
+       (dt*4.5) — un plan met plusieurs secondes à s'installer plutôt que
+       de sauter dessus, cohérent avec un fond d'écran-titre plutôt qu'une
+       caméra de jeu. */
+    camPos.lerp(titleCinePos, Math.min(1, dt*0.3));
+    camLook.lerp(titleCineLook, Math.min(1, dt*0.3));
+    camera.position.copy(camPos);
+    camera.up.set(0,1,0);
+    camera.lookAt(camLook);
+  }
+}
 function enterPause(){
   if(gamePaused || !gameStarted) return;
   gamePaused = true;
@@ -4567,6 +4949,15 @@ const HUD_ICONS = {
      orbital littéral — c'est l'ORIENTATION relative qui est montrée, pas la
      géométrie à N corps elle-même */
   lagrange: '<circle cx="12" cy="12" r="8.5"/><path d="M12 5L14 12L12 19L10 12Z" fill="currentColor" stroke="none"/>',
+  /* carte stellaire (§23) : trois points reliés par des traits fins,
+     évoquant une petite constellation — distinct de « route » (un seul
+     trait) et de « itinerary » (repère + trajet pointillé) déjà utilisés
+     par ailleurs dans cette même barre. */
+  starmap: '<circle cx="6" cy="17" r="1.6" fill="currentColor" stroke="none"/><circle cx="13" cy="6" r="1.6" fill="currentColor" stroke="none"/><circle cx="18" cy="14" r="1.6" fill="currentColor" stroke="none"/><path d="M6 17L13 6M13 6L18 14M6 17L18 14" stroke-dasharray="2 2"/>',
+  /* réglage des volumes (demande utilisateur) : haut-parleur simple, sans
+     ondes barrées (ce n'est pas un bouton muet comme F10/radio, juste
+     l'accès au réglage) */
+  audio: '<path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M16 9.5c1 1 1 4 0 5"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.3 9.2a2.7 2.7 0 1 1 3.8 2.4c-.7.35-1.1.9-1.1 1.7v.4" stroke-linecap="round"/><circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none"/>'
 };
 const HUD_BAR_ITEMS = [
@@ -4587,6 +4978,16 @@ const HUD_BAR_ITEMS = [
      Comme l'aide (H), ceux-ci prennent une touche FIXE plutôt qu'un F-slot. */
   { cls:'hud-itinerary', icon:'itinerary', labelKey:'lblItinerary',  kind:'panel', hotkey:'I' },
   { cls:'hud-lagrange',  icon:'lagrange',  labelKey:'lblLagrange',   kind:'panel', hotkey:'L' },
+  /* carte stellaire (§23) : même principe (touche fixe, ajoutée après les
+     six premiers panneaux pour ne pas décaler F7-F9) — indispensable au
+     clavier ET au tactile, faute de quoi le module resterait totalement
+     hors d'atteinte sur mobile/tablette (pas de touche M sur un écran
+     tactile). kind:'starmap', pas 'panel' : n'affiche/masque pas une
+     classe CSS mais ouvre/ferme l'overlay dédié, cf. activateHudBarItem. */
+  { cls:null,            icon:'starmap', labelKey:'lblStarMapTitle', kind:'starmap', hotkey:'M' },
+  /* réglage des volumes (demande utilisateur) : même principe, touche fixe
+     ajoutée après les six premiers panneaux pour ne pas décaler F7-F9. */
+  { cls:null,            icon:'audio',   labelKey:'lblAudioTitle', kind:'audio', hotkey:'V' },
   /* aide (amélioration demandée) : ajoutée dans la MÊME barre plutôt qu'un
      bouton séparé, pour une seule et unique zone de contrôle — mais avec
      un raccourci FIXE ('H', déjà établi) plutôt que le F-suivant
@@ -4627,6 +5028,10 @@ function activateHudBarItem(item){
   } else if(item.kind === 'help'){
     const el = document.getElementById('helpOverlay');
     if(el) el.classList.toggle('visible');
+  } else if(item.kind === 'starmap'){
+    if(starMapOpen) closeStarMap(); else openStarMap();
+  } else if(item.kind === 'audio'){
+    toggleAudioPanel();
   }
   refreshHudIconBar();
 }
@@ -4654,6 +5059,11 @@ function refreshHudIconBar(){
       item.el.querySelector('svg').innerHTML = HUD_ICONS['cam_'+CAMERA_MODES[cameraMode]];
     } else if(item.kind === 'help'){
       const el = document.getElementById('helpOverlay');
+      active = !!(el && el.classList.contains('visible'));
+    } else if(item.kind === 'starmap'){
+      active = starMapOpen;
+    } else if(item.kind === 'audio'){
+      const el = document.getElementById('audioOverlay');
       active = !!(el && el.classList.contains('visible'));
     }
     item.el.classList.toggle('active', active);
@@ -4713,6 +5123,10 @@ document.addEventListener('click', function(e){
     const el = document.getElementById('helpOverlay');
     if(el) el.classList.remove('visible');
     if(typeof refreshHudIconBar === 'function') refreshHudIconBar();
+  } else if(cls === '__starmap__'){
+    closeStarMap();
+  } else if(cls === '__audio__'){
+    toggleAudioPanel();
   } else {
     const el = document.querySelector('.'+cls);
     if(el) el.classList.add('panel-hidden');
@@ -4924,6 +5338,476 @@ const FUEL_WARN_RATIO = 0.25, FUEL_CRIT_RATIO = 0.10;
 function fuelRefuelCost(){
   return Math.ceil((FUEL_CAPACITY - fuel) * FUEL_PRICE_PER_UNIT);
 }
+
+/* =========================================================================
+   PROPULSION QUANTIQUE ET CARTE STELLAIRE (§23)
+   ========================================================================= */
+/* achat unique en escale (§23.1) — pas un système à paliers comme les
+   propulseurs : soit le vaisseau dispose du module, soit non. */
+const QUANTUM_JUMP_PRICE = 18000;
+let hasQuantumJump = false;
+/* rayon (en cellules stellaires, §2) dans lequel une étoile est proposée
+   comme cible de saut — plus large que le rayon de rendu courant
+   (STAR_RADIUS=3) : la carte s'appuie sur starDataForCell() directement
+   (pur calcul, sans construire de maillage 3D complet) plutôt que sur les
+   seules étoiles déjà rendues, pour une portée de saut qui a du sens sans
+   pour autant générer/dessiner une région jamais visitée (§23.4). */
+const STAR_MAP_RADIUS = 5;
+let starMapOpen = false;
+let starMapCandidates = [];      /* étoiles candidates de la session en cours */
+let starMapSelectedKey = null;   /* clé de cellule de l'étoile sélectionnée */
+/* caméra libre de la carte : coordonnées sphériques autour du vaisseau,
+   pas de THREE.OrbitControls (non chargé) — même esprit que le regard
+   libre déjà en place (§4), juste appliqué à une caméra dédiée plutôt
+   qu'à la caméra de jeu. */
+let mapCamYaw = 0.6, mapCamPitch = 0.5, mapCamDist = 1400;
+let mapScene = null, mapCamera = null;
+let mapDragging = false, mapLastX = 0, mapLastY = 0;
+/* rotation automatique après inactivité (demande utilisateur) : très
+   lente, seulement le temps que la souris ne bouge pas sur la carte —
+   reprend la main dès le moindre mouvement ou molette, sans geste
+   particulier pour la couper. */
+const MAP_AUTOROTATE_DELAY = 5, MAP_AUTOROTATE_SPEED = 0.035;
+let mapIdleTimer = 0;
+/* séquence de saut (§23.5) : machine à états à trois phases, mise à jour
+   dans la boucle principale (updateFlight) — non interruptible, comme la
+   mise en orbite. jumpState.phase vaut null hors séquence. */
+let jumpState = null;
+const JUMP_CHARGE_DURATION = 0.4, JUMP_STRETCH_DURATION = 0.5, JUMP_FLASH_DURATION = 0.15;
+function quantumJumpFuelCost(distance){
+  /* §23.2 : exactement le coût d'un trajet en croisière normale — le
+     régime de la formule de consommation (§22.2) vaut 1 par construction
+     au ratio vitesse/croisière = 1, donc coût = distance × 1. L'intérêt du
+     module est le temps gagné, pas le carburant économisé. */
+  return distance;
+}
+
+/* ---------- constitution de la liste de cibles (§23.4) ----------
+   S'appuie sur starDataForCell() directement — un pur calcul déterministe,
+   sans construire de maillage 3D — plutôt que sur les seules étoiles déjà
+   RENDUES (starField, fenêtre glissante bien plus étroite, §2). La portée
+   de saut peut ainsi dépasser ce qui est affiché à l'écran sans pour
+   autant générer une région jamais visitée : la donnée existe déjà,
+   seule sa matérialisation graphique est différée. Le volume brut
+   (STAR_MAP_RADIUS élargi) est ensuite réduit aux plus proches : sans ce
+   plafond, une carte à 5 cellules de rayon proposerait plusieurs centaines
+   d'étoiles, illisible. */
+const STAR_MAP_MAX_CANDIDATES = 24;
+function collectStarMapCandidates(){
+  const p = shipRig.position;
+  const cx = Math.round(p.x/STAR_CELL), cy = Math.round(p.y/STAR_CELL), cz = Math.round(p.z/STAR_CELL);
+  const list = [];
+  for(let dx=-STAR_MAP_RADIUS; dx<=STAR_MAP_RADIUS; dx++){
+    for(let dy=-STAR_MAP_RADIUS; dy<=STAR_MAP_RADIUS; dy++){
+      for(let dz=-STAR_MAP_RADIUS; dz<=STAR_MAP_RADIUS; dz++){
+        const data = starDataForCell(cx+dx, cy+dy, cz+dz);
+        if(!data) continue;
+        list.push({
+          key: data.cell, position: data.position.clone(), name: data.name, star: data.star,
+          dist: data.position.distanceTo(p), built: starField.has(data.cell)
+        });
+      }
+    }
+  }
+  list.sort(function(a,b){ return a.dist - b.dist; });
+  return list.slice(0, STAR_MAP_MAX_CANDIDATES);
+}
+
+/* ---------- scène dédiée de la carte (§23.3) ----------
+   Marqueurs simples (sphères), pas les maillages étoile réels (shaders +
+   halo additif) : bien moins coûteux à instancier pour ~24 candidates, et
+   plus proche de la maquette filaire (§22.5/§23.6) — construite (pleine),
+   à portée non construite (fil de fer), sélection (anneau). Rendue à la
+   place de la scène de jeu tant que la carte est ouverte (cf. animate()),
+   pas un second contexte WebGL. */
+const starMapRaycaster = new THREE.Raycaster();
+/* étiquettes HTML de la carte (noms + repères de grille) — même principe
+   que #starLabels (position:fixed + projection écran), conteneur séparé
+   nettoyé à chaque fermeture de la carte plutôt que des éléments qui
+   s'accumuleraient d'une ouverture à l'autre. */
+let starMapLabelEls = [];
+function clearStarMapLabels(){
+  starMapLabelEls.forEach(function(l){ l.el.remove(); });
+  starMapLabelEls = [];
+}
+function addStarMapLabel(text, worldPos, cls, rich){
+  const el = document.createElement('div');
+  el.className = cls;
+  if(rich){
+    /* cercle + flèche + nom, comme les étiquettes du jeu (createStarLabel)
+       — réutilise directement les mêmes classes CSS (.star-ring/.star-
+       arrow/.star-text), ce conteneur-ci (#starMapLabels) leur est
+       indifférent, seule compte la classe. Taille fixe (cf. commentaire
+       d'appel) plutôt que le calcul dynamique de projectShipLabel. */
+    el.innerHTML = '<span class="star-ring"></span><span class="star-arrow"></span><span class="star-text"></span>';
+    el.querySelector('.star-text').textContent = text;
+  } else {
+    el.textContent = text;
+  }
+  document.getElementById('starMapLabels').appendChild(el);
+  starMapLabelEls.push({el:el, pos:worldPos});
+}
+function updateStarMapLabels(){
+  if(!mapCamera) return;
+  const w = window.innerWidth, h = window.innerHeight;
+  starMapLabelEls.forEach(function(l){
+    const p = l.pos.clone().project(mapCamera);
+    if(p.z > 1){ l.el.style.display = 'none'; return; }
+    l.el.style.display = 'block';
+    l.el.style.left = ((p.x*0.5+0.5)*w)+'px';
+    l.el.style.top = ((1-(p.y*0.5+0.5))*h)+'px';
+  });
+}
+function buildStarMapScene(){
+  mapScene = new THREE.Scene();
+  clearStarMapLabels();
+  const center = shipRig.position.clone();
+
+  /* le vaisseau du joueur, représenté par une miniature du VRAI modèle
+     plutôt qu'un simple repère géométrique (demande utilisateur) : clone
+     du groupe visuel shipMesh (buildShip) — géométries et matériaux
+     réutilisés par référence (comportement par défaut de .clone(true),
+     pas de copie profonde), donc aucun coût de génération des textures de
+     coque une seconde fois. Les halos moteurs de l'original ne sont
+     référencés que par window.__engineGlows (une liste d'objets
+     précis) : le clone n'y figure pas, ses propres halos restent donc
+     immobiles — sans incidence puisqu'une miniature statique n'a pas
+     besoin de scintiller. shipMesh utilise des MeshStandardMaterial
+     (éclairés) : sans lumière dans cette scène dédiée, le clone
+     resterait quasi noir — cf. les deux lumières ajoutées plus bas. */
+  const shipMarker = shipMesh.clone(true);
+  mapScene.add(shipMarker);
+  mapScene.add(new THREE.AmbientLight(0xffffff, 0.85));
+  const mapSunLight = new THREE.DirectionalLight(0xfff4e0, 0.9);
+  mapSunLight.position.set(60, 90, 40);
+  mapScene.add(mapSunLight);
+
+  /* étiquette du vaisseau : même vocabulaire visuel que dans le jeu
+     (cercle + flèche + nom, .ship-label) plutôt qu'un simple texte comme
+     pour les étoiles (demande utilisateur) — taille fixe, la carte se
+     zoome librement contrairement à la caméra de jeu dont la formule de
+     dimensionnement (projectShipLabel) suppose une distance de vue bien
+     plus stable. */
+  addStarMapLabel(SHIP_REGISTRY, new THREE.Vector3(0, 0, 0), 'star-label ship-label starmap-ship-label', true);
+
+  /* empreinte au sol (X/Z) des candidates + hauteur moyenne, pour
+     dimensionner la grille et placer son plan (demande utilisateur) */
+  let minX=0, maxX=0, minZ=0, maxZ=0, sumY=0, maxDist=600;
+  starMapCandidates.forEach(function(c){
+    const rel = c.position.clone().sub(center);
+    c.rel = rel;
+    minX = Math.min(minX, rel.x); maxX = Math.max(maxX, rel.x);
+    minZ = Math.min(minZ, rel.z); maxZ = Math.max(maxZ, rel.z);
+    sumY += rel.y;
+    maxDist = Math.max(maxDist, rel.length());
+  });
+  const planeY = starMapCandidates.length ? sumY/starMapCandidates.length : 0;
+
+  /* grille de référence, fine et blanche, sur un plan horizontal centré
+     sur les étoiles (demande utilisateur) — cellules d'environ 220 u,
+     taille arrondie au nombre de divisions le plus proche pour que les
+     repères lettrés tombent pile sur les lignes. */
+  const half = Math.max(maxX-minX, maxZ-minZ, 400)/2*1.3;
+  const divisions = Math.min(20, Math.max(6, Math.round(half*2/220)));
+  const gridSize = divisions*220;
+  const gridHelper = new THREE.GridHelper(gridSize, divisions, 0xffffff, 0xffffff);
+  gridHelper.material.transparent = true;
+  gridHelper.material.opacity = 0.3;
+  gridHelper.position.y = planeY;
+  mapScene.add(gridHelper);
+
+  /* repères lettrés le long d'un bord de la grille (A, B, C…) */
+  const step = gridSize/divisions;
+  for(let i=0;i<=divisions;i++){
+    const letter = String.fromCharCode(65 + Math.min(25, i));
+    const gx = -gridSize/2 + i*step;
+    addStarMapLabel(letter, new THREE.Vector3(gx, planeY, -gridSize/2 - 26), 'starmap-grid-letter');
+  }
+
+  starMapCandidates.forEach(function(c){
+    const rel = c.rel;
+    const color = new THREE.Color(c.star.color.r, c.star.color.g, c.star.color.b);
+
+    /* étoile rendue COMME dans le jeu principal (même shader cœur +
+       même halo additif, buildStarCell) mais à une échelle réduite,
+       adaptée au recul de la carte — un rayon « au sens du jeu » serait
+       ici quasi invisible, une échelle réaliste serait illisible. Les
+       systèmes non encore construits restent visuellement présents mais
+       plus discrets (cœur et halo réduits) plutôt qu'un simple fil de
+       fer, pour garder le même langage visuel que le jeu partout. */
+    const baseCore = 7 + (c.built ? 4 : 0);
+    const coreMat = new THREE.ShaderMaterial({
+      vertexShader: STAR_VERT, fragmentShader: STAR_FRAG,
+      uniforms:{
+        baseColor:{value:color},
+        limbU:{value: 0.45 + 0.3*Math.exp(-c.star.temp/9000)},
+        time:{value:0},
+        granulation:{value: c.star.temp < 7000 ? 1.0 : 0.25},
+        seed:{value: Math.abs(c.key.split(',').reduce(function(a,v){ return a+parseInt(v,10); },0)) % 97 / 97}
+      }
+    });
+    const core = new THREE.Mesh(new THREE.SphereGeometry(baseCore, 16, 16), coreMat);
+    core.position.copy(rel);
+    mapScene.add(core);
+    c.coreMat = coreMat;
+
+    const haloMat = new THREE.SpriteMaterial({
+      map:glowTex, color:color, transparent:true, depthWrite:false,
+      blending:THREE.AdditiveBlending, opacity: c.built ? 1 : 0.5
+    });
+    const halo = new THREE.Sprite(haloMat);
+    halo.scale.setScalar(baseCore*(c.built ? 4.4 : 3.2));
+    halo.position.copy(rel);
+    mapScene.add(halo);
+
+    /* cible de clic généreuse, découplée de la taille visuelle du cœur —
+       une sphère invisible mais bien réelle pour le lancer de rayon
+       (raycaster ignore seulement les objets visible:false, pas
+       l'opacité), sans quoi cliquer une petite étoile deviendrait
+       pénible une fois le cœur réduit à l'échelle carte. */
+    const hitMat = new THREE.MeshBasicMaterial({transparent:true, opacity:0});
+    const hitSphere = new THREE.Mesh(new THREE.SphereGeometry(26, 8, 8), hitMat);
+    hitSphere.position.copy(rel);
+    hitSphere.userData.candidateKey = c.key;
+    mapScene.add(hitSphere);
+    c.mesh = hitSphere;
+
+    /* ligne pointillée jusqu'au plan de référence, couleur de l'étoile
+       (demande utilisateur) — matérialise sa hauteur au-dessus/en dessous
+       du plan, comme un fil à plomb. */
+    const lineGeo = new THREE.BufferGeometry().setFromPoints([
+      rel.clone(), new THREE.Vector3(rel.x, planeY, rel.z)
+    ]);
+    const lineMat = new THREE.LineDashedMaterial({color:color, dashSize:9, gapSize:7, transparent:true, opacity:0.75});
+    const dropLine = new THREE.Line(lineGeo, lineMat);
+    dropLine.computeLineDistances();
+    mapScene.add(dropLine);
+
+    const ringGeo = new THREE.RingGeometry(baseCore*1.7, baseCore*2.0, 24);
+    const ringMat = new THREE.MeshBasicMaterial({color:0xffb454, side:THREE.DoubleSide, transparent:true, opacity:0});
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.position.copy(rel);
+    mapScene.add(ring);
+    c.selectionRing = ring;
+
+    /* étiquette de nom (demande utilisateur) — sur chaque étoile, discrète */
+    addStarMapLabel(c.name, rel.clone().add(new THREE.Vector3(0, -baseCore*1.4, 0)), 'starmap-label');
+  });
+
+  mapCamYaw = 0.6; mapCamPitch = 0.5; mapCamDist = maxDist*1.35;
+  mapCamera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 1, 200000);
+  updateMapCameraFromSpherical();
+}
+function updateMapCameraFromSpherical(){
+  if(!mapCamera) return;
+  mapCamPitch = THREE.MathUtils.clamp(mapCamPitch, -1.4, 1.4);
+  mapCamDist = THREE.MathUtils.clamp(mapCamDist, 200, 60000);
+  const cp = Math.cos(mapCamPitch);
+  mapCamera.position.set(
+    mapCamDist*cp*Math.sin(mapCamYaw),
+    mapCamDist*Math.sin(mapCamPitch),
+    mapCamDist*cp*Math.cos(mapCamYaw)
+  );
+  mapCamera.lookAt(0,0,0);
+}
+function selectStarMapCandidate(key){
+  starMapCandidates.forEach(function(c){
+    if(c.selectionRing) c.selectionRing.material.opacity = (c.key === key) ? 1 : 0;
+  });
+  starMapSelectedKey = key;
+  refreshStarMapSidePanel();
+}
+function refreshStarMapSidePanel(){
+  const bodyEl = document.getElementById('starMapTargetBody');
+  const btn = document.getElementById('starMapConfirmBtn');
+  if(!bodyEl || !btn) return;
+  const target = starMapCandidates.find(function(c){ return c.key === starMapSelectedKey; });
+  if(!target){
+    bodyEl.innerHTML = '<div class="starmap-empty" id="lblStarMapNone">'+t('starMapNone')+'</div>';
+    btn.style.display = 'none';
+    return;
+  }
+  const dist = target.position.distanceTo(shipRig.position);
+  const cost = Math.round(quantumJumpFuelCost(dist));
+  bodyEl.innerHTML =
+    '<div class="starmap-target-name">'+target.name+'</div>'
+    + '<div class="starmap-target-line">'+target.star.designation+'</div>'
+    + '<div class="starmap-target-line">'+t('starMapDist')+' '+Math.round(dist)+' u</div>'
+    + '<div class="starmap-target-line">'+t('starMapFuelCost')+' \u2248 '+cost+' u</div>';
+  btn.style.display = 'block';
+  if(!hasQuantumJump){
+    btn.textContent = t('starMapNeedsModule');
+    btn.classList.add('starmap-disabled');
+  } else if(cost > fuel){
+    btn.textContent = t('starMapNotEnoughFuel');
+    btn.classList.add('starmap-disabled');
+  } else {
+    btn.textContent = t('starMapConfirm');
+    btn.classList.remove('starmap-disabled');
+  }
+}
+function openStarMap(){
+  /* la carte reste consultable sans le module (§23.3) — seule la
+     confirmation de saut se verrouille, cf. refreshStarMapSidePanel().
+     Non ouvrable pendant une manœuvre d'orbite/livraison en cours : sauter
+     au milieu d'une livraison (navettes en vol) n'a pas de sens propre. */
+  if(starMapOpen || gamePaused || flightPhase === 'ARRIVAL_PAUSE' || jumpState || !gameStarted) return;
+  enterPause();
+  document.body.classList.add('starmap-open');
+  const pauseOv = document.getElementById('pauseOverlay');
+  if(pauseOv) pauseOv.classList.remove('visible');
+  starMapOpen = true;
+  starMapSelectedKey = null;
+  mapIdleTimer = 0;
+  starMapCandidates = collectStarMapCandidates();
+  buildStarMapScene();
+  const lockedBox = document.getElementById('starMapLockedBox');
+  if(lockedBox) lockedBox.style.display = hasQuantumJump ? 'none' : 'block';
+  refreshStarMapSidePanel();
+  const overlay = document.getElementById('starMapOverlay');
+  if(overlay) overlay.classList.add('visible');
+}
+function closeStarMap(){
+  if(!starMapOpen) return;
+  starMapOpen = false;
+  clearStarMapLabels();
+  mapScene = null; mapCamera = null;
+  document.body.classList.remove('starmap-open');
+  const overlay = document.getElementById('starMapOverlay');
+  if(overlay) overlay.classList.remove('visible');
+  resumeGame();
+}
+function confirmQuantumJump(){
+  const target = starMapCandidates.find(function(c){ return c.key === starMapSelectedKey; });
+  if(!target || !hasQuantumJump) return;
+  const dist = target.position.distanceTo(shipRig.position);
+  const cost = quantumJumpFuelCost(dist);
+  if(cost > fuel) return;
+  /* point d'arrivée (§23.4) : pas le centre de l'étoile elle-même — le
+     long de l'axe qu'on vient de viser sur la carte, en s'arrêtant à
+     bonne distance de sécurité (proportionnelle au rayon stellaire réel,
+     jamais moins de 400 u). */
+  const dir = target.position.clone().sub(shipRig.position).normalize();
+  const safeDist = Math.max(400, target.star.radius*4);
+  const arrivalPos = target.position.clone().addScaledVector(dir, -safeDist);
+  closeStarMap();
+  jumpState = { phase:'charge', t:0, targetPos:arrivalPos, fuelCost:cost, teleported:false };
+}
+function performQuantumTeleport(js){
+  fuel = Math.max(0, fuel - js.fuelCost);
+  shipRig.position.copy(js.targetPos);
+  refreshField(STAR_CELL, STAR_RADIUS, starField, buildStarCell);
+  refreshField(NEBULA_CELL, NEBULA_RADIUS, nebulaField, buildNebulaCell);
+  const curFwd = new THREE.Vector3(0,0,-1).applyQuaternion(shipRig.quaternion);
+  computeRoute(shipRig.position, curFwd, false);
+  /* recale les variables de suivi de caméra sur la nouvelle position —
+     sans quoi la poursuite normale, en reprenant après la séquence,
+     « rattraperait » le vaisseau depuis son ancienne position à travers
+     tout l'écran d'un coup. */
+  camPos.copy(shipRig.position).add(CAM_OFFSET.clone().applyQuaternion(shipRig.quaternion));
+  camLook.copy(shipRig.position).add(new THREE.Vector3(0,0,-45).applyQuaternion(shipRig.quaternion));
+  camera.position.copy(camPos);
+  camera.lookAt(camLook);
+}
+/* ---------- séquence visuelle du saut (§23.5) ----------
+   Trois phases, appelées depuis updateFlight() (cf. plus bas) tant que
+   jumpState n'est pas nul — non interruptible, comme la mise en orbite.
+   Réutilise des éléments déjà en place (halo des réacteurs, .speedlines
+   du boost) plutôt qu'un nouveau système de particules. */
+function updateJumpSequence(dt){
+  jumpState.t += dt;
+  const banner = document.getElementById('jumpBanner');
+  const vignette = document.getElementById('jumpVignette');
+  const flash = document.getElementById('jumpFlash');
+  const speedlines = document.getElementById('speedlines');
+  if(banner){ banner.style.display = 'block'; banner.textContent = t('jumpBannerText'); }
+
+  if(jumpState.phase === 'charge'){
+    const p = Math.min(1, jumpState.t/JUMP_CHARGE_DURATION);
+    if(vignette) vignette.style.opacity = String(p*0.55);
+    (window.__engineGlows||[]).forEach(function(g){ g.scale.set(3+p*3.5, 3+p*3.5, 1); });
+    if(jumpState.t >= JUMP_CHARGE_DURATION){ jumpState.phase = 'stretch'; jumpState.t = 0; }
+  } else if(jumpState.phase === 'stretch'){
+    const p = Math.min(1, jumpState.t/JUMP_STRETCH_DURATION);
+    if(speedlines) speedlines.style.opacity = String(0.15 + p*0.8);
+    if(vignette) vignette.style.opacity = String(0.55*(1-p*0.4));
+    if(!jumpState.teleported && p >= 0.5){
+      performQuantumTeleport(jumpState);
+      jumpState.teleported = true;
+    }
+    if(jumpState.t >= JUMP_STRETCH_DURATION){ jumpState.phase = 'flash'; jumpState.t = 0; }
+  } else if(jumpState.phase === 'flash'){
+    const p = Math.min(1, jumpState.t/JUMP_FLASH_DURATION);
+    if(flash) flash.style.opacity = String(p < 0.5 ? p*2 : (1-p)*2);
+    if(jumpState.t >= JUMP_FLASH_DURATION){
+      if(speedlines) speedlines.style.opacity = '0';
+      if(vignette) vignette.style.opacity = '0';
+      if(flash) flash.style.opacity = '0';
+      if(banner) banner.style.display = 'none';
+      (window.__engineGlows||[]).forEach(function(g){ g.scale.set(3,3,1); });
+      jumpState = null;
+    }
+  }
+}
+/* ---------- interaction souris sur la carte (glisser = orbite, molette =
+   zoom, clic = sélection, double-clic = confirmation directe) ---------- */
+(function initStarMapInteraction(){
+  const vp = document.getElementById('starMapViewport');
+  if(!vp) return;
+  vp.addEventListener('pointerdown', function(e){
+    mapDragging = true; mapLastX = e.clientX; mapLastY = e.clientY;
+  });
+  window.addEventListener('pointerup', function(){ mapDragging = false; });
+  window.addEventListener('pointermove', function(e){
+    if(!mapDragging || !starMapOpen) return;
+    mapIdleTimer = 0;
+    const dx = e.clientX - mapLastX, dy = e.clientY - mapLastY;
+    mapLastX = e.clientX; mapLastY = e.clientY;
+    mapCamYaw -= dx*0.006;
+    mapCamPitch += dy*0.006;
+    updateMapCameraFromSpherical();
+  });
+  /* simple survol (sans glisser) compte aussi comme une présence — remet
+     à zéro le minuteur d'inactivité qui déclenche la rotation auto,
+     séparément du glisser ci-dessus qui gère en plus l'orbite elle-même. */
+  vp.addEventListener('pointermove', function(){
+    if(starMapOpen) mapIdleTimer = 0;
+  });
+  vp.addEventListener('wheel', function(e){
+    if(!starMapOpen) return;
+    e.preventDefault();
+    mapIdleTimer = 0;
+    mapCamDist *= (e.deltaY > 0 ? 1.12 : 0.89);
+    updateMapCameraFromSpherical();
+  }, {passive:false});
+  function pickAt(clientX, clientY){
+    if(!mapCamera) return null;
+    const rect = vp.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((clientX-rect.left)/rect.width)*2-1,
+      -((clientY-rect.top)/rect.height)*2+1
+    );
+    starMapRaycaster.setFromCamera(ndc, mapCamera);
+    const meshes = starMapCandidates.map(function(c){ return c.mesh; }).filter(Boolean);
+    const hits = starMapRaycaster.intersectObjects(meshes);
+    return hits.length ? hits[0].object.userData.candidateKey : null;
+  }
+  vp.addEventListener('click', function(e){
+    if(!starMapOpen) return;
+    const key = pickAt(e.clientX, e.clientY);
+    if(key) selectStarMapCandidate(key);
+  });
+  vp.addEventListener('dblclick', function(e){
+    if(!starMapOpen) return;
+    const key = pickAt(e.clientX, e.clientY);
+    if(key){ selectStarMapCandidate(key); confirmQuantumJump(); }
+  });
+  const confirmBtn = document.getElementById('starMapConfirmBtn');
+  if(confirmBtn) confirmBtn.addEventListener('click', function(e){
+    e.stopPropagation();
+    if(!confirmBtn.classList.contains('starmap-disabled')) confirmQuantumJump();
+  });
+})();
 const CAM_OFFSET = new THREE.Vector3(0, 12, 46);
 let camPos = new THREE.Vector3(0, 12, 46);
 let camLook = new THREE.Vector3(0,0,-40);
@@ -5214,6 +6098,7 @@ function refreshPortPanel(){
     if(credits < cost) btn.classList.add('port-disabled');
   }
   refreshFuelPortRow();
+  refreshJumpPortRow();
   repositionPortPanel();
 }
 /* ravitaillement (§22.3) : même panneau, même mécanisme d'activation que
@@ -5235,6 +6120,24 @@ function refreshFuelPortRow(){
     if(credits < cost) btn.classList.add('port-disabled');
   }
 }
+/* module de saut quantique (§23.1) : achat UNIQUE, pas de paliers — la
+   ligne bascule définitivement sur « ACQUIS » une fois payée, jamais de
+   retour en arrière (sauf nouvelle partie, §11). */
+function refreshJumpPortRow(){
+  const statusEl = document.getElementById('jumpPortStatus');
+  const btn = document.getElementById('jumpBuyBtn');
+  if(!statusEl || !btn) return;
+  btn.classList.remove('port-disabled', 'port-maxed');
+  if(hasQuantumJump){
+    statusEl.textContent = '\u25CF';
+    btn.textContent = t('portJumpAcquired');
+    btn.classList.add('port-maxed');
+  } else {
+    statusEl.textContent = '\u25CB';
+    btn.textContent = t('portJumpBtn') + ' \u2014 ' + formatCredits(QUANTUM_JUMP_PRICE) + ' CR';
+    if(credits < QUANTUM_JUMP_PRICE) btn.classList.add('port-disabled');
+  }
+}
 function buySpeedUpgrade(){
   if(speedUpgradeLevel >= SPEED_UPGRADE_MAX) return;
   const cost = speedUpgradeCost(speedUpgradeLevel);
@@ -5251,11 +6154,20 @@ function buyFuel(){
   fuel = FUEL_CAPACITY;
   refreshPortPanel();
 }
+function buyQuantumJump(){
+  if(hasQuantumJump) return;
+  if(credits < QUANTUM_JUMP_PRICE) return;
+  addCredits(-QUANTUM_JUMP_PRICE);
+  hasQuantumJump = true;
+  refreshPortPanel();
+}
 (function initPortPanel(){
   const btn = document.getElementById('portBuyBtn');
   if(btn) btn.addEventListener('click', function(e){ e.stopPropagation(); buySpeedUpgrade(); });
   const fuelBtn = document.getElementById('fuelBuyBtn');
   if(fuelBtn) fuelBtn.addEventListener('click', function(e){ e.stopPropagation(); buyFuel(); });
+  const jumpBtn = document.getElementById('jumpBuyBtn');
+  if(jumpBtn) jumpBtn.addEventListener('click', function(e){ e.stopPropagation(); buyQuantumJump(); });
 })();
 const RADIO_AVATARS = {
   /* silhouette de capitaine (ambre) et d'antenne de tour (cyan) —
@@ -5294,6 +6206,32 @@ function appendRadioLine(entry){
    varient selon le navigateur et l'OS de la personne qui joue.
    ========================================================================= */
 let radioMuted = false;
+/* =========================================================================
+   MUSIQUE DE FOND ET RÉGLAGE DES VOLUMES (demande utilisateur)
+   ========================================================================= */
+/* Fichier livré à part (pas embarqué en base64 dans le HTML — un simple
+   fichier audio libre de droit, aucune raison d'alourdir le fichier
+   principal) : chargé depuis un dossier `musics/` à côté du HTML, comme
+   convenu. `Audio()` plutôt qu'un <audio> HTML : rien à afficher, juste à
+   piloter par JS (lecture, boucle, volume). */
+const MUSIC_PATH = 'musics/observation-des-etoiles_by_scorestudio_from_envato.m4a';
+let musicVolume = 0.4, voiceVolume = 0.85;
+const musicAudio = new Audio(MUSIC_PATH);
+musicAudio.loop = true;
+musicAudio.volume = musicVolume;
+/* la lecture ne peut démarrer que sur un geste utilisateur (politique
+   autoplay des navigateurs) — le clic qui referme le générique (§11, déjà
+   un vrai geste) sert aussi de déclencheur ici, cf. plus bas dans ce
+   fichier (bootEl.addEventListener). .catch() : un blocage éventuel du
+   navigateur ne doit jamais faire remonter d'erreur bruyante, la musique
+   est un agrément, pas une fonction critique. */
+function setMusicVolume(v){
+  musicVolume = THREE.MathUtils.clamp(v, 0, 1);
+  musicAudio.volume = musicVolume;
+}
+function setVoiceVolume(v){
+  voiceVolume = THREE.MathUtils.clamp(v, 0, 1);
+}
 let radioSpeaking = false;  /* false, ou l'utterance en cours de lecture */
 let audioCtx = null;
 function getAudioCtx(){
@@ -5356,7 +6294,7 @@ function speakRadioLine(entry){
   /* le ton suit le GENRE tiré pour cet interlocuteur, pas son rôle : la
      tour et l'équipage sonnent différemment selon le tirage du jour. */
   u.pitch = orbitState.voiceGender[entry.from] === 'female' ? 1.15 : 0.85;
-  u.volume = 0.85;
+  u.volume = voiceVolume;
   /* on bloque le message suivant tant que celui-ci n'est pas terminé —
      et on ne bloque JAMAIS indéfiniment : onend/onerror lèvent tous les
      deux la garde, et un filet de sécurité la lève aussi après un délai
@@ -6153,6 +7091,10 @@ function applyAngular(dt){
 }
 
 function updateFlight(dt, elapsed){
+  /* séquence de saut quantique (§23.5) en cours : non interruptible, prend
+     entièrement la main sur cette fonction — ni pilotage, ni caméra (qui
+     reste fixe, cf. commentaire de updateJumpSequence) tant qu'elle dure. */
+  if(jumpState){ updateJumpSequence(dt); return; }
   const paused = (flightPhase === 'ARRIVAL_PAUSE');
 
   /* sollicitation d'attitude de l'image, remise à zéro à chaque tour */
@@ -6187,11 +7129,38 @@ function updateFlight(dt, elapsed){
        aucun canal radio, sans le moindre message d'erreur. */
     if(ROUTE.curve && ROUTE.length > 0){
       const L = ROUTE.length;
-      const SEARCH_AHEAD = 420, SEARCH_STEPS = 24;
+      /* bug remonté en jeu (« le vaisseau semble avancer en saccadant ») :
+         cette recherche du point le plus proche sur la courbe tournait à
+         24 pas sur 420 u, soit un pas de ~17,5 u — bien plus grossier que
+         la distance parcourue par image en croisière (~0,9 u à 56 u/s,
+         60 i/s). ROUTE.s restait donc figée une vingtaine d'images avant
+         de sauter d'un coup au palier suivant, décalant le cap visé
+         (§« suivi de courbe » ci-dessous) par à-coups plutôt que de le
+         laisser glisser en continu.
+         Une simple passe densifiée (essayé : 240 pas, ~1,75 u) restait
+         perceptible — ROUTE.s alternait encore entre 0 et 1,75 u d'une
+         image à l'autre, faute d'être plus fin que le déplacement réel.
+         Recherche en DEUX passes à la place : une grossière (24 pas,
+         repère la bonne zone), puis une fine (32 pas resserrés sur ± un
+         pas grossier autour de ce repère) — un pas final de l'ordre de
+         0,05 u, largement sous tout déplacement par image, pour un total
+         de 56 itérations seulement (moins cher que les 240 de la
+         première tentative, pour un résultat nettement plus lisse). */
+      const COARSE_AHEAD = 420, COARSE_STEPS = 24;
       let bestS = ROUTE.s, bestD = Infinity;
-      for(let i=0;i<=SEARCH_STEPS;i++){
-        const s = ROUTE.s + (i/SEARCH_STEPS)*SEARCH_AHEAD;
+      for(let i=0;i<=COARSE_STEPS;i++){
+        const s = ROUTE.s + (i/COARSE_STEPS)*COARSE_AHEAD;
         if(s > L) break;
+        const q = ROUTE.curve.getPointAt(s/L, _routeTmpA);
+        const d = q.distanceToSquared(shipRig.position);
+        if(d < bestD){ bestD = d; bestS = s; }
+      }
+      const coarseStep = COARSE_AHEAD/COARSE_STEPS;
+      const FINE_STEPS = 32;
+      const fineMin = Math.max(ROUTE.s, bestS - coarseStep);
+      const fineMax = Math.min(L, bestS + coarseStep);
+      for(let i=0;i<=FINE_STEPS;i++){
+        const s = fineMin + (i/FINE_STEPS)*(fineMax-fineMin);
         const q = ROUTE.curve.getPointAt(s/L, _routeTmpA);
         const d = q.distanceToSquared(shipRig.position);
         if(d < bestD){ bestD = d; bestS = s; }
@@ -6959,6 +7928,65 @@ function animate(){
   const dt = Math.min(clock.getDelta(), 0.1);
   const elapsed = clock.getElapsedTime();
 
+  /* travelling de fond de l'écran-titre (demande utilisateur) : tant que
+     la partie n'a pas commencé, on ne fait tourner qu'une caméra
+     cinématique et un minimum d'entretien visuel (scintillement des
+     étoiles, dérive des nébuleuses) — jamais le pilotage, jamais le HUD
+     (déjà masqués par CSS, cf. body.title-active), jamais les étiquettes
+     de ciblage. worldReadyForCinematic protège contre un premier appel
+     avant que finish() n'ait eu la main (cf. générique). */
+  if(!gameStarted){
+    if(worldReadyForCinematic){
+      updateTitleCinematic(dt);
+      /* bug remonté en jeu (étoiles de décoration trop rapides / passant
+         devant d'autres objets) : le fond d'étoiles lointaines (skybox,
+         dust, accent…) n'est normalement recentré que sur la position du
+         VAISSEAU (plus bas dans cette fonction, animate() en vol normal)
+         — jamais mis à jour ici, puisque le vaisseau ne bouge pas pendant
+         l'écran-titre. La caméra cinématique, elle, parcourt plusieurs
+         centaines/milliers d'unités : le fond, resté figé près de
+         l'origine, se faisait donc traverser plutôt que rester à distance
+         infinie perçue, d'où une vitesse apparente excessive et le risque
+         de passer devant les étoiles/planètes/nébuleuses réelles du plan
+         en cours. Recentré ici sur la CAMÉRA plutôt que sur le vaisseau. */
+      backdrop.position.copy(camera.position);
+      /* les étoiles sont modélisées à une échelle physique minuscule
+         (quelques dixièmes d'unité, cf. buildStarCell) : leur taille
+         APPARENTE ne vient que du calcul d'angle ci-dessous (repris tel
+         quel de la boucle de jeu normale, plus bas dans cette fonction),
+         normalement recalculé chaque image en vol. Sans lui, une étoile
+         reste un point sub-pixel à toute distance de caméra un tant soit
+         peu réaliste — cause du fond resté noir en test malgré une caméra
+         correctement positionnée : la scène ÉTAIT bien cadrée, mais rien
+         dedans n'était assez grand pour être vu. */
+      const camPosNow = camera.position;
+      starField.forEach(function(o){
+        if(!o) return;
+        const d = o.mesh.position.distanceTo(camPosNow);
+        const angular = THREE.MathUtils.clamp(o.baseCore*26/Math.max(d,1), 0.3, 9.0);
+        o.core.scale.setScalar(angular);
+        o.core.material.uniforms.time.value = elapsed;
+        const distPc = Math.max(d/38, 1e-3);
+        const mag = apparentMagnitude(o.star.lum, distPc);
+        const flux = Math.pow(10, -0.4*(mag-4.0));
+        const perceived = THREE.MathUtils.clamp(Math.pow(flux, 0.25), 0.0, 6.0);
+        o.halo.scale.setScalar(o.baseHalo*(0.55+perceived*0.55));
+        o.halo.material.opacity = THREE.MathUtils.clamp(0.25+perceived*0.35, 0.15, 1.0);
+      });
+      nebulaField.forEach(function(o){
+        if(!o) return;
+        o.mesh.material.uniforms.uTime.value = elapsed;
+        const ud = o.mesh.userData;
+        if(ud && ud.currentFade < ud.targetFade - 0.001){
+          ud.currentFade += (ud.targetFade - ud.currentFade)*Math.min(1, dt*0.5);
+          o.mesh.material.uniforms.uFade.value = ud.currentFade;
+        }
+      });
+    }
+    renderer.render(scene, camera);
+    return;
+  }
+
   /* mode Pause (§11) : on continue d'appeler clock.getDelta() ci-dessus à
      CHAQUE image (y compris en pause) pour absorber le temps écoulé —
      sans quoi la reprise verrait un dt géant d'un coup, faisant sauter le
@@ -6966,7 +7994,29 @@ function animate(){
      en revanche, plus rien n'avance : image figée, tout le reste de cette
      fonction est sauté. */
   if(gamePaused){
-    renderer.render(scene, camera);
+    if(starMapOpen && mapScene && mapCamera){
+      mapCamera.aspect = window.innerWidth/window.innerHeight;
+      mapCamera.updateProjectionMatrix();
+      /* rotation automatique après inactivité (demande utilisateur) :
+         très lente, uniquement si la souris n'a pas bougé sur la carte
+         depuis MAP_AUTOROTATE_DELAY — jamais pendant un glisser en cours
+         (mapDragging), pour ne jamais lutter contre la main du joueur. */
+      mapIdleTimer += dt;
+      if(mapIdleTimer > MAP_AUTOROTATE_DELAY && !mapDragging){
+        mapCamYaw += dt*MAP_AUTOROTATE_SPEED;
+        updateMapCameraFromSpherical();
+      }
+      /* scintillement discret des cœurs d'étoiles (même uniform "time" que
+         dans le jeu principal) + repositionnement des étiquettes HTML,
+         nécessaire ici : la caméra de la carte peut bouger (glisser/zoom)
+         alors que le reste de la boucle de jeu est à l'arrêt (gamePaused). */
+      const t = clock.getElapsedTime();
+      starMapCandidates.forEach(function(c){ if(c.coreMat) c.coreMat.uniforms.time.value = t; });
+      updateStarMapLabels();
+      renderer.render(mapScene, mapCamera);
+    } else {
+      renderer.render(scene, camera);
+    }
     return;
   }
 
@@ -7088,6 +8138,7 @@ function animate(){
   const term = document.getElementById('bootTerm');
   const bootEl = document.getElementById('boot');
   const titleEl = document.getElementById('titleScreen');
+  const langBtns = Array.prototype.slice.call(document.querySelectorAll('.lang-btn'));
   let li = 0;
   function nextLine(){
     if(li >= lines.length){
@@ -7101,6 +8152,54 @@ function animate(){
     li++;
     setTimeout(nextLine, 340);
   }
+  /* navigation clavier de l'écran-titre (demande utilisateur) : curseur
+     gauche/droite (et haut/bas, par tolérance) pour déplacer le focus
+     entre les langues, ENTRÉE ou ESPACE pour valider — en plus du clic/
+     tactile déjà en place, jamais à la place. titleFocusIndex vit ici
+     plutôt qu'en variable globale : rien en dehors de cet écran n'en a
+     besoin. */
+  let titleFocusIndex = 0;
+  function updateTitleFocusVisual(){
+    langBtns.forEach(function(b, i){ b.classList.toggle('focused', i === titleFocusIndex); });
+  }
+  function selectLanguageAndStart(btn){
+    LANG = btn.getAttribute('data-lang');
+    applyLanguage();
+    refreshCreditsDisplay(false);
+    titleEl.classList.add('hidden');
+    document.body.classList.remove('title-active');
+    setTimeout(function(){ titleEl.style.display = 'none'; }, 650);
+    /* réaffiche ce que le travelling de fond masquait (§25.2) — la partie
+       commence pour de vrai à partir d'ici. */
+    shipRig.visible = true;
+    if(ROUTE.gates) ROUTE.gates.visible = true;
+    startGame();
+  }
+  langBtns.forEach(function(btn, i){
+    btn.addEventListener('click', function(){ selectLanguageAndStart(btn); });
+    /* le focus clavier natif (Tab) doit aussi mettre à jour le repère
+       visuel et l'index suivi, pour rester cohérent si le joueur mélange
+       Tab et curseurs plutôt que de n'utiliser que l'un des deux. */
+    btn.addEventListener('focus', function(){ titleFocusIndex = i; updateTitleFocusVisual(); });
+  });
+  window.addEventListener('keydown', function(e){
+    if(titleEl.style.display !== 'flex') return;
+    if(e.code === 'ArrowRight' || e.code === 'ArrowDown'){
+      e.preventDefault();
+      titleFocusIndex = (titleFocusIndex+1) % langBtns.length;
+      updateTitleFocusVisual();
+      langBtns[titleFocusIndex].focus();
+    } else if(e.code === 'ArrowLeft' || e.code === 'ArrowUp'){
+      e.preventDefault();
+      titleFocusIndex = (titleFocusIndex-1+langBtns.length) % langBtns.length;
+      updateTitleFocusVisual();
+      langBtns[titleFocusIndex].focus();
+    } else if(e.code === 'Enter' || e.code === 'Space'){
+      e.preventDefault();
+      selectLanguageAndStart(langBtns[titleFocusIndex]);
+    }
+  });
+
   /* la séquence terminal ne fait plus démarrer le jeu directement : elle
      cède la place à l'écran-titre, où le choix de la langue déclenche
      réellement le calcul de la route et le lancement de la boucle
@@ -7110,38 +8209,60 @@ function animate(){
     setTimeout(function(){
       bootEl.style.display = 'none';
       titleEl.style.display = 'flex';
+      document.body.classList.add('title-active');
+      /* musique dès l'affichage de l'écran-titre (demande utilisateur),
+         pas seulement sur le clic qui l'a amené ici — le générique finit
+         aussi tout seul (setTimeout ci-dessous, sans clic) et doit
+         déclencher la musique de la même façon. Politique autoplay des
+         navigateurs : ne joue effectivement que si un geste utilisateur a
+         déjà eu lieu quelque part avant cet instant (le clic, quand il a
+         eu lieu) — sinon .play() est silencieusement refusée par le
+         navigateur (.catch()), sans quoi ce ne serait plus un agrément
+         mais une erreur bruyante à chaque partie où le joueur n'a pas
+         cliqué pour passer le générique. */
+      musicAudio.play().catch(function(){});
+      updateTitleFocusVisual();
+      langBtns[titleFocusIndex].focus();
+      /* travelling de fond (demande utilisateur) : le monde doit déjà
+         exister pour qu'il y ait quelque chose à survoler. computeRoute()
+         ne dépend d'aucun choix de langue (juste de la position/cap de
+         départ du vaisseau, fixes) — avancé ici plutôt que dans
+         startGame() où il vivait avant, sans changer son résultat (pur/
+         déterministe pour une position de départ inchangée). Son appel
+         construit aussi le premier système planétaire en chemin
+         (ensureSystemsBuilt, en fin de fonction) : sans ce déplacement,
+         aucune planète n'existerait encore pour le travelling. */
+      computeRoute(shipRig.position, new THREE.Vector3(0,0,-1), true);
+      refreshField(STAR_CELL, STAR_RADIUS, starField, buildStarCell);
+      refreshField(NEBULA_CELL, NEBULA_RADIUS, nebulaField, buildNebulaCell);
+      /* vaisseau et trajectoire hors champ (demande utilisateur) : le
+         travelling doit montrer l'univers généré, pas le cargo ni le
+         tracé de sa route — repéré avec une capture montrant clairement
+         les portiques en pointillés de ROUTE.gates dans le décor. .visible
+         ne touche qu'au rendu (pas à la position/aux calculs), donc sans
+         incidence sur le calcul de route lui-même ni sur son affichage une
+         fois la partie réellement démarrée (remis à true dans
+         selectLanguageAndStart, juste en dessous dans ce même fichier). */
+      shipRig.visible = false;
+      if(ROUTE.gates) ROUTE.gates.visible = false;
+      worldReadyForCinematic = true;
+      animate();
     }, 900);
   }
   bootEl.addEventListener('click', finish);
   nextLine();
 
-  document.querySelectorAll('.lang-btn').forEach(function(btn){
-    btn.addEventListener('click', function(){
-      LANG = btn.getAttribute('data-lang');
-      applyLanguage();
-      refreshCreditsDisplay(false);
-      titleEl.classList.add('hidden');
-      setTimeout(function(){ titleEl.style.display = 'none'; }, 650);
-      startGame();
-    });
-  });
-
   function startGame(){
     gameStarted = true;
-    /* calcul du plan de vol AVANT le premier rendu : le vaisseau sait où il
-       va dès le départ, et les portiques sont tracés d'emblée sur tout le
-       trajet. `true` = orienter le nez sur la courbe (départ uniquement). */
-    computeRoute(shipRig.position, new THREE.Vector3(0,0,-1), true);
-
-    refreshField(STAR_CELL, STAR_RADIUS, starField, buildStarCell);
-    refreshField(NEBULA_CELL, NEBULA_RADIUS, nebulaField, buildNebulaCell);
     /* premier rafraîchissement de la barre d'icônes — différé jusqu'ici
        (cf. commentaires dans initHudIconBar/initTouchControls) car il
        dépend d'orbitState et ROUTE, tous deux déclarés après ces IIFE. */
     if(typeof refreshHudIconBar === 'function') refreshHudIconBar();
     if(typeof repositionAllPanels === 'function') repositionAllPanels();
     showWelcomeMessage();
-    animate();
+    /* animate() tourne déjà depuis la fin du générique (cf. finish()) —
+       il ne reste rien à (re)lancer ici, seulement à laisser gameStarted
+       faire basculer son comportement au prochain passage. */
   }
 })();
 </script>
