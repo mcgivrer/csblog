@@ -79,6 +79,7 @@ python3 -m http.server 8000
 | `voyage-spatial-spec.docx`           | Spécification fonctionnelle et technique du simulateur (v2.0)                            |
 | `spec-space-travel-evolution-2.0.md` | Spécification des évolutions à venir (pause, économie, événements aléatoires, interface) |
 | `space-travel-reqs.md`               | Notes de cadrage d'origine                                                               |
+| `docs/generation-de-l-univers.md`    | Génération de l'univers : graine, étoiles, nébuleuses, route, systèmes planétaires       |
 
 ## Feuille de route
 
