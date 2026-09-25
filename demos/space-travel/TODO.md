@@ -49,8 +49,24 @@ Aide-moi à raffiner ces besoins et correctifs :
 
 - **Revoir la position des différents panels en mode smartphone** pour qu'ils soient tous affichés au même endroit, mais ils sont alors exclusifs.
 
-### Retour de la documentation (français et anglais) 
+### Retour de la documentation (français et anglais)
 
 - Dans le chapitre 9, peux-tu préciser la mécanique de génération avec quelques paragraphes et quelques formules de mathématiques expliquant le principe du générateur à graine.
 - Pour le chapitre 22, proposer les maquettes en wireframing pour l'affichage de la consommation de carburant
 - Pour le chapitre 23, proposer un maquette en wireframing de l'affichage de la carte en 3D, les décisions de détails visuels seront prises à l'implémentation.
+
+## 2026/09/20
+
+### Bugs
+
+1. Le texte affiché lors du démarrage du jeu doit être affioché en anglais par défaut: procéder à sa traduction dans les différentes langues du jeu, ainsi lors du redémarrage d'une partie on connait la langue précédemment selectionnée, on peut afficher dan sla bonne langue.
+
+   1. vérifier que le volume solnore de la voix "text to speach" est bien contrôlée
+
+### Améliorations
+
+1. Sur la base du document d'étude du systèlme de génération, il faut revoir la notion d'échelle entre les différentes distances entre étoiles, planetes et satellites. En effet, les planetes d'une étoile semblent trop grosses et peu distantes de leur étoile.  la taille du vaisseau est aussi a revoir, il est beacoup trop gros par rapport aux planetes
+
+2. il y a toujours ce bug de tressautement de la camera ou des objets cible de la camera: en gros plan les cargo et navette semble sacadées ou tressauter. Il faut revoir l'algorithme de positionnement de la camera et celui de calcul de la position des vaisseaux.
+
+3. Lorsque le carburant est vide, les moteurs principaux s'arrêtent, le cargo se met alors à dériver en continuant sa route, mais en décélérant lentement. Une alerte est affichée dans un nouveau dialogue sur fond orange (alerte/warning) et un message explicite indique la raison de la panne. 2 options sont alors proposée, arrếter la partie (1), oubien demander de l'aide (2). Si le joueur choisit l'option 1, il est renvoyé sur l'écran de titre, après confirmation. Si il choixi l'option 2 et si il a assez de crédits, un vaisseau de ravittaillement (type vaisseau citerne) arrive après une certaine attente (entre 5 et 20 s) et s'arime au cargo pour le transfert de carburant.  la jauge de carburant dremonte et une fois à 100% les crédits sont débités et le vaisseau citerne se désarime et part.  Si le joueur interompt la manoeuvre (ESAPCE, propulsion, etc.) le vaisseau citerne est automatiquement désarimé (sysème de sécurité). l'intégralité de la somme due est prélevé malgré un plein non complet !  En cas de désarrimage demandé, une confirmation est demandée pour valider l'opération.
