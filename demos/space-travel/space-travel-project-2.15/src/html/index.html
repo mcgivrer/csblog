@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<!--
+  Voyage Spatial / Space Travel & Transport
+  Version 2.15 — 25 septembre 2026
+  Spec de référence : spec-space_travel_and_transport-2.15.md
+
+  MIT License
+  Copyright (c) 2026 Frédéric Delorme <frederic.delorme@gmail.com>
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+-->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Voyage spatial — Navigation quantique</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>/*@inline:css*/</style>
+</head>
+<body>
+
+<canvas id="scene"></canvas>
+<div class="atmo"></div>
+<div class="speedlines" id="speedlines"></div>
+
+<div id="hud">
+  <div id="starLabels"></div>
+  <div class="hud-top">
+    <span><span class="amber" id="topBrand">NAVIGATION QUANTIQUE</span> &nbsp;//&nbsp; <span id="shipName" class="mono">R.S.C. VENTARIS</span></span>
+    <span><span id="creditsLabel">CRÉDITS</span>&nbsp;<span id="creditsVal" class="mono">10 000</span>&nbsp;&nbsp;&nbsp;<span id="seedLabel">SEED</span>&nbsp;<span id="seedVal" class="mono amber">—</span>&nbsp;&nbsp;<span class="live" id="onlineLabel">EN LIGNE</span></span>
+  </div>
+
+  <div class="hud-mode auto mono" id="modeBadge">AUTOPILOTE</div>
+  <div class="hud-mode mono" id="cameraModeFlash" style="top:96px; display:none; opacity:0; transition:opacity .5s ease;"></div>
+
+  <div class="panel hud-left">
+    <button class="panel-close-btn" data-panel-cls="hud-left" title="Fermer">×</button>
+    <div class="row"><span class="k" id="lblSpeed">Vitesse</span><span class="v" id="speedVal">0 u/s</span></div>
+    <div class="row"><span class="k" id="lblSector">Secteur</span><span class="v" id="sectorVal">0 · 0 · 0</span></div>
+    <div class="row"><span class="k" id="lblHeading">Cap</span><span class="v" id="headingVal">000°</span></div>
+  </div>
+
+  <div class="panel hud-route" id="routePanel">
+    <button class="panel-close-btn" data-panel-cls="hud-route" title="Fermer">×</button>
+    <div class="route-title"><span id="lblFlightPlan">Plan de vol</span> <span class="amber" id="routeProgress">—</span></div>
+    <div class="route-list" id="routeList"></div>
+  </div>
+
+  <div class="panel hud-right" id="nearestPanel">
+    <button class="panel-close-btn" data-panel-cls="hud-right" title="Fermer">×</button>
+    <div class="k mono" id="lblNearest">OBJET LE PLUS PROCHE</div>
+    <div class="obj-body">
+      <canvas class="obj-icon" id="nearIcon" width="52" height="52"></canvas>
+      <div class="obj-text">
+        <div class="obj-name" id="nearName">—</div>
+        <div class="obj-meta" id="nearMeta">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hud-hint mono" id="arrivalHint" style="display:none; bottom:52px;">
+    ESPACE — abréger la manœuvre (travelling accéléré)
+  </div>
+
+  <!-- aide clavier — overlay centré, même famille visuelle que le mode
+       Pause (amélioration : remplace l'ancienne bande fixe en bas d'écran,
+       peu lisible et qui empiétait sur la vue) -->
+  <div id="helpOverlay" class="mono">
+    <div class="help-panel">
+      <button class="panel-close-btn" data-panel-cls="__help__" title="Fermer">×</button>
+      <div class="help-title" id="lblHelpTitle">AIDE — COMMANDES</div>
+      <div class="help-grid" id="helpGrid"></div>
+      <div class="help-foot" id="lblHelpFoot">H — masquer cette aide</div>
+    </div>
+  </div>
+
+  <!-- rangée basse : température, propulsion, commandes moteur -->
+  <div class="hud-bottom-row">
+    <div class="panel hud-temp mono" id="tempPanel">
+      <button class="panel-close-btn" data-panel-cls="hud-temp" title="Fermer">×</button>
+      <div class="tm-title" id="lblEngineTemp">TEMPÉRATURE MOTEUR</div>
+      <div id="tempBody"></div>
+    </div>
+
+    <div class="panel hud-engines" id="enginesPanel">
+      <button class="panel-close-btn" data-panel-cls="hud-engines" title="Fermer">×</button>
+      <div class="engines-title mono" id="lblPropulsion">PROPULSION</div>
+      <div class="engines-row" id="enginesRow"></div>
+    </div>
+
+    <div class="panel hud-telemetry mono" id="telemetryPanel">
+      <button class="panel-close-btn" data-panel-cls="hud-telemetry" title="Fermer">×</button>
+      <div class="tm-title" id="lblEngineCmd">COMMANDES MOTEUR</div>
+      <div id="telemetryBody"></div>
+    </div>
+  </div>
+
+  <!-- canal radio : échanges équipage / contrôle du port pendant l'approche -->
+  <div class="panel hud-radio mono" id="radioPanel">
+    <button class="panel-close-btn" data-panel-cls="__radio__" title="Fermer">×</button>
+    <div class="radio-title"><span id="lblRadioChannel">CANAL RADIO</span><span><span class="llm-indicator inactive" id="llmIndicator" title="Détection de l’IA embarquée en cours…">🧠</span><button class="radio-mute" id="radioMuteBtn" title="Couper le son du canal radio">🔊</button><span class="dot">●</span></span></div>
+    <div class="radio-log" id="radioLog"></div>
+  </div>
+
+  <!-- services portuaires (#9, palier 1) : mini-fonction réelle et
+       autonome, indépendante du système de réparations du palier 2 (pas
+       encore implémenté) — amélioration payante et permanente des
+       propulseurs, seul débouché actuel pour les crédits accumulés. -->
+  <div class="panel hud-port mono" id="portPanel">
+    <button class="panel-close-btn" data-panel-cls="__port__" title="Fermer">×</button>
+    <div class="port-title"><span id="lblPortServices">SERVICES PORTUAIRES</span></div>
+    <div class="port-row">
+      <span id="lblSpeedUpgrade">Propulseurs</span>
+      <span class="port-dots" id="portLevelDots"></span>
+    </div>
+    <button class="port-buy-btn" id="portBuyBtn"></button>
+    <div class="port-row" id="fuelPortRow">
+      <span id="lblFuelService">Carburant</span>
+      <span class="port-dots" id="fuelPortPct"></span>
+    </div>
+    <button class="port-buy-btn" id="fuelBuyBtn"></button>
+    <div class="port-row" id="jumpPortRow">
+      <span id="lblJumpService">Saut quantique</span>
+      <span class="port-dots" id="jumpPortStatus"></span>
+    </div>
+    <button class="port-buy-btn" id="jumpBuyBtn"></button>
+  </div>
+
+  <!-- itinéraire (§ amélioration v2.4) : bas droite, au-dessus de la barre
+       d'icônes — point représentant le vaisseau + étapes vert/bleu -->
+  <div class="panel hud-itinerary mono" id="itineraryPanel">
+    <button class="panel-close-btn" data-panel-cls="hud-itinerary" title="Fermer">×</button>
+    <div class="tm-title" id="lblItinerary">ITINÉRAIRE</div>
+    <div class="itin-track" id="itinTrack">
+      <div class="itin-line"></div>
+      <div class="itin-ship" id="itinShip"></div>
+    </div>
+  </div>
+
+  <!-- orientation / point de Lagrange (§ amélioration v2.4) : bas gauche -->
+  <div class="panel hud-lagrange mono" id="lagrangePanel">
+    <button class="panel-close-btn" data-panel-cls="hud-lagrange" title="Fermer">×</button>
+    <div class="tm-title" id="lblLagrange">POINT DE LAGRANGE</div>
+    <div class="lagrange-body">
+      <svg class="lagrange-dial" viewBox="0 0 60 60">
+        <circle cx="30" cy="30" r="26" fill="none" stroke="var(--line)" stroke-width="1.5"/>
+        <path d="M30 6v8" stroke="var(--muted-2)" stroke-width="1.5"/>
+        <g id="lagrangeNeedle">
+          <path d="M30 30L30 10" stroke="var(--amber)" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="30" cy="10" r="2.6" fill="var(--amber)" stroke="none"/>
+        </g>
+        <circle cx="30" cy="30" r="1.8" fill="var(--muted-2)" stroke="none"/>
+      </svg>
+      <div class="lagrange-info">
+        <div class="lagrange-dist" id="lagrangeDist">— u</div>
+        <div class="lagrange-name" id="lagrangeName">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- barre d'icônes du HUD (§12) — unifiée bureau + tactile, générée en JS -->
+  <div id="hudIconBar" class="mono"></div>
+
+  <!-- contrôles tactiles — masqués par défaut (touch-mode ajoutée en JS
+       si un pointeur grossier est détecté), §15 de la spec v2.1 -->
+  <div class="touch-controls mono" id="touchControls">
+    <button class="touch-btn" id="touchRollMinus">⟲</button>
+    <button class="touch-btn" id="touchRollPlus">⟳</button>
+    <button class="touch-btn" id="touchBoostBtn">BOOST</button>
+    <button class="touch-btn" id="touchLookBtn" title="Maintenir pour regarder autour">📷</button>
+    <div class="touch-btn" id="touchJoyBase"><div id="touchJoyNub"></div></div>
+  </div>
+</div>
+
+<!-- carte stellaire (§23) : même famille visuelle que Pause/Aide (coins
+     ambrés) plutôt qu'un nouveau gabarit d'overlay. Le canevas 3D est le
+     canevas PRINCIPAL du jeu (bascule sur une scène/caméra dédiées
+     pendant que l'overlay est ouvert, cf. animate()) — pas un second
+     contexte WebGL à faire vivre à côté. Placée en dehors de #hud (comme
+     #pauseOverlay juste en dessous) : bug corrigé au passage — imbriquée
+     DANS #hud comme au premier jet, la règle qui masque #hud pendant que
+     la carte est ouverte (cf. CSS) masquait aussi la carte elle-même. -->
+<!-- étiquettes de la carte stellaire (noms + repères lettrés de grille,
+     §23 amélioration) : même technique que #starLabels (projection écran
+     via .project()), conteneur séparé — mise à jour tant que la carte est
+     ouverte, cf. updateStarMapLabels(). Hors de #hud comme starMapOverlay
+     lui-même (bug déjà corrigé une fois pour ce dernier, cf. §23.6). -->
+<div id="starMapLabels"></div>
+<div id="starMapOverlay" class="mono">
+  <div class="starmap-panel">
+    <div class="starmap-titlebar">
+      <span class="starmap-title" id="lblStarMapTitle">CARTE STELLAIRE</span>
+      <span class="starmap-hint" id="lblStarMapHint">M — fermer / reprendre</span>
+      <button class="panel-close-btn" data-panel-cls="__starmap__" title="Fermer">×</button>
+    </div>
+    <div class="starmap-body">
+      <div class="starmap-viewport" id="starMapViewport"></div>
+      <div class="starmap-side">
+        <div class="starmap-target-box">
+          <div class="starmap-box-title" id="lblStarMapTarget">CIBLE SÉLECTIONNÉE</div>
+          <div id="starMapTargetBody">
+            <div class="starmap-empty" id="lblStarMapNone">Aucune cible — cliquez une étoile</div>
+          </div>
+          <button class="starmap-confirm-btn" id="starMapConfirmBtn" style="display:none;"></button>
+          <div class="starmap-subhint" id="lblStarMapDblclick">Double-clic sur une cible = même action</div>
+        </div>
+        <div class="starmap-locked-box" id="starMapLockedBox" style="display:none;">
+          <div class="starmap-box-title" id="lblStarMapLockedTitle">Sans module de saut</div>
+          <div class="starmap-empty" id="lblStarMapLockedBody">Carte consultable en lecture seule — aperçu toujours utile.</div>
+        </div>
+      </div>
+    </div>
+    <div class="starmap-legend">
+      <span><span class="dot built"></span><span id="lblStarMapBuilt">système déjà construit</span></span>
+      <span><span class="dot range"></span><span id="lblStarMapRange">à portée de saut</span></span>
+      <span><span class="dot sel"></span><span id="lblStarMapSel">sélection courante</span></span>
+    </div>
+  </div>
+</div>
+
+<!-- bannière de séquence de saut (§23.5) — élément dédié plutôt que
+     modeBadge, réécrit chaque image par la logique de vol normale. -->
+<div class="hud-mode mono" id="jumpBanner" style="display:none;"></div>
+<!-- halo d'écran du saut (charge/sortie) — même famille que .speedlines
+     (déjà utilisée au boost), poussée plus fort plutôt qu'un nouveau
+     système de rendu à part. -->
+<div class="jump-vignette" id="jumpVignette"></div>
+<div class="jump-flash" id="jumpFlash"></div>
+
+<!-- réglage des volumes (demande utilisateur) : même famille visuelle que
+     les autres overlays (coins ambrés), hors de #hud comme eux tous —
+     cf. le bug déjà rencontré deux fois sur ce point précis (§23.6, §25). -->
+<div id="audioOverlay" class="mono">
+  <div class="audio-panel">
+    <button class="panel-close-btn" data-panel-cls="__audio__" title="Fermer">×</button>
+    <div class="audio-title" id="lblAudioTitle">SON</div>
+    <div class="audio-row">
+      <span class="audio-label" id="lblMusicVolume">Musique</span>
+      <input type="range" id="musicVolumeSlider" min="0" max="100" value="40">
+      <span class="audio-pct" id="musicVolumePct">40%</span>
+    </div>
+    <div class="audio-row">
+      <span class="audio-label" id="lblVoiceVolume">Voix</span>
+      <input type="range" id="voiceVolumeSlider" min="0" max="100" value="85">
+      <span class="audio-pct" id="voiceVolumePct">85%</span>
+    </div>
+    <div class="audio-foot" id="lblAudioFoot">V — masquer ce réglage</div>
+  </div>
+</div>
+
+<div id="pauseOverlay" class="mono">
+  <div class="pause-panel">
+    <div class="pause-title" id="pauseTitle">PAUSE</div>
+    <div class="pause-sub" id="pauseSub">Simulation suspendue</div>
+    <button class="pause-btn" id="pauseResumeBtn">▶ <span id="pauseResumeLbl">REPRENDRE</span></button>
+    <button class="pause-btn pause-btn-quit" id="pauseQuitBtn">⏻ <span id="pauseQuitLbl">QUITTER — ÉCRAN-TITRE</span></button>
+    <div class="pause-hint" id="pauseHint">ESPACE / ENTRÉE — reprendre &nbsp;·&nbsp; ÉCHAP — quitter</div>
+  </div>
+</div>
+
+<div id="boot">
+  <div class="term" id="bootTerm"></div>
+  <div class="skip">cliquer pour ignorer</div>
+</div>
+
+<!-- écran-titre : choix de la langue, affiché juste après l'initialisation,
+     avant que le vaisseau ne prenne réellement l'air -->
+<div id="shipSelect" role="dialog" aria-modal="true" aria-labelledby="ssTitle">
+  <div class="ss-panel">
+    <span class="ss-c tl"></span><span class="ss-c tr"></span><span class="ss-c bl"></span><span class="ss-c br"></span>
+    <div class="ss-head"><h2 id="ssTitle"></h2><p class="ss-note" id="ssNote"></p></div>
+    <div class="ss-body">
+      <div class="ss-carousel">
+        <canvas id="ssCanvas"></canvas>
+        <span class="ss-count" id="ssCount"></span>
+        <button type="button" class="ss-arrow ss-prev" id="ssPrev">‹</button>
+        <button type="button" class="ss-arrow ss-next" id="ssNext">›</button>
+        <div class="ss-strip" id="ssStrip"></div>
+      </div>
+      <div class="ss-specs" aria-live="polite">
+        <div class="ss-name" id="ssName"></div>
+        <div class="ss-type" id="ssType"></div>
+        <div class="ss-prop" role="group" aria-labelledby="ssPropLbl"><span id="ssPropLbl"></span><span class="ss-base" id="ssOptE"></span><div class="ss-seg"><button type="button" id="ssOptW" aria-pressed="false"></button><button type="button" id="ssOptJ" aria-pressed="false"></button></div><span class="ss-prop-note" id="ssPropNote"></span></div>
+        <dl class="ss-kv" id="ssKv"></dl>
+        <div class="ss-foot"><button type="button" class="ss-confirm" id="ssConfirm"></button><span class="ss-hint" id="ssHint"></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="titleScreen" style="display:none;">
+  <div class="title-inner">
+    <div class="title-eyebrow">// SIMULATION SPATIALE PROCÉDURALE</div>
+    <div class="title-main">SPACE TRAVEL <span class="amber">&amp;</span> TRANSPORT</div>
+    <div class="title-sub" id="titleSub">Choisissez une langue</div>
+    <div class="title-langs">
+      <button class="lang-btn" data-lang="fr"><span class="lang-flag">FR</span><span class="lang-name">Français</span></button>
+      <button class="lang-btn" data-lang="en"><span class="lang-flag">EN</span><span class="lang-name">English</span></button>
+      <button class="lang-btn" data-lang="de"><span class="lang-flag">DE</span><span class="lang-name">Deutsch</span></button>
+      <button class="lang-btn" data-lang="es"><span class="lang-flag">ES</span><span class="lang-name">Español</span></button>
+    </div>
+  </div>
+  <div class="title-copyright" id="titleCopyright">(c) 2026 - game by Frédéric Delorme - music by ScoreStudio from Envato</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>/*@inline:js*/</script>
+</body>
+</html>

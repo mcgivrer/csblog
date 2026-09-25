@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="fr" data-demo>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Epstein drive — shader de propulsion</title>
+<style>
+  :root{
+    --panel-bg: rgba(244,247,252,0.90); --panel-fg:#16202e; --accent:#1f6fd1; --muted:#556477;
+    box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){ --panel-bg: rgba(12,16,24,0.80); --panel-fg:#dfe8f5; --accent:#7fc4ff; --muted:#93a3b8; }
+  }
+  :root[data-theme="dark"]{ --panel-bg: rgba(12,16,24,0.80); --panel-fg:#dfe8f5; --accent:#7fc4ff; --muted:#93a3b8; }
+  html,body{ margin:0; height:100%; background:#05070c; overflow:hidden; }
+  canvas{ display:block; position:fixed; inset:0; touch-action:none; }
+  #ui{ display:none; position:fixed; z-index:2; left:50%; transform:translateX(-50%);
+       bottom:calc(12px + env(safe-area-inset-bottom,0px)); background:var(--panel-bg); color:var(--panel-fg);
+       font:13px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; padding:10px 14px; border-radius:10px;
+       gap:14px; align-items:center; flex-wrap:wrap; justify-content:center; max-width:calc(100% - 24px); box-sizing:border-box; }
+  #ui label{ display:flex; align-items:center; gap:6px; white-space:nowrap; }
+  #ui input[type=range]{ accent-color:var(--accent); width:110px; }
+  #ui select{ font:inherit; }
+  #ui .hint{ color:var(--muted); font-size:11.5px; width:100%; text-align:center; }
+</style>
+</head>
+<body>
+<div id="ui">
+  <label>Vaisseau
+    <select id="ship">
+      <option value="tugM">Pousseur moyen</option>
+      <option value="beam20">Cargo-poutre (20)</option>
+      <option value="warehouse40">Cargo-entrepôt (40)</option>
+      <option value="liner20">Paquebot (20 cabines)</option>
+    </select>
+  </label>
+  <label>Poussée <input id="thr" type="range" min="0" max="1" step="0.01" value="1"></label>
+  <label><input id="dia" type="checkbox" checked> Diamants de choc</label>
+  <div class="hint">Glisser pour tourner autour du vaisseau</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const V3 = THREE.Vector3;
+const DEMO = /demo/.test(location.search) || document.documentElement.hasAttribute('data-demo');
+
+function mixMaterial(hex, opts){
+  opts = opts || {};
+  return new THREE.MeshStandardMaterial({
+    color: hex, metalness: opts.metalness!==undefined?opts.metalness:0.6,
+    roughness: opts.roughness!==undefined?opts.roughness:0.4,
+    emissive: opts.emissive || 0x000000, emissiveIntensity: opts.emissiveIntensity || 0,
+    flatShading: true
+  });
+}
+function makeTaperedHull(profile, segments, mat){
+  const pts = profile.map(p => new THREE.Vector2(p[0], p[1]));
+  const geo = new THREE.LatheGeometry(pts, segments);
+  geo.rotateX(Math.PI/2);
+  return new THREE.Mesh(geo, mat);
+}
+function makeBeveledBox(w, h, l, chamfer, mat){
+  const shape = new THREE.Shape();
+  const hw = w/2-chamfer, hh = h/2-chamfer;
+  shape.moveTo(-hw, -h/2); shape.lineTo(hw, -h/2); shape.lineTo(w/2, -hh);
+  shape.lineTo(w/2, hh); shape.lineTo(hw, h/2); shape.lineTo(-hw, h/2);
+  shape.lineTo(-w/2, hh); shape.lineTo(-w/2, -hh); shape.closePath();
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth:l, bevelEnabled:true, bevelThickness:chamfer*0.6, bevelSize:chamfer*0.5, bevelSegments:2, curveSegments:1
+  });
+  geo.center();
+  return new THREE.Mesh(geo, mat);
+}
+function makeEngineBell(throatR, exitR, length, mat){
+  const profile = [[throatR*0.55,0],[throatR,length*0.12],[throatR*0.82,length*0.3],[exitR*0.55,length*0.72],[exitR,length]];
+  return makeTaperedHull(profile, 10, mat);
+}
+function makeHexBeam(radius, length, mat){
+  const geo = new THREE.CylinderGeometry(radius, radius, length, 6, 1, false);
+  geo.rotateX(Math.PI/2);
+  return new THREE.Mesh(geo, mat);
+}
+function addGreebles(parent, halfW, halfH, halfL, count, mat, unit){
+  for(let i=0;i<count;i++){
+    const gw = unit*(0.12+Math.random()*0.2), gh = unit*(0.05+Math.random()*0.1), gl = unit*(0.15+Math.random()*0.35);
+    const box = new THREE.Mesh(new THREE.BoxGeometry(gw,gh,gl), mat);
+    const side = Math.random()>0.5?1:-1;
+    box.position.set(side*(halfW+gh/2-0.01), (Math.random()*2-1)*halfH*0.75, (Math.random()*2-1)*halfL*0.8);
+    parent.add(box);
+  }
+}
+function addCrossBracing(parent, halfW, halfH, halfL, mat, unit){
+  const segCount = Math.max(2, Math.round((halfL*2)/(unit*2.4)));
+  const dz = (halfL*2)/segCount, r = unit*0.05;
+  function strut(pA, pB){
+    const dir = new V3().subVectors(pB, pA); const len = dir.length(); if(len < 1e-4) return;
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 5), mat);
+    mesh.position.copy(pA).addScaledVector(dir, 0.5);
+    mesh.quaternion.setFromUnitVectors(new V3(0,1,0), dir.clone().normalize());
+    parent.add(mesh);
+  }
+  const faces = [
+    z => [new V3(-halfW,-halfH,z), new V3(-halfW,halfH,z)], z => [new V3(halfW,-halfH,z), new V3(halfW,halfH,z)],
+    z => [new V3(-halfW,halfH,z), new V3(halfW,halfH,z)],   z => [new V3(-halfW,-halfH,z), new V3(halfW,-halfH,z)]
+  ];
+  faces.forEach(function(fn){
+    for(let i=0;i<segCount;i++){
+      const z0 = -halfL + i*dz, c0 = fn(z0), c1 = fn(z0+dz);
+      strut(c0[0], c1[1]); strut(c0[1], c1[0]);
+    }
+  });
+}
+function addNavLight(parent, hex, x, y, z){
+  const light = new THREE.Mesh(new THREE.SphereGeometry(0.42, 8, 8), mixMaterial(0x111111, {emissive:hex, emissiveIntensity:3}));
+  light.position.set(x, y, z); parent.add(light);
+}
+function hullRadiusAt(profile, localZ){
+  for(let i=0;i<profile.length-1;i++){
+    const [r0,z0] = profile[i], [r1,z1] = profile[i+1];
+    if(localZ >= z0 && localZ <= z1){ const t = (localZ-z0)/((z1-z0)||1); return r0 + (r1-r0)*t; }
+  }
+  return profile[profile.length-1][0];
+}
+
+/* ============ éléments « The Expanse » : radiateurs, PDC ============ */
+function addRadiatorPanel(parent, x, y, z, width, height, tiltZ, unit){
+  const finMat = mixMaterial(0x14171b, {metalness:0.5, roughness:0.5});
+  const strutMat = mixMaterial(0x3a3f46, {metalness:0.6});
+  const g = new THREE.Group(); const strutLen = unit*0.5;
+  const strut = new THREE.Mesh(new THREE.CylinderGeometry(unit*0.04, unit*0.04, strutLen, 6), strutMat);
+  strut.rotation.z = Math.PI/2; strut.position.x = strutLen/2; g.add(strut);
+  const panel = new THREE.Mesh(new THREE.BoxGeometry(width, height, unit*0.06), finMat);
+  panel.position.x = strutLen + width*0.15; g.add(panel);
+  const ribMat = mixMaterial(0x0a0c0f, {metalness:0.3, roughness:0.8});
+  for(let i=1;i<3;i++){
+    const rib = new THREE.Mesh(new THREE.BoxGeometry(unit*0.03, height*0.94, unit*0.065), ribMat);
+    rib.position.x = strutLen + width*0.15 - width/2 + i*(width/3); g.add(rib);
+  }
+  g.position.set(x,y,z); g.rotation.z = tiltZ; parent.add(g);
+}
+function addPDCTurret(parent, x, y, z, scale){
+  const mat = mixMaterial(0x3a3f46, {metalness:0.7, roughness:0.35});
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(new THREE.SphereGeometry(0.34*scale, 8, 6, 0, Math.PI*2, 0, Math.PI/2), mat));
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.05*scale, 0.07*scale, 0.55*scale, 6), mat);
+  barrel.rotation.x = Math.PI/2 - 0.5; barrel.position.set(0, 0.15*scale, 0.22*scale); g.add(barrel);
+  g.position.set(x,y,z); parent.add(g);
+}
+
+/* ======================================================================
+   SHADER EPSTEIN DRIVE
+   ----------------------------------------------------------------------
+   Deux maillages par tuyère, tous deux de simples quads (2 triangles) :
+   1) le JET : quad « billboard axial » — son grand axe reste aligné sur
+      l'axe de poussée, il ne pivote qu'autour de cet axe pour toujours
+      présenter sa face à la caméra (technique classique des faisceaux et
+      jets : aspect volumétrique sous presque tous les angles pour le coût
+      d'un quad). Le profil est calculé par fragment : cœur blanc très
+      collimaté, diamants de choc, gaine bleue turbulente, halo violet,
+      point chaud à la sortie de tuyère, scintillement.
+   2) le FLARE : sprite face caméra à la sortie de tuyère, avec traînée
+      horizontale (flare anamorphique) — prend le relais quand on regarde
+      dans l'axe du moteur, là où le quad du jet devient une simple ligne.
+   Les uniforms de temps / poussée / diamants / couleurs sont PARTAGÉS par
+   toutes les tuyères (un seul objet mis à jour une fois par image).
+   ====================================================================== */
+const DRIVE_U = {
+  uTime:     { value: 3.7 },
+  uThrottle: { value: 1.0 },
+  uDiamonds: { value: 7.0 },
+  uCore:     { value: new THREE.Color(0.93, 0.97, 1.00) },
+  uSheath:   { value: new THREE.Color(0.28, 0.55, 1.00) },
+  uHaze:     { value: new THREE.Color(0.52, 0.36, 1.00) }
+};
+const DRIVE_LIGHTS = [];
+
+const NOISE_GLSL = `
+float hash(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x*p.y); }
+float vnoise(vec2 p){
+  vec2 i = floor(p); vec2 f = fract(p);
+  float a = hash(i); float b = hash(i + vec2(1.0,0.0));
+  float c = hash(i + vec2(0.0,1.0)); float d = hash(i + vec2(1.0,1.0));
+  vec2 u = f*f*(3.0 - 2.0*f);
+  return mix(mix(a,b,u.x), mix(c,d,u.x), u.y);
+}
+float fbm(vec2 p){ float v = 0.0; float a = 0.5; for(int i = 0; i < 4; i++){ v += a*vnoise(p); p *= 2.03; a *= 0.5; } return v; }
+`;
+
+const PLUME_VS = `
+uniform float uLength; uniform float uRadius; uniform float uThrottle;
+varying float vAxial; varying float vRadial; varying float vEndOn;
+void main(){
+  vec3 origin = (modelMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+  vec3 axisW  = (modelMatrix * vec4(0.0, 0.0, 1.0, 0.0)).xyz;   // axe de poussée = +Z local (vers l'arrière)
+  float sc = length(axisW);
+  vec3 axis = axisW / sc;
+  float L = uLength * (0.35 + 0.65*uThrottle) * sc;           // le jet s'allonge avec la poussée
+  vec3 toCam = normalize(cameraPosition - (origin + axis*L*0.5));
+  vec3 side = cross(axis, toCam);
+  float sl = length(side);
+  side = sl > 1e-4 ? side/sl : normalize(cross(axis, vec3(0.0, 1.0, 0.0)));
+  vAxial  = uv.y;                  // 0 = sortie de tuyère, 1 = extrémité du jet
+  vRadial = uv.x*2.0 - 1.0;        // -1..1 en travers du jet
+  vEndOn  = abs(dot(axis, normalize(cameraPosition - origin)));
+  vec3 wp = origin + axis*(uv.y*L) + side*(vRadial*uRadius*sc);
+  gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+}`;
+
+const PLUME_FS = `
+precision highp float;
+uniform float uTime; uniform float uThrottle; uniform float uDiamonds; uniform float uSeed; uniform float uGain;
+uniform vec3 uCore; uniform vec3 uSheath; uniform vec3 uHaze;
+varying float vAxial; varying float vRadial; varying float vEndOn;
+${NOISE_GLSL}
+void main(){
+  float z = vAxial; float x = vRadial;
+  float t = uTime + uSeed*13.7;
+  // turbulence qui s'écoule vers l'arrière (deux échelles)
+  float n  = fbm(vec2(x*5.0  + uSeed*3.1, z*12.0 - t*7.0));
+  float n2 = fbm(vec2(x*13.0 - uSeed*1.7, z*28.0 - t*15.0));
+  float xw = x + (n - 0.5)*0.05*z;                     // léger flottement latéral, nul à la tuyère
+  // largeurs : jet très collimaté (cœur quasi constant), gaine qui s'évase doucement
+  float wCore   = mix(0.10, 0.15, z);
+  float wSheath = mix(0.26, 0.60, pow(z, 0.8));
+  // diamants de choc : losanges lumineux régulièrement espacés sur l'axe ;
+  // entre deux noeuds le coeur s'assombrit (structure en chapelet du jet)
+  float cell = z*uDiamonds;
+  float u = fract(cell + 0.5) - 0.5;
+  float dOn = step(0.5, uDiamonds) * smoothstep(0.4, 0.8, cell);
+  float nodeA = (1.0 - abs(u)*2.0); nodeA *= nodeA;
+  float a = xw/wCore;
+  float core = exp(-a*a) * exp(-z*1.8) * (1.0 - dOn*0.55*(1.0 - nodeA)*exp(-z*1.2));
+  float m = abs(u)*1.8 + abs(xw)/(wCore*2.4);
+  float diamond = pow(clamp(1.0 - m, 0.0, 1.0), 1.5) * exp(-z*2.6) * dOn;
+  // gaine et halo naissent progressivement à la sortie de tuyère (le gaz se détend) : pas de « mur » lumineux
+  float b = xw/wSheath;            float sheath = exp(-b*b) * exp(-z*1.15) * (0.55 + 0.45*n) * smoothstep(0.0, 0.05, z);
+  float c = xw/(wSheath*2.1);      float haze   = exp(-c*c) * exp(-z*2.2) * (0.6 + 0.4*n2) * smoothstep(0.0, 0.10, z);
+  float d = xw/0.22;               float hot    = exp(-z*22.0) * exp(-d*d);
+  float flick = 0.9 + 0.1*vnoise(vec2(t*21.0, uSeed*5.0));
+  vec3 col = uHaze*haze*0.16 + uSheath*sheath*0.45 + uCore*(core*1.5 + diamond*1.8 + hot*2.6);
+  float fade = (1.0 - smoothstep(0.5, 1.0, z)) * smoothstep(0.0, 0.02, z) * (1.0 - smoothstep(0.82, 1.0, abs(x)));
+  fade *= 1.0 - smoothstep(0.80, 0.985, vEndOn);       // vu dans l'axe : le flare prend le relais
+  col *= flick * uThrottle * uGain * fade;
+  col = vec3(1.0) - exp(-col*1.3);                     // tonemapping : cœur saturé au blanc, gaine qui reste bleue
+  gl_FragColor = vec4(col, 1.0);
+}`;
+
+const FLARE_VS = `
+uniform float uSize; uniform float uThrottle;
+varying vec2 vUv; varying float vFacing;
+void main(){
+  vUv = uv;
+  vec3 origin = (modelMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+  vec3 axis = normalize((modelMatrix * vec4(0.0, 0.0, 1.0, 0.0)).xyz);
+  vFacing = max(dot(axis, normalize(cameraPosition - origin)), 0.0);   // 1 = on regarde dans la tuyère
+  float s = uSize * (0.55 + 1.6*pow(vFacing, 4.0)) * (0.4 + 0.6*uThrottle);
+  vec4 mv = viewMatrix * vec4(origin, 1.0);
+  mv.xy += position.xy * s;
+  gl_Position = projectionMatrix * mv;
+}`;
+
+const FLARE_FS = `
+precision highp float;
+uniform float uTime; uniform float uThrottle; uniform float uSeed; uniform float uGain;
+uniform vec3 uCore; uniform vec3 uSheath;
+varying vec2 vUv; varying float vFacing;
+${NOISE_GLSL}
+void main(){
+  vec2 p = (vUv - 0.5)*vec2(8.0, 2.0);                 // quad 4:1 -> repère isotrope
+  float r2 = dot(p, p);
+  float core   = exp(-r2*18.0)*2.6;
+  float glow   = exp(-r2*2.2)*0.55;
+  float streak = exp(-p.y*p.y*90.0) * exp(-abs(p.x)*0.8) * (0.25 + 1.1*vFacing);   // traînée anamorphique
+  float rr = sqrt(r2) - 0.75;
+  float ring   = exp(-rr*rr*81.0) * 0.08 * vFacing;
+  float flick  = 0.9 + 0.1*vnoise(vec2((uTime + uSeed*9.1)*19.0, 3.3));
+  vec3 col = uCore*core + uSheath*(glow + ring) + mix(uSheath, vec3(1.0), 0.35)*streak;
+  col *= flick * uThrottle * uGain;
+  col *= (1.0 - smoothstep(3.0, 4.0, abs(p.x))) * (1.0 - smoothstep(0.75, 1.0, abs(p.y)));
+  col = vec3(1.0) - exp(-col*1.5);
+  gl_FragColor = vec4(col, 1.0);
+}`;
+
+/* une tuyère = un groupe placé à la SORTIE de la tuyère, axe +Z vers l'arrière */
+function addEpsteinDrive(parent, x, y, z, exitR, length, seed, gain){
+  gain = gain || 1.0;
+  const g = new THREE.Group(); g.position.set(x, y, z);
+  const plumeMat = new THREE.ShaderMaterial({
+    uniforms: Object.assign({}, DRIVE_U, { uSeed:{value:seed}, uGain:{value:gain}, uLength:{value:length}, uRadius:{value:exitR*3.4} }),
+    vertexShader: PLUME_VS, fragmentShader: PLUME_FS,
+    transparent:true, depthWrite:false, side:THREE.DoubleSide, blending:THREE.AdditiveBlending
+  });
+  const plume = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), plumeMat);
+  plume.frustumCulled = false; plume.renderOrder = 10; plume.userData.noFrame = true;
+  g.add(plume);
+  const flareMat = new THREE.ShaderMaterial({
+    uniforms: Object.assign({}, DRIVE_U, { uSeed:{value:seed}, uGain:{value:gain}, uSize:{value:exitR*2.4} }),
+    vertexShader: FLARE_VS, fragmentShader: FLARE_FS,
+    transparent:true, depthWrite:false, blending:THREE.AdditiveBlending
+  });
+  const flare = new THREE.Mesh(new THREE.PlaneGeometry(4, 1), flareMat);
+  flare.frustumCulled = false; flare.renderOrder = 11; flare.userData.noFrame = true;
+  g.add(flare);
+  parent.add(g);
+}
+/* UNE lumière dynamique par vaisseau (pas par tuyère) : le jet éclaire la
+   poupe, comme dans la série, pour un coût maîtrisé */
+function addDriveLight(parent, x, y, z, range){
+  const l = new THREE.PointLight(0x9fd0ff, 2.0, range, 2);
+  l.position.set(x, y, z); parent.add(l); DRIVE_LIGHTS.push(l);
+}
+function setDrive(p){
+  if(p.time !== undefined) DRIVE_U.uTime.value = p.time;
+  if(p.throttle !== undefined){ DRIVE_U.uThrottle.value = p.throttle; }
+  if(p.diamonds !== undefined) DRIVE_U.uDiamonds.value = p.diamonds;
+  DRIVE_LIGHTS.forEach(l => { l.intensity = 2.0*DRIVE_U.uThrottle.value; });
+}
+window.setDrive = setDrive;
+
+/* ============ conteneurs, hublots ============ */
+const CARGO_COLORS = { minerais:0x8a6a4a, denrees:0x4a8a52, medical:0xe6e6de, transport:0x4a6a9a, techno:0x8a4ac0, glace:0xaee4ea };
+const CARGO_LIST = Object.keys(CARGO_COLORS);
+function makeContainer(cargoType, w, h, d){
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mixMaterial(CARGO_COLORS[cargoType], {roughness:0.65})));
+  const bandMat = mixMaterial(0x1a1d22, {roughness:0.4, metalness:0.7});
+  [-1,1].forEach(function(sx){
+    const band = new THREE.Mesh(new THREE.BoxGeometry(w*1.02, h*0.08, d*1.02), bandMat);
+    band.position.y = sx*h*0.42; g.add(band);
+  });
+  return g;
+}
+function makeWindowMaterial(colorHex){
+  return new THREE.ShaderMaterial({
+    uniforms:{ uColor:{value:new THREE.Color(colorHex)}, uCoreSharpness:{value:3.2} },
+    vertexShader:`varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+    fragmentShader:`
+      precision highp float; varying vec2 vUv; uniform vec3 uColor; uniform float uCoreSharpness;
+      void main(){
+        vec2 c = vUv-0.5; float d = length(c)*2.0;
+        float core = pow(clamp(1.0-d,0.0,1.0), uCoreSharpness);
+        float halo = pow(clamp(1.0-d,0.0,1.0), 2.4)*0.35;
+        gl_FragColor = vec4(uColor, clamp(core+halo,0.0,1.0));
+      }`,
+    transparent:true, depthWrite:false, side:THREE.DoubleSide
+  });
+}
+function addCabinWindows(parent, blockWidth, blockHeight, blockLength, blockCenterY, blockCenterZ, cabins, unit){
+  const n = cabins.length, spacing = blockLength/n;
+  cabins.forEach(function(cab, i){
+    const z = blockCenterZ - blockLength/2 + spacing*(i+0.5);
+    [-1,1].forEach(function(side){
+      const x = side*(blockWidth/2+1.3);
+      if(cab.type === 'panoramique'){
+        const bay = new THREE.Mesh(new THREE.PlaneGeometry(spacing*0.94, blockHeight*0.82), makeWindowMaterial(0xfff3d0));
+        bay.position.set(x, blockCenterY, z); bay.rotation.y = side>0?Math.PI/2:-Math.PI/2; parent.add(bay);
+      } else {
+        const count = cab.type==='standard'?1 : cab.type==='confort'?2 : 3;
+        for(let k=0;k<count;k++){
+          const off = count>1 ? (k/(count-1)-0.5)*spacing*0.6 : 0;
+          const port = new THREE.Mesh(new THREE.PlaneGeometry(unit*0.38, unit*0.38), makeWindowMaterial(0xfff3d0));
+          port.position.set(x, blockCenterY, z+off); port.rotation.y = side>0?Math.PI/2:-Math.PI/2; parent.add(port);
+        }
+      }
+    });
+  });
+}
+
+/* ============ ARCHETYPE A : cargo-entrepôt ============ */
+function buildWarehouseShip(nContainers){
+  const g = new THREE.Group(); const unit = 6;
+  const cbrt = Math.max(1, Math.cbrt(nContainers));
+  const cols = Math.max(2, Math.round(cbrt*1.25)), rows = Math.max(2, Math.round(cbrt*0.95));
+  const depthCount = Math.max(1, Math.ceil(nContainers/(cols*rows)));
+  const hullW = cols*unit*1.12 + unit*1.6, hullH = rows*unit*1.12 + unit*1.6, hullL = depthCount*unit*1.12 + unit*3.2;
+  const hullFrontZ = -hullL/2, hullRearZ = hullL/2;
+
+  const frameMat = mixMaterial(0x3a4250, {roughness:0.5, metalness:0.7});
+  frameMat.transparent = true; frameMat.opacity = 0.10; frameMat.depthWrite = false;
+  g.add(new THREE.Mesh(new THREE.BoxGeometry(hullW+unit, hullH+unit, hullL), frameMat));
+  const strutMat = mixMaterial(0x4a5568, {metalness:0.4, roughness:0.7});
+  const cornerX = (hullW+unit)/2, cornerY = (hullH+unit)/2;
+  [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(function(s){
+    const strut = makeBeveledBox(unit*0.32, unit*0.32, hullL, unit*0.1, strutMat);
+    strut.position.set(s[0]*cornerX, s[1]*cornerY, 0); g.add(strut);
+  });
+  addCrossBracing(g, cornerX, cornerY, hullL/2, strutMat, unit);
+
+  let placed = 0;
+  for(let dpt=0; dpt<depthCount && placed<nContainers; dpt++)
+    for(let r=0; r<rows && placed<nContainers; r++)
+      for(let c=0; c<cols && placed<nContainers; c++){
+        const box = makeContainer(CARGO_LIST[placed % CARGO_LIST.length], unit*0.92, unit*0.92, unit*0.92);
+        box.position.set(-hullW/2+unit*0.8+c*unit*1.08, -hullH/2+unit*0.8+r*unit*1.08, hullFrontZ+unit*1.6+dpt*unit*1.08);
+        g.add(box); placed++;
+      }
+
+  addRadiatorPanel(g, cornerX, 0, 0, unit*3.2, unit*1.4, -0.12, unit);
+  addRadiatorPanel(g, -cornerX, 0, 0, unit*3.2, unit*1.4, Math.PI+0.12, unit);
+  addPDCTurret(g, cornerX*0.6, cornerY, -hullL*0.2, unit*0.7);
+  addPDCTurret(g, -cornerX*0.6, cornerY, -hullL*0.2, unit*0.7);
+  addPDCTurret(g, 0, cornerY, hullL*0.25, unit*0.7);
+
+  const engRadius = Math.min(hullH, hullW)*0.32;
+  const engHousingL = unit*2.2, engHousingRearZ = hullRearZ + engHousingL;
+  const engHousing = makeBeveledBox(engRadius*1.9, engRadius*1.9, engHousingL, unit*0.5, mixMaterial(0x3a4048, {metalness:0.4, roughness:0.7}));
+  engHousing.position.z = hullRearZ + engHousingL/2; g.add(engHousing);
+  addGreebles(engHousing, engRadius*0.95, engRadius*0.95, unit*1.1, 6, mixMaterial(0x22262c), unit);
+  const nozzleCount = nContainers > 80 ? 6 : (nContainers > 25 ? 4 : 2);
+  const bellMat = mixMaterial(0x1e2226, {metalness:0.85, roughness:0.3, emissive:0x5ec9ff, emissiveIntensity:0.4});
+  const bellLen = unit*1.5, bellExit = unit*0.55;
+  const plumeLen = (hullL + unit*6)*1.1;
+  for(let i=0;i<nozzleCount;i++){
+    const a = (i/nozzleCount)*Math.PI*2 + (nozzleCount<=2?Math.PI/2:0);
+    const bx = Math.cos(a)*engRadius*0.75, by = Math.sin(a)*engRadius*0.75;
+    const bell = makeEngineBell(unit*0.28, bellExit, bellLen, bellMat);
+    bell.position.set(bx, by, engHousingRearZ); g.add(bell);
+    addEpsteinDrive(g, bx, by, engHousingRearZ + bellLen, bellExit, plumeLen, i*1.7 + 0.3, 1/Math.sqrt(nozzleCount));
+  }
+  addDriveLight(g, 0, 0, engHousingRearZ + bellLen + unit, plumeLen);
+  g.userData.driveCenter = new V3(0, 0, engHousingRearZ + bellLen);
+  g.userData.plumeLen = plumeLen;
+
+  const bridgeProfile = [[unit*0.15,0],[unit*0.9,unit*0.7],[unit*1.0,unit*1.8],[unit*0.7,unit*2.6],[unit*0.25,unit*3.1]];
+  const bridgeLen = bridgeProfile[bridgeProfile.length-1][1];
+  const bridgeZ = hullFrontZ - bridgeLen;
+  const bridge = makeTaperedHull(bridgeProfile, 8, mixMaterial(0x4a5262, {roughness:0.4}));
+  bridge.position.z = bridgeZ; g.add(bridge);
+  const windows = new THREE.Mesh(new THREE.PlaneGeometry(unit*1.6, unit*0.55), makeWindowMaterial(0x8fd8ff));
+  windows.position.set(0, unit*0.35, bridgeZ + unit*0.05); g.add(windows);
+
+  const rcsMat = mixMaterial(0x666a70, {metalness:0.6});
+  [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(function(s){
+    [-1,1].forEach(function(zend){
+      const rcs = new THREE.Mesh(new THREE.ConeGeometry(unit*0.2, unit*0.45, 6), rcsMat);
+      rcs.position.set(s[0]*cornerX, s[1]*cornerY, zend*hullL*0.42); rcs.rotation.z = Math.PI/2; g.add(rcs);
+    });
+  });
+  const retroLocalZ = unit*0.7, retroR = hullRadiusAt(bridgeProfile, retroLocalZ);
+  const retroMat = mixMaterial(0x50565e, {metalness:0.7});
+  [-1,1].forEach(function(s){
+    const retro = makeEngineBell(unit*0.18, unit*0.3, unit*0.6, retroMat);
+    retro.rotation.x = Math.PI; retro.position.set(s*retroR*0.95, 0, bridgeZ + retroLocalZ); g.add(retro);
+  });
+  const bridgeLocalZ = unit*1.8, bridgeR = hullRadiusAt(bridgeProfile, bridgeLocalZ);
+  addNavLight(g, 0x2ee66b, bridgeR*0.96, 0, bridgeZ + bridgeLocalZ);
+  addNavLight(g, 0xe0402e, -bridgeR*0.96, 0, bridgeZ + bridgeLocalZ);
+  addNavLight(g, 0xf0f0f0, 0, engRadius*0.95, engHousingRearZ - unit*0.3);
+  return g;
+}
+
+/* ============ ARCHETYPE B : cargo-poutre ============
+   CORRIGÉ (orientation) : le pousseur est désormais à l'ARRIÈRE de la
+   poutre, comme son nom l'indique — il pousse le faisceau de conteneurs.
+   Avant correction, il était placé à l'avant avec ses tuyères tournées
+   vers la poutre : le jet aurait tiré droit dans la cargaison.
+   Ordre, de l'avant (-Z) vers l'arrière (+Z) :
+   pointe de proue -> module de proue (rétros, RCS, feux vert/rouge)
+   -> poutre + conteneurs -> habitat -> nacelle -> tuyères -> jet. */
+function buildBeamShip(nContainers){
+  const g = new THREE.Group(); const unit = 6;
+  const spacing = unit*2.3, perSide = 4;
+  const slices = Math.ceil(nContainers/perSide);
+  const beamLen = Math.max(unit*6, slices*spacing + unit*2.5);
+  const beamFrontZ = -beamLen/2, beamRearZ = beamLen/2;
+  const firstSliceZ = -(slices-1)*spacing/2;
+  const structMat = mixMaterial(0x4a515c, {metalness:0.4, roughness:0.65});
+
+  g.add(makeHexBeam(unit*0.28, beamLen, mixMaterial(0x565c66, {metalness:0.75, roughness:0.4})));
+  const ringMat = mixMaterial(0x3a3f46, {metalness:0.6});
+  const ringCount = Math.floor(beamLen/(unit*1.8));
+  for(let i=0;i<ringCount;i++){
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(unit*0.42, unit*0.045, 6, 6), ringMat);
+    ring.position.z = beamFrontZ + i*(beamLen/ringCount); ring.rotation.z = Math.PI/6; g.add(ring);
+  }
+  const armMat = mixMaterial(0x2c2f34, {metalness:0.7});
+  for(let i=0;i<nContainers;i++){
+    const side = i % perSide, along = firstSliceZ + Math.floor(i/perSide)*spacing;
+    const ang = (side/perSide)*Math.PI*2, R = unit*0.85;
+    const box = makeContainer(CARGO_LIST[i % CARGO_LIST.length], unit*0.85, unit*0.85, unit*2.0);
+    box.position.set(Math.cos(ang)*R, Math.sin(ang)*R, along); box.rotation.z = ang;
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(unit*0.07, unit*0.07, unit*0.6, 6), armMat);
+    arm.position.set(Math.cos(ang)*unit*0.42, Math.sin(ang)*unit*0.42, along); arm.rotation.z = ang; arm.rotation.x = Math.PI/2;
+    g.add(arm); g.add(box);
+  }
+
+  /* --- proue : module collé à l'avant de la poutre --- */
+  const bowW = unit*1.5, bowL = unit*1.6, bowCh = unit*0.3, bowOut = bowCh*0.5;
+  const bowZ = beamFrontZ - bowL/2;
+  const bow = makeBeveledBox(bowW, bowW, bowL, bowCh, structMat); bow.position.z = bowZ; g.add(bow);
+  const noseLen = unit*1.4;
+  const nose = makeTaperedHull([[bowW*0.45,0],[bowW*0.3,noseLen*0.45],[0.02,noseLen]], 8, mixMaterial(0x3a3f46, {metalness:0.5}));
+  nose.rotation.x = Math.PI; nose.position.z = bowZ - bowL/2; g.add(nose);
+  const retroMat = mixMaterial(0x50565e, {metalness:0.7});
+  [-1,1].forEach(function(s){
+    const retro = makeEngineBell(unit*0.14, unit*0.24, unit*0.45, retroMat);
+    retro.rotation.x = Math.PI;                              // sortie vers l'avant : freinage
+    retro.position.set(s*(bowW/2 + bowOut + unit*0.2), 0, bowZ + bowL*0.3); g.add(retro);
+  });
+  const rcsMat = mixMaterial(0x666a70, {metalness:0.6});
+  function addRcsRing(r, z){
+    [[-1,0],[1,0],[0,-1],[0,1]].forEach(function(s){
+      const rcs = new THREE.Mesh(new THREE.ConeGeometry(unit*0.15, unit*0.34, 6), rcsMat);
+      rcs.position.set(s[0]*r, s[1]*r, z);
+      rcs.rotation.z = s[0]!==0 ? -s[0]*Math.PI/2 : (s[1]<0 ? Math.PI : 0);
+      g.add(rcs);
+    });
+  }
+  addRcsRing(bowW/2 + bowOut + unit*0.1, bowZ - bowL*0.2);
+  addNavLight(g, 0x2ee66b,  bowW/2 + bowOut + 0.25, unit*0.35, bowZ);
+  addNavLight(g, 0xe0402e, -(bowW/2 + bowOut + 0.25), unit*0.35, bowZ);
+  addPDCTurret(g, 0, bowW/2 + bowOut, bowZ, unit*0.45);
+
+  /* --- pousseur : habitat collé à l'arrière de la poutre --- */
+  const habW = unit*1.9, habL = unit*2.4, habCh = unit*0.4;
+  const habZ = beamRearZ + habL/2;
+  const habitat = makeBeveledBox(habW, habW, habL, habCh, mixMaterial(0x5a6270, {roughness:0.75, metalness:0.3}));
+  habitat.position.z = habZ; g.add(habitat);
+  addCabinWindows(g, habW, habW, habL, 0, habZ, [{type:'confort'},{type:'panoramique'}], unit);
+  addRadiatorPanel(g, habW/2, 0, habZ, unit*1.9, unit*0.9, -0.15, unit);
+  addRadiatorPanel(g, -habW/2, 0, habZ, unit*1.9, unit*0.9, Math.PI+0.15, unit);
+  addPDCTurret(g, 0, habW/2 + habCh*0.5, habZ - habL*0.2, unit*0.5);
+
+  /* nacelle : large à l'attache (habitat), resserrée vers les tuyères */
+  const nacLen = unit*3.2, nacFrontR = unit*0.85, nacRearR = unit*0.65;
+  const nacZ = habZ + habL/2;
+  const nacProfile = [[nacFrontR,0],[nacFrontR*1.02,nacLen*0.35],[nacRearR,nacLen]];
+  const nacelle = makeTaperedHull(nacProfile, 10, structMat); nacelle.position.z = nacZ; g.add(nacelle);
+  addGreebles(nacelle, nacFrontR*0.9, nacFrontR*0.9, nacLen*0.4, 6, mixMaterial(0x2c2f34), unit);
+  addRcsRing(nacFrontR + unit*0.05, nacZ + nacLen*0.3);
+
+  const tipZ = nacZ + nacLen;
+  const nozzleCount = nContainers > 24 ? 4 : 2;
+  const bellMat = mixMaterial(0x1e2226, {metalness:0.85, roughness:0.3, emissive:0x5ec9ff, emissiveIntensity:0.4});
+  const bellLen = unit*1.2, bellExit = unit*0.38;
+  const plumeLen = beamLen*0.8 + unit*10;
+  for(let i=0;i<nozzleCount;i++){
+    const a = (i/nozzleCount)*Math.PI*2 + (nozzleCount===2?0:Math.PI/4);
+    const bx = Math.cos(a)*nacRearR*0.7, by = Math.sin(a)*nacRearR*0.7;
+    const bell = makeEngineBell(unit*0.2, bellExit, bellLen, bellMat);
+    bell.position.set(bx, by, tipZ); g.add(bell);
+    addEpsteinDrive(g, bx, by, tipZ + bellLen, bellExit, plumeLen, i*1.7 + 0.9, 1/Math.sqrt(nozzleCount));
+  }
+  addDriveLight(g, 0, 0, tipZ + bellLen + unit, plumeLen*0.8);
+  const wLocal = nacLen*0.75, wR = hullRadiusAt(nacProfile, wLocal);
+  addNavLight(g, 0xf0f0f0, 0, wR + 0.2, nacZ + wLocal);
+  g.userData.driveCenter = new V3(0, 0, tipZ + bellLen);
+  g.userData.plumeLen = plumeLen;
+  return g;
+}
+
+/* ============ pousseur seul (paliers) + paquebot ============ */
+function buildTug(tier, unit){
+  unit = unit || 6;
+  const g = new THREE.Group();
+  const habZ = 0, nacelleZ = tier.habL/2;
+  const nacelleProfile = [[tier.nacRadius*0.28,0],[tier.nacRadius,unit*1.1],[tier.nacRadius*1.05,unit*2.2],[tier.nacRadius*0.8,unit*3.0],[tier.nacRadius*0.4,unit*3.5]];
+  const nacelle = makeTaperedHull(nacelleProfile, 10, mixMaterial(0x4a515c, {metalness:0.4, roughness:0.65}));
+  nacelle.position.z = nacelleZ; g.add(nacelle);
+  addGreebles(nacelle, tier.nacRadius*0.9, tier.nacRadius*0.9, unit*1.6, 5, mixMaterial(0x2c2f34), unit);
+
+  const habMat = mixMaterial(0x5a6270, {roughness:0.75, metalness:0.3});
+  for(let d=0; d<tier.decks; d++){
+    const deckY = (d-(tier.decks-1)/2)*(tier.habH/tier.decks), deckH = tier.habH/tier.decks*0.92;
+    const deck = makeBeveledBox(tier.habW, deckH, tier.habL, Math.min(tier.habW,deckH)*0.18, habMat);
+    deck.position.set(0, deckY, habZ); g.add(deck);
+    const cabinsThisDeck = tier.cabins.slice(Math.floor(d*tier.cabins.length/tier.decks), Math.floor((d+1)*tier.cabins.length/tier.decks));
+    if(cabinsThisDeck.length) addCabinWindows(g, tier.habW, deckH, tier.habL, deckY, habZ, cabinsThisDeck, unit);
+  }
+  addRadiatorPanel(g, tier.habW/2, tier.habH*0.15, habZ, tier.habL*0.6, tier.habH*0.35, -0.15, unit);
+  addRadiatorPanel(g, -tier.habW/2, tier.habH*0.15, habZ, tier.habL*0.6, tier.habH*0.35, Math.PI+0.15, unit);
+  addPDCTurret(g, 0, tier.habH/2, habZ - tier.habL*0.25, unit*0.5);
+
+  const tipZ = nacelleZ + nacelleProfile[nacelleProfile.length-1][1];
+  const tipR = nacelleProfile[nacelleProfile.length-1][0];
+  const bellMat = mixMaterial(0x1e2226, {metalness:0.85, roughness:0.3, emissive:0x5ec9ff, emissiveIntensity:0.4});
+  const bellLen = unit*1.3, bellExit = unit*0.55;
+  const plumeLen = (tier.habL + unit*3.5 + bellLen)*1.15;
+  for(let i=0;i<tier.engines;i++){
+    const a = (i/tier.engines)*Math.PI*2 + 0.3;
+    const bx = Math.cos(a)*tipR*0.8, by = Math.sin(a)*tipR*0.8;
+    const bell = makeEngineBell(unit*0.28, bellExit, bellLen, bellMat);
+    bell.position.set(bx, by, tipZ); g.add(bell);
+    addEpsteinDrive(g, bx, by, tipZ + bellLen, bellExit, plumeLen, i*1.7 + 0.3, 1/Math.sqrt(tier.engines));
+  }
+  addDriveLight(g, 0, 0, tipZ + bellLen + unit, plumeLen);
+  g.userData.driveCenter = new V3(0, 0, tipZ + bellLen);
+  g.userData.plumeLen = plumeLen;
+
+  const rcsMat = mixMaterial(0x666a70, {metalness:0.6});
+  [[-1,0],[1,0],[0,-1],[0,1]].forEach(function(s){
+    const rcs = new THREE.Mesh(new THREE.ConeGeometry(unit*0.16, unit*0.36, 6), rcsMat);
+    rcs.position.set(s[0]*tier.habW*0.55, s[1]*tier.habH*0.5, habZ - tier.habL*0.35);
+    rcs.rotation.z = s[0]!==0?Math.PI/2:0; rcs.rotation.x = s[1]!==0?Math.PI/2:0; g.add(rcs);
+  });
+  const retroMat = mixMaterial(0x50565e, {metalness:0.7});
+  [-1,1].forEach(function(s){
+    const retro = makeEngineBell(unit*0.16, unit*0.24, unit*0.35, retroMat);
+    retro.rotation.x = Math.PI; retro.position.set(s*tier.habW*0.5, 0, habZ - tier.habL/2); g.add(retro);
+  });
+  addNavLight(g, 0x2ee66b, tier.habW/2+1.3, 0, habZ);
+  addNavLight(g, 0xe0402e, -(tier.habW/2+1.3), 0, habZ);
+  return g;
+}
+const TUG_TIERS = {
+  small:  {cabins:[{type:'standard'},{type:'panoramique'}], nacRadius:6*1.1, habW:6*1.6, habH:6*1.5, habL:6*2.6, decks:1, engines:2},
+  medium: {cabins:[{type:'standard'},{type:'confort'},{type:'panoramique'},{type:'confort'},{type:'standard'},{type:'suite'}], nacRadius:6*1.5, habW:6*2.1, habH:6*1.9, habL:6*5.5, decks:1, engines:3},
+  large:  {cabins:(function(){ const a=[]; for(let i=0;i<9;i++)a.push({type:['standard','confort','suite','panoramique'][i%4]}); return a; })(), nacRadius:6*2.1, habW:6*2.8, habH:6*3.4, habL:6*7.5, decks:2, engines:4}
+};
+function buildLiner(nCabins, unit){
+  unit = unit || 6;
+  const cabins = [];
+  for(let i=0;i<nCabins;i++) cabins.push({type:['standard','confort','suite','panoramique'][i%4]});
+  const decks = nCabins > 14 ? 3 : (nCabins > 6 ? 2 : 1);
+  const habL = Math.max(unit*4, Math.ceil(nCabins/decks)*unit*1.3);
+  const tier = { cabins: cabins, nacRadius: unit*(1.3+Math.min(1.2,nCabins*0.03)), habW: unit*(2.0+Math.min(1.6,nCabins*0.04)),
+    habH: unit*(1.8*decks*0.75), habL: habL, decks: decks, engines: nCabins>14?5:(nCabins>6?4:2) };
+  const g = buildTug(tier, unit);
+  const capLen = tier.habW*1.1, habFrontZ = -tier.habL/2;
+  const cap = makeTaperedHull([[tier.habW*0.42,0],[tier.habW*0.3,tier.habW*0.5],[0.02,capLen]], 8, mixMaterial(0x4a5262, {roughness:0.4}));
+  cap.rotation.x = Math.PI; cap.position.z = habFrontZ; g.add(cap);
+  addNavLight(g, 0xf0f0f0, 0, 0, habFrontZ - capLen);
+  return g;
+}
+
+function buildByKind(kind){
+  DRIVE_LIGHTS.length = 0;
+  switch(kind){
+    case 'warehouse18': return buildWarehouseShip(18);
+    case 'warehouse40': return buildWarehouseShip(40);
+    case 'warehouse140': return buildWarehouseShip(140);
+    case 'beam10': return buildBeamShip(10);
+    case 'beam20': return buildBeamShip(20);
+    case 'beam44': return buildBeamShip(44);
+    case 'tugS': return buildTug(TUG_TIERS.small);
+    case 'tugM': return buildTug(TUG_TIERS.medium);
+    case 'tugL': return buildTug(TUG_TIERS.large);
+    case 'liner20': return buildLiner(20);
+  }
+}
+
+/* ============ scène ============ */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05070c);
+const camera = new THREE.PerspectiveCamera(42, window.innerWidth/window.innerHeight, 0.1, 8000);
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1) || 1);
+if(!DEMO) renderer.setPixelRatio(2);
+document.body.appendChild(renderer.domElement);
+scene.add(new THREE.AmbientLight(0xffffff, 0.45));
+const sun = new THREE.DirectionalLight(0xfff4e0, 1.1); sun.position.set(80,120,60); scene.add(sun);
+const rim = new THREE.DirectionalLight(0x6fa8ff, 0.4); rim.position.set(-100,-40,-80); scene.add(rim);
+
+/* cadrage sur la coque seule (le jet, très long, ne doit pas écraser le vaisseau à l'image) */
+function frameBox(obj){
+  const box = new THREE.Box3(); obj.updateMatrixWorld(true);
+  obj.traverse(function(o){
+    if(o.isMesh && !o.userData.noFrame){
+      if(!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+      box.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld));
+    }
+  });
+  return box;
+}
+let current = null;
+function setCurrent(obj){ if(current) scene.remove(current); current = obj; scene.add(obj); }
+function show(obj, camSide){
+  setCurrent(obj);
+  const box = frameBox(obj), c = box.getCenter(new V3()), s = box.getSize(new V3());
+  const dist = Math.max(s.x, s.y, s.z)*(camSide||1.05);
+  camera.position.set(c.x+dist*0.85, c.y+dist*0.35, c.z-dist*0.65);
+  camera.lookAt(c); renderer.render(scene, camera);
+}
+window.renderConfig = function(kind, n){ show(kind==='warehouse'?buildWarehouseShip(n):buildBeamShip(n), kind==='beam'?1.35:1.1); };
+window.renderTug = function(t){ show(buildTug(TUG_TIERS[t]), 1.15); };
+window.renderLiner = function(n){ show(buildLiner(n), 1.15); };
+/* vues dédiées au moteur */
+window.renderShot = function(kind, view){
+  const obj = buildByKind(kind); setCurrent(obj);
+  const box = frameBox(obj), c = box.getCenter(new V3()), s = box.getSize(new V3());
+  const L = Math.max(s.x, s.y, s.z), dc = obj.userData.driveCenter, pl = obj.userData.plumeLen;
+  let target, pos;
+  if(view === 'rear34'){ target = new V3().lerpVectors(c, dc, 0.6).add(new V3(0,0,pl*0.15)); pos = dc.clone().add(new V3(L*1.05, L*0.42, L*0.12)); }
+  else if(view === 'side'){ const z0 = box.min.z, z1 = dc.z + pl*0.55; target = new V3(0, c.y, (z0+z1)/2); pos = target.clone().add(new V3((z1-z0)*0.92, (z1-z0)*0.1, 0)); }
+  else { target = c.clone(); pos = dc.clone().add(new V3(L*0.07, L*0.09, L*1.5)); }
+  camera.position.copy(pos); camera.lookAt(target); renderer.render(scene, camera);
+};
+
+/* ============ mode démo (animé) ============ */
+if(DEMO){
+  const ui = document.getElementById('ui'); ui.style.display = 'flex';
+  const sel = document.getElementById('ship'), thr = document.getElementById('thr'), dia = document.getElementById('dia');
+  let target = new V3(), radius = 100, az = 0.95, el = 0.22, dragging = false, lastX = 0, lastY = 0, idle = 0;
+  function load(kind){
+    const obj = buildByKind(kind); setCurrent(obj);
+    const box = frameBox(obj), c = box.getCenter(new V3()), s = box.getSize(new V3());
+    const L = Math.max(s.x, s.y, s.z);
+    target = new V3().lerpVectors(c, obj.userData.driveCenter.clone().add(new V3(0,0,obj.userData.plumeLen*0.25)), 0.5);
+    radius = L*1.55;
+    setDrive({ throttle: parseFloat(thr.value) });
+  }
+  sel.addEventListener('change', () => load(sel.value));
+  thr.addEventListener('input', () => setDrive({ throttle: parseFloat(thr.value) }));
+  dia.addEventListener('change', () => setDrive({ diamonds: dia.checked ? 7.0 : 0.0 }));
+  const cv = renderer.domElement;
+  cv.addEventListener('pointerdown', e => { dragging = true; lastX = e.clientX; lastY = e.clientY; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointermove', e => {
+    if(!dragging) return;
+    az -= (e.clientX - lastX)*0.006; el = Math.max(-0.9, Math.min(0.9, el + (e.clientY - lastY)*0.004));
+    lastX = e.clientX; lastY = e.clientY; idle = 0;
+  });
+  cv.addEventListener('pointerup', () => { dragging = false; });
+  cv.addEventListener('wheel', e => { radius *= e.deltaY > 0 ? 1.08 : 0.93; e.preventDefault(); }, {passive:false});
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+  let prev = performance.now();
+  function loop(now){
+    const dt = Math.min(0.05, (now - prev)/1000); prev = now; idle += dt;
+    DRIVE_U.uTime.value = now*0.001;
+    if(!dragging && idle > 2.5) az += dt*0.12;
+    camera.position.set(target.x + radius*Math.sin(az)*Math.cos(el), target.y + radius*Math.sin(el), target.z + radius*Math.cos(az)*Math.cos(el));
+    camera.lookAt(target); renderer.render(scene, camera);
+    requestAnimationFrame(loop);
+  }
+  load(sel.value); requestAnimationFrame(loop);
+}
+window.__ready = true;
+</script>
+</body>
+</html>
