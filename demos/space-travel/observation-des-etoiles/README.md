@@ -27,8 +27,9 @@ Aucune interface, aucun HUD : l'univers est généré en continu, des vaisseaux 
 
 | Fichier | Contenu |
 |---|---|
-| `observation-des-etoiles-v6.5.html` | Version courante (**échelle réelle**, **RCS**, **vaisseaux vieillis**, **moteurs réalistes**, **gros plans**, **géode pulsante**, **hublots et hangars réalistes**), code de la démo lisible et commenté |
-| `observation-des-etoiles-v6.5.min.html` | Même version, scripts de la démo minifiés (terser) et CSS compacté |
+| `observation-des-etoiles-v6.6.html` | Version courante (**échelle réelle**, **RCS**, **vaisseaux vieillis**, **moteurs réalistes**, **gros plans**, **géode pulsante**, **hublots et hangars réalistes**, **baies à champ de force**, **petits engins**), code de la démo lisible et commenté |
+| `observation-des-etoiles-v6.6.min.html` | Même version, scripts de la démo minifiés (terser) et CSS compacté |
+| `observation-des-etoiles-v6.5.html` / `.min.html` | Hublots et hangars simulés, navettes d'origine du jeu |
 | `observation-des-etoiles-v6.4.html` / `.min.html` | Gros plans et géode, vitrages plats d'origine |
 | `observation-des-etoiles-v6.3.html` / `.min.html` | Moteurs réalistes, sans gros plans |
 | `observation-des-etoiles-v6.2.html` / `.min.html` | Vaisseaux vieillis, tuyères d'origine du jeu |
@@ -39,31 +40,32 @@ Aucune interface, aucun HUD : l'univers est généré en continu, des vaisseaux 
 | `observation-des-etoiles-v3.html` / `.min.html` | Version stabilisée (sans aurores) |
 | `space-travel-universe-tour.html` | Première démo : visite scénarisée de 60 s en boucle (plans fixes) |
 
-Chaque fichier est **autonome** (≈ 7 Mo) : moteur du jeu, three.js r128, musique et code de la démo sont embarqués. L'essentiel du poids vient de la piste musicale encodée en base64 ; la minification ne fait gagner qu'environ 65 Ko (code de la démo : 241 Ko → 169 Ko).
+Chaque fichier est **autonome** (≈ 7 Mo) : moteur du jeu, three.js r128, musique et code de la démo sont embarqués. L'essentiel du poids vient de la piste musicale encodée en base64 ; la minification ne fait gagner qu'environ 65 Ko (code de la démo : 290 Ko → 200 Ko).
 
 Seules les polices *JetBrains Mono* / *Inter* sont chargées depuis Google Fonts (police système en repli si hors ligne).
 
-### Package source (`observation-des-etoiles-v6.5-projet.zip`)
+### Package source (`observation-des-etoiles-v6.6-projet.zip`)
 
 ```
 observation-des-etoiles/
 ├── README.md                              ce document
-├── observation-des-etoiles-v6.5.html      version lisible (prête à ouvrir)
-├── observation-des-etoiles-v6.5.min.html  version minifiée
+├── observation-des-etoiles-v6.6.html      version lisible (prête à ouvrir)
+├── observation-des-etoiles-v6.6.min.html  version minifiée
 ├── package.json                           outils : terser, clean-css, playwright (tests)
 ├── engine/game.html                       build v2.15 du jeu (moteur, three.js r128, musique) — entrée du build, jamais modifiée
 ├── src/                                   code de la démo, dans l'ordre d'assemblage
 │   ├── head_guard2.js                     ① garde (boucle, clavier, souris du jeu)
 │   ├── planets.js · asteroids.js · stars.js
 │   ├── shipdrive.js · shipglass.js · shipwear.js   options du générateur de vaisseaux
+│   ├── smallcraft.js                      générateur de petits engins (maintenance, transport, drones, gabares)
 │   ├── cine.js                            simulation, réalisateur, rendu en couches
 │   └── live2.js                           ④ écran d'accueil, boucle temps réel, légende
-├── build/build.py · build/build_min.js    assemblage → dist/
+├── build/build.py · build_min.js · package.py   assemblage → dist/, zip du projet
 ├── tests/                                 harnais Playwright + SwiftShader (rendu logiciel)
-└── docs/                                  planches d'images des versions 6.1 à 6.5
+└── docs/                                  planches d'images des versions 6.1 à 6.6
 ```
 
-Reconstruire : `python3 build/build.py` (aucune dépendance) puis `npm install` et `node build/build_min.js` ; les fichiers sortent dans `dist/`. Tests : `node tests/smoke.js` (démarrage et 200 s de simulation sur la version minifiée), `node tests/longrun.js LONG-10` (20 min simulées : erreurs, mémoire, types de plans), `node tests/shots.js OBS-9 30:dockClose@x1:2` (plans forcés, captures), `node tests/hangar.js l20 0.5 "…"` (vaisseau isolé sous plusieurs angles), `node tests/geode.js`, `node tests/fleet.js` et `node tests/drawcalls.js`.
+Reconstruire : `python3 build/build.py` (aucune dépendance) puis `npm install` et `node build/build_min.js` ; les fichiers sortent dans `dist/`. Tests : `node tests/smoke.js` (démarrage et 200 s de simulation sur la version minifiée), `node tests/longrun.js LONG-10` (20 min simulées : erreurs, mémoire, types de plans), `node tests/shots.js OBS-8 30:bay@1:1 34:keep` (plans forcés — ici une sortie de baie —, captures), `node tests/hangar.js l20 0.5 "…"` (vaisseau isolé sous plusieurs angles), `node tests/geode.js`, `node tests/fleet.js`, `node tests/drawcalls.js` (objets par modèle) et `node tests/framecalls.js` (appels de dessin par image).
 
 ---
 
@@ -85,7 +87,7 @@ Toutes les autres entrées clavier / souris sont neutralisées : le jeu tourne �
 
 ## Paramètres d'URL
 
-À ajouter à la fin de l'adresse, par exemple `observation-des-etoiles-v6.5.html?seed=OBS-1&quality=low`.
+À ajouter à la fin de l'adresse, par exemple `observation-des-etoiles-v6.6.html?seed=OBS-1&quality=low`.
 
 | Paramètre | Valeurs | Effet |
 |---|---|---|
@@ -149,7 +151,7 @@ Chaque étape (≈ 70 à 90 s) suit le même schéma, avec des paramètres tiré
 
 **Relais** : 3 fois sur 10, un autre vaisseau en orbite prend le départ ; la caméra le suit dans le système suivant, l'ancien héros reste sur place.
 
-**Trafic ambiant** par système, sur des orbites képlériennes réelles : 3 navettes en orbite basse autour de la planète habitée, 1 à 2 remorqueurs, 1 à 2 cargos en navette perpétuelle *flip-and-burn* entre l'orbite basse et une station haute (3,5–7 rayons).
+**Trafic ambiant** par système, sur des orbites képlériennes réelles : 3 petits engins (navettes de transport, gabares à conteneurs, navettes de maintenance) en orbite basse autour de la planète habitée, 1 à 2 remorqueurs, 1 à 2 cargos en navette perpétuelle *flip-and-burn* entre l'orbite basse et une station haute (3,5–7 rayons).
 
 **Noms** : types issus du catalogue du jeu (*Warehouse freighter*, *Long spine freighter*, *Ice tanker*, *Liner*…), noms générés à partir des banques de noms du jeu (*R.S.C. Ventaris*, *C.S.V. Etoilea*…).
 
@@ -163,7 +165,8 @@ Les plans durent de 5 à 8 s et sont choisis selon la phase du vol :
 | Proches d'une planète | plongée par-dessus l'épaule (horizon en travers du cadre) ; en orbite, les plans latéraux et orbitaux se placent de préférence du côté extérieur pour garder la planète en fond |
 | Événements | arrivée par saut, saut quantique (plan en surplomb pour voir le quadrillage), départ en distorsion, poursuite / côté / face en distorsion, sortie de distorsion, **transit du vaisseau devant son étoile** (longue focale) |
 | **Gros plans** (v6.4–v6.5) | travelling au ras de la coque, tour des tuyères, proue en légère contre-plongée, bloc RCS pendant un retournement, géode du cœur de saut, **plongée dans une baie de hangar** (voir ci-dessous) |
-| Plans de coupe | trafic ambiant (≈ 1 plan sur 4, en temps réel uniquement) |
+| **Manœuvres de baie** (v6.6) | un engin sort ou rentre par le champ de force d'une baie (`bayOps`, caméra dans le repère du porteur) : prioritaire quand une manœuvre a lieu pendant le plan ; la légende présente alors l'engin |
+| Plans de coupe | trafic ambiant (≈ 1 plan sur 4, en temps réel uniquement), dont les manœuvres de baie des autres vaisseaux |
 | Découverte sans vaisseau | orbite lente autour d'une planète, rase-nuages à 60–95 km au lever d'étoile, **aurores vues de nuit à ~50 km d'altitude**, survol d'un astéroïde et de ses fragments, lune devant sa planète, dérive au bord d'une nébuleuse (plan purement galactique) |
 | Étoiles et éclipses (sans vaisseau) | approche de la photosphère, **éruption vue de profil au limbe**, **éclipse totale par une lune**, **lever d'étoile derrière une planète**, transit d'une petite lune devant le disque |
 
@@ -265,6 +268,26 @@ Les vitrages du générateur étaient des rectangles et des disques lumineux pla
 - **Coût** : toutes les ouvertures d'un vaisseau sont fusionnées en **un seul maillage** (un quad par ouverture, un seul programme GPU pour la flotte). Moins d'appels de dessin qu'avant : paquebot 215 → 140 objets (−35 %), pousseurs −20 à −25 %. Le calcul par pixel (4 à 9 intersections rayon-boîte) ne porte que sur les pixels des ouvertures.
 - Désactivable : `SHIPGEN.build(modèle, { realGlass: false })` rend les vitrages d'origine.
 
+### Baies à champ de force et petits engins — v6.6
+
+Inspirées d'une image de référence (grande baie latérale bleue d'où sortent des navettes) : les hangars ne sont plus fermés par une porte mais par un **champ de force**, et de vrais engins y entrent et en sortent.
+
+- **Champ de force** : voile bleu translucide dans l'ouverture (plus vif sur les bords et en incidence rasante, ondulations lentes), émetteurs bleus le long du seuil, feux de position ambre aux angles, **onde circulaire** chaque fois qu'un engin le traverse, halo additif sur la coque autour de l'ouverture ; le hangar est baigné de lumière bleue.
+- **Grandes baies latérales** ajoutées (côté tribord) au paquebot (12,4 × 7 m, 17 m de profondeur) et au pousseur lourd (13 × 6,4 m) ; les hublots qui s'y trouvaient disparaissent. Baies ventrales (v6.5) et baies du *Vagabonde* conservées.
+- **Baie-portail** (la technique qui permet d'y faire entrer de vrais engins) : l'intérieur reste simulé par le shader, mais il est dessiné en deux passes. Passe A : un quad invisible, testé contre la coque déjà dessinée, marque le stencil là où la baie est vue (un vaisseau qui passe devant la masque). Passe B : là où le stencil est marqué, l'intérieur remplace la coque et **écrit la profondeur réelle** du point vu (`gl_FragDepth`), puis remet le stencil à zéro. Les engins, dessinés ensuite, sont donc cachés ou visibles exactement comme dans un vrai hangar (derrière le portique, devant le mur du fond…). Coût : 2 appels de dessin par vaisseau à baies, calcul limité aux pixels de l'ouverture.
+- **Éclairage des engins dans le hangar** : chaque engin connaît le plan de la baie dans son propre repère ; la partie à l'intérieur perd le soleil et prend la lumière bleue du hangar, pixel par pixel pendant la traversée.
+
+| Engin (`smallcraft.js`) | Taille | Description | Où |
+|---|---|---|---|
+| **Crew shuttle** (transport court) | 16 m | nez effilé à pare-brise, cabine à 12 hublots (intérieurs simulés), ailerons radiateurs en flèche, collier d'amarrage, 2 tuyères à torche, liseré bleu | grandes baies latérales ; orbite basse |
+| **Maintenance tender** | 8,8 m (version étroite 2,5 m) | cabine vitrée, soute d'équipement, **bras manipulateurs**, **projecteurs à faisceau visible**, réservoirs, radiateurs, 4 petites tuyères, peinture de chantier | baies ventrales ; orbite basse |
+| **Drones** : inspection, relais, cargo | 2,4–3,4 m | quadri-propulseur à tourelle caméra et anneau bleu ; antenne et panneaux solaires ; caisse à 4 propulseurs | baies du *Vagabonde* |
+| **Container lighter** (gabare) | 22–34 m | cabine, poutre en treillis, 1 ou 2 conteneurs de 12 m verrouillés, moteur | orbite basse |
+
+Tous ont blocs RCS animés, feux de navigation clignotants, usure (v6.2), détails en relief ; pièces fusionnées par matériau (4 à 8 appels de dessin par engin).
+
+**Cycle d'une baie** (dans le repère du porteur, qui file à 7 km/s en orbite) : garé (18–40 s) → **sortie** (marche arrière lente à travers le champ ; la navette de transport pivote puis allume ses tuyères vers la planète) → **mission** (transport : hors champ ; maintenance : travail au ras de la coque, projecteurs allumés ; drone : tour d'inspection autour du porteur) → **retour** (approche, alignement, entrée lente) → garé. Les manœuvres n'ont lieu qu'en temps réel et sans poussée du porteur ; quand le héros a une baie, une manœuvre est programmée pendant son orbite. Les RCS réagissent aux rotations et aux translations.
+
 ### Vieillissement des vaisseaux — v6.2
 
 Le générateur de vaisseaux accepte un **facteur de vieillissement** : `SHIPGEN.build(modèle, { age, ageSeed })`, avec `age` de 0 (sortie de chantier) à 1 (épave en fin de vie). La démo enveloppe l'appel du moteur sans modifier son code (`shipwear.js`) ; le même appel pourra être repris tel quel dans le jeu.
@@ -342,6 +365,7 @@ flowchart TB
       SD["shipdrive.js<br/>window.__SHIPDRIVE<br/>tuyères réalistes<br/>jet de torche"]
       SG["shipglass.js<br/>window.__SHIPGLASS<br/>hublots · baies · hangars<br/>interior mapping"]
       SW["shipwear.js<br/>window.__SHIPWEAR<br/>SHIPGEN.build(…, { age })<br/>usure des coques"]
+      SC["smallcraft.js<br/>window.__CRAFT<br/>petits engins : maintenance,<br/>transport, drones, gabares"]
       CI["cine.js<br/>window.__CINE<br/>échelle réelle · temps τ<br/>itinéraires · réalisateur · effets"]
       RL["Rendu en couches (cine.js)<br/>champ galactique + système en mètres<br/>origine flottante · tranches de profondeur"]
     end
@@ -368,12 +392,14 @@ flowchart TB
   CI -- "chaleur des tuyères" --> SD
   CI -- "âge de chaque vaisseau" --> SW
   CI -- "direction et couleur de l'étoile, temps" --> SG
+  CI -- "engins de baie et trafic, ondes du champ" --> SC
+  SC -. "hublots simulés" .-> SG
 
   classDef engine fill:#0f1a30,stroke:#25375c,color:#e8edf5
   classDef demo fill:#1a2a1f,stroke:#5eead4,color:#e8edf5
   classDef boot fill:#2a2113,stroke:#ffb454,color:#e8edf5
   class T3,GEN,BLD,SHP,WRP engine
-  class PL,AS,SU,SD,SG,SW,CI,RL demo
+  class PL,AS,SU,SD,SG,SW,SC,CI,RL demo
   class G,L boot
 ```
 
@@ -499,6 +525,7 @@ Alternative écartée : le *logarithmic depth buffer* de three.js aurait imposé
 - **Résolution dynamique** : la page mesure le temps d'image et ajuste la densité de pixels entre 0,45 et le plafond (1,5 par défaut, 2 avec `quality=high`, 60 % avec `quality=low`). Au-dessus de ~23 ms par image elle baisse, en dessous de ~18,5 ms elle remonte.
 - Le nombre d'octaves de bruit dépend de la taille d'un pixel sur la planète : une planète lointaine coûte peu.
 - Rendu en tranches : 2 à 5 passes système par image, mais chaque fragment n'est calculé qu'une fois (les tranches découpent la géométrie) ; seul le traitement des sommets est répété. Mesuré sur 24 plans : ≈ 780 appels de dessin et 1,1 M triangles par image (médiane), contre ≈ 820 et 1,5 M en v5.
+- v6.6, mesuré sur 40 images d'un système riche en baies (toutes passes confondues, compteur remis à zéro à chaque image) : médiane **≈ 280 appels de dessin**, 90ᵉ centile 375, maximum 465 ; baies-portails : +2 appels par vaisseau à baies, halo +1 ; petits engins : 4 à 8 appels chacun.
 - Sphères planétaires plus fines (256 × 192 pour la surface, 224 × 168 pour les nuages) pour des horizons lisses à basse altitude.
 - Mémoire stable sur de longues sessions (vérifié sur 20 min simulées : 11 à 15 vaisseaux, tas JavaScript constant, nœuds de temps élagués).
 
@@ -516,6 +543,7 @@ Alternative écartée : le *logarithmic depth buffer* de three.js aurait imposé
 - RCS : seules les buses radiales des blocs sont animées (pas de roulis pur) ; les navettes du jeu n'ont pas de blocs RCS.
 - Usure procédurale (bruits 3D) : pas de décalcomanies, d'immatriculations effacées ni de dégâts de forme (bosses géométriques, trous).
 - Moteurs : les cloches restent fixes (les vérins ne pivotent pas) ; le jet est un effet lumineux (pas d'éclairage de la coque par le jet au-delà de la lueur de tuyère).
+- Baies et petits engins : les engins ne croisent jamais d'autres engins (pas d'évitement) ; la navette de transport part « hors champ » (elle disparaît au-delà de quelques kilomètres) ; les gabares ne s'amarrent pas ; les engins garés dans un hangar ne projettent pas d'ombre sur son sol simulé.
 - Intérieurs simulés : les objets intérieurs ne projettent pas d'ombre et la tache de soleil les ignore ; chaque hublot a sa propre pièce (une suite à trois hublots montre trois « cabines ») ; l'intérieur est vu sans flou de profondeur.
 - Gros plans : caméras sans détection de collision avec les autres vaisseaux (un vaisseau du trafic peut traverser le cadre) ; les navettes du jeu n'ont que le travelling de coque.
 - L'éclipse totale n'est possible que si le système possède une lune ; sinon le réalisateur choisit un lever d'étoile, une éruption ou un transit du vaisseau.
@@ -532,6 +560,7 @@ Alternative écartée : le *logarithmic depth buffer* de three.js aurait imposé
 | v3 | Astéroïdes et lunes texturés, travellings de découverte sans vaisseau, vol supraluminique, version minifiée |
 | v4 | Aurores polaires et travellings en rase-mottes sous les aurores |
 | v5 | Soleils « cinéma » (granulation, taches, chromosphère, couronne, protubérances, éruptions), éclipses totales, levers d'étoile, transits |
+| v6.6 | **Baies à champ de force** (voile bleu, onde au passage, halo) et **baies-portails** (stencil + profondeur écrite : de vrais engins entrent dans les hangars simulés) ; grandes baies latérales sur le paquebot et le pousseur lourd ; **générateur de petits engins** (navette de transport, navette de maintenance, drones, gabare à conteneurs) qui remplace les navettes du jeu ; cycle de sortie / mission / retour, plan **bayOps** |
 | v6.5 | **Hublots, baies et hangars réalistes** (interior mapping : pièces, mobilier, occupants, éclairage variable, tache de soleil, cadre en relief, embrasure, vitrage qui s'encrasse) ; **baies ventrales** ajoutées aux pousseurs et au paquebot, baie latérale du *Vagabonde* agrandie ; plan **dockClose** ; −20 à −35 % d'appels de dessin sur les vaisseaux habités |
 | v6.4 | **Gros plans** dans le réalisateur (coque, tuyères, proue, RCS, géode), placés côté éclairé ; **géode du cœur de saut qui bat de plus en plus vite** avant le saut, avec séquence de saut en trois plans |
 | v6.3 | **Moteurs principaux réalistes** : cloches Rao à tubes de refroidissement, bobines magnétiques, vérins, incandescence avec inertie thermique ; jet de torche de fusion collimaté à cœur blanc |

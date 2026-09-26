@@ -10,10 +10,11 @@ const ROOT = 'file://' + require('path').resolve(__dirname, '..') + '/';   // ra
  await p.route(/fonts\.g/, r=>r.abort());
  await p.goto(ROOT + 'dist/observation-des-etoiles.html?seed=OBS-1');
  await p.waitForFunction(()=>document.querySelector('#sttStart.ready'),{timeout:180000});
- if(process.argv[7] === 'abs') await p.evaluate(()=>{ window.__ABS = true; });
+ await p.evaluate((t)=>{ window.__THR = t; }, +(process.env.THR||0)); if(process.argv[7] === 'abs') await p.evaluate(()=>{ window.__ABS = true; });
  const info = await p.evaluate(([model, age, dark])=>{
    document.getElementById('sttStart').style.display='none'; document.querySelectorAll('#sttTitle,#sttCap,#sttCredit').forEach(e=>e.style.display='none');
-   const bb = SHIPGEN.build(model, { warp: true, jump: true, age, ageSeed: 77 }); bb.lights.forEach(l => l.parent && l.parent.remove(l));
+   const bb = model.startsWith('craft:') ? (() => { const [_, k, v] = model.split(':'); const c = __CRAFT.build(k, { variant: v, age, seed: 77 }); c.thr.value = window.__THR || 0; c.nav.forEach(n => n.mat.opacity = n.peak); c.lamps.forEach(l => l.value = 1); return { group: c.group, lights: [], glass: { count: 0 }, docks: [], craft: c }; })()
+     : SHIPGEN.build(model, { warp: true, jump: true, age, ageSeed: 77 }); bb.lights.forEach(l => l.parent && l.parent.remove(l));
    const sc = new THREE.Scene(); sc.background = new THREE.Color(0x03050a);
    sc.add(new THREE.AmbientLight(0x141c2e, .55)); const L = new THREE.DirectionalLight(0xfff2e0, dark ? .08 : 1.65); L.position.set(.7, .6, -.3); sc.add(L); sc.add(L.target);
    sc.add(bb.group);
@@ -28,7 +29,7 @@ const ROOT = 'file://' + require('path').resolve(__dirname, '..') + '/';   // ra
      if(window.__ABS){ renderer.autoClear = true; renderer.setRenderTarget(null); cam.fov = v[6] || 40; cam.aspect = sz.x/sz.y; cam.updateProjectionMatrix(); cam.position.set(v[0], v[1], v[2]); cam.lookAt(v[3], v[4], v[5]); renderer.render(sc, cam); return; }
      const Z = f => box.min.z + (box.max.z - box.min.z)*f;
      renderer.autoClear = true; renderer.setRenderTarget(null); cam.fov = fov || 40; cam.aspect = sz.x/sz.y; cam.updateProjectionMatrix(); cam.position.set(fx*R, fy*R, Z(fz)); cam.lookAt((lx||0)*R, (ly||0)*R, Z(lz)); renderer.render(sc, cam); }, views[i]);
-   await p.screenshot({path:`${out}_${model}_${i}.jpg`,type:'jpeg',quality:88});
+   await p.screenshot({path:`${out}_${model.replace(/:/g,'-')}_${i}.jpg`,type:'jpeg',quality:88});
  }
  console.log(JSON.stringify(info));
  await b.close();

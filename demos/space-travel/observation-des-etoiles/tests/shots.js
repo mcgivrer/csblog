@@ -13,7 +13,7 @@ const ROOT = 'file://' + require('path').resolve(__dirname, '..') + '/';   // ra
  if(process.env.INFO) console.log(JSON.stringify(await p.evaluate(()=>({scale:__CINE.scale(), tim:__CINE.timings()})),null,0));
  for(const pr of pairs){ const [tt, kind, adv] = pr.split(':');
    const r = await p.evaluate(([tt,kind,adv])=>{ let x=__CINE.time(); while(x < tt){ __CINE.step(0.1,true); x+=0.1; }
-     let ty = kind === 'keep' ? 'keep' : (kind.startsWith('v_') ? __CINE.forceVista(kind.slice(2), 9) : (__CINE.forceShot(kind.split('@')[0], kind.split('@')[1]), kind));
+     let ty = kind === 'keep' ? 'keep' : (kind.startsWith('v_') ? __CINE.forceVista(kind.slice(2), 9) : (kind.startsWith('bay') ? __CINE.forceBay(+kind.split('@')[1], kind.split('@')[2]) : (__CINE.forceShot(kind.split('@')[0], kind.split('@')[1]), kind)));
      for(let i=0;i<(+adv||0)*10;i++) __CINE.step(0.1,true); const o = __CINE.step(0.01,false);
      const c=__CINE.caption(); const e=document.getElementById('sttCap'); e.querySelector('.ship').style.display = c.vista?'none':'';
      if(!c.vista){ e.querySelector('.ty').textContent=c.type; e.querySelector('.nm').textContent=c.name; }

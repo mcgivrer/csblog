@@ -6,7 +6,7 @@ rd = lambda *a: open(P(*a), encoding='utf8').read()
 s = rd('engine', 'game.html')
 s = s.replace('<title>Voyage spatial — Navigation quantique</title>', '<title>Space Travel & Transport — Observation des étoiles</title>')
 guard = rd('src', 'head_guard2.js')
-demo = '\n'.join(rd('src', f) for f in ['planets.js', 'asteroids.js', 'stars.js', 'shipdrive.js', 'shipglass.js', 'shipwear.js', 'cine.js'])
+demo = '\n'.join(rd('src', f) for f in ['planets.js', 'asteroids.js', 'stars.js', 'shipdrive.js', 'shipglass.js', 'shipwear.js', 'smallcraft.js', 'cine.js'])
 live = rd('src', 'live2.js')
 i = s.index('<script>'); s = s[:i] + '<script>\n' + guard + '\n</script>\n' + s[i:]
 j = s.rindex('</body>'); s = s[:j] + '<script>\n' + demo + '\n</script>\n<script>\n' + live + '\n</script>\n' + s[j:]
