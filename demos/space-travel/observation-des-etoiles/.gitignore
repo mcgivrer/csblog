@@ -1,0 +1,4 @@
+node_modules/
+dist/*.html
+*.jpg
+!docs/*.jpg

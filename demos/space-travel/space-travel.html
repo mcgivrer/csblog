@@ -3,8 +3,8 @@
 <head>
 <!--
   Voyage Spatial / Space Travel & Transport
-  Version 2.15 — 25 septembre 2026
-  Spec de référence : spec-space_travel_and_transport-2.15.md
+  Version 2.16 — 26 septembre 2026
+  Spec de référence : spec-space_travel_and_transport-2.16.md
 
   MIT License
   Copyright (c) 2026 Frédéric Delorme <frederic.delorme@gmail.com>
@@ -4524,6 +4524,8 @@ function buildPlanetSystemMeshes(leg){
 }
 
 function disposePlanetGroup(grp){
+  /* v2.16 : ressources partagées (roches, aurores) détachées, définitions des planètes libérées */
+  window.__AST.detachShared(grp); window.__PLANETS.release(grp);
   grp.traverse(function(obj){
     if(obj.geometry) obj.geometry.dispose();
     if(obj.material){
@@ -4550,6 +4552,7 @@ function ensureSystemsBuilt(){
     if(!ROUTE.builtSystems.has(i) && ROUTE.legs[i] && ROUTE.legs[i].system){
       const grp = buildPlanetSystemMeshes(ROUTE.legs[i]);
       scene.add(grp);
+      enhanceSystem(ROUTE.legs[i], grp);   /* v2.16 : surfaces, nuages, atmosphère, aurores, roches (§31) */
       ROUTE.builtSystems.set(i, grp);
     }
   });
@@ -4938,6 +4941,935 @@ function updateLagrangePanel(){
   nameEl.textContent = 'L1 · '+leg.name;
 }
 
+/* =========================================================================
+   7quater. PLANÈTES ET ASTÉROÏDES DÉTAILLÉS (v2.16)
+   Repris de la démo « Observation des étoiles » (v4), qui pilotait le moteur
+   v2.15 sans le modifier. Deux modules autonomes, raccordés au jeu par :
+     ensureSystemsBuilt()  → enhanceSystem()        (construction d'un système)
+     disposePlanetGroup()  → detachShared / release  (avant sa destruction)
+     updatePlanetSystems() → setPixelAngle, update, lod (à chaque image)
+   Ajout propre au jeu : détail géométrique selon la taille à l'écran (PL.lod).
+   ========================================================================= */
+/* =====================================================================
+   PLANÈTES DÉTAILLÉES — surface procédurale à détail adaptatif,
+   3 couches de nuages, atmosphère diffusante.
+   Remplace à chaud les matériaux créés par buildPlanetSystemMeshes().
+   ===================================================================== */
+(function(){
+'use strict';
+const PL = window.__PLANETS = {};
+const PIX = { value: .001 };                       // taille angulaire d'un pixel (partagée par tous les matériaux)
+PL.PIX = PIX;
+
+/* ---------- GLSL commun ---------- */
+const NOISE = `
+vec3 mod289(vec3 x){ return x - floor(x*(1.0/289.0))*289.0; }
+vec4 mod289(vec4 x){ return x - floor(x*(1.0/289.0))*289.0; }
+vec4 permute(vec4 x){ return mod289(((x*34.0)+1.0)*x); }
+vec4 taylorInvSqrt(vec4 r){ return 1.79284291400159 - 0.85373472095314*r; }
+/* bruit simplex 3D (Ashima Arts / S. Gustavson, licence MIT) */
+float snoise(vec3 v){
+  const vec2 C = vec2(1.0/6.0, 1.0/3.0);
+  const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+  vec3 i = floor(v + dot(v, C.yyy));
+  vec3 x0 = v - i + dot(i, C.xxx);
+  vec3 g = step(x0.yzx, x0.xyz);
+  vec3 l = 1.0 - g;
+  vec3 i1 = min(g.xyz, l.zxy);
+  vec3 i2 = max(g.xyz, l.zxy);
+  vec3 x1 = x0 - i1 + C.xxx;
+  vec3 x2 = x0 - i2 + C.yyy;
+  vec3 x3 = x0 - D.yyy;
+  i = mod289(i);
+  vec4 p = permute(permute(permute(i.z + vec4(0.0, i1.z, i2.z, 1.0)) + i.y + vec4(0.0, i1.y, i2.y, 1.0)) + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+  float n_ = 0.142857142857;
+  vec3 ns = n_ * D.wyz - D.xzx;
+  vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+  vec4 x_ = floor(j * ns.z);
+  vec4 y_ = floor(j - 7.0 * x_);
+  vec4 x = x_ * ns.x + ns.yyyy;
+  vec4 y = y_ * ns.x + ns.yyyy;
+  vec4 h = 1.0 - abs(x) - abs(y);
+  vec4 b0 = vec4(x.xy, y.xy);
+  vec4 b1 = vec4(x.zw, y.zw);
+  vec4 s0 = floor(b0)*2.0 + 1.0;
+  vec4 s1 = floor(b1)*2.0 + 1.0;
+  vec4 sh = -step(h, vec4(0.0));
+  vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy;
+  vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
+  vec3 p0 = vec3(a0.xy, h.x);
+  vec3 p1 = vec3(a0.zw, h.y);
+  vec3 p2 = vec3(a1.xy, h.z);
+  vec3 p3 = vec3(a1.zw, h.w);
+  vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
+  p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
+  vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+  m = m * m;
+  return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
+}
+/* fBm à nombre d'octaves fractionnaire : les octaves fines n'apparaissent que lorsqu'elles sont résolues à l'écran */
+float fbmA(vec3 p, float oct){
+  float v = 0.0, a = 0.5;
+  for(int i = 0; i < 12; i++){
+    float w = clamp(oct - float(i), 0.0, 1.0);
+    if(w <= 0.0) break;
+    v += a*w*snoise(p);
+    p = p*2.03 + vec3(1.7, 9.2, 3.1);
+    a *= 0.5;
+  }
+  return v;
+}
+float ridgedA(vec3 p, float oct){
+  float v = 0.0, a = 0.5, prev = 1.0;
+  for(int i = 0; i < 10; i++){
+    float w = clamp(oct - float(i), 0.0, 1.0);
+    if(w <= 0.0) break;
+    float r = 1.0 - abs(snoise(p));
+    r *= r;
+    v += a*w*r*prev;
+    prev = r;
+    p = p*2.07 + vec3(4.3, 1.1, 7.7);
+    a *= 0.5;
+  }
+  return v;
+}
+/* nombre d'octaves utiles pour une fréquence de base et une empreinte de pixel (en rayons planétaires) */
+float octFor(float freq, float fp){ return clamp(log2(0.4/(freq*fp)), 1.0, 11.0); }
+vec3 rotY(vec3 v, float a){ float c = cos(a), s = sin(a); return vec3(c*v.x + s*v.z, v.y, -s*v.x + c*v.z); }
+vec3 rotAxis(vec3 v, vec3 k, float a){ float c = cos(a), s = sin(a); return v*c + cross(k, v)*s + k*dot(k, v)*(1.0 - c); }
+`;
+
+/* nuages : fonction partagée par les couches et par l'ombre portée au sol */
+const CLOUDS = `
+uniform vec4 uCyc1; uniform vec4 uCyc2; uniform float uCover; uniform float uCSeed;
+vec3 cyclone(vec3 n, vec4 c, float strength){
+  float d = length(n - c.xyz);
+  float a = c.w * strength * exp(-d*d*28.0) / (d + 0.06);
+  return rotAxis(n, c.xyz, a);
+}
+float cloudDensity(vec3 n, float layer, float oct, float t){
+  vec3 so = vec3(uCSeed*0.173, uCSeed*0.091, uCSeed*0.137) + vec3(layer*17.3);
+  float lat = n.y;
+  if(layer < 0.5){
+    /* couche basse : cumulus et amas convectifs, cyclones marqués */
+    vec3 p = cyclone(cyclone(n, uCyc1, 0.09), uCyc2, 0.07);
+    p = rotY(p, t*0.0021);
+    vec3 w = vec3(snoise(p*2.1 + so), snoise(p*2.1 + so + 11.0), snoise(p*2.1 + so + 23.0));
+    float v = 0.5 + 0.55*fbmA(p*5.5 + w*0.5 + so, oct);
+    float belt = 0.72 + 0.42*(exp(-lat*lat*36.0) + exp(-(abs(lat) - 0.62)*(abs(lat) - 0.62)*22.0));
+    float th = 1.0 - uCover*belt;
+    return smoothstep(th, th + 0.14, v);
+  } else if(layer < 1.5){
+    /* couche moyenne : voiles et fronts étirés en longitude, enroulés par les cyclones */
+    vec3 p = cyclone(cyclone(n, uCyc1, 0.16), uCyc2, 0.12);
+    p = rotY(p, t*0.0012);
+    vec3 q = vec3(p.x*2.0, p.y*5.5, p.z*2.0);
+    vec3 w = vec3(snoise(q*0.8 + so), snoise(q*0.8 + so + 7.0), snoise(q*0.8 + so + 19.0));
+    float v = 0.5 + 0.6*fbmA(q + w*0.9 + so, oct);
+    float th = 1.18 - uCover*0.85;
+    return smoothstep(th, th + 0.16, v)*0.75;
+  }
+  /* couche haute : cirrus filamenteux */
+  vec3 p = rotY(cyclone(n, uCyc1, 0.1), t*0.0006);
+  vec3 q = vec3(p.x*1.4, p.y*16.0, p.z*1.4);
+  vec3 w = vec3(snoise(p*3.0 + so), snoise(p*3.0 + so + 5.0), snoise(p*3.0 + so + 9.0));
+  float r = ridgedA(q + w*1.6 + so, oct);
+  float mask = smoothstep(0.1, 0.5, 0.5 + 0.5*snoise(p*1.7 + so + 31.0));
+  return smoothstep(0.42, 0.78, r)*mask*0.55*min(uCover*2.2, 1.0);
+}
+`;
+
+/* ---------- surface ---------- */
+const SURF_VERT = `
+varying vec3 vObjNormal; varying vec3 vWorldNormal; varying vec3 vWorldPos;
+void main(){
+  vObjNormal = normal;
+  vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+  vec4 wp = modelMatrix * vec4(position, 1.0); vWorldPos = wp.xyz;
+  gl_Position = projectionMatrix * viewMatrix * wp;
+}`;
+const SURF_FRAG = `
+precision highp float;
+varying vec3 vObjNormal; varying vec3 vWorldNormal; varying vec3 vWorldPos;
+uniform vec3 uLightDir; uniform vec3 uLightColor; uniform vec3 uLightObj; uniform vec3 uAtmoCol;
+uniform float uOceanFrac; uniform float uSeed; uniform float uHue; uniform float uTime; uniform float uKind;
+uniform float uRadius; uniform float uPixAng; uniform float uCities; uniform float uShadowRot; uniform float uHasAtmo;
+uniform float uGas; uniform float uIcy; uniform float uVolcanic;
+${NOISE}
+${CLOUDS}
+vec3 SO;
+float terrain(vec3 n, float oct, out float mtn){
+  vec3 p = n*1.7 + SO;
+  vec3 w = vec3(snoise(p*0.9), snoise(p*0.9 + 31.7), snoise(p*0.9 + 57.1));
+  float c = fbmA(n*2.1 + w*0.5 + SO, min(oct, 6.0));
+  mtn = 0.0;
+  if(oct > 2.2) mtn = ridgedA(n*7.5 + w*0.35 + SO*1.31, oct - 2.2);
+  float inland = smoothstep(-0.02, 0.3, c);
+  return c + 0.3*mtn*inland + (oct > 6.0 ? 0.06*fbmA(n*140.0 + SO, oct - 6.0) : 0.0);
+}
+vec3 gasGiant(vec3 n, float oct){
+  float lat = n.y;
+  float jet = sin(lat*23.0 + uSeed)*0.6 + sin(lat*9.0)*0.4;
+  vec3 q = rotY(n, jet*uTime*0.003);
+  float turb = fbmA(vec3(q.x*2.2, q.y*14.0, q.z*2.2) + SO, oct);
+  float edd = oct > 3.0 ? fbmA(q*24.0 + SO + turb, oct - 3.0) : 0.0;
+  /* grande tempête ovale */
+  vec3 sc = normalize(vec3(sin(uSeed), 0.35*sin(uSeed*1.7) - 0.25, cos(uSeed)));
+  vec3 dq = q - sc; dq.y *= 2.2;
+  float sd = length(dq);
+  float storm = exp(-sd*sd*38.0);
+  vec3 qs = rotAxis(q, sc, storm*6.0/(sd + 0.2));
+  float b = lat*11.0 + turb*1.5 + edd*0.45 + 0.5*snoise(vec3(qs.x, qs.y*5.0, qs.z)*1.6 + SO);
+  float s1 = smoothstep(-0.55, 0.55, sin(b*3.14159)), s2 = smoothstep(-0.6, 0.6, sin(b*1.37 + 1.3));
+  float hs = fract(uHue*3.7);
+  vec3 c1 = mix(vec3(0.86,0.76,0.60), vec3(0.62,0.78,0.86), step(0.72, hs));
+  vec3 c2 = mix(vec3(0.62,0.42,0.28), vec3(0.28,0.44,0.62), step(0.72, hs));
+  vec3 c3 = mix(vec3(0.93,0.88,0.78), vec3(0.84,0.90,0.95), step(0.72, hs));
+  vec3 c4 = mix(vec3(0.72,0.52,0.36), vec3(0.40,0.56,0.70), step(0.72, hs));
+  vec3 col = mix(mix(c2, c1, s1), mix(c4, c3, s1), s2*0.7);
+  col = mix(col, vec3(0.78,0.36,0.22), smoothstep(0.35, 0.9, storm)*0.8);
+  col = mix(col, vec3(0.95,0.9,0.82), smoothstep(0.6, 1.0, storm)*smoothstep(0.1, 0.4, fbmA(qs*9.0 + SO, 3.0) + 0.3)*0.6);
+  col *= 0.9 + 0.2*edd;
+  return col;
+}
+void main(){
+  SO = vec3(uSeed*0.137, uSeed*0.071, uSeed*0.113);
+  vec3 n = normalize(vObjNormal);
+  vec3 N = normalize(vWorldNormal), L = normalize(uLightDir), V = normalize(cameraPosition - vWorldPos);
+  float dist = length(cameraPosition - vWorldPos);
+  float fp = dist*uPixAng/uRadius;
+  float ndl = dot(N, L);
+  float mu = max(dot(N, V), 0.0);
+  vec3 sun = uLightColor;
+  if(uHasAtmo > 0.5) sun *= mix(vec3(1.0, 0.5, 0.26), vec3(1.0), smoothstep(-0.02, 0.35, ndl));
+  vec3 albedo; float ocean = 0.0; float relief = 0.0; float h = 0.0; float e = 0.0; float temp = 1.0; float emissive = 0.0; vec3 emisCol = vec3(0.0);
+  float oct = octFor(2.1, fp);
+  float slopeLit = ndl;
+
+  if(uKind > 4.5){
+    albedo = gasGiant(n, octFor(10.0, fp));
+  } else {
+    float mtn;
+    h = terrain(n, oct, mtn);
+    float sea = mix(-0.5, 0.42, uOceanFrac);
+    e = h - sea;
+    float lat = abs(n.y);
+    temp = 1.0 - pow(lat, 1.7)*1.08 - max(e - 0.1, 0.0)*1.3 + 0.1*snoise(n*4.0 + SO);
+    float micro = clamp(oct - 5.0, 0.0, 1.0);
+    float grain = 0.5 + 0.5*snoise(n*90.0 + SO);
+    if(uKind < 1.5){
+      /* monde océanique / continental : biomes selon latitude, altitude et humidité */
+      if(e < 0.0){
+        float d = -e; ocean = 1.0;
+        albedo = mix(vec3(0.06,0.36,0.44), vec3(0.012,0.06,0.17), smoothstep(0.0, 0.16, d));
+        albedo = mix(albedo, vec3(0.01,0.035,0.12), smoothstep(0.2, 0.6, d));
+        float ice = smoothstep(0.12, 0.02, temp + 0.05*snoise(n*12.0 + SO));
+        albedo = mix(albedo, vec3(0.86,0.9,0.95), ice); ocean *= 1.0 - ice;
+      } else {
+        float moist = 0.58 + 0.6*fbmA(n*3.1 + SO*0.7 + 11.0, min(oct, 5.0)) + 0.25*(1.0 - smoothstep(0.0, 0.1, e)) - 0.3*exp(-(lat - 0.36)*(lat - 0.36)*45.0);
+        vec3 desert = vec3(0.76,0.58,0.36), savanna = vec3(0.55,0.52,0.28), grass = vec3(0.26,0.40,0.15);
+        vec3 forest = vec3(0.09,0.24,0.08), jungle = vec3(0.04,0.19,0.06), tundra = vec3(0.44,0.43,0.35);
+        vec3 rock = vec3(0.33,0.29,0.26), snow = vec3(0.95,0.96,0.98), sand = vec3(0.80,0.72,0.52);
+        if(uHue > 0.82){ forest = forest.gbr*vec3(1.2,0.9,1.4); jungle = jungle.brg*vec3(1.3,1.0,1.2); grass = grass.gbr; }
+        vec3 veg = mix(forest, jungle, smoothstep(0.62, 0.9, temp));
+        vec3 dry = mix(desert, savanna, smoothstep(0.32, 0.5, moist));
+        albedo = mix(dry, mix(grass, veg, smoothstep(0.55, 0.8, moist)), smoothstep(0.38, 0.62, moist));
+        albedo = mix(albedo, tundra, smoothstep(0.38, 0.16, temp));
+        albedo = mix(albedo, rock, clamp(smoothstep(0.22, 0.48, mtn*smoothstep(0.02, 0.2, e)) + smoothstep(0.28, 0.5, e)*0.7, 0.0, 1.0));
+        albedo = mix(albedo, sand, (1.0 - smoothstep(0.001, 0.009, e))*mix(0.25, 0.85, micro));
+        albedo = mix(albedo, snow, smoothstep(0.13, 0.04, temp));
+        albedo *= mix(1.0, 0.82 + 0.36*grain, micro);
+        relief = 1.0;
+      }
+    } else if(uKind < 2.5){
+      /* monde désertique : ergs, canyons, lacs salés */
+      vec3 w = vec3(snoise(n*6.0 + SO), snoise(n*6.0 + SO + 3.0), 0.0);
+      float canyon = ridgedA(n*5.0 + SO + w*0.3, min(oct, 7.0));
+      albedo = mix(vec3(0.78,0.52,0.30), vec3(0.62,0.36,0.20), smoothstep(-0.2, 0.4, h));
+      albedo = mix(albedo, vec3(0.86,0.72,0.52), smoothstep(0.35, 0.65, 0.5 + 0.5*fbmA(n*3.0 + SO + 5.0, 4.0)));
+      albedo = mix(albedo, vec3(0.36,0.17,0.10), smoothstep(0.72, 0.95, canyon)*0.85);
+      float dunes = 0.5 + 0.5*sin(dot(n, normalize(vec3(0.7, 0.2, 0.68)))*900.0 + w.x*25.0);
+      albedo *= mix(1.0, 0.8 + 0.3*dunes, clamp(oct - 5.5, 0.0, 1.0));
+      if(e < 0.0){ albedo = mix(vec3(0.9,0.88,0.82), vec3(0.12,0.22,0.3), smoothstep(0.0, 0.06, -e)); ocean = smoothstep(0.02, 0.08, -e); }
+      albedo *= mix(1.0, 0.85 + 0.3*grain, micro);
+      relief = 1.0;
+    } else if(uKind < 3.5){
+      /* monde glacé : banquise fracturée, inlandsis, crevasses */
+      float cracks = ridgedA(n*11.0 + SO, min(oct, 8.0));
+      if(e < 0.0){
+        albedo = mix(vec3(0.72,0.84,0.93), vec3(0.42,0.6,0.76), smoothstep(0.0, 0.3, -e));
+        albedo = mix(albedo, vec3(0.08,0.2,0.34), smoothstep(0.8, 0.98, cracks)*0.8);
+        ocean = 0.35;
+      } else {
+        albedo = mix(vec3(0.93,0.96,1.0), vec3(0.76,0.84,0.94), smoothstep(0.0, 0.3, mtn));
+        albedo = mix(albedo, vec3(0.3,0.3,0.33), smoothstep(0.28, 0.5, e)*0.7);
+        albedo = mix(albedo, vec3(0.45,0.62,0.8), smoothstep(0.85, 0.98, cracks)*0.5);
+      }
+      albedo *= mix(1.0, 0.9 + 0.2*grain, micro);
+      relief = 0.8;
+    } else {
+      /* monde volcanique : basalte, coulées de lave incandescentes */
+      float flows = ridgedA(n*4.5 + SO + vec3(snoise(n*3.0 + SO))*0.4, min(oct, 8.0));
+      albedo = mix(vec3(0.1,0.08,0.07), vec3(0.3,0.2,0.15), smoothstep(-0.2, 0.5, h));
+      albedo *= mix(1.0, 0.75 + 0.5*grain, micro);
+      float lava = smoothstep(0.5, 0.72, flows) * (0.75 + 0.25*sin(uTime*1.3 + flows*30.0));
+      emissive = lava; emisCol = mix(vec3(1.0,0.25,0.03), vec3(1.0,0.75,0.25), lava);
+      albedo = mix(albedo, vec3(0.3,0.08,0.02), lava);
+      relief = 1.2;
+    }
+    /* relief : dérivée directionnelle de la hauteur dans la direction de l'étoile (ombrage des montagnes) */
+    vec3 lt = uLightObj - n*dot(uLightObj, n); float ltl = length(lt);
+    if(relief > 0.0 && ltl > 1e-3 && ndl > -0.2){
+      float eps = max(fp*2.5, 0.00035);
+      float m2; float h2 = terrain(normalize(n + lt/ltl*eps), min(oct, 8.0), m2);
+      float s = (h2 - h)/eps * 0.018 * relief * step(0.0, e);
+      slopeLit = (ndl - s*ltl)/sqrt(1.0 + s*s);
+    }
+  }
+
+  float day = max(slopeLit, 0.0);
+  /* ombre des nuages de la couche basse, projetée dans la direction de l'étoile */
+  float cshadow = 0.0;
+  if(uCover > 0.01 && ndl > -0.1){
+    vec3 sp = normalize(n + uLightObj*(0.012/max(dot(n, uLightObj), 0.2)));
+    cshadow = cloudDensity(rotY(sp, uShadowRot), 0.0, min(octFor(5.5, fp), 5.0), uTime)*0.62;
+  }
+  vec3 col = albedo*sun*day*(1.0 - cshadow) + albedo*vec3(0.03, 0.034, 0.045);
+  /* océan : reflet spéculaire du soleil, ondulé de près, et reflet du ciel en incidence rasante */
+  if(ocean > 0.0){
+    vec3 Hh = normalize(L + V);
+    vec3 Nw = N;
+    if(oct > 5.0){ vec3 wv = vec3(snoise(n*420.0 + SO + uTime*0.05), snoise(n*420.0 + SO + 7.0 - uTime*0.04), snoise(n*420.0 + SO + 3.0)); Nw = normalize(N + wv*0.05*clamp(oct - 5.0, 0.0, 1.0)); }
+    float nh = max(dot(Nw, Hh), 0.0);
+    float spec = pow(nh, 240.0)*2.2 + pow(nh, 36.0)*0.18;
+    col += sun*spec*ocean*smoothstep(0.0, 0.1, ndl)*(1.0 - cshadow);
+    float fr = pow(1.0 - mu, 5.0);
+    col += uAtmoCol*fr*0.35*ocean*smoothstep(-0.1, 0.3, ndl)*uHasAtmo;
+  }
+  /* nuit : lumières des villes, regroupées sur les côtes et les plaines tempérées */
+  float night = smoothstep(0.06, -0.18, ndl);
+  if(uCities > 0.5 && uKind < 1.5 && e > 0.0 && night > 0.0){
+    float coast = 1.0 - smoothstep(0.0, 0.1, e);
+    float cl = fbmA(n*12.0 + SO + 5.0, clamp(oct - 1.0, 1.0, 4.0));
+    float dens = smoothstep(0.1, 0.5, cl + coast*0.35 - smoothstep(0.25, 0.05, temp)*0.6);
+    float pts = mix(1.0, smoothstep(0.35, 0.85, 0.5 + 0.5*snoise(n*320.0 + SO)), clamp(oct - 4.0, 0.0, 1.0));
+    col += vec3(1.0,0.76,0.4)*dens*pts*night*1.3*(1.0 - cshadow*0.7);
+  }
+  col += emisCol*emissive*(0.9 + 1.2*night);
+  /* brume atmosphérique vers le limbe (perspective aérienne) */
+  if(uHasAtmo > 0.5){
+    float hz = pow(1.0 - mu, 2.2)*0.6;
+    col = mix(col, uAtmoCol*smoothstep(-0.25, 0.45, ndl)*0.9, hz);
+    col += uAtmoCol*pow(1.0 - mu, 4.0)*0.05*night;   /* lueur nocturne (airglow) */
+  } else if(uKind > 4.5){
+    col *= 0.55 + 0.45*pow(mu, 0.5);
+  }
+  gl_FragColor = vec4(col, 1.0);
+}`;
+
+/* ---------- couches de nuages ---------- */
+const CLOUD_FRAG = `
+precision highp float;
+varying vec3 vObjNormal; varying vec3 vWorldNormal; varying vec3 vWorldPos;
+uniform vec3 uLightDir; uniform vec3 uLightColor; uniform vec3 uLightObj;
+uniform float uLayer; uniform float uTime; uniform float uRadius; uniform float uPixAng; uniform float uOpacity;
+${NOISE}
+${CLOUDS}
+void main(){
+  vec3 n = normalize(vObjNormal);
+  vec3 N = normalize(vWorldNormal), L = normalize(uLightDir), V = normalize(cameraPosition - vWorldPos);
+  float fp = length(cameraPosition - vWorldPos)*uPixAng/uRadius;
+  float base = uLayer < 0.5 ? 5.5 : (uLayer < 1.5 ? 5.5 : 16.0);
+  float oct = min(octFor(base, fp), uLayer < 1.5 ? 9.0 : 7.0);
+  float d = cloudDensity(n, uLayer, oct, uTime);
+  if(d < 0.004) discard;
+  float ndl = dot(N, L);
+  /* épaisseur : la densité vers l'étoile assombrit la face opposée (volume apparent) */
+  float d2 = cloudDensity(normalize(n + uLightObj*0.018), uLayer, min(oct, 5.0), uTime);
+  float shade = clamp(1.05 - (d2 - d)*0.9 - d*0.18, 0.45, 1.1);
+  float day = smoothstep(-0.14, 0.3, ndl);
+  vec3 sunC = uLightColor*mix(vec3(1.0, 0.52, 0.3), vec3(1.0), smoothstep(0.0, 0.32, ndl));
+  vec3 col = sunC*day*shade*(uLayer > 1.5 ? 1.05 : 0.98) + vec3(0.02, 0.025, 0.04);
+  float mu = max(dot(N, V), 0.0);
+  float a = d*uOpacity*(0.55 + 0.45*smoothstep(0.0, 0.25, mu));
+  gl_FragColor = vec4(col, clamp(a, 0.0, 1.0));
+}`;
+
+/* ---------- atmosphère à diffusion simple ---------- */
+const ATM_VERT = `varying vec3 vWorldPos; void main(){ vec4 wp = modelMatrix*vec4(position,1.0); vWorldPos = wp.xyz; gl_Position = projectionMatrix*viewMatrix*wp; }`;
+const ATM_FRAG = `
+precision highp float;
+varying vec3 vWorldPos;
+uniform vec3 uCenter; uniform float uRp; uniform float uRa; uniform vec3 uLightDir; uniform vec3 uRay; uniform vec3 uSunset; uniform float uStrength; uniform vec3 uLightColor;
+vec2 raySphere(vec3 ro, vec3 rd, vec3 c, float r){ vec3 oc = ro - c; float b = dot(oc, rd); float cc = dot(oc, oc) - r*r; float h = b*b - cc; if(h < 0.0) return vec2(1e9, -1e9); h = sqrt(h); return vec2(-b - h, -b + h); }
+void main(){
+  vec3 ro = cameraPosition, rd = normalize(vWorldPos - ro);
+  vec2 ta = raySphere(ro, rd, uCenter, uRa);
+  float t0 = max(ta.x, 0.0), t1 = ta.y;
+  vec2 tp = raySphere(ro, rd, uCenter, uRp);
+  if(tp.x > 0.0) t1 = min(t1, tp.x);
+  if(t1 <= t0) discard;
+  float seg = (t1 - t0)/8.0, od = 0.0, H = uRa - uRp;
+  vec3 L = normalize(uLightDir), acc = vec3(0.0);
+  for(int i = 0; i < 8; i++){
+    vec3 p = ro + rd*(t0 + seg*(float(i) + 0.5));
+    vec3 nr = p - uCenter; float r = length(nr); nr /= r;
+    float dens = exp(-clamp((r - uRp)/H, 0.0, 1.0)*4.2);
+    float m = dot(nr, L);
+    float lit = smoothstep(-0.14, 0.12, m);
+    vec3 c = mix(uSunset*0.55, uRay, smoothstep(-0.02, 0.3, m));
+    od += dens*seg/H;
+    acc += c*dens*lit*seg*exp(-od*0.35);
+  }
+  float cth = dot(rd, L);
+  float phase = 0.75*(1.0 + cth*cth) + 0.9*pow(max(cth, 0.0), 12.0);
+  vec3 col = acc/H*uStrength*phase*uLightColor;
+  col = vec3(1.0) - exp(-col);
+  gl_FragColor = vec4(col, 1.0);
+}`;
+
+/* ---------- aurores polaires : rideaux lumineux sur les ovales magnétiques ---------- */
+const AUR_VERT = `
+attribute vec2 aUV;
+uniform float uR; uniform float uColat; uniform float uTime; uniform float uSeed; uniform float uPole; uniform float uH0; uniform float uH1;
+varying float vH; varying float vU; varying vec3 vDirW;
+void main(){
+  float phi = aUV.x*6.2831853;
+  /* plis du rideau : ondulations lentes à plusieurs échelles qui glissent le long de l'ovale */
+  float fold = 0.05*sin(phi*3.0 + uTime*0.13 + uSeed) + 0.028*sin(phi*7.0 - uTime*0.29 + uSeed*2.1)
+             + 0.012*sin(phi*19.0 + uTime*0.7 + uSeed*3.3) + 0.005*sin(phi*53.0 - uTime*1.6);
+  float colat = uColat + fold - aUV.y*0.014;              /* le sommet penche vers le pôle */
+  vec3 dir = vec3(sin(colat)*cos(phi), uPole*cos(colat), sin(colat)*sin(phi));
+  vH = aUV.y; vU = aUV.x;
+  vDirW = normalize(mat3(modelMatrix)*dir);
+  gl_Position = projectionMatrix*viewMatrix*modelMatrix*vec4(dir*uR*(1.0 + mix(uH0, uH1, aUV.y)), 1.0);
+}`;
+const AUR_FRAG = `
+precision highp float;
+uniform vec3 uLightDir; uniform float uTime; uniform float uSeed; uniform float uIntensity; uniform vec3 uLow; uniform vec3 uHigh;
+varying float vH; varying float vU; varying vec3 vDirW;
+float h1(float x){ return fract(sin(x*127.1 + 311.7)*43758.5453); }
+float n1(float x){ float i = floor(x), f = fract(x); f = f*f*(3.0 - 2.0*f); return mix(h1(i), h1(i + 1.0), f); }
+void main(){
+  /* rayons verticaux qui scintillent et défilent */
+  float rays = 0.55*n1(vU*380.0 + uTime*1.1 + uSeed) + 0.3*n1(vU*1150.0 - uTime*2.3 + uSeed*2.0) + 0.15*n1(vU*3100.0 + uTime*4.0);
+  rays = pow(rays, 1.5);
+  /* arcs qui s'allument, se déplacent et s'éteignent le long de l'ovale */
+  float band = smoothstep(0.3, 0.85, n1(vU*14.0 - uTime*0.06 + uSeed*3.0))*0.75 + 0.25*smoothstep(0.4, 0.9, n1(vU*41.0 + uTime*0.15 + uSeed));
+  /* profil vertical : bord inférieur net et lumineux, décroissance vers le haut */
+  float h = vH;
+  float prof = smoothstep(0.0, 0.045, h)*(exp(-h*2.4) + 0.9*exp(-h*h*400.0));
+  vec3 col = mix(uLow, uHigh, smoothstep(0.3, 0.95, h));
+  col += vec3(0.6, 1.0, 0.8)*exp(-h*h*900.0)*0.6;         /* liseré inférieur plus blanc */
+  float dark = smoothstep(0.18, -0.22, dot(vDirW, normalize(uLightDir)));
+  float a = 1.7*prof*(0.3 + 0.7*rays)*(0.25 + 0.75*band)*uIntensity*(0.1 + 0.9*dark);
+  gl_FragColor = vec4(col*a, 1.0);
+}`;
+function auroraGeometry(N, M){
+  const uv = new Float32Array((N+1)*(M+1)*2), pos = new Float32Array((N+1)*(M+1)*3), idx = [];
+  for(let i=0;i<=N;i++) for(let j=0;j<=M;j++){ const k = i*(M+1) + j; uv[k*2] = i/N; uv[k*2+1] = j/M; }
+  for(let i=0;i<N;i++) for(let j=0;j<M;j++){ const a = i*(M+1) + j, b = a + M + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aUV', new THREE.BufferAttribute(uv, 2)); g.setIndex(idx);
+  return g;
+}
+let AUR_GEO = null;
+const AURORA_ALL = new URLSearchParams(location.search).get('aurora') === 'all';
+const KIND_ID = { ocean:0, continental:1, desert:2, ice:3, volcanic:4, gas:5 };
+const COVER = { ocean:.4, continental:.33, desert:.07, ice:.22, volcanic:0, gas:0 };
+const ATMO = {
+  ocean:       { ray:[.28,.52,1.0], sunset:[1.0,.42,.18], k:1.25 },
+  continental: { ray:[.30,.54,1.0], sunset:[1.0,.44,.2],  k:1.2 },
+  desert:      { ray:[.85,.62,.42], sunset:[1.0,.4,.2],   k:.9 },
+  ice:         { ray:[.55,.78,1.0], sunset:[1.0,.6,.4],   k:1.0 },
+  gas:         { ray:[.92,.82,.66], sunset:[1.0,.5,.3],   k:.8 }
+};
+function prng(seed){ let a = (seed*2654435761)>>>0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0)/4294967296; }; }
+function randDir(r){ const z = r()*2 - 1, a = r()*Math.PI*2, s = Math.sqrt(1 - z*z); return new THREE.Vector3(Math.cos(a)*s, z*.75, Math.sin(a)*s).normalize(); }
+
+/* ---------- application à une planète générée par le jeu ---------- */
+PL.enhance = function(p){
+  if(!p.mesh || p.__enhanced) return; p.__enhanced = true;
+  const key = p.kind.key, grp = p.mesh.parent, R = p.radius, r = prng(Math.floor(p.seedNoise*1000) + 7);
+  // sphère haute définition (silhouette lisse en gros plan)
+  p.mesh.geometry.dispose(); p.mesh.geometry = new THREE.SphereGeometry(R, 64, 48);   /* v2.16 : sphère légère d'abord, pleine définition à l'approche (PL.lod) */
+  const cover = (COVER[key] || 0)*(0.8 + .4*r());
+  const cyc = () => { const d = randDir(r); return new THREE.Vector4(d.x, d.y, d.z, (r() < .5 ? -1 : 1)*(d.y > 0 ? 1 : -1)*(.7 + .6*r())); };
+  const shared = { uCyc1:{value:cyc()}, uCyc2:{value:cyc()}, uCover:{value:cover}, uCSeed:{value:p.seedNoise*.37 + 11} };
+  const atmo = ATMO[key];
+  const atmoCol = atmo ? new THREE.Color(atmo.ray[0], atmo.ray[1], atmo.ray[2]) : new THREE.Color(0,0,0);
+  const old = p.mesh.material;
+  p.mesh.material = new THREE.ShaderMaterial({
+    uniforms: Object.assign({
+      uLightDir:{value:new THREE.Vector3(1,0,0)}, uLightColor:{value:new THREE.Color(1,1,1)}, uLightObj:{value:new THREE.Vector3(1,0,0)}, uAtmoCol:{value:atmoCol},
+      uOceanFrac:{value:p.oceanFrac}, uSeed:{value:(p.seedNoise % 97) + 3}, uHue:{value:p.hueShift}, uTime:{value:0}, uKind:{value:KIND_ID[key]},
+      uRadius:{value:R}, uPixAng:PIX, uCities:{value:(p.isHabitable || r() < .3) ? 1 : 0}, uShadowRot:{value:0}, uHasAtmo:{value:p.hasAtmosphere ? 1 : 0},
+      uGas:{value:p.kind.gas?1:0}, uIcy:{value:p.kind.icy?1:0}, uVolcanic:{value:p.kind.volcanic?1:0}
+    }, shared),
+    vertexShader: SURF_VERT, fragmentShader: SURF_FRAG
+  });
+  old.dispose();
+  // ancienne coque d'atmosphère du jeu → remplacée par la diffusion
+  grp.children.slice().forEach(c => { if(c.material && c.material.fragmentShader === ATMO_FRAG){ grp.remove(c); c.geometry.dispose(); c.material.dispose(); } });
+  p.fx = { clouds: [], atm: null, shared, hi:false, geos:[p.mesh.geometry] };
+  p.mesh.userData.plfx = p.fx;
+  if(p.hasAtmosphere && atmo){
+    const Ra = R*(key === 'gas' ? 1.035 : 1.06);
+    const m = new THREE.Mesh(new THREE.SphereGeometry(Ra, 96, 72), new THREE.ShaderMaterial({
+      uniforms: { uCenter:{value:new THREE.Vector3()}, uRp:{value:R*0.999}, uRa:{value:Ra}, uLightDir:{value:new THREE.Vector3(1,0,0)}, uLightColor:{value:new THREE.Color(1,1,1)},
+        uRay:{value:new THREE.Vector3(...atmo.ray)}, uSunset:{value:new THREE.Vector3(...atmo.sunset)}, uStrength:{value:atmo.k} },
+      vertexShader: ATM_VERT, fragmentShader: ATM_FRAG, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, side:THREE.FrontSide }));
+    m.renderOrder = 4; grp.add(m); p.fx.atm = m;
+  }
+  if(cover > 0.02){
+    const layers = [ { l:0, h:1.006, op:.95, drift:.0 }, { l:1, h:1.013, op:.6, drift:.0035*(r() < .5 ? -1 : 1) }, { l:2, h:1.022, op:.65, drift:.007*(r() < .5 ? -1 : 1) } ];
+    layers.forEach(L => {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(R*L.h, 48, 36), new THREE.ShaderMaterial({
+        uniforms: Object.assign({ uLightDir:{value:new THREE.Vector3(1,0,0)}, uLightColor:{value:new THREE.Color(1,1,1)}, uLightObj:{value:new THREE.Vector3(1,0,0)},
+          uLayer:{value:L.l}, uTime:{value:0}, uRadius:{value:R}, uPixAng:PIX, uOpacity:{value:L.op} }, shared),
+        vertexShader: SURF_VERT, fragmentShader: CLOUD_FRAG, transparent:true, depthWrite:false }));
+      m.renderOrder = 1 + L.l; m.rotation.y = r()*6.28; grp.add(m);
+      p.fx.geos.push(m.geometry);
+      p.fx.clouds.push({ mesh:m, drift:L.drift + .0025*(L.l + 1)*(r() - .5), base:m.rotation.y, h:L.h });
+    });
+  }
+  // aurores : sur une partie des planètes à atmosphère (plus fréquentes sur les mondes habités et glacés)
+  const auChance = key === 'gas' ? .35 : (p.isHabitable ? .65 : (key === 'ice' ? .6 : .4));
+  p.fx.aurora = [];
+  if(p.hasAtmosphere && (AURORA_ALL || r() < auChance)){
+    if(!AUR_GEO) AUR_GEO = auroraGeometry(900, 18);
+    const hue = r(), low = hue < .7 ? [.2, 1.0, .5] : (hue < .85 ? [.3, .75, 1.0] : [.95, .35, .75]), high = hue < .7 ? [.95, .22, .5] : [.6, .3, 1.0];
+    const tilt = new THREE.Euler((r() - .5)*.28, 0, (r() - .5)*.28);
+    [1, -1].forEach(pole => [0, 1].forEach(k => {
+      const m = new THREE.Mesh(AUR_GEO, new THREE.ShaderMaterial({
+        uniforms: { uR:{value:R}, uColat:{value:(key === 'gas' ? .22 : .3) + k*.055 + r()*.03}, uTime:{value:0}, uSeed:{value:r()*100}, uPole:{value:pole},
+          uH0:{value:key === 'gas' ? .008 : .012}, uH1:{value:key === 'gas' ? .05 : .065 - k*.012}, uLightDir:{value:new THREE.Vector3(1,0,0)},
+          uIntensity:{value:(k ? .55 : 1)*(.9 + .5*r())}, uLow:{value:new THREE.Vector3(...low)}, uHigh:{value:new THREE.Vector3(...high)} },
+        vertexShader: AUR_VERT, fragmentShader: AUR_FRAG, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, side:THREE.DoubleSide }));
+      m.rotation.copy(tilt); m.frustumCulled = false; m.renderOrder = 5; m.userData.astShared = false; m.userData.auroraGeoShared = true;
+      grp.add(m); p.fx.aurora.push({ mesh:m, pole, colat:m.material.uniforms.uColat.value });
+    }));
+  }
+};
+
+/* ---------- mise à jour par image ---------- */
+const _q = new THREE.Quaternion(), _v = new THREE.Vector3();
+const _sun = new THREE.Color(), _white = new THREE.Color(1,1,1);
+PL.update = function(p, starPos, sunColor0, T, camPos){
+  if(!p.fx) return;
+  const sunColor = _sun.copy(sunColor0).lerp(_white, .45);
+  const L = _v.copy(starPos).sub(p.position).normalize();
+  const u = p.mesh.material.uniforms;
+  u.uLightDir.value.copy(L); u.uLightColor.value.copy(sunColor); u.uTime.value = T;
+  p.mesh.getWorldQuaternion(_q); u.uLightObj.value.copy(L).applyQuaternion(_q.invert());
+  const spin = p.mesh.rotation.y;
+  p.fx.clouds.forEach((c, i) => {
+    c.mesh.rotation.y = spin + c.base + c.drift*T;          // chaque couche dérive à sa propre vitesse (parallaxe entre couches)
+    const cu = c.mesh.material.uniforms;
+    cu.uLightDir.value.copy(L); cu.uLightColor.value.copy(sunColor); cu.uTime.value = T;
+    c.mesh.getWorldQuaternion(_q); cu.uLightObj.value.copy(L).applyQuaternion(_q.invert());
+    if(i === 0) u.uShadowRot.value = spin - c.mesh.rotation.y;
+  });
+  p.fx.aurora.forEach(a => { const au = a.mesh.material.uniforms; au.uTime.value = T; au.uLightDir.value.copy(L); });
+  if(p.fx.atm){
+    const au = p.fx.atm.material.uniforms;
+    p.fx.atm.getWorldPosition(au.uCenter.value);
+    au.uLightDir.value.copy(L); au.uLightColor.value.copy(sunColor);
+    const inside = camPos.distanceTo(au.uCenter.value) < au.uRa.value*1.002;
+    p.fx.atm.material.side = inside ? THREE.BackSide : THREE.FrontSide;
+  }
+};
+PL.setPixelAngle = function(fovDeg, heightPx){ PIX.value = 2*Math.tan(fovDeg*Math.PI/360)/Math.max(1, heightPx); };
+
+/* ---------- v2.16 : détail géométrique selon la taille à l'écran ----------
+   La démo filme un système à la fois ; le jeu en garde jusqu'à quatre
+   construits. En pleine définition partout (≈ 250 000 triangles et cinq
+   passes transparentes par planète), ce serait plusieurs millions de
+   triangles. Sphères légères au loin, définition de la démo de près ;
+   nuages, aurores et atmosphère masqués quand la planète n'est qu'un point. */
+const LOD_HI = 110, LOD_LO = 80;       /* rayon apparent en pixels : montée / redescente (hystérésis) */
+let lodBudget = 1;                      /* au plus une montée en définition par image : pas d'à-coup */
+const _wp = new THREE.Vector3();
+PL.lodFrame = function(){ lodBudget = 1; };
+PL.lod = function(p, camPos){
+  const fx = p.fx; if(!fx) return;
+  p.mesh.getWorldPosition(_wp);
+  const px = p.radius/Math.max(1e-3, camPos.distanceTo(_wp))/PIX.value;
+  fx.clouds.forEach(c => { c.mesh.visible = px > 6; });
+  (fx.aurora || []).forEach(a => { a.mesh.visible = px > 40; });
+  if(fx.atm) fx.atm.visible = px > 2;
+  const want = fx.hi ? px > LOD_LO : px > LOD_HI;
+  if(want === fx.hi) return;
+  if(want){
+    if(lodBudget <= 0) return;
+    lodBudget--;
+    if(!fx.hiGeo){
+      fx.loGeo = { surf:p.mesh.geometry, clouds:fx.clouds.map(c => c.mesh.geometry) };
+      fx.hiGeo = { surf:new THREE.SphereGeometry(p.radius, 192, 144), clouds:fx.clouds.map(c => new THREE.SphereGeometry(p.radius*c.h, 176, 132)) };
+      fx.geos.push(fx.hiGeo.surf, ...fx.hiGeo.clouds);
+    }
+    p.mesh.geometry = fx.hiGeo.surf; fx.clouds.forEach((c, i) => { c.mesh.geometry = fx.hiGeo.clouds[i]; });
+  } else {
+    p.mesh.geometry = fx.loGeo.surf; fx.clouds.forEach((c, i) => { c.mesh.geometry = fx.loGeo.clouds[i]; });
+  }
+  fx.hi = want;
+};
+/* libération d'un système : toutes les définitions créées, attachées ou non */
+PL.release = function(group){
+  group.traverse(o => { const fx = o.userData && o.userData.plfx; if(fx){ fx.geos.forEach(g => g.dispose()); fx.geos = []; } });
+};
+})();
+
+
+/* =====================================================================
+   ASTÉROÏDES TEXTURÉS — générés au démarrage
+   - 5 gabarits de roches (icosphères déformées : forme irrégulière, cratères, arêtes)
+   - 4 familles de textures tuilables générées sur canvas (albédo + hauteur) :
+     carbonée (sombre), silicatée (grise-ocre), métallique, glacée
+   - matériau standard + mappage triplanaire (sans coutures) + relief par dérivées écran
+   Appliqué aux ceintures d'astéroïdes et aux lunes des systèmes générés.
+   ===================================================================== */
+(function(){
+'use strict';
+const AST = window.__AST = { ready:false };
+
+/* ---------- bruits (JS) ---------- */
+function hash3(x, y, z, s){ let h = (x*374761393 + y*668265263 + z*1274126177 + s*2246822519) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0)/4294967295; }
+function vnoise3(x, y, z, s){
+  const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z), fx = x - xi, fy = y - yi, fz = z - zi;
+  const u = fx*fx*(3-2*fx), v = fy*fy*(3-2*fy), w = fz*fz*(3-2*fz);
+  const L = (a,b,t) => a + (b-a)*t;
+  return L(L(L(hash3(xi,yi,zi,s), hash3(xi+1,yi,zi,s), u), L(hash3(xi,yi+1,zi,s), hash3(xi+1,yi+1,zi,s), u), v),
+           L(L(hash3(xi,yi,zi+1,s), hash3(xi+1,yi,zi+1,s), u), L(hash3(xi,yi+1,zi+1,s), hash3(xi+1,yi+1,zi+1,s), u), v), w);
+}
+function fbm3(x, y, z, s, oct){ let v = 0, a = .5, f = 1, n = 0; for(let i=0;i<oct;i++){ v += a*vnoise3(x*f, y*f, z*f, s+i*7); n += a; a *= .5; f *= 2.03; } return v/n; }
+/* bruit 2D périodique (texture tuilable sans raccord) */
+function tnoise(x, y, P, s){
+  const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, u = fx*fx*(3-2*fx), v = fy*fy*(3-2*fy);
+  const m = k => ((k % P) + P) % P;
+  const a = hash3(m(xi), m(yi), 0, s), b = hash3(m(xi+1), m(yi), 0, s), c = hash3(m(xi), m(yi+1), 0, s), d = hash3(m(xi+1), m(yi+1), 0, s);
+  return a + (b-a)*u + (c-a)*v + (a-b-c+d)*u*v;
+}
+function tfbm(x, y, P, s, oct){ let v = 0, a = .5, n = 0; for(let i=0;i<oct;i++){ v += a*tnoise(x, y, P, s+i*13); n += a; x *= 2; y *= 2; P *= 2; a *= .5; } return v/n; }
+function prng(seed){ let a = seed >>> 0; return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0)/4294967296; }; }
+
+/* ---------- icosphère indexée (normales lissées, pas de coutures) ---------- */
+function icosphere(level){
+  const t = (1 + Math.sqrt(5))/2;
+  let V = [[-1,t,0],[1,t,0],[-1,-t,0],[1,-t,0],[0,-1,t],[0,1,t],[0,-1,-t],[0,1,-t],[t,0,-1],[t,0,1],[-t,0,-1],[-t,0,1]].map(p => { const l = Math.hypot(...p); return p.map(c => c/l); });
+  let F = [[0,11,5],[0,5,1],[0,1,7],[0,7,10],[0,10,11],[1,5,9],[5,11,4],[11,10,2],[10,7,6],[7,1,8],[3,9,4],[3,4,2],[3,2,6],[3,6,8],[3,8,9],[4,9,5],[2,4,11],[6,2,10],[8,6,7],[9,8,1]];
+  for(let l=0;l<level;l++){
+    const cache = new Map(), NF = [];
+    const mid = (a,b) => { const k = a < b ? a+'_'+b : b+'_'+a; if(cache.has(k)) return cache.get(k);
+      const p = V[a].map((c,i) => (c + V[b][i])/2), n = Math.hypot(...p); V.push(p.map(c => c/n)); cache.set(k, V.length-1); return V.length-1; };
+    F.forEach(([a,b,c]) => { const ab = mid(a,b), bc = mid(b,c), ca = mid(c,a); NF.push([a,ab,ca],[b,bc,ab],[c,ca,bc],[ab,bc,ca]); });
+    F = NF;
+  }
+  return { V, F };
+}
+/* roche : forme globale bosselée, ellipsoïde, cratères à rebord, stries */
+function rockGeometry(seed, level, opts){
+  opts = opts || {};
+  const r = prng(seed), { V, F } = icosphere(level);
+  const sx = .75 + .5*r(), sy = .65 + .45*r(), sz = .8 + .5*r();
+  const craters = [];
+  const nc = opts.craters !== undefined ? opts.craters : 9 + Math.floor(r()*9);
+  for(let i=0;i<nc;i++){ const z = r()*2-1, a = r()*6.283, s = Math.sqrt(1-z*z); craters.push({ d:[Math.cos(a)*s, z, Math.sin(a)*s], rad: .12 + .38*Math.pow(r(), 2), depth: .06 + .1*r() }); }
+  const amp = opts.amp !== undefined ? opts.amp : 1, lobe = opts.lobe ? { d:[r()*2-1, r()*2-1, r()*2-1] } : null;
+  if(lobe){ const l = Math.hypot(...lobe.d); lobe.d = lobe.d.map(c => c/l); }
+  const pos = new Float32Array(V.length*3);
+  V.forEach((p, i) => {
+    let h = 1 + amp*(.42*(fbm3(p[0]*1.1, p[1]*1.1, p[2]*1.1, seed, 3) - .5) + .16*(fbm3(p[0]*3.2, p[1]*3.2, p[2]*3.2, seed+50, 4) - .5));
+    craters.forEach(c => {
+      const cosA = p[0]*c.d[0] + p[1]*c.d[1] + p[2]*c.d[2], ang = Math.acos(Math.max(-1, Math.min(1, cosA))), x = ang/c.rad;
+      if(x < 1) h -= c.depth*(1 - x*x)*amp;                       // cuvette
+      h += c.depth*.35*Math.exp(-((x-1)/.22)*((x-1)/.22))*amp;     // rebord
+    });
+    if(lobe){ const k = p[0]*lobe.d[0] + p[1]*lobe.d[1] + p[2]*lobe.d[2]; h *= 1 - .22*Math.exp(-k*k*14); }  // étranglement (binaire de contact)
+    pos[i*3] = p[0]*h*sx; pos[i*3+1] = p[1]*h*sy; pos[i*3+2] = p[2]*h*sz;
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setIndex(F.flat());
+  g.computeVertexNormals(); g.computeBoundingSphere();
+  return g;
+}
+
+/* ---------- textures tuilables générées (albédo + hauteur) ---------- */
+const FAMILIES = {
+  carbonaceous: { a:[34,31,29], b:[62,56,50], c:[20,19,19], speck:[120,112,100], speckP:.004, rough:.97, metal:.02, cr:.55 },
+  silicate:     { a:[112,98,82], b:[150,132,108], c:[78,64,52], speck:[190,176,150], speckP:.006, rough:.93, metal:.04, cr:.7 },
+  metallic:     { a:[96,98,104], b:[140,142,148], c:[64,64,70], speck:[210,210,215], speckP:.012, rough:.62, metal:.55, cr:.45 },
+  icy:          { a:[150,164,178], b:[206,220,232], c:[70,74,82], speck:[240,248,255], speckP:.008, rough:.55, metal:.02, cr:.6 }
+};
+function makeTextures(fam, seed, N){
+  N = N || 512;
+  const r = prng(seed), H = new Float32Array(N*N);
+  const P0 = 6;
+  for(let y=0;y<N;y++) for(let x=0;x<N;x++){
+    const u = x/N*P0, v = y/N*P0;
+    const base = tfbm(u, v, P0, seed, 6);
+    const ridge = 1 - Math.abs(tfbm(u*1.7, v*1.7, P0*2, seed+91, 4)*2 - 1);
+    H[y*N+x] = base*.75 + ridge*ridge*.25;
+  }
+  // cratères (repliés sur les bords pour rester tuilables)
+  const nc = Math.floor(90*fam.cr);
+  for(let i=0;i<nc;i++){
+    const cx = r()*N, cy = r()*N, R = 3 + Math.pow(r(), 3)*N*.12, depth = .08 + .12*r(), ext = Math.ceil(R*1.6);
+    for(let dy=-ext; dy<=ext; dy++) for(let dx=-ext; dx<=ext; dx++){
+      const d = Math.hypot(dx, dy)/R; if(d > 1.6) continue;
+      const xx = ((Math.floor(cx+dx) % N) + N) % N, yy = ((Math.floor(cy+dy) % N) + N) % N;
+      let h = 0; if(d < 1) h -= depth*(1 - d*d); h += depth*.45*Math.exp(-((d-1)/.18)*((d-1)/.18));
+      H[yy*N+xx] += h;
+    }
+  }
+  let mn = Infinity, mx = -Infinity; for(let i=0;i<H.length;i++){ mn = Math.min(mn, H[i]); mx = Math.max(mx, H[i]); }
+  const cA = document.createElement('canvas'), cH = document.createElement('canvas'); cA.width = cA.height = cH.width = cH.height = N;
+  const xA = cA.getContext('2d'), xH = cH.getContext('2d'), iA = xA.createImageData(N, N), iH = xH.createImageData(N, N);
+  for(let y=0;y<N;y++) for(let x=0;x<N;x++){
+    const i = y*N + x, h = (H[i] - mn)/(mx - mn);
+    const m = tfbm(x/N*3, y/N*3, 3, seed+333, 4);                    // taches minérales
+    const hx = H[y*N + (x+1)%N] - H[i], hy = H[((y+1)%N)*N + x] - H[i];
+    const slope = Math.min(1, Math.hypot(hx, hy)*40);
+    let col = [0,1,2].map(k => fam.a[k] + (fam.b[k] - fam.a[k])*m);
+    col = col.map((c,k) => c + (fam.c[k] - c)*Math.max(0, .55 - h)*1.2);   // creux plus sombres
+    col = col.map(c => c*(1 - .25*slope));
+    if(hash3(x, y, 7, seed) < fam.speckP) col = fam.speck.slice();
+    const g = .9 + .2*hash3(x, y, 3, seed);
+    iA.data[i*4] = Math.min(255, col[0]*g); iA.data[i*4+1] = Math.min(255, col[1]*g); iA.data[i*4+2] = Math.min(255, col[2]*g); iA.data[i*4+3] = 255;
+    const hv = Math.round(h*255); iH.data[i*4] = iH.data[i*4+1] = iH.data[i*4+2] = hv; iH.data[i*4+3] = 255;
+  }
+  xA.putImageData(iA, 0, 0); xH.putImageData(iH, 0, 0);
+  const tA = new THREE.CanvasTexture(cA), tH = new THREE.CanvasTexture(cH);
+  [tA, tH].forEach(t => { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; });
+  return { albedo: tA, height: tH };
+}
+
+/* ---------- matériau : triplanaire + relief ---------- */
+const TRI_VERT_PARS = `varying vec3 vAstObj; varying vec3 vAstN; varying float vAstScale;`;
+const TRI_VERT = `
+  vAstObj = position; vAstN = normal;
+  #ifdef USE_INSTANCING
+    vAstScale = length(instanceMatrix[0].xyz) * length(modelMatrix[0].xyz);
+  #else
+    vAstScale = length(modelMatrix[0].xyz);
+  #endif`;
+const TRI_FRAG_PARS = `
+varying vec3 vAstObj; varying vec3 vAstN; varying float vAstScale;
+uniform sampler2D tAstAlb; uniform sampler2D tAstH; uniform float uAstScale; uniform float uAstBump; uniform vec3 uAstTint;
+vec3 astW(){ vec3 w = pow(abs(normalize(vAstN)), vec3(4.0)); return w/(w.x + w.y + w.z); }
+vec3 astTex(sampler2D t, vec3 p, vec3 w){ return texture2D(t, p.yz).rgb*w.x + texture2D(t, p.xz + 0.37).rgb*w.y + texture2D(t, p.xy + 0.71).rgb*w.z; }
+float astHt(vec3 p, vec3 w){ return astTex(tAstH, p, w).r + 0.35*astTex(tAstH, p*4.3 + 0.5, w).r; }
+vec3 astAlbedo(){
+  vec3 w = astW(), p = vAstObj*uAstScale;
+  vec3 c = astTex(tAstAlb, p, w);
+  vec3 c2 = astTex(tAstAlb, p*4.3 + 0.5, w);
+  c = c*(0.72 + 0.56*c2.g/max(0.05, (c2.r + c2.g + c2.b)/3.0 + 0.2));
+  return pow(c, vec3(2.2)) * uAstTint;                     // sRGB → linéaire (sortie du moteur en sRGB)
+}
+vec3 astPerturb(vec3 surf_pos, vec3 surf_norm){
+  vec3 w = astW(), p = vAstObj*uAstScale;
+  vec3 dpx = dFdx(p), dpy = dFdy(p);
+  float Hc = astHt(p, w);
+  float k = uAstBump*vAstScale;
+  float dBx = (astHt(p + dpx, w) - Hc)*k, dBy = (astHt(p + dpy, w) - Hc)*k;
+  vec3 sX = dFdx(surf_pos), sY = dFdy(surf_pos);
+  vec3 R1 = cross(sY, surf_norm), R2 = cross(surf_norm, sX);
+  float det = dot(sX, R1);
+  vec3 grad = sign(det)*(dBx*R1 + dBy*R2);
+  return normalize(abs(det)*surf_norm - grad);
+}`;
+function makeMaterial(fam, tex){
+  const m = new THREE.MeshStandardMaterial({ color:0xffffff, roughness:fam.rough, metalness:fam.metal });
+  m.extensions = { derivatives:true };
+  m.userData.astShared = true;
+  m.onBeforeCompile = sh => {
+    sh.uniforms.tAstAlb = { value: tex.albedo }; sh.uniforms.tAstH = { value: tex.height };
+    sh.uniforms.uAstScale = { value: .85 }; sh.uniforms.uAstBump = { value: .06 }; sh.uniforms.uAstTint = { value: new THREE.Color(1.25,1.25,1.25) };
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\n' + TRI_VERT_PARS).replace('#include <begin_vertex>', '#include <begin_vertex>\n' + TRI_VERT);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + TRI_FRAG_PARS)
+      .replace('#include <map_fragment>', '#include <map_fragment>\n  diffuseColor.rgb *= astAlbedo();')
+      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n  normal = astPerturb(-vViewPosition, normal);');
+  };
+  m.customProgramCacheKey = () => 'ast-triplanar';
+  return m;
+}
+
+/* ---------- génération au démarrage ---------- */
+AST.init = function(seedStr){
+  let s = 0; for(let i=0;i<seedStr.length;i++) s = (s*31 + seedStr.charCodeAt(i)) | 0;
+  const t0 = performance.now();
+  AST.geos = [];
+  for(let i=0;i<5;i++) AST.geos.push(rockGeometry((s + i*7919) >>> 0, 3, { lobe: i === 3 }));
+  AST.moonGeo = rockGeometry((s + 424242) >>> 0, 4, { amp: .18, craters: 26 });
+  AST.fam = Object.keys(FAMILIES);
+  AST.mats = {};
+  AST.fam.forEach((k, i) => { const tex = makeTextures(FAMILIES[k], (s + i*104729) >>> 0, 512); AST.mats[k] = makeMaterial(FAMILIES[k], tex); });
+  AST.ready = true;
+  return { ms: Math.round(performance.now() - t0) };
+};
+
+/* ---------- application à un système construit par le moteur ---------- */
+AST.apply = function(leg){
+  if(!AST.ready || !leg.group) return;
+  const r = prng((leg.cell.split(',').reduce((a,c) => a*131 + (+c), 7)) >>> 0);
+  // composition de la ceinture : deux familles dominantes
+  const famA = AST.fam[Math.floor(r()*AST.fam.length)], famB = AST.fam[Math.floor(r()*AST.fam.length)];
+  leg.group.traverse(o => {
+    if(o.isInstancedMesh && o.material === ASTEROID_MAT){
+      const idx = ASTEROID_TEMPLATES.indexOf(o.geometry);
+      o.geometry = AST.geos[Math.max(0, idx) % AST.geos.length];
+      o.material = AST.mats[idx % 2 ? famB : famA];
+      o.frustumCulled = false;                           // les instances s'étendent bien au-delà du gabarit
+      o.userData.astShared = true;
+    }
+  });
+  // lunes : sphères lisses → roches cratérisées texturées
+  (leg.planets || []).forEach(p => (p.moonPivots || []).forEach(pv => pv.children.forEach(m => {
+    if(!m.isMesh || m.userData.astShared) return;
+    const rad = m.geometry.parameters && m.geometry.parameters.radius || 1;
+    m.geometry.dispose(); m.material.dispose();
+    m.geometry = AST.moonGeo; m.scale.setScalar(rad);
+    m.material = AST.mats[AST.fam[Math.floor(r()*AST.fam.length)]];
+    m.userData.astShared = true;
+  })));
+};
+/* avant libération d'un système : on détache ce qui est partagé pour ne pas le détruire */
+AST.detachShared = function(group){
+  const list = []; group.traverse(o => { if(o.userData && (o.userData.astShared || o.userData.auroraGeoShared)) list.push(o); });
+  list.forEach(o => { if(o.userData.auroraGeoShared && o.material) o.material.dispose(); });
+  list.forEach(o => o.parent && o.parent.remove(o));
+};
+AST.rockTemplates = () => AST.geos;
+})();
+
+
+/* raccordement : appelé par ensureSystemsBuilt() juste après la construction d'un système */
+function enhanceSystem(leg, grp){
+  if(!leg || !leg.system) return;
+  if(!window.__AST.ready) window.__AST.init(String(SEED));
+  leg.system.planets.forEach(function(p){ window.__PLANETS.enhance(p); });
+  window.__AST.apply({ group:grp, cell:leg.cell || '0,0,0', planets:leg.system.planets });
+}
+/* =========================================================================
+   7quinquies. EFFETS DE SAUT ET DE SUPRALUMINIQUE (v2.16)
+   Repris de la démo « Observation des étoiles » (v4) :
+   - quadrillage d'espace-temps sous le vaisseau pendant le saut quantique :
+     le puits se creuse et s'enroule, le vaisseau y glisse ; à l'arrivée, un
+     nouveau puits se referme en ondulant ;
+   - traînées d'étoiles en 3D pendant la croisière supraluminique (elles
+     remplacent les traits en surimpression, gardés pour le boost).
+   La passe de lentille que la démo ajoute aussi en croisière n'est pas
+   reprise : elle coûterait une passe plein écran pendant toute la croisière.
+   ========================================================================= */
+function buildWellGrid(){
+  const N = 46, M = 96, pos = [];
+  for(let i=0;i<=N;i++){
+    const c = -1 + 2*i/N;
+    for(let j=0;j<M;j++){
+      const a = -1 + 2*j/M, b = -1 + 2*(j+1)/M;
+      pos.push(c,0,a, c,0,b);   // lignes parallèles à Z
+      pos.push(a,0,c, b,0,c);   // lignes parallèles à X
+    }
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uDepth:{value:0}, uSigma:{value:.16}, uTwist:{value:0}, uRip:{value:0}, uRipAmp:{value:0}, uOpacity:{value:0}, uTime:{value:0},
+      uColA:{value:new THREE.Color(0x3f86c0)}, uColB:{value:new THREE.Color(0xc2a8ff)}, uColC:{value:new THREE.Color(0x5eead4)} },
+    vertexShader: `
+      uniform float uDepth; uniform float uSigma; uniform float uTwist; uniform float uRip; uniform float uRipAmp; uniform float uTime;
+      varying float vFade; varying float vDeep; varying float vWave;
+      void main(){
+        vec2 p = position.xz;
+        float r = length(p);
+        /* torsion : le tissu s'enroule autour du puits */
+        float ang = uTwist * exp(-r/(uSigma*2.2));
+        float c = cos(ang), s = sin(ang);
+        p = vec2(c*p.x - s*p.y, s*p.x + c*p.y);
+        /* puits : profil lorentzien (entonnoir de type gravitationnel) */
+        float well = uDepth / (1.0 + (r*r)/(uSigma*uSigma));
+        /* onde de choc qui se propage après l'éclair */
+        float dr = r - uRip;
+        float wave = uRipAmp * sin(dr*34.0) * exp(-dr*dr*26.0);
+        /* légère respiration du tissu */
+        float breath = 0.004 * sin(r*18.0 - uTime*3.0) * step(0.001, uDepth);
+        float y = -well + wave + breath;
+        vDeep = uDepth > 0.001 ? clamp(well/uDepth, 0.0, 1.0) : 0.0;
+        vWave = uRipAmp > 0.0001 ? clamp(abs(wave)/uRipAmp, 0.0, 1.0) : 0.0;
+        vFade = 1.0 - smoothstep(0.52, 1.0, r);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(p.x, y, p.y, 1.0);
+      }`,
+    fragmentShader: `
+      precision highp float;
+      uniform float uOpacity; uniform vec3 uColA; uniform vec3 uColB; uniform vec3 uColC;
+      varying float vFade; varying float vDeep; varying float vWave;
+      void main(){
+        vec3 col = mix(uColA, uColB, clamp(vDeep*1.25, 0.0, 1.0));
+        col = mix(col, uColC, vWave*0.7);
+        float a = uOpacity * vFade * (0.38 + 0.9*vDeep + 0.6*vWave);
+        gl_FragColor = vec4(col * a, 1.0);
+      }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+  });
+  const mesh = new THREE.LineSegments(g, mat); mesh.frustumCulled = false; mesh.renderOrder = 9; mesh.visible = false;
+  scene.add(mesh);
+  return mesh;
+}
+function buildWarpStreaks(){
+  const N = 900, pos = new Float32Array(N*2*3), base = new Float32Array(N*2*3), seg = new Float32Array(N*2), col = new Float32Array(N*2*3);
+  for(let i=0;i<N;i++){
+    const ax = Math.random(), rad = 12 + Math.pow(Math.random(), .6)*520, ang = Math.random()*Math.PI*2, hue = Math.random();
+    for(let k=0;k<2;k++){ base.set([ax, rad, ang], (i*2+k)*3); seg[i*2+k] = k;
+      col.set(hue < .2 ? [1, .82, .7] : (hue < .6 ? [.72, .84, 1] : [.9, .94, 1]), (i*2+k)*3); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aBase', new THREE.BufferAttribute(base, 3));
+  g.setAttribute('aSeg', new THREE.BufferAttribute(seg, 1)); g.setAttribute('aCol', new THREE.BufferAttribute(col, 3));
+  const m = new THREE.ShaderMaterial({
+    uniforms: { uCenter:{value:new THREE.Vector3()}, uDir:{value:new THREE.Vector3(0,0,1)}, uU:{value:new THREE.Vector3(1,0,0)}, uW:{value:new THREE.Vector3(0,1,0)}, uOff:{value:0}, uLen:{value:1}, uAlpha:{value:0}, uSpan:{value:1400} },
+    vertexShader: `
+      attribute vec3 aBase; attribute float aSeg; attribute vec3 aCol;
+      uniform vec3 uCenter; uniform vec3 uDir; uniform vec3 uU; uniform vec3 uW; uniform float uOff; uniform float uLen; uniform float uSpan;
+      varying vec3 vCol; varying float vA;
+      void main(){
+        float ax = mod(aBase.x*uSpan - uOff, uSpan) - uSpan*0.5;          /* position le long de l'axe, bouclée */
+        vec3 p = uCenter + uDir*(ax + aSeg*uLen) + (uU*cos(aBase.z) + uW*sin(aBase.z))*aBase.y;
+        vCol = aCol; vA = (1.0 - smoothstep(0.32, 0.5, abs(ax)/uSpan)) * mix(1.0, 0.25, aSeg);
+        gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
+      }`,
+    fragmentShader: `precision highp float; uniform float uAlpha; varying vec3 vCol; varying float vA; void main(){ float a = uAlpha*vA; gl_FragColor = vec4(vCol*a, 1.0); }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+  });
+  const mesh = new THREE.LineSegments(g, m); mesh.frustumCulled = false; mesh.visible = false; mesh.renderOrder = 8; scene.add(mesh);
+  return mesh;
+}
+let JUMP_GRID = null, WARP_STREAKS = null, WARP_STREAK_OFF = 0;
+const _jgUp = new THREE.Vector3(), _wsFwd = new THREE.Vector3(), _wsU = new THREE.Vector3(), _wsY = new THREE.Vector3(0, 1, 0);
+/* quadrillage placé sous le vaisseau (à 0,55 longueur), étendu à 6,5 longueurs */
+function setJumpGrid(depth, twist, op, rip, ripA, time){
+  if(!JUMP_GRID) JUMP_GRID = buildWellGrid();
+  const g = JUMP_GRID, u = g.material.uniforms;
+  _jgUp.set(0, 1, 0).applyQuaternion(shipRig.quaternion);
+  g.position.copy(shipRig.position).addScaledVector(_jgUp, -SHIP_GAME_LEN*0.55);
+  g.quaternion.copy(shipRig.quaternion); g.scale.setScalar(SHIP_GAME_LEN*6.5);
+  u.uDepth.value = depth; u.uTwist.value = twist; u.uOpacity.value = op; u.uRip.value = rip; u.uRipAmp.value = ripA; u.uTime.value = time;
+  g.visible = op > 0.005;
+}
+function hideJumpGrid(){ if(JUMP_GRID) JUMP_GRID.visible = false; }
+/* traînées : axe = cap du vaisseau, défilement = distance parcourue, longueur ∝ vitesse */
+function updateWarpStreaks(dt){
+  const L = jumpState ? 0 : WARP_LEVEL;
+  if(L < 0.01){ if(WARP_STREAKS) WARP_STREAKS.visible = false; return; }
+  if(!WARP_STREAKS) WARP_STREAKS = buildWarpStreaks();
+  const u = WARP_STREAKS.material.uniforms;
+  _wsFwd.set(0, 0, -1).applyQuaternion(shipRig.quaternion);
+  _wsU.copy(_wsY).addScaledVector(_wsFwd, -_wsY.dot(_wsFwd)).normalize();
+  u.uCenter.value.copy(shipRig.position); u.uDir.value.copy(_wsFwd); u.uU.value.copy(_wsU); u.uW.value.crossVectors(_wsFwd, _wsU);
+  WARP_STREAK_OFF = (WARP_STREAK_OFF + currentSpeed*dt) % u.uSpan.value;
+  u.uOff.value = WARP_STREAK_OFF; u.uLen.value = -Math.min(currentSpeed*0.09, 170) - 2;
+  u.uAlpha.value = 0.9*warpSmooth((L - 0.15)/0.85);
+  WARP_STREAKS.visible = u.uAlpha.value > 0.01;
+}
 /* =========================================================================
    8. COMMANDES DE VOL — dérive automatique par défaut, prise de contrôle
       au clavier (ZQSD / flèches / AE) ou à la souris (glisser)
@@ -6424,7 +7356,7 @@ function renderMain(){
 }
 function warpSmooth(x){ x = Math.max(0, Math.min(1, x)); return x*x*(3 - 2*x); }
 function endWarpJump(){
-  WARP.active = false; WARP_THR = null; WARP_SPIN = 1; SHIPGEN.JUMP_U.uCharge.value = 0; shipMesh.scale.set(1, 1, 1);
+  WARP.active = false; WARP_THR = null; WARP_SPIN = 1; SHIPGEN.JUMP_U.uCharge.value = 0; shipMesh.scale.set(1, 1, 1); shipMesh.position.set(0, 0, 0); hideJumpGrid();
   const u = WARP.mat.uniforms; u.uLens.value = u.uRipple.value = u.uRippleAmp.value = u.uFlash.value = u.uChroma.value = 0;
   ['jumpVignette', 'jumpFlash', 'speedlines'].forEach(function(id){ const el = document.getElementById(id); if(el) el.style.opacity = '0'; });
   const banner = document.getElementById('jumpBanner'); if(banner) banner.style.display = 'none';
@@ -6436,19 +7368,32 @@ function updateJumpSequence(dt){
   const banner = document.getElementById('jumpBanner'), vignette = document.getElementById('jumpVignette'), flashEl = document.getElementById('jumpFlash');
   if(banner){ banner.style.display = 'block'; banner.textContent = t('jumpBannerText'); }
   let field = 0, lens = 0, stretch = 0, flash = 0, ripple = 0, rAmp = 0, chroma = 0, thr = 0.05, vig = 0.45, spin = 1;
+  /* quadrillage d'espace-temps (v2.16, §31.4) : puits, torsion, opacité, onde ; glissement du vaisseau dans le puits */
+  let depth = 0, twist = 0, gop = 0, gRip = 0, gRipA = 0, slide = 0;
+  const slideOf = function(x){ const e = Math.min(1, Math.max(0, (x - T1)/(WARP_T.fold + WARP_T.flash*0.5))); return e*e; };
+  const arrival = function(u){      /* à l'arrivée : un nouveau puits se referme en ondulant */
+    const e = Math.min(1, u/(T4 - T2 - WARP_T.flash*0.5));
+    depth = 0.9*Math.exp(-e*4.6)*Math.cos(e*8.0); twist = -2.2*Math.exp(-e*3.6); gop = 1 - warpSmooth((e - 0.45)/0.55);
+    gRip = 0.04 + 1.0*e; gRipA = 0.07*(1 - e);
+  };
   if(tt < T1){            /* charge : moteurs coupés, anneaux qui montent en régime, bulle */
     const k = warpSmooth(tt/T1); field = k; spin = 1 + 5*k; lens = 0.12*warpSmooth((tt - 0.8)/(T1 - 0.8));
     thr = 0.05 + 0.3*(1 - k); vig = 0.45*k;
+    depth = 0.55*k*k; twist = 0.5*k; gop = warpSmooth(tt/0.8);
   } else if(tt < T2){     /* pli : l'espace se creuse autour du vaisseau, qui s'étire */
     const e = Math.pow((tt - T1)/WARP_T.fold, 2); field = 1 + 0.8*e; spin = 6 + 12*e; lens = 0.12 + 0.88*e; stretch = e; chroma = 0.015 + 0.05*e;
+    depth = 0.55 + 0.75*e; twist = 0.5 + 2.6*e; gop = 1; slide = slideOf(tt);
   } else if(tt < T3){     /* saut : éclair, téléportation au milieu */
     const k = (tt - T2)/WARP_T.flash; flash = Math.sin(k*Math.PI);
     if(!jumpState.teleported && k >= 0.5){ shipMesh.scale.set(1, 1, 1); performQuantumTeleport(jumpState); jumpState.teleported = true; }
     stretch = jumpState.teleported ? 0 : 1 + k; lens = jumpState.teleported ? 0.8 : 1; field = jumpState.teleported ? 0.6 : 1.8; spin = 18;
     ripple = jumpState.teleported ? 0.02 : 0; rAmp = 0.03; chroma = 0.06;
+    if(jumpState.teleported) arrival(tt - (T2 + WARP_T.flash*0.5));
+    else { depth = 1.3 + 0.3*k; twist = 3.1; gop = 1; slide = slideOf(tt); }
   } else if(tt < T4){     /* onde : à l'arrivée, l'espace se relâche */
     const k = (tt - T3)/WARP_T.wave; lens = 0.8*(1 - warpSmooth(k)); ripple = 0.02 + 1.3*k; rAmp = 0.03*(1 - k);
     chroma = 0.04*(1 - k); field = 0.6*(1 - k); thr = 0.05 + 0.3*warpSmooth(k); vig = 0.45*(1 - k);
+    arrival(tt - (T2 + WARP_T.flash*0.5));
   } else { endWarpJump(); return; }
   WARP.active = true; WARP_THR = thr; WARP_SPIN = spin;
   SHIPGEN.JUMP_U.uCharge.value = field;
@@ -6456,6 +7401,8 @@ function updateJumpSequence(dt){
   const u = WARP.mat.uniforms; u.uLens.value = lens; u.uRipple.value = ripple; u.uRippleAmp.value = rAmp; u.uFlash.value = flash*0.9; u.uChroma.value = chroma;
   if(vignette) vignette.style.opacity = String(vig);
   if(flashEl) flashEl.style.opacity = String(flash*0.5);
+  setJumpGrid(depth, twist, gop, gRip, gRipA, tt);
+  shipMesh.position.set(0, -SHIP_GAME_LEN*0.3*slide, 0);    /* le vaisseau glisse dans le puits avant de disparaître */
 }
 /* ---------- interaction souris sur la carte (glisser = orbite, molette =
    zoom, clic = sélection, double-clic = confirmation directe) ---------- */
@@ -8067,7 +9014,7 @@ function updateFlight(dt, elapsed){
   }
 
   const speedlines = document.getElementById('speedlines');
-  speedlines.style.opacity = String(Math.max(boosting ? 0.5 : 0, 0.45*WARP_LEVEL));
+  speedlines.style.opacity = boosting && WARP_LEVEL < 0.2 ? '0.5' : '0';   /* v2.16 : en supraluminique, traînées 3D (updateWarpStreaks) */
 
   /* réacteurs : le cœur et le panache réagissent à la poussée.
      Scintillement volontairement faible (±2 %) et lent : un moteur de
@@ -8084,6 +9031,7 @@ function updateFlight(dt, elapsed){
     mainPowers[i] = THREE.MathUtils.clamp(enginePowerBase*flicker, 0, 1);
   });
   if(!jumpState) SHIPGEN.FTL_U.uField.value = 0.45*WARP_LEVEL;   /* bulle de distorsion pendant la croisière supraluminique */
+  updateWarpStreaks(dt);                                          /* v2.16 : traînées d'étoiles */
   SHIPGEN.tick(elapsed, dt, jumpState ? WARP_SPIN : 1 + 5*WARP_LEVEL);
   SHIPGEN.setDrive({ throttle: WARP_THR !== null ? WARP_THR : (boosting ? 1.0 : 0.3 + 0.5*enginePowerBase) });
   (window.__engineCones||[]).forEach(function(c){
@@ -8628,19 +9576,27 @@ let chunkAccum = 0;
    vaisseau — chaque planète est éclairée par SON soleil), dérive des
    nuages (via uTime), orbite des satellites.
    ========================================================================= */
-const _planetLightDir = new THREE.Vector3();
+const _planetLightDir = new THREE.Vector3(), _planetSun = new THREE.Color(), _planetBuf = new THREE.Vector2();
 function updatePlanetSystems(dt, elapsed){
+  window.__PLANETS.setPixelAngle(camera.fov, renderer.getDrawingBufferSize(_planetBuf).y);
+  window.__PLANETS.lodFrame();
   ROUTE.builtSystems.forEach(function(grp, legIndex){
     const leg = ROUTE.legs[legIndex];
     if(!leg || !leg.system) return;
     leg.system.planets.forEach(function(p){
       if(!p.mesh) return;
       p.mesh.rotation.y += p.spinSpeed*dt;
-      const u = p.mesh.material.uniforms;
-      u.uTime.value = elapsed;
-      _planetLightDir.copy(leg.starPosition).sub(p.position).normalize();
-      u.uLightDir.value.copy(_planetLightDir);
-      u.uLightColor.value.setRGB(leg.star.color.r, leg.star.color.g, leg.star.color.b);
+      if(p.fx){      /* planète détaillée (v2.16) : éclairage, nuages en couches, atmosphère, détail selon la distance */
+        _planetSun.setRGB(leg.star.color.r, leg.star.color.g, leg.star.color.b);
+        window.__PLANETS.update(p, leg.starPosition, _planetSun, elapsed, camera.position);
+        window.__PLANETS.lod(p, camera.position);
+      } else {
+        const u = p.mesh.material.uniforms;
+        u.uTime.value = elapsed;
+        _planetLightDir.copy(leg.starPosition).sub(p.position).normalize();
+        u.uLightDir.value.copy(_planetLightDir);
+        u.uLightColor.value.setRGB(leg.star.color.r, leg.star.color.g, leg.star.color.b);
+      }
       (p.moonPivots||[]).forEach(function(pivot){
         pivot.rotation.y += pivot.userData.speed*dt;
       });
@@ -8648,10 +9604,31 @@ function updatePlanetSystems(dt, elapsed){
   });
 }
 
+/* v2.16 — résolution dynamique (reprise de la démo) : quand les images dépassent ~23 ms
+   en moyenne (gros plan planétaire, shaders procéduraux), la définition baisse par paliers
+   de 10 %, puis remonte doucement quand le débit revient. ?quality=low réduit le plafond,
+   ?quality=fixed fige la résolution (captures reproductibles). */
+const DYNRES = (function(){
+  const q = new URLSearchParams(location.search).get('quality');
+  const max = Math.min(window.devicePixelRatio || 1, 2)*(q === 'low' ? 0.6 : 1);
+  return { fixed:q === 'fixed', max:max, pr:max, ema:16.7, last:0, prev:performance.now() };
+})();
+renderer.setPixelRatio(DYNRES.pr);
+function adaptResolution(){
+  const now = performance.now(), ms = now - DYNRES.prev; DYNRES.prev = now;
+  DYNRES.ema = DYNRES.ema*0.92 + Math.min(ms, 100)*0.08;
+  if(DYNRES.fixed || document.hidden || now - DYNRES.last < 700) return;
+  const old = DYNRES.pr;
+  if(DYNRES.ema > 23 && DYNRES.pr > 0.45) DYNRES.pr = Math.max(0.45, DYNRES.pr - 0.1);
+  else if(DYNRES.ema < 18.5 && DYNRES.pr < DYNRES.max) DYNRES.pr = Math.min(DYNRES.max, DYNRES.pr + 0.05);
+  if(DYNRES.pr !== old){ renderer.setPixelRatio(DYNRES.pr); renderer.setSize(window.innerWidth, window.innerHeight); DYNRES.last = now; }
+}
+
 function animate(){
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.1);
   const elapsed = clock.getElapsedTime();
+  adaptResolution();
 
   /* travelling de fond de l'écran-titre (demande utilisateur) : tant que
      la partie n'a pas commencé, on ne fait tourner qu'une caméra
@@ -8801,9 +9778,13 @@ function animate(){
   const LABEL_RANGE = STAR_PROXIMITY_RANGE * 1.5;
   const winW = window.innerWidth, winH = window.innerHeight;
   const margin = 60;
-  starField.forEach(function(obj){
+  /* v2.16 : les soleils des systèmes construits gardent un disque et un halo visibles de loin */
+  const hostCells = new Set();
+  ROUTE.builtSystems.forEach(function(g, i){ const L = ROUTE.legs[i]; if(L && L.cell) hostCells.add(L.cell); });
+  starField.forEach(function(obj, key){
     if(!obj) return;
     const d = obj.mesh.position.distanceTo(shipPos);
+    const host = hostCells.has(key);
     const distPc = Math.max(d/38, 1e-3);
 
     /* magnitude apparente réelle, puis conversion en éclat perçu.
@@ -8816,13 +9797,17 @@ function animate(){
 
     /* le disque stellaire grandit selon son diamètre ANGULAIRE (∝ R/d) */
     const angular = THREE.MathUtils.clamp(obj.baseCore*26/Math.max(d, 1), 0.3, 9.0);
-    obj.core.scale.setScalar(angular);
+    const kCore = host ? Math.max(angular, d*0.0042/obj.baseCore) : angular;
+    obj.core.scale.setScalar(kCore);
     obj.core.material.uniforms.time.value = elapsed;
 
     /* le halo grossit avec l'éclat perçu : c'est le "bloom" des étoiles
        brillantes, effet de diffusion dans l'optique comme dans l'œil */
-    obj.halo.scale.setScalar(obj.baseHalo * (0.55 + perceived*0.55));
-    obj.halo.material.opacity = THREE.MathUtils.clamp(0.25 + perceived*0.35, 0.15, 1.0);
+    if(host){ obj.halo.scale.setScalar(Math.max(obj.baseHalo*1.4, obj.baseCore*kCore*7)); obj.halo.material.opacity = 1; }
+    else {
+      obj.halo.scale.setScalar(obj.baseHalo * (0.55 + perceived*0.55));
+      obj.halo.material.opacity = THREE.MathUtils.clamp(0.25 + perceived*0.35, 0.15, 1.0);
+    }
 
     /* n'étiqueter que les étoiles effectivement détectables (mag < 9) */
     if(d > LABEL_RANGE || mag > 9){ obj.label.style.display = 'none'; return; }
