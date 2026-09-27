@@ -338,7 +338,7 @@
       if(hero) label(g, placed, '▲ ' + hero.name, X, Y - pr - 10, F(9.5), '#ffb454', false); });
     // vaisseaux en transit (hors des orbites planétaires)
     loose.forEach(s => { const r = Math.hypot(s.pos[0], s.pos[1], s.pos[2]), a = Math.atan2(dot(s.pos, info.basis.l), dot(s.pos, info.basis.s)), [X, Y] = P(r, a);
-      const fa = Math.atan2(-dot(s.fwd, info.basis.l), dot(s.fwd, info.basis.s)); chevron(g, X, Y, fa, s.craft ? 3.5 : 5, s.hero ? '#ffb454' : '#5eead4');
+      const fa = Math.atan2(-dot(s.fwd, info.basis.l), dot(s.fwd, info.basis.s)); chevron(g, X, Y, fa, s.craft ? 3.5 : 5, s.hero ? '#ffb454' : (s.mil ? '#ff6b5e' : '#5eead4'));
       hit(X, Y, 7, Object.assign({ kind: 'ship' }, s), 5); label(g, placed, s.name, X, Y, F(9.5), s.hero ? '#ffb454' : '#b9c4dc', s.hero, s.hero ? s.type : null); });
     // étiquettes d'anneaux (zone habitable, ceinture) : premier emplacement libre sur le cercle
     const ringLabel = (t, r, col) => { if(r < 30) return; g.font = F(9); const w = g.measureText(t).width;
@@ -383,7 +383,7 @@
     // vaisseaux : trace d'orbite discrète, chevron orienté, étiquette nom + immatriculation + altitude
     g.lineWidth = 1; ships.forEach(s => { if(s.craft) return; g.strokeStyle = s.hero ? 'rgba(255,180,84,.28)' : 'rgba(94,234,212,.12)'; g.beginPath(); g.arc(Ox, Oy, gm(s.d)*k, 0, TAU); g.stroke(); });
     ships.sort((a, b) => (b.hero - a.hero) || (a.d - b.d)).forEach(s => { const [X, Y] = at(s.rel, s.d), fa = Math.atan2(-dot(s.fwd, B.l), dot(s.fwd, B.s));
-      chevron(g, X, Y, fa, s.craft ? 3.6 : 5.2, s.hero ? '#ffb454' : (s.craft ? '#8ea0c4' : '#5eead4'));
+      chevron(g, X, Y, fa, s.craft ? 3.6 : 5.2, s.hero ? '#ffb454' : (s.mil ? '#ff6b5e' : (s.craft ? '#8ea0c4' : '#5eead4')));
       hit(X, Y, 7, Object.assign({ kind: 'ship' }, s), 5);
       label(g, placed, s.name, X, Y, F(9.5, s.hero ? 700 : 400), s.hero ? '#ffb454' : '#d5dcea', s.hero, s.reg + ' · ' + C.fmtU(s.d - R) + ' up', '#5d6f92'); });
     if(!cur) { g.font = F(10); g.fillStyle = '#5d6f92'; g.fillText('Ships are only tracked in the current system.', 14, H - 20); }
@@ -443,7 +443,7 @@
       a = isCur ? btn('▶ SEND CAMERA', 'go') : btn('▶ JUMP TO THIS SYSTEM', 'go');
     } else if(o.kind === 'ship'){
       const all = liveShips(), s = all.find(x => x.uid === o.uid) || o, hero = all.find(x => x.hero);
-      h = '<div class="nm' + (s.hero ? ' a' : '') + '">' + esc(s.name) + '</div>' + (s.hero ? '<span class="tag a">HERO</span>' : '') + (s.subj ? '<span class="tag c">ON SCREEN</span>' : '') +
+      h = '<div class="nm' + (s.hero ? ' a' : '') + '">' + esc(s.name) + '</div>' + (s.hero ? '<span class="tag a">HERO</span>' : '') + (s.subj ? '<span class="tag c">ON SCREEN</span>' : '') + (s.mil ? '<span class="tag" style="color:#ff6b5e;border-color:#ff6b5e">MILITARY</span>' : '') +
         ln('Type', esc(s.type)) + ln('Registration', esc(s.reg)) + ln('Length', Math.round(s.len) + ' m') + (hero && !s.hero ? ln('From the hero', C.fmtU(dist3(hero.pos, s.pos))) : '') + ln('Phase', esc(s.seg));
       a = btn('▶ SEND CAMERA', 'go');
     }

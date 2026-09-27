@@ -180,7 +180,21 @@ void main(){
   gl_FragColor = vec4(col*a, 1.0);
 }`;
 
-/* ---------- éjection de masse coronale (coquille qui s'étend) ---------- */
+/* ---------- éjection de masse coronale (coquille qui s'étend) ----------
+   v7.2.2 : plus de demi-sphère franche — coquille à peine ondulée, brillance de bord qui
+   s'efface avant la silhouette (bord plume, déchiqueté par le bruit), fondu large et irrégulier au bord ouvert de la
+   calotte, filaments qui dérivent vers l'extérieur. */
+const CME_VERT = `
+varying vec3 vN; varying vec3 vWN; varying vec3 vWP;
+uniform float uTime;
+${HASH}
+void main(){
+  vec3 n = normalize(position);
+  float d = 0.025*(n3(n*3.5 + vec3(0.0, uTime*0.2, 0.0)) - 0.5);          /* ondulation légère : la silhouette reste celle de la sphère (bord plume exact) */
+  vN = n; vWN = normalize((modelMatrix*vec4(normal, 0.0)).xyz);
+  vec4 wp = modelMatrix*vec4(position*(1.0 + d), 1.0); vWP = wp.xyz;
+  gl_Position = projectionMatrix*viewMatrix*wp;
+}`;
 const CME_FRAG = `
 precision highp float;
 varying vec3 vN; varying vec3 vWN; varying vec3 vWP;
@@ -188,10 +202,14 @@ uniform float uAlpha; uniform float uTime; uniform vec3 uTint;
 ${HASH}
 void main(){
   vec3 N = normalize(vWN), V = normalize(cameraPosition - vWP);
-  float rim = pow(1.0 - abs(dot(N, V)), 2.2);
-  float nz = 0.5 + 0.5*n3(normalize(vN)*9.0 + uTime*0.4);
-  float cap = smoothstep(0.0, 0.35, vN.y);                  /* bord de la calotte adouci */
-  gl_FragColor = vec4(uTint*rim*nz*uAlpha*cap, 1.0);
+  float c = abs(dot(N, V));
+  vec3 q = normalize(vN);
+  float n1 = n3(q*5.0 + vec3(0.0, -uTime*0.35, 0.0)), n2 = n3(q*14.0 - uTime*0.5), n3v = n3(q*31.0 + uTime*0.2);
+  float limb = pow(1.0 - c, 1.7);                                     /* coquille vue par la tranche : plus lumineuse… */
+  float feather = smoothstep(0.0, 0.38, c - 0.3*(n2 - 0.5) - 0.06);    /* …mais effacée avant la silhouette : bord plume, déchiqueté par le bruit */
+  float cap = smoothstep(0.26, 0.6 + 0.25*n1, q.y);                    /* bord ouvert de la calotte : fondu large et irrégulier */
+  float wisp = 0.12 + 0.88*smoothstep(0.42, 0.88, n1*0.7 + n2*0.35 + n3v*0.15);  /* filaments, trouées */
+  gl_FragColor = vec4(uTint*limb*feather*cap*wisp*uAlpha*1.2, 1.0);
 }`;
 
 function stripGeometry(N, M){
@@ -243,7 +261,7 @@ ST.create = function(leg, PIX, host){
   }
   // éjection de masse coronale (réutilisée à chaque éruption)
   const cme = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24, 0, Math.PI*2, 0, Math.PI*.42), new THREE.ShaderMaterial({ uniforms: { uAlpha:{value:0}, uTime:{value:0}, uTint:{value:new V3(1.0, .8, .7)} },
-    vertexShader: PH_VERT, fragmentShader: CME_FRAG, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, side:THREE.DoubleSide }));
+    vertexShader: CME_VERT, fragmentShader: CME_FRAG, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending, side:THREE.DoubleSide }));
   cme.visible = false; cme.renderOrder = 7; root.add(cme);
   // halo : éblouissement modulé par l'occultation
   const glowC = col.clone().lerp(new THREE.Color(1,1,1), .35);

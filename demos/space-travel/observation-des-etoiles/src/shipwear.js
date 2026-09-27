@@ -19,7 +19,7 @@ const PARS_V = `
 attribute vec3 aShip;
 varying vec3 vShip;`;
 const PARS_F = `
-uniform float uAge; uniform float uWSeed; uniform vec2 uZr; uniform float uWLen; uniform float uWKind;
+uniform float uAge; uniform float uWSeed; uniform vec2 uZr; uniform float uWLen; uniform float uWKind; uniform float uDark; uniform float uFlood; uniform vec4 uSpotP[4]; uniform vec4 uSpotD[4]; uniform vec4 uRing; uniform float uRingI;
 varying vec3 vShip;
 float wRust = 0.0, wSoot = 0.0, wChip = 0.0, wGrime = 0.0, wH = 0.0, wScr = 0.0, wGrain = 0.0;
 float wh(vec3 p){ p = fract(p*0.3183099 + 0.1); p *= 17.0; return fract(p.x*p.y*p.z*(p.x + p.y + p.z)); }
@@ -43,6 +43,7 @@ float wDetail(inout vec3 col){
   wScr = (1.0 - smoothstep(0.0, 0.012 + fw*3.0, sc))*step(0.55, wn(p*0.9 + 7.0))*f2*(uWKind > 1.5 && uWKind < 2.5 ? 0.5 : 1.0);
   h -= wScr*0.012;
   col *= 1.0 + 0.09*wScr + 0.08*wGrain;
+  col += (0.028*wScr + 0.004*wGrain)*uDark*vec3(1.0, 1.0, 1.02);      /* rayures : métal clair sous une peinture sombre */
   return h;
 }
 /* kinds : 0 coque peinte (tôles), 1 tuyères, 2 structure métallique, 4 pièces peintes / conteneurs */
@@ -59,7 +60,8 @@ void wearColor(inout vec3 col, float seam){
   wGrime = A*(0.35 + 0.65*smoothstep(0.52, 0.66, g2 + 0.12*seam));   /* voile général + taches franches */
   /* peinture passée : désaturée et jaunie */
   float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
-  col = mix(col, lum*vec3(1.05, 0.92, 0.72), (engine ? 0.15 : 0.7)*A);
+  col = mix(col, lum*vec3(1.05, 0.92, 0.72), (engine ? 0.15 : 0.7)*A*(1.0 - uDark));
+  col = mix(col, vec3(lum*1.25 + 0.012), 0.55*A*uDark*(hull ? 1.0 : 0.5));   /* peinture sombre : farinage (oxydation mate, plus claire) */
   /* tôles remplacées (coque) : apprêt rouge, gris neutre ou blanc neuf */
   if(hull){
     vec3 cell = floor(p/vec3(4.2, 4.2, 5.6));
@@ -85,8 +87,10 @@ void wearColor(inout vec3 col, float seam){
   /* suie autour des tuyères (poupe) et crasse */
   float soot = engine ? 0.6 + 0.4*g : smoothstep(uZr.y - 0.2*uWLen, uZr.y, vShip.z)*(0.5 + 0.5*g);
   wSoot = A*soot;
-  col *= (1.0 - 0.55*wGrime)*(1.0 - 0.6*wSoot);
-  col = mix(col, col*vec3(0.9, 0.8, 0.66), wGrime*0.7);
+  vec3 cg = col*(1.0 - 0.55*wGrime);
+  cg = mix(cg, cg*vec3(0.9, 0.8, 0.66), wGrime*0.7);
+  vec3 dust = wLin(vec3(0.43, 0.41, 0.38));                            /* peinture sombre : la poussière éclaircit au lieu d'assombrir */
+  col = mix(cg, mix(col, dust, 0.42*wGrime), uDark)*(1.0 - 0.6*wSoot);
   /* éclats de peinture : métal nu */
   float ch = wn(p*2.7)*wn(p*9.0 + 3.0);
   float chw = max(0.05, 1.5*fwidth(ch));                              /* éclats : bord adouci à l'échelle du pixel (v7.1) */
@@ -96,6 +100,35 @@ void wearColor(inout vec3 col, float seam){
   if(engine){ float band = sin(vShip.z*1.7 + wn(p*0.8)*3.0)*0.5 + 0.5; col = mix(col, mix(wLin(vec3(0.45, 0.30, 0.18)), wLin(vec3(0.25, 0.22, 0.42)), band), 0.55*A); }
   /* relief : cloques de rouille, éclats, bosses */
   wH = wRust*(0.6 + 0.4*rf) - wChip*0.4 + A*0.3*wfbm(p*0.5);
+}`;
+/* projecteurs de coque (v7.2) : cônes analytiques en coordonnées vaisseau, lumière chaude ajoutée à l'émission ;
+   normale de face tirée des dérivées (coques à facettes) ; portée limitée : pas d'ombres portées à calculer */
+const FLOOD = `
+{
+  if(uFlood > 0.001){
+    vec3 fn = normalize(cross(dFdx(vShip), dFdy(vShip)));
+    vec3 fl = vec3(0.0);
+    for(int i = 0; i < 4; i++){
+      vec3 lv = uSpotP[i].xyz - vShip; float d2 = dot(lv, lv), dd = sqrt(d2); vec3 ld = lv/max(dd, 1e-3);
+      float cone = smoothstep(uSpotD[i].w, uSpotD[i].w + 0.08, dot(-ld, uSpotD[i].xyz));
+      float rr = uSpotP[i].w, att = 1.0/(1.0 + d2/(rr*rr*0.2))*(1.0 - smoothstep(0.7*rr, rr, dd));
+      fl += cone*att*max(dot(fn, ld), 0.0);
+    }
+    totalEmissiveRadiance += diffuseColor.rgb*vec3(1.0, 0.9, 0.74)*fl*uFlood*3.2;
+  }
+  if(uRingI > 0.02 && uRing.w > 0.5){                                  /* anneaux de distorsion (v7.2) : lueur bleue sur la coque proche */
+    vec3 fn = normalize(cross(dFdx(vShip), dFdy(vShip)));
+    float rl = 0.0;
+    for(int i = 0; i < 2; i++){
+      if(float(i) > uRing.w - 0.5) break;
+      float zr = i == 0 ? uRing.x : uRing.y;
+      vec2 xy = vShip.xy; float r = length(xy);
+      vec3 rp = vec3(xy/max(r, 1e-3)*uRing.z, zr), lv = rp - vShip; float dd = length(lv);
+      rl += max(dot(fn, lv/max(dd, 1e-3)), 0.0)/(1.0 + pow(dd/(0.18*uRing.z + 2.0), 2.0));
+    }
+    float f = max(uRingI - 0.15, 0.0);
+    totalEmissiveRadiance += diffuseColor.rgb*vec3(0.35, 0.6, 1.0)*rl*f*2.2;
+  }
 }`;
 const AFTER_MAP = `
 {
@@ -123,9 +156,10 @@ function WEAR_OBC(shader){
   shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>' + PARS_F)
     .replace('#include <map_fragment>', '#include <map_fragment>' + AFTER_MAP)
     .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>' + AFTER_METAL)
-    .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>' + AFTER_NORMAL);
+    .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>' + AFTER_NORMAL)
+    .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>' + FLOOD);
 }
-const WEAR_KEY = () => 'shipwear-v1';
+const WEAR_KEY = () => 'shipwear-v2';
 function kindOf(m){
   if(m.userData && m.userData.wearKind !== undefined) return m.userData.wearKind;   // pièce qui déclare sa nature (ex. moteurs de shipdrive.js)
   if(m.bumpMap) return 0;                                                            // coque à tôles
@@ -134,12 +168,68 @@ function kindOf(m){
   return 2;                                                                          // structure métallique
 }
 
+/* ---------- livrées (v7.2) ----------
+   Le jeu peint chaque vaisseau avec 3 teintes sur la même texture de tôles : coque (#e2e7eb), intermédiaire (#a4acb6) et livrée
+   (couleur du modèle). Une palette remplace ces teintes sur les copies de matériaux : aucun coût par image.
+   Teintes sombres converties en linéaire (vraiment sombres à l'écran) ; accents laissés comme ceux du jeu. */
+const PAL = {
+  jeu:        null,
+  anthracite: { hull: 0x4a4f57, mid: 0x33373d, acc: null,     dark: 1,   rough: .5 },
+  nuit:       { hull: 0x2e3b55, mid: 0x212a3b, acc: 0xd9a441, dark: 1,   rough: .48 },
+  bouteille:  { hull: 0x2f4539, mid: 0x223229, acc: 0xcdb27a, dark: 1,   rough: .5 },
+  bordeaux:   { hull: 0x552a2e, mid: 0x361d20, acc: 0xb8bcc3, dark: 1,   rough: .48 },
+  noir:       { hull: 0x26282c, mid: 0x1b1c1f, acc: 0xe0701f, dark: 1,   rough: .55 },
+  acier:      { hull: 0x8a9099, mid: 0x656b73, acc: null,     dark: .4,  rough: .6 }
+};
+const DARKS = ['anthracite', 'nuit', 'bouteille', 'bordeaux', 'noir'];
+const P_DARK = { l20: .12, x1: .5, tS: .35, tM: .35, tL: .35 };            // paquebots rarement sombres, coureurs indépendants souvent
+W.PAL = PAL;
+function hashSeed(n){ let t = (n >>> 0) + 0x6D2B79F5; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0)/4294967296; }
+W.pickLivery = function(model, seed, force){
+  const q = force || new URLSearchParams(location.search).get('livery');
+  if(q && PAL.hasOwnProperty(q)) return q;
+  const a = hashSeed(seed*7 + 11), b = hashSeed(seed*13 + 5);
+  if(q === 'dark') return DARKS[Math.floor(b*DARKS.length)];
+  if(q === 'light' || q === 'jeu') return 'jeu';
+  const pd = P_DARK[model] !== undefined ? P_DARK[model] : .3;
+  if(a < pd) return DARKS[Math.floor(b*DARKS.length)];
+  return a < pd + .1 ? 'acier' : 'jeu';
+};
+const LIV = { e18: 0xd98c2b, e140: 12601647, p10: 0x2f8f86, p44: 4026291, g1: 2977696, tS: 0x3aa0c9, tM: 0xd98c2b, tL: 0xb8433a, l20: 13214282, x1: 0xcc5a24 };
+const lin = h => new THREE.Color(h).convertSRGBToLinear();                     // le jeu passe ses couleurs en linéaire à la construction
+const HULL_L = lin(0xe2e7eb), MID_L = lin(0xa4acb6);
+const near = (a, b) => Math.abs(a.r - b.r) + Math.abs(a.g - b.g) + Math.abs(a.b - b.b) < .03;   // tolérance : arrondis de conversion du jeu
+function recolor(mm, pal, model){
+  const c = mm.color; let hit = true;
+  if(near(c, HULL_L)) c.copy(lin(pal.hull));
+  else if(near(c, MID_L)) c.copy(lin(pal.mid));
+  else if(LIV[model] !== undefined && near(c, lin(LIV[model]))){ if(pal.acc !== null) c.copy(lin(pal.acc)); }   // livrée du modèle → accent
+  else hit = false;
+  if(hit && pal.rough) mm.roughness = pal.rough;                               // peinture un peu satinée : reflet du soleil lisible
+}
+/* projecteurs : 4 cônes posés contre les flancs, qui éclairent la proue et la poupe (portée ≈ 40 % de la longueur) */
+function placeSpots(U, box, pal, model){
+  if(!box || box.isEmpty()) return;
+  const c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3()), L = sz.z, wx = sz.x/2, hy = sz.y/2;
+  const rr = Math.max(10, Math.min(110, .5*L)), off = Math.max(3, Math.min(25, .12*L)), ang = Math.cos(.45);
+  [[1, -1], [-1, -1], [1, 1], [-1, 1]].forEach(([sx, sz_], i) => {
+    const P = U.uSpotP.value[i], D = U.uSpotD.value[i];
+    P.set(c.x + sx*(wx + off), c.y + .25*hy, c.z - sz_*.06*L, rr);
+    const d = new THREE.Vector3(-sx*.55, -.1, sz_).normalize(); D.set(d.x, d.y, d.z, ang);
+  });
+  U.uFlood.value = pal && pal.dark >= 1 ? 1 : (model === 'l20' ? .55 : 0);
+}
+
+W.floods = function(U, box, k){ placeSpots(U, box, { dark: 1 }, ''); U.uFlood.value = k === undefined ? 1 : k; };   // v7.4 : projecteurs pour d'autres générateurs
 /* applique l'usure à un vaisseau construit ; unit = mètres par unité locale du groupe */
 W.apply = function(group, age, seed, unit){
   unit = unit || 1; age = clamp(+age || 0, 0, 1);
   group.updateMatrixWorld(true);
   const inv = new THREE.Matrix4().copy(group.matrixWorld).invert();
-  const U = { uAge:{ value: age }, uWSeed:{ value: ((seed >>> 0) % 997)*.113 + .37 }, uZr:{ value: new THREE.Vector2() }, uWLen:{ value: 1 } };
+  const U = { uAge:{ value: age }, uWSeed:{ value: ((seed >>> 0) % 997)*.113 + .37 }, uZr:{ value: new THREE.Vector2() }, uWLen:{ value: 1 },
+    uDark:{ value: 0 }, uFlood:{ value: 0 }, uRing:{ value: new THREE.Vector4() }, uRingI:{ value: 0 }, uSpotP:{ value: [0, 1, 2, 3].map(() => new THREE.Vector4(0, 0, 0, 1)) }, uSpotD:{ value: [0, 1, 2, 3].map(() => new THREE.Vector4(0, 0, 1, 2)) } };
+  const pal = W.livery;                                                   // livrée choisie par l'enveloppe (v7.2), sinon couleurs du jeu
+  if(pal && pal.dark) U.uDark.value = pal.dark;
   const mats = new Map(), v = new THREE.Vector3(); let zmin = Infinity, zmax = -Infinity;
   group.traverse(o => {
     if(!o.isMesh || o.isInstancedMesh || !o.geometry || !o.geometry.attributes.position) return;
@@ -156,10 +246,11 @@ W.apply = function(group, age, seed, unit){
       if(!m || !m.isMeshStandardMaterial) return m;
       if(mats.has(m)) return mats.get(m);
       const mm = m.clone();                                   // copie par vaisseau : aucun matériau partagé n'est modifié
+      if(pal && m.map && m.bumpMap && m.userData.wearKind === undefined) recolor(mm, pal, W.liveryModel);
       mm.userData = Object.assign({}, m.userData);            // copie superficielle : les uniformes d'autres modules restent liés
       mm.userData.wear = Object.assign({ uWKind:{ value: kindOf(m) } }, U);
       const pre = m.onBeforeCompile !== THREE.Material.prototype.onBeforeCompile ? m.onBeforeCompile : null;   // injection existante (moteurs) : enchaînée
-      if(pre){ const preKey = m.customProgramCacheKey ? m.customProgramCacheKey() : ''; mm.onBeforeCompile = function(sh, r){ pre.call(this, sh, r); WEAR_OBC.call(this, sh, r); }; mm.customProgramCacheKey = () => 'shipwear-v1+' + preKey; }
+      if(pre){ const preKey = m.customProgramCacheKey ? m.customProgramCacheKey() : ''; mm.onBeforeCompile = function(sh, r){ pre.call(this, sh, r); WEAR_OBC.call(this, sh, r); }; mm.customProgramCacheKey = () => 'shipwear-v2+' + preKey; }
       else { mm.onBeforeCompile = WEAR_OBC; mm.customProgramCacheKey = WEAR_KEY; }
       mm.extensions = Object.assign({}, mm.extensions || {}, { derivatives: true });
       mats.set(m, mm); return mm;
@@ -174,9 +265,14 @@ W.apply = function(group, age, seed, unit){
 const build0 = SHIPGEN.build;
 SHIPGEN.build = function(model, opts){
   const b = build0.call(SHIPGEN, model, opts);
-  const age = opts && opts.age ? +opts.age : 0;
+  const age = opts && opts.age ? +opts.age : 0, seed = (opts && opts.ageSeed) || 0;
   b.age = age;
-  if(!(opts && opts.wear === false)) b.wear = W.apply(b.group, age, (opts && opts.ageSeed) || 0, 1);   // v7.1 : aussi à l'âge 0 (micro-relief des gros plans)
+  b.livery = W.pickLivery(model, seed, opts && opts.livery);                 // v7.2 : livrée (palette) tirée par graine et par famille
+  if(!(opts && opts.wear === false)){
+    W.livery = PAL[b.livery]; W.liveryModel = model; b.wear = W.apply(b.group, age, seed, 1); W.livery = null;   // v7.1 : aussi à l'âge 0 (micro-relief des gros plans)
+    placeSpots(b.wear, b.hullBox, PAL[b.livery], model);
+    if(b.rings){ const L = b.rings.list; b.wear.uRing.value.set(L[0].z, (L[1] || L[0]).z, L[0].Rin, Math.min(2, L.length)); b.wear.uRingI.value = .15; }
+  }
   return b;
 };
 W.label = a => a < .2 ? 'new' : (a < .62 ? 'used' : 'old');

@@ -53,21 +53,22 @@ function bayOBC(bay){
     reflectedLight.indirectDiffuse += kb*uBayCol*diffuseColor.rgb; }`);
   };
 }
-function mats(bay, paint, accentHex){
+function mats(bay, paint, accentHex, midHex){
   const std = (color, o) => { const m = new THREE.MeshStandardMaterial(Object.assign({ color, metalness: .4, roughness: .6, flatShading: true }, o || {})); m.color.convertSRGBToLinear(); if(m.emissive) m.emissive.convertSRGBToLinear(); m.userData.lin = true;
     m.onBeforeCompile = bayOBC(bay); m.customProgramCacheKey = () => 'craft-bay-v1'; return m; };
   const out = {
     paint: std(paint, { map: PANEL, bumpMap: PANEL, bumpScale: .02, metalness: .3, roughness: .62 }),
-    mid: std(0x8a9098, { map: PANEL, bumpMap: PANEL, bumpScale: .015, metalness: .5, roughness: .5 }),
+    mid: std(midHex || 0x8a9098, { map: PANEL, bumpMap: PANEL, bumpScale: .015, metalness: .5, roughness: .5 }),
     dark: std(0x2c3036, { metalness: .6, roughness: .5 }),
     noz: std(0x3a3c41, { metalness: .85, roughness: .35, side: THREE.DoubleSide, emissive: 0x2a4a7a, emissiveIntensity: .25 }),
     hazard: std(0xffffff, { map: HAZARD, metalness: .2, roughness: .7 }),
     accent: std(0x0a0e14, { emissive: accentHex || 0x2f86ff, emissiveIntensity: 1.3, metalness: .2, roughness: .4 }),
     lamp: std(0x111111, { emissive: 0xfff4e0, emissiveIntensity: 3, metalness: 0, roughness: .3 }),
+    heat: std(0x1a0a06, { emissive: 0xff4a1a, emissiveIntensity: .7, metalness: .3, roughness: .6 }),   // v7.4 : canaux de chaleur des radiateurs
     cargo: {}, std
   };
   // usure : pas de « tôles remplacées » (cellules de 4 m, trop grandes pour un petit engin)
-  [out.paint, out.mid, out.hazard, out.accent, out.lamp].forEach(m => m.userData.wearKind = 4); out.dark.userData.wearKind = 2; out.noz.userData.wearKind = 1;
+  [out.paint, out.mid, out.hazard, out.accent, out.lamp].forEach(m => m.userData.wearKind = 4); out.dark.userData.wearKind = 2; out.heat.userData.wearKind = 2; out.noz.userData.wearKind = 1;
   const std0 = out.std; out.std = (c, o) => { const m = std0(c, o); m.userData.wearKind = 4; return m; };
   return out;
 }
@@ -266,6 +267,9 @@ function greeble(G, M, R, n, x0, x1, y, z0, z1){
     box(G, a, hh, b, R() < .6 ? M.dark : M.mid, x0 + (x1 - x0)*R(), y + hh/2, z0 + (z1 - z0)*R()); }
 }
 const BUILDERS = { maint: buildMaint, crew: buildCrew, drone: buildDrone, lighter: buildLighter };
+/* v7.4 : outils exposés pour d'autres générateurs (warships.js) et enregistrement de nouveaux types */
+CR.H = { T, part, box, prism, cyl, rod, bell, rcsPod, plume, navLight, lampCone, merge, greeble, PANEL, HAZARD, ORDER };
+CR.register = function(kind, builder, paints, name){ BUILDERS[kind] = builder; PAINT[kind] = paints; CR.NAMES[kind] = name; };
 CR.NAMES = { maint: 'Maintenance tender', crew: 'Crew shuttle', lighter: 'Container lighter', drone: { inspect: 'Inspection drone', relay: 'Relay drone', cargo: 'Cargo drone' } };
 
 CR.build = function(kind, opts){
@@ -274,7 +278,8 @@ CR.build = function(kind, opts){
   const G = new THREE.Group();
   const bay = { uBayP: { value: new THREE.Vector4(0, 0, 0, 1e6) }, uBayOn: { value: 0 }, uBayCol: { value: new THREE.Color(.05, .16, .42) } };
   const pal = PAINT[kind] || PAINT.crew, paint = opts.paint || pal[Math.floor(R()*pal.length)];
-  const M = mats(bay, paint, opts.accent);
+  const mil = CR.MIL && CR.MIL[kind];                                             // v7.4 : militaires — structure sombre, feux rouges
+  const M = mats(bay, paint, opts.accent || (mil ? mil.accent : undefined), mil ? mil.mid : undefined);
   const o = { rcs: [], variant: opts.variant, slim: opts.slim, containers: opts.containers };
   const spec = BUILDERS[kind](G, M, o, R);
   const thr = { value: 0 };
@@ -286,12 +291,17 @@ CR.build = function(kind, opts){
   if(kind === 'drone') navLight(G, nav, 0x5aa8ff, 0, spec.navY, 0, .9, .9, .35, R(), .9);
   (spec.lamps || []).forEach(l => lampCone(G, lamps, l[0], l[1], l[2], l[3], kind === 'maint' ? 14 : 9, .28));
   merge(G);
-  if(spec.windows.length && window.__SHIPGLASS){ const gm = __SHIPGLASS.addWindows(G, spec.windows, opts.age || 0, s); gm.renderOrder = ORDER; }
-  if(window.__SHIPWEAR) __SHIPWEAR.apply(G, opts.age || 0, s, 1);                     // v7.1 : aussi neuf (micro-relief des gros plans)
-  G.traverse(m => { if(m.isMesh && m.renderOrder < ORDER) m.renderOrder = ORDER; });
-  const box3 = new THREE.Box3(); G.traverse(m => { if(m.isMesh && !m.userData.noFrame){ m.geometry.computeBoundingBox(); box3.union(m.geometry.boundingBox.clone().applyMatrix4(m.matrix)); } });
+  if(spec.windows.length && window.__SHIPGLASS){ const gm = __SHIPGLASS.addWindows(G, spec.windows, opts.age || 0, s, spec.style !== undefined ? spec.style : (kind === 'crew' ? 0 : 1)); gm.renderOrder = ORDER; }   // v7.3 : navette de passagers = hospitalité
+  let docks = [];
+  if(spec.bays && window.__SHIPGLASS && __SHIPGLASS.addBays) docks = __SHIPGLASS.addBays(G, spec.bays, opts.age || 0, s, 1).docks;   // v7.5 : hangars à champ de force (destroyer)
+  let wearU = null;
+  if(window.__SHIPWEAR) wearU = __SHIPWEAR.apply(G, opts.age || 0, s, 1);             // v7.1 : aussi neuf (micro-relief des gros plans)
+  G.traverse(m => { if(m.isMesh && m.renderOrder < ORDER && !m.userData.portal) m.renderOrder = ORDER; });
+  if(docks.length) G.children.forEach(m => { if(m.isMesh && !m.userData.portal && !m.userData.noFrame && !m.userData.glass) m.renderOrder = 0; });   // coque avant les portails (comme les vaisseaux du jeu)
+  const box3 = new THREE.Box3(); G.updateMatrixWorld(true); G.traverse(m => { if(m.isMesh && !m.userData.noFrame){ m.geometry.computeBoundingBox(); box3.union(m.geometry.boundingBox.clone().applyMatrix4(m.matrixWorld)); } });
+  if(spec.floods && wearU && __SHIPWEAR.floods) __SHIPWEAR.floods(wearU, box3, spec.floods);   // v7.4 : projecteurs de coque (coques sombres)
   return { group: G, kind, variant: o.variant || null, name: kind === 'drone' ? CR.NAMES.drone[o.variant || 'inspect'] : CR.NAMES[kind], len: spec.len, box: box3,
-    rcs: o.rcs, rcsLen: Math.max(1.2, spec.len*.18), nav, lamps, thr, bay,
+    rcs: o.rcs, rcsLen: Math.max(1.2, spec.len*.18), nav, lamps, thr, bay, turrets: spec.turrets || [], mil: !!mil, wear: wearU, docks, extra: spec.extra || null,
     dispose(){ G.traverse(m => { if(m.geometry) m.geometry.dispose(); if(m.material){ (Array.isArray(m.material) ? m.material : [m.material]).forEach(x => x.dispose()); } }); G.parent && G.parent.remove(G); } };
 };
 })();

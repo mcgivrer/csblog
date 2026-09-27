@@ -123,8 +123,9 @@ function pathTraj(path, prof, tau0, up){ const f = T => pathState(path, prof, ta
 /* ---------- vaisseaux (dimensions réelles du générateur, en mètres) ---------- */
 const TYPE_EN = { e18:'Warehouse freighter', e140:'Warehouse bulk carrier', p10:'Spine freighter', p44:'Long spine freighter', g1:'Ice tanker', tS:'Light tug', tM:'Medium tug', tL:'Heavy tug', l20:'Liner', x1:'Fast light freighter', shuttle:'Cargo shuttle' };
 const FTL = { e140:1, p44:1, g1:1, l20:1 };
-const ACC = { e18:.9, e140:.55, p10:1, p44:.8, g1:.7, tS:3, tM:2.4, tL:1.8, l20:1.4, x1:2.8, shuttle:2 };   // poussée en g
+const ACC = { e18:.9, e140:.55, p10:1, p44:.8, g1:.7, tS:3, tM:2.4, tL:1.8, l20:1.4, x1:2.8, shuttle:2, fighter:6, corvette:2.5, destroyer:1.2 };   // poussée en g
 const HERO_POOL = [['e18',1],['e140',1],['p10',1],['p44',1.2],['g1',1],['tM',.45],['tL',.5],['l20',1.2],['x1',1.3]];
+const DEP_POOL = HERO_POOL.filter(([m]) => FTL[m]);                   // v7.2.2 : seuls les vaisseaux à géode ou anneaux quittent un système
 const NPC_BIG = [['e18',1],['p10',1],['g1',.7],['x1',1],['e140',.5],['tL',.6]];
 const NPC_TUG = [['tS',1],['tM',1],['tL',.6]];
 const PREFIX = ['R.S.C.','C.S.V.','T.S.S.','M.V.','S.T.T.','I.C.V.','F.T.V.'];
@@ -244,25 +245,32 @@ function updateRcs(sh, T, dt){
 }
 /* ---------- âge des vaisseaux : mélange réaliste (≈ 30 % neufs, 45 % usés, 25 % très vieux) ----------
    remorqueurs et cargos plus souvent fatigués, paquebots entretenus ; ?age=0…1 impose un âge à toute la flotte */
-const AGE_BIAS = { tS:.15, tM:.14, tL:.12, e18:.05, e140:.06, p10:.06, p44:.04, g1:.08, x1:-.05, l20:-.3, shuttle:0 };
+const AGE_BIAS = { tS:.15, tM:.14, tL:.12, e18:.05, e140:.06, p10:.06, p44:.04, g1:.08, x1:-.05, l20:-.3, shuttle:0, fighter:-.3, corvette:-.25, destroyer:-.25 };   // militaires : bien entretenus
 function shipAge(model){
   const f = PARAMS.get('age');
   if(f !== null && f !== '' && !isNaN(+f)) return clamp(+f, 0, 1);
   const r = clamp(R() + (AGE_BIAS[model] || 0), 0, .999);
   return r < .3 ? rr(0, .12) : (r < .75 ? rr(.32, .6) : rr(.68, 1));
 }
-function makeShip(model, leg){
-  const ftl = !!FTL[model], age = shipAge(model);
-  const b = SHIPGEN.build(model, { warp: ftl, jump: ftl, age, ageSeed: Math.floor(R()*1e9) });   // option de vieillissement du générateur (shipwear.js)
+/* v7.2.2 : un vaisseau n'emploie que les moyens dont il est équipé — cœur de saut (géode) et/ou anneaux de distorsion ;
+   les modèles non supraluminiques du jeu n'en ont aucun, et le sélecteur du jeu peut retirer l'un ou l'autre */
+function equipOf(model, opts){ const f = !!FTL[model]; return { warp: f && !(opts && opts.warp === false), jump: f && !(opts && opts.jump === false) }; }
+const canLeave = (model, opts) => { const e = equipOf(model, opts); return e.warp || e.jump; };
+function makeShip(model, leg, opts){
+  const eq = equipOf(model, opts), ftl = eq.warp || eq.jump, age = shipAge(model);
+  const b = SHIPGEN.build(model, { warp: eq.warp, jump: eq.jump, age, ageSeed: Math.floor(R()*1e9) });   // option de vieillissement du générateur (shipwear.js)
   const thr = { value: 0 }, charge = { value: 0 }, field = { value: .15 }, phase = { value: 0 };
   patchUniforms(b.group, thr, charge, field, phase);
   b.lights.forEach(l => l.parent && l.parent.remove(l));      // une seule lumière de tuyère partagée (pas de recompilation de shaders)
   const root = new THREE.Group();
-  b.group.scale.setScalar(SCALE); root.add(b.group); shipWorld.add(root);
+  // v7.2.2 : la racine du vaisseau est son centre de gravité (centre de la coque, comme pour le couple des RCS) : les
+  // retournements, roulis et lacets tournent autour de lui (avant : autour de l'origine du modèle, près de la proue)
+  const com = b.hullBox.getCenter(new V3());
+  b.group.scale.setScalar(SCALE); b.group.position.copy(com).multiplyScalar(-SCALE); root.add(b.group); shipWorld.add(root);
   const rcs = buildRcs(b, b.dims.z*SCALE);
   const hull = { box: b.box.clone(), drive: b.group.userData.driveCenter ? b.group.userData.driveCenter.clone() : null, rcs: (b.rcs || []).slice(), docks: (b.docks || []).slice() };   // repères pour les gros plans
   const geode = findGeode(b.group, charge);
-  const sh = { model, type: TYPE_EN[model], name: genShipName(), root, inner: b.group, len: b.dims.z*SCALE, thr, charge, field, phase, ftl, traj: null, leg, rcs, age, drive: b.drive || null, hull, geode,
+  const sh = { model, type: TYPE_EN[model], name: genShipName(), root, inner: b.group, com, equip: eq, rings: b.rings || null, ringU: b.wear && b.wear.uRingI, len: b.dims.z*SCALE, thr, charge, field, phase, ftl, traj: null, leg, rcs, age, drive: b.drive || null, hull, geode,
     acc: (ACC[model] || 1)*G0*rr(.85, 1.15),
     dispose(){ (sh.bays || []).forEach(op => op.c.dispose()); disposeRcs(rcs); if(geode){ geode.spark.parent && geode.spark.parent.remove(geode.spark); geode.spark.material.dispose(); } root.parent && root.parent.remove(root); SHIPGEN.dispose(b.group); ships.delete(sh); } };
   ships.add(sh);
@@ -321,6 +329,28 @@ function spinGeode(sh, T){
   G.wire.quaternion.copy(_qGeo.setFromAxisAngle(_yAxis, a % (2*Math.PI))).multiply(G.q0);
 }
 function noteJump(sh, tJ){ sh.jumpTs = (sh.jumpTs || []).filter(t => T - t < 120 && t !== tJ).concat([tJ]); }
+/* ---------- anneaux de distorsion (v7.2, warpring.js) ----------
+   Rotation lente au repos (un tour en 50 s) ; pré-charge de 3 s avant la charge du jeu (visuelle : trajectoires inchangées),
+   pendant laquelle la vitesse monte vers un tour en 6 s ; charge : montée linéaire jusqu'à 1,2 tour/s, tenue pendant la
+   distorsion, puis décroissance (τ = 2 s). Deux anneaux tournent en sens contraires. Angle calculé depuis le temps. */
+const RING = { W0: 2*Math.PI/50, W1: 2*Math.PI/6, WM: 2*Math.PI*1.2, PRE: 3, TAU: 2 };
+function ringExtra(u, w){                               // angle ajouté par une distorsion, u = temps depuis le début de la pré-charge
+  if(u <= 0) return 0;
+  const P = RING.PRE, SP = w.tEng - w.tW0, UE = P + (w.tExit - w.tW0), d1 = RING.W1 - RING.W0, dM = RING.WM - RING.W0;
+  if(u <= P) return d1*u*u*u/(3*P*P);
+  let a = d1*P/3; const v = Math.min(u - P, SP);
+  a += d1*v + (dM - d1)*v*v/(2*SP); if(u <= P + SP) return a;
+  a += dM*(Math.min(u, UE) - P - SP); if(u <= UE) return a;
+  return a + dM*RING.TAU*(1 - Math.exp(-(u - UE)/RING.TAU));
+}
+function ringAngle(sh, T){ let a = RING.W0*T; (sh.warps || []).forEach(w => a += ringExtra(T - (w.tW0 - RING.PRE), w)); return a; }
+function spinRings(sh, T){
+  const Rg = sh.rings; if(!Rg) return;
+  const a = ringAngle(sh, T) % (2*Math.PI), f = Math.max(0, sh.field.value - .15);
+  Rg.list.forEach(r => { r.pivot.rotation.z = r.dir*a; if(r.halo) r.halo.visible = f > .01; });
+  Rg.padMesh().forEach(m => { if(m.material) m.material.emissiveIntensity = .06 + 1.8*f; });
+  if(sh.ringU) sh.ringU.value = sh.field.value;
+}
 function makeShuttle(leg){
   const s = buildShuttle(), age = shipAge('shuttle');
   if(window.__SHIPWEAR) __SHIPWEAR.apply(s.group, age, Math.floor(R()*1e9), 12);      // navette : même usure (unités de coque ×12 = mètres)
@@ -349,10 +379,11 @@ function makeCraft(kind, leg, o){
   const age = shipAge(kind), c = __CRAFT.build(kind, { variant: o.variant, slim: o.slim, age, seed: Math.floor(R()*1e9) + 1, containers: o.containers });
   const root = new THREE.Group(); root.add(c.group); (o.parent || shipWorld).add(root);
   const rcs = buildRcs({ group: c.group, hullBox: c.box, rcs: c.rcs, rcsLen: c.rcsLen }, c.len);
-  const sh = { model: kind, type: c.name, name: genShipName(), root, inner: c.group, len: c.len, thr: c.thr, charge: { value: 0 }, nav: c.nav, lamps: c.lamps, traj: null, leg, rcs, age, craft: c,
-    acc: (ACC[kind] || 1)*G0*rr(.85, 1.15), hull: { box: c.box.clone(), drive: null, rcs: c.rcs.slice(), docks: [] },
+  const sh = { model: kind, type: c.name, name: genShipName(), root, inner: c.group, len: c.len, thr: c.thr, charge: { value: 0 }, nav: c.nav, lamps: c.lamps, traj: null, leg, rcs, age, craft: c, mil: !!c.mil,
+    acc: (ACC[kind] || 1)*G0*rr(.85, 1.15), hull: { box: c.box.clone(), drive: null, rcs: c.rcs.slice(), docks: (c.docks || []).slice() },
     dispose(){ disposeRcs(rcs); c.dispose(); root.parent && root.parent.remove(root); ships.delete(sh); crafts.delete(sh); } };
   if(o.parent){ crafts.add(sh); sh.carrier = o.carrier; } else ships.add(sh);
+  if(!o.parent && sh.hull.docks.length) setupBays(sh);                    // v7.5 : hangars du destroyer (chasseurs catapultés)
   return sh;
 }
 /* ---------- segments de mouvement (repère du porteur) ---------- */
@@ -365,11 +396,12 @@ function segBez(P0, P1, P2, P3, qA, qB, ease, x){ return u => { const k = ease(u
 function setupBays(sh){
   const docks = sh.hull && sh.hull.docks; if(!docks || !docks.length || !window.__CRAFT) return;
   sh.bays = docks.map((d, i) => {
-    const kind = d.mode === 'belly' ? 'maint' : (d.hy >= 2.5 ? 'crew' : 'drone');
+    const kind = sh.mil ? 'fighter' : (d.mode === 'belly' ? 'maint' : (d.hy >= 2.5 ? 'crew' : 'drone'));
     const c = makeCraft(kind, sh.leg, { parent: sh.inner, carrier: sh, variant: 'inspect', slim: kind === 'maint' && 2*d.hy < 6.5 });
     const box = c.craft.box, sz = box.getSize(new V3()), cb = box.getCenter(new V3());
     const op = { d, c, kind, carrier: sh, sz, cb, plan: [], lastRip: -9, idx: 0 };
     if(d.mode === 'belly'){ op.qPark = quatNose(d.T.clone().negate(), d.N.clone().negate()); op.cPark = d.C.clone().addScaledVector(d.N, -(d.D - .7 - sz.y/2)); op.ext = sz.y/2; }
+    else if(kind === 'fighter'){ op.qPark = quatNose(d.N.clone(), d.B); op.cPark = d.C.clone().addScaledVector(d.N, -(sz.z/2 + 3)).addScaledVector(d.B, -d.hy + sz.y/2 + .6); op.ext = sz.z/2; }   // nez vers la sortie (catapulte)
     else { op.qPark = quatNose(d.N.clone().negate(), d.B); op.cPark = d.C.clone().addScaledVector(d.N, -(sz.z/2 + 1.2)).addScaledVector(d.B, -d.hy + sz.y/2 + .3); op.ext = sz.z/2; }
     op.pPark = op.cPark.clone().sub(cb.clone().applyQuaternion(op.qPark));            // position de l'origine de l'engin
     c.local = t => opPose(op, t);
@@ -379,13 +411,17 @@ function setupBays(sh){
     return op;
   });
 }
+/* v7.2.2 : point de sortie franchement dehors — l'engin quitte l'embrasure dans l'axe avant tout virage (baies ventrales :
+   la profondeur du hangar comptait pour moitié, l'engin tournait encore à moitié dedans) */
+function outDist(op){ return op.d.mode === 'belly' ? op.d.D + 3.5 : op.ext*2 + 5; }
 function calmAt(op, t){ const tr = op.carrier.traj; return rateAt(t) < 3 && (!tr || !(tr(t).throttle > .05)); }
 function opNext(op){                          // ajoute l'état suivant au plan
   const last = op.plan[op.plan.length - 1], d = op.d, sz = op.sz, N = d.N;
   let t = last.t1; while(!calmAt(op, t) && t < last.t1 + 600) t += 3;           // les manœuvres attendent le temps réel
   if(t > last.t1){ op.plan.push({ s: last.s, t0: last.t1, t1: t, f: last.f.hold || segHold(last.end ? last.end.p : op.pPark, last.end ? last.end.q : op.qPark, { thr: 0, vis: last.s !== 'away' || op.kind !== 'crew' }) }); }
   const add = (s, dur, f, end) => { const t0 = op.plan[op.plan.length - 1].t1; op.plan.push({ s, t0, t1: t0 + dur, f, end }); };
-  const out = op.pPark.clone().addScaledVector(N, d.mode === 'belly' ? sz.y + 3 : op.ext*2 + 5);   // point de sortie devant la baie
+  const out = op.pPark.clone().addScaledVector(N, outDist(op));                // point de sortie devant la baie (engin entièrement dehors)
+  if(op.kind === 'fighter'){ fighterNext(op, last, add, out); return; }       // v7.5 : chasseur catapulté
   if(last.s === 'parked'){
     add('out', d.mode === 'belly' ? 7 : (op.kind === 'crew' ? 8 : 5), segLin(op.pPark, out, op.qPark, op.qPark, easeIO, { thr: 0, vis: true, rcs: 1 }), { p: out, q: op.qPark });
     if(op.kind === 'crew'){                                                      // demi-tour puis poussée vers la planète
@@ -401,17 +437,19 @@ function opNext(op){                          // ajoute l'état suivant au plan
       const B = op.carrier.hull.box, sgn = R() < .5 ? -1 : 1, H = new V3(sgn*B.max.x*.8, lerp(B.min.y, B.max.y, rr(.3, .8)), lerp(B.min.z, B.max.z, rr(.35, .85)));
       const Wp = H.clone().add(new V3(sgn*rr(7, 10), rr(-2, 3), 0)); Wp.x = sgn*Math.max(Math.abs(Wp.x), B.max.x + 6);
       const qW = quatNose(H.clone().sub(Wp).normalize(), v(0, 1, 0)), bob = rr(0, 6);
-      add('away', 9, segBez(e.p, e.p.clone().addScaledVector(N, 6), Wp.clone().add(new V3(sgn*8, 0, 0)), Wp, e.q, qW, easeIO, { thr: .25, vis: true, lamp: .5, rcs: 1 }), { p: Wp, q: qW });
+      add('away', 9, segBez(e.p, e.p.clone().addScaledVector(N, 12), Wp.clone().add(new V3(sgn*8, 0, 0)), Wp, e.q, qW, easeIO, { thr: .25, vis: true, lamp: .5, rcs: 1 }), { p: Wp, q: qW });
       const hov = rr(14, 22);
       add('away', hov, u => ({ p: Wp.clone().add(new V3(0, .4*Math.sin(u*hov*.7 + bob), .6*Math.sin(u*hov*.4))), q: qW, thr: 0, vis: true, lamp: 1 }), { p: Wp, q: qW });
-      add('away', 9, segBez(Wp, Wp.clone().add(new V3(sgn*8, 0, 0)), out.clone().addScaledVector(N, 6), out, qW, op.qPark, easeIO, { thr: .25, vis: true, lamp: .5, rcs: 1 }), { p: out, q: op.qPark });
+      add('away', 9, segBez(Wp, Wp.clone().add(new V3(sgn*8, 0, 0)), out.clone().addScaledVector(N, 12), out, qW, op.qPark, easeIO, { thr: .25, vis: true, lamp: .5, rcs: 1 }), { p: out, q: op.qPark });
     } else {                                                                     // drone : tour d'inspection autour du porteur
-      const B = op.carrier.hull.box, Cc = B.getCenter(new V3()), rad = Math.max(B.max.x - B.min.x, B.max.y - B.min.y)*.5 + rr(6, 10), a0 = rr(0, 6.28), sg = R() < .5 ? -1 : 1, per = rr(18, 26);
-      const ring = a => Cc.clone().add(new V3(Math.cos(a)*rad, Math.sin(a)*rad*.7, 0)).add(new V3(0, 0, (B.max.z - B.min.z)*.25*Math.sin(a*1.5)));
+      // v7.2.2 : la boucle commence et finit devant la porte (avant : point de départ tiré au hasard, parfois de l'autre côté
+      // du porteur — le drone longeait ou traversait la coque en sortant)
+      const B = op.carrier.hull.box, Cc = B.getCenter(new V3()), rad = Math.max(B.max.x - B.min.x, B.max.y - B.min.y)*.5 + rr(6, 10), a0 = Math.atan2(N.y/.7, N.x) + rr(-.2, .2), sg = R() < .5 ? -1 : 1, per = rr(18, 26);
+      const dz = d.C.z - Cc.z, ring = a => Cc.clone().add(new V3(Math.cos(a)*rad, Math.sin(a)*rad*.7, dz + (B.max.z - B.min.z)*.25*Math.sin((a - a0)*1.5)));
       const P0 = ring(a0), P1 = ring(a0 + sg*6.2832);
-      add('away', 5, segBez(e.p, e.p.clone().addScaledVector(N, 5), P0.clone().addScaledVector(P0.clone().sub(Cc).normalize(), 4), P0, e.q, quatNose(Cc.clone().sub(P0), v(0, 0, 1)), easeIO, { thr: .3, vis: true, rcs: 1 }), { p: P0 });
+      add('away', 6, segBez(e.p, e.p.clone().addScaledVector(N, 12), P0.clone().addScaledVector(P0.clone().sub(Cc).normalize(), 4), P0, e.q, quatNose(Cc.clone().sub(P0), v(0, 0, 1)), easeIO, { thr: .3, vis: true, rcs: 1 }), { p: P0 });
       add('away', per, u => { const a = a0 + sg*6.2832*u, P = ring(a); return { p: P, q: quatNose(Cc.clone().sub(P), v(0, 0, 1)), thr: 0, vis: true }; }, { p: P1 });
-      add('away', 5, segBez(P1, P1.clone().addScaledVector(P1.clone().sub(Cc).normalize(), 4), out.clone().addScaledVector(N, 5), out, quatNose(Cc.clone().sub(P1), v(0, 0, 1)), op.qPark, easeIO, { thr: .3, vis: true, rcs: 1 }), { p: out, q: op.qPark });
+      add('away', 6, segBez(P1, P1.clone().addScaledVector(P1.clone().sub(Cc).normalize(), 4), out.clone().addScaledVector(N, 12), out, quatNose(Cc.clone().sub(P1), v(0, 0, 1)), op.qPark, easeIO, { thr: .3, vis: true, rcs: 1 }), { p: out, q: op.qPark });
     }
   } else if(last.s === 'away'){
     let from = last.end ? last.end.p : out;
@@ -425,6 +463,29 @@ function opNext(op){                          // ajoute l'état suivant au plan
   } else {                                                                       // in → parked
     add('parked', rr(18, 40), segHold(op.pPark, op.qPark, { thr: 0, vis: true }), { p: op.pPark, q: op.qPark });
   }
+}
+/* chasseur d'un hangar militaire (v7.5) : catapulte (accélération dans l'axe, allumage en sortie), dégagement, ronde autour du
+   porteur, retour face à la baie, entrée lente nez en avant, plateau tournant (le chasseur repart nez vers la sortie) */
+function fighterNext(op, last, add, out){
+  const d = op.d, N = d.N, qIn = quatNose(N.clone().negate(), d.B), pIn = op.cPark.clone().sub(op.cb.clone().applyQuaternion(qIn));
+  if(last.s === 'parked'){
+    const far = out.clone().addScaledVector(N, 40);
+    add('out', 2.6, u => ({ p: op.pPark.clone().lerp(far, u*u), q: op.qPark, thr: smooth((u - .55)/.45), vis: true, rcs: 0 }), { p: far, q: op.qPark });
+  } else if(last.s === 'out'){
+    const e = last.end, B = op.carrier.hull.box, Cc = B.getCenter(new V3()), sz = B.getSize(new V3());
+    const rad = Math.max(sz.x, sz.y)*.5 + rr(90, 150), a0 = Math.atan2(N.y/.6, N.x), sg = R() < .5 ? -1 : 1, per = rr(26, 36), dz = d.C.z - Cc.z;
+    const ring = a => Cc.clone().add(new V3(Math.cos(a)*rad, Math.sin(a)*rad*.6, dz + sz.z*.35*Math.sin(a - a0)));
+    const tan = a => ring(a + sg*.01).sub(ring(a)).normalize();
+    const P0 = ring(a0), P1 = ring(a0 + sg*6.2832), q0 = quatNose(tan(a0), v(0, 0, 1));
+    add('away', 6, segBez(e.p, e.p.clone().addScaledVector(N, 160), P0.clone().addScaledVector(tan(a0), -120), P0, e.q, q0, easeIO, { thr: .9, vis: true, rcs: 1 }), { p: P0, q: q0 });
+    add('away', per, u => { const a = a0 + sg*6.2832*u; return { p: ring(a), q: quatNose(tan(a), v(0, 0, 1)), thr: .55, vis: true }; }, { p: P1 });
+    const app = out.clone().addScaledVector(N, 50);
+    add('away', 9, segBez(P1, P1.clone().addScaledVector(tan(a0), 140), app.clone().addScaledVector(N, 160), app, q0, qIn, easeOut, { thr: .15, vis: true, rcs: 1 }), { p: app, q: qIn });
+  } else if(last.s === 'away'){
+    const from = last.end ? last.end.p : out.clone().addScaledVector(N, 50);
+    add('in', 7, segLin(from, pIn, qIn, qIn, easeOut, { thr: 0, vis: true, rcs: 1 }), { p: pIn, q: qIn });
+    add('in', 3.5, u => ({ p: pIn.clone().lerp(op.pPark, smooth(u)), q: qIn.clone().slerp(op.qPark, smooth(u)), thr: 0, vis: true }), { p: op.pPark, q: op.qPark });   // plateau tournant
+  } else add('parked', rr(20, 40), segHold(op.pPark, op.qPark, { thr: 0, vis: true }), { p: op.pPark, q: op.qPark });
 }
 function opEnsure(op, t){ let n = 0; while(op.plan[op.plan.length - 1].t1 <= t && n++ < 40) opNext(op); }
 function opPose(op, t){
@@ -442,7 +503,7 @@ function opSchedule(op, tS){
   const parked = cur.s === 'parked' || cur.s === 'in' || (cur.s === 'out' && R() < .5) || R() < .55;
   op.plan.push({ s: parked ? 'parked' : 'away', t0: -1e9, t1: tS, f: segHold(op.pPark, op.qPark, { thr: 0, vis: parked || op.kind !== 'crew' }),
     end: parked ? { p: op.pPark, q: op.qPark } : null });
-  if(!parked){ const o = op.pPark.clone().addScaledVector(op.d.N, op.d.mode === 'belly' ? op.sz.y + 3 : op.ext*2 + 5); op.plan[0].f = segHold(o, op.qPark, { thr: 0, vis: op.kind !== 'crew' }); op.plan[0].end = { p: o, q: op.qPark }; }
+  if(!parked){ const o = op.pPark.clone().addScaledVector(op.d.N, outDist(op)); op.plan[0].f = segHold(o, op.qPark, { thr: 0, vis: op.kind !== 'crew' }); op.plan[0].end = { p: o, q: op.qPark }; }
 }
 function opActive(op, t0, t1){ opEnsure(op, t1); return op.plan.some(sg => sg.t1 > t0 && sg.t0 < t1 && (sg.s === 'out' || sg.s === 'in')); }
 /* mise à jour des engins attachés : pose, ondes du champ, ombrage de hangar, feux, RCS */
@@ -464,7 +525,8 @@ function updateCrafts(dt){
       if(c.root.visible && r.rcs) updateRcs(c, T, dt); else if(c.rcs) c.rcs.forEach(j => { j.lvl = 0; j.jet.visible = j.spark.visible = false; });
     });
   });
-  ships.forEach(sh => { if(sh.craft){ if(sh.nav) sh.nav.forEach(nl => { const ph = ((T/nl.period + nl.phase) % 1); nl.mat.opacity = ph < nl.duty ? nl.peak : 0; }); (sh.lamps || []).forEach(l => l.value = .6); } });
+  ships.forEach(sh => { if(sh.craft){ if(sh.nav) sh.nav.forEach(nl => { const ph = ((T/nl.period + nl.phase) % 1); nl.mat.opacity = ph < nl.duty ? nl.peak : 0; }); (sh.lamps || []).forEach(l => l.value = .6);
+    if(sh.craft.turrets && sh.craft.turrets.length && sh.root.visible && !gunActive(sh)) __CRAFT.aimTurrets(sh.craft, T, sh.name.length*3.7 + sh.name.charCodeAt(0)); } });   // v7.4 : tourelles qui balaient (v7.5 : sauf en exercice)
 }
 const CRAFT_TIME = window.__CRAFT ? __CRAFT.TIME : null;
 
@@ -630,6 +692,127 @@ function pingPongTraj(PA, PB, up, acc, tau0, body){
   const upB = up.clone().negate();                                   // après le retournement, le cargo est « à l'envers » : le retour repart ainsi (attitude continue)
   return T => { const t = ((tauAt(T) - tau0) % per + per) % per; return t < prof.D ? pathState(Pf, prof, t, up) : pathState(Pb, prof, t - prof.D, upB); };
 }
+/* ---------- formations militaires (v7.4) ----------
+   formTraj : position décalée dans le repère du chef (nez, dos), petite ondulation propre à chaque ailier ;
+   loopTraj : ronde inclinée autour d'un vaisseau, dans son repère, en temps réel (chasseurs d'escorte d'un destroyer) ;
+   sideTraj : escorte parallèle à décalage fixe (la corvette se retourne en même temps que le cargo qu'elle escorte) */
+function formTraj(lead, off, wob){ return T => { const st = lead(T), q = st.q || quatNose(st.nose, st.up), o = off.clone();
+  if(wob){ o.x += wob*Math.sin(T*.37 + off.x); o.y += wob*.6*Math.sin(T*.29 + off.z); }
+  return { pos: st.pos.clone().add(o.applyQuaternion(q)), nose: st.nose, up: st.up, q, throttle: st.throttle || 0, seg: st.seg }; }; }
+function loopTraj(lead, rad, per, tilt, ph){ return T => { const st = lead(T), q = st.q || quatNose(st.nose, st.up), a = ph + 2*Math.PI*T/per;
+  const lp = new V3(Math.cos(a)*rad, Math.sin(a)*rad*tilt, Math.sin(a)*rad), tg = new V3(-Math.sin(a), Math.cos(a)*tilt, Math.cos(a)).normalize();
+  return { pos: st.pos.clone().add(lp.applyQuaternion(q)), nose: tg.applyQuaternion(q), up: new V3(0, 1, 0).applyQuaternion(q), throttle: .12, seg: 'orbit' }; }; }
+function sideTraj(lead, offW){ return T => { const st = lead(T); return Object.assign({}, st, { pos: st.pos.clone().add(offW) }); }; }
+const FINGER = [new V3(0, 0, 0), new V3(24, -3, 26), new V3(-24, -3, 26), new V3(48, -6, 52)];   // formation « quatre doigts » (m, repère du chef)
+function wingOf(leg, lead, n, wob){ const grp = [lead]; for(let i = 1; i < n; i++){ const f = makeCraft('fighter', leg); f.traj = formTraj(lead.traj, FINGER[i], wob); grp.push(f); leg.npcs.push(f); }
+  grp.forEach(f => f.formation = grp); return grp; }
+/* ---------- exercices de tir (v7.5) ----------
+   Le destroyer s'exerce sur son drone-cible : fenêtres de 12–16 s toutes les 40–55 s, en temps réel seulement. Les tourelles
+   pointent la cible (avec anticipation), les tourelles de défense rapprochée tirent des rafales de traçantes orangées,
+   les tourelles principales des obus électromagnétiques bleutés ; ~70 % des coups touchent : éclat et bouclier
+   d'entraînement qui s'illumine. Aucune destruction. Traçantes et éclats dans un groupe ancré sur le tireur (précision). */
+const GUN = { N: 320, pool: [], grp: null, pos: null, col: null, flashes: [], fi: 0, shooter: null };
+function buildGunFx(){
+  const g = new THREE.BufferGeometry(); GUN.pos = new Float32Array(GUN.N*6); GUN.col = new Float32Array(GUN.N*6);
+  g.setAttribute('position', new THREE.BufferAttribute(GUN.pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(GUN.col, 3));
+  const lines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  lines.frustumCulled = false; lines.renderOrder = 9;
+  GUN.grp = new THREE.Group(); GUN.grp.visible = false; GUN.grp.add(lines); GUN.lines = lines; shipWorld.add(GUN.grp);
+  const hg = new THREE.BufferGeometry(); GUN.hpos = new Float32Array(GUN.N*3); GUN.hcol = new Float32Array(GUN.N*3);
+  hg.setAttribute('position', new THREE.BufferAttribute(GUN.hpos, 3)); hg.setAttribute('color', new THREE.BufferAttribute(GUN.hcol, 3));
+  GUN.heads = new THREE.Points(hg, new THREE.PointsMaterial({ map: glowTex, size: 7, sizeAttenuation: false, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  GUN.heads.frustumCulled = false; GUN.heads.renderOrder = 10; GUN.grp.add(GUN.heads);
+  for(let i = 0; i < 24; i++){ const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xffc080, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
+    sp.visible = false; sp.renderOrder = 10; GUN.grp.add(sp); GUN.flashes.push({ sp, t0: -9, dur: .4, size: 10, rel: new V3() }); }
+  GUN.grp.userData.center = new V3(); GUN.grp.userData.r = 1;
+}
+function gunActive(sh){ const g = sh.gun; return !!g && g.target && g.target.traj && rateAt(T) < 3 && ((T + g.ph) % g.per) < g.on; }
+function gunFlash(rel, size, dur, color){ const f = GUN.flashes[GUN.fi++ % GUN.flashes.length]; f.rel.copy(rel); f.t0 = T; f.dur = dur; f.size = size; f.sp.material.color.setHex(color); f.sp.visible = true; }
+const _gq = new Q(), _gv = new V3(), _gw = new V3();
+function updateGunnery(dt){
+  if(!GUN.grp) return;
+  const leg = visit && visit.leg; let sh = null;
+  if(leg) ships.forEach(x => { if(!sh && x.gun && x.leg === leg && x.root.visible && gunActive(x)) sh = x; });
+  const live = GUN.pool.some(t => T - t.t0 < t.life + .05) || GUN.flashes.some(f => T - f.t0 < f.dur);
+  if(!sh && !live){ GUN.grp.visible = false; GUN.shooter = null; return; }
+  if(sh) GUN.shooter = sh;
+  const S = GUN.shooter; if(!S || !S.traj){ GUN.grp.visible = false; return; }
+  const P = S.traj(T).pos; GUN.grp.position.copy(P); GUN.grp.visible = true;
+  if(sh && dt > 0 && dt < .2){
+    const tg = sh.gun.target, g = sh.gun; sh.root.updateMatrixWorld(true);
+    sh.craft.turrets.forEach((u, i) => {
+      // pointage : cible (avec anticipation) dans le repère du socle de la tourelle
+      const speed = u.main ? 1300 : 1900, tp = tg.traj(T).pos, flight = tp.distanceTo(P)/speed, tpl = tg.traj(T + flight).pos.sub(sh.traj(T + flight).pos).add(P);   // anticipation dans le repère co-mobile du tireur (le destroyer file à plusieurs km/s)
+      const loc = sh.inner.worldToLocal(tpl.clone()).sub(u.pos); if(u.ventral){ loc.x = -loc.x; loc.y = -loc.y; }
+      const yawT = Math.atan2(-loc.x, -loc.z), pitT = Math.atan2(loc.y - u.pitch.position.y, Math.hypot(loc.x, loc.z));
+      const k = Math.min(1, dt*(u.main ? 1.6 : 4)), dy = Math.atan2(Math.sin(yawT - u.yaw.rotation.y), Math.cos(yawT - u.yaw.rotation.y));
+      u.yaw.rotation.y += dy*k; u.pitch.rotation.x += (clamp(pitT, -.2, 1.2) - u.pitch.rotation.x)*k;
+      if(Math.abs(dy) > .08) return;                                           // pas encore en ligne : on ne tire pas
+      // cadence : rafales pour la défense rapprochée, coups isolés pour les pièces principales
+      const key = 'u' + i, rate = u.main ? 1/2.8 : 13, inBurst = u.main ? true : ((T + i*.37) % 1.7) < .55, n = Math.floor(T*rate), last = g.last[key];
+      g.last[key] = n; if(!inBurst || last === undefined || n === last) return;
+      u.pitch.updateMatrixWorld(true);
+      const side = (n % 2 ? 1 : -1)*(u.main ? .95 : .42)*u.s/2, mz = u.pitch.localToWorld(_gv.set(side, 0, -u.len)).clone(), rel0 = mz.clone().sub(P);
+      const hit = Math.random() < .7, aim = tpl.clone().sub(P), dir = aim.sub(rel0).normalize();
+      const spr = hit ? .0015 : .012; dir.x += (Math.random() - .5)*spr*2; dir.y += (Math.random() - .5)*spr*2; dir.z += (Math.random() - .5)*spr*2; dir.normalize();
+      const life = tpl.distanceTo(mz)/speed*(hit ? 1 : 1.6);
+      let tr = GUN.pool.find(t => T - t.t0 > t.life + .05); if(!tr){ if(GUN.pool.length >= GUN.N) return; tr = {}; GUN.pool.push(tr); }
+      Object.assign(tr, { t0: T, rel0, dir, speed, life, len: u.main ? 45 : 16, main: u.main, hit, tg });
+      gunFlash(rel0, (u.main ? 9 : 2.6)*u.s/1.4, .06, u.main ? 0xbfe0ff : 0xffd090);
+    });
+  }
+  // traçantes (repère co-mobile du tireur) ; plan large : traçantes et éclats allongés avec la distance caméra (lisibilité)
+  const pa = GUN.pos, ca = GUN.col, kd = clamp(cam.position.distanceTo(P)/320, 1, 3.5); let j = 0;
+  GUN.pool.forEach(t => { const a = T - t.t0; if(a < 0 || a > t.life){ if(t.hit && t.done !== t.t0 && a > t.life && a < t.life + .1){ t.done = t.t0;
+        const tgp = t.tg.traj(T).pos.sub(P); gunFlash(tgp, (t.main ? 16 : 7)*kd, t.main ? .6 : .35, t.main ? 0xcfe8ff : 0xffb070);
+        if(t.tg.craft && t.tg.craft.extra && t.tg.craft.extra.shield) t.tg.craft.extra.shield.value = Math.min(1.2, t.tg.craft.extra.shield.value + (t.main ? .9 : .35)); }
+      return; }
+    const hd = t.rel0.clone().addScaledVector(t.dir, t.speed*a), tl = hd.clone().addScaledVector(t.dir, -Math.min(t.len*kd, t.speed*a));
+    const c = t.main ? [.55, .8, 1.3] : [1.4, .8, .3];
+    pa.set([tl.x, tl.y, tl.z, hd.x, hd.y, hd.z], j*6); ca.set([c[0]*.15, c[1]*.15, c[2]*.15, c[0], c[1], c[2]], j*6);
+    GUN.hpos.set([hd.x, hd.y, hd.z], j*3); const hk = t.main ? 1.0 : .6; GUN.hcol.set([c[0]*hk, c[1]*hk, c[2]*hk], j*3); j++; });
+  for(let k = j; k < GUN.N; k++){ pa.fill(0, k*6, k*6 + 6); }
+  GUN.lines.geometry.attributes.position.needsUpdate = true; GUN.lines.geometry.attributes.color.needsUpdate = true; GUN.lines.geometry.setDrawRange(0, j*2);
+  GUN.heads.geometry.attributes.position.needsUpdate = true; GUN.heads.geometry.attributes.color.needsUpdate = true; GUN.heads.geometry.setDrawRange(0, j);
+  GUN.flashes.forEach(f => { const a = (T - f.t0)/f.dur; if(a < 0 || a > 1){ f.sp.visible = false; return; }
+    f.sp.visible = true; f.sp.position.copy(f.rel); f.sp.scale.setScalar(f.size*(.4 + .6*Math.sqrt(a))); f.sp.material.opacity = (1 - a)*(1 - a); });
+  // boucliers des cibles : décroissance
+  ships.forEach(x => { if(x.craft && x.craft.extra && x.craft.extra.shield) x.craft.extra.shield.value *= Math.exp(-dt*3.5); });
+  if(S.gun && S.gun.target && S.gun.target.traj){ const tp = S.gun.target.traj(T).pos; GUN.grp.userData.center.copy(P).lerp(tp, .5); GUN.grp.userData.r = tp.distanceTo(P)*.5 + 60; }
+}
+function militaryTasks(leg, tasks, force){
+  if(!window.__CRAFT || !__CRAFT.MIL) return;
+  const pm = force || PARAMS.get('military'); if(pm === '0') return;
+  const all = pm === 'all', kinds = ['station', 'patrol', 'escort'];
+  if(!(pm || R() < .6)) return;                                             // présence militaire dans ≈ 6 systèmes sur 10 (?military= pour forcer)
+  const pickK = kinds.includes(pm) ? pm : pickW([['station', 1], ['patrol', 1.1], ['escort', .9]]), hab = leg.hab;
+  if(all || pickK === 'station') tasks.push(() => {                         // destroyer en orbite haute et sa ronde de deux chasseurs
+    const d = makeCraft('destroyer', leg), u = randUnit(), w = perpTo(u), r = hab.radius*rr(1.18, 1.4);
+    d.traj = orbitTraj(hab.position, r, u, w, rr(0, 6.28), Math.sqrt(hab.GM/r)/r*(R() < .5 ? -1 : 1), 0); leg.npcs.push(d);
+    const f0 = makeCraft('fighter', leg); f0.traj = loopTraj(d.traj, d.len*rr(1.2, 1.6), rr(34, 46), .35, rr(0, 6.28)); leg.npcs.push(f0);
+    d.escorts = wingOf(leg, f0, 2, 2);
+    const tg = makeCraft('target', leg); tg.traj = loopTraj(d.traj, rr(700, 1100), rr(55, 75), .25, rr(0, 6.28)); leg.npcs.push(tg);   // v7.5 : drone-cible
+    d.gun = { target: tg, per: rr(40, 55), on: rr(12, 16), ph: rr(0, 40), last: {} };
+  });
+  if(all || pickK === 'patrol') tasks.push(() => {                          // patrouille de 3 ou 4 chasseurs en orbite basse
+    const f0 = makeCraft('fighter', leg), u = randUnit(), w = perpTo(u), r = hab.radius*rr(1.04, 1.1);
+    f0.traj = orbitTraj(hab.position, r, u, w, rr(0, 6.28), Math.sqrt(hab.GM/r)/r*(R() < .5 ? -1 : 1), 0); leg.npcs.push(f0);
+    wingOf(leg, f0, R() < .5 ? 3 : 4, 2.5); f0.patrol = true;
+  });
+  if(all || pickK === 'escort') tasks.push(() => {                          // corvette d'escorte le long d'un cargo (même route, se retourne avec lui)
+    const cargo = leg.npcs.find(x => !x.craft && NPC_BIG.some(([m]) => m === x.model) && x.traj);
+    const c = makeCraft('corvette', leg);
+    if(cargo){ const st = cargo.traj(T), f = frameOf(st.q || quatNose(st.nose, st.up)), side = R() < .5 ? -1 : 1;
+      c.traj = sideTraj(cargo.traj, f.right.clone().multiplyScalar(side*(cargo.len*.35 + c.len*.8 + 30)).addScaledVector(f.up, 12)); c.escortOf = cargo; }
+    else { const u = randUnit(), w = perpTo(u), r = hab.radius*rr(1.1, 1.3); c.traj = orbitTraj(hab.position, r, u, w, rr(0, 6.28), Math.sqrt(hab.GM/r)/r, 0); }
+    leg.npcs.push(c);
+  });
+}
+function ensureMil(leg, kind){                                               // groupe militaire du système (créé s'il manque)
+  const find = () => kind === 'station' ? leg.npcs.find(x => x.model === 'destroyer') : (kind === 'escort' ? leg.npcs.find(x => x.model === 'corvette') : leg.npcs.find(x => x.patrol));
+  let s = find(); if(s) return s;
+  const tasks = []; militaryTasks(leg, tasks, kind); tasks.forEach(f => f()); return find();
+}
 function populateSystem(leg){
   if(!OPT.traffic) return [];
   const tasks = [], hab = leg.hab;
@@ -662,6 +845,7 @@ function populateSystem(leg){
     s.traj = pingPongTraj(PA, PB, perpTo(PB.clone().sub(PA).normalize()), s.acc, rr(0, 1e5), pl);
     leg.npcs.push(s);
   });
+  militaryTasks(leg, tasks);                                                 // v7.4
   return tasks;
 }
 
@@ -671,7 +855,7 @@ function populateSystem(leg){
    ===================================================================== */
 const JT = { charge: 3.4, fold: 1.25, flash: .32, wave: 1.7 };   // saut plus lent que dans le jeu : la géode bat, puis l'espace se creuse
 JT.total = JT.charge + JT.fold + JT.flash + JT.wave;
-const WT = { spool: 2.6, engage: .75, decel: .9 };
+const WT = { spool: 2.6, engage: 2.2, decel: .9 };                // v7.2.1 : engagement 0,75 → 2,2 s (on voit le vaisseau démarrer)
 const WARP_V_EXIT = 30;                                           // vitesses « écran » de la distorsion, en L/40 par seconde
 let visit = null;
 
@@ -695,27 +879,28 @@ function warpPlan(dep, legA, legB, tJ, coastFn, jDir, up, reuse){
   const s = dep.len/40, vS = 5*s, vEx = WARP_V_EXIT*s, Ts = WT.spool, Te = WT.engage, Tx = WT.decel;
   const sInt = x => x*x*x - x*x*x*x/2;                                    // ∫ smoothstep
   const wDir = legB.gal.clone().sub(legA.gal).normalize();
-  const Tc = reuse ? reuse.tDec - reuse.tCru : rr(4.5, 7), Vw = reuse ? reuse.Vw/reuse.s*s : rr(260, 380)*s;
+  const Tc = reuse ? reuse.tDec - reuse.tCru : rr(7, 9.5), Vw = reuse ? reuse.Vw/reuse.s*s : rr(260, 380)*s;   // croisière allongée : le plan de départ dure jusqu'à la dispersion
   const tEng = tJ + Ts, tCru = tEng + Te, tDec = tCru + Tc, tExit = tDec + Tx;
-  const dE = vS*Te + (Vw - vS)*Te*.5, dC = dE + Vw*Tc, D = dC + Vw*Tx + (vEx - Vw)*Tx*.5;
+  // engagement : vitesse vS + (Vw − vS)·x³ — départ lent (≈ 0,2 L la première seconde), puis le vaisseau s'arrache
+  const dE = vS*Te + (Vw - vS)*Te*.25, dC = dE + Vw*Tc, D = dC + Vw*Tx + (vEx - Vw)*Tx*.5;
   const dist = T => {                                                     // déplacement « bulle » depuis l'engagement
     if(T <= tEng) return 0;
-    if(T <= tCru){ const x = (T - tEng)/Te; return vS*Te*x + (Vw - vS)*Te*sInt(x); }
+    if(T <= tCru){ const x = (T - tEng)/Te; return vS*Te*x + (Vw - vS)*Te*x*x*x*x*.25; }
     if(T <= tDec) return dE + Vw*(T - tCru);
     if(T <= tExit){ const x = (T - tDec)/Tx; return dC + Vw*Tx*x + (vEx - Vw)*Tx*sInt(x); }
     return D + vEx*(T - tExit);
   };
-  const speed = T => T < tEng ? vS : (T < tCru ? vS + (Vw - vS)*smooth((T - tEng)/Te) : (T < tDec ? Vw : (T < tExit ? Vw + (vEx - Vw)*smooth((T - tDec)/Tx) : vEx)));
+  const speed = T => T < tEng ? vS : (T < tCru ? vS + (Vw - vS)*Math.pow((T - tEng)/Te, 3) : (T < tDec ? Vw : (T < tExit ? Vw + (vEx - Vw)*smooth((T - tDec)/Tx) : vEx)));
   // durée physique : distance interstellaire réelle parcourue à 1 200–3 000 c
   const Dg = legA.gal.distanceTo(legB.gal)*UNIT_GAL, Vc = reuse ? reuse.Vc : rr(1200, 3000), Dphys = Dg/(Vc*CLIGHT);
-  if(!reuse) tlSegment(tEng, tExit, Dphys, 1, 1, .8);
-  const tauE = tauAt(tEng);
+  if(!reuse) tlSegment(tCru, tExit, Dphys, 1, 1, .8);                  // le voyage commence quand le vaisseau disparaît
+  const tauE = tauAt(tCru);
   const frac = T => clamp((tauAt(T) - tauE)/Dphys, 0, 1);
   const qJ = quatNose(jDir, up), qW = quatNose(wDir, up);
   const fA = T => { const c = coastFn(T), x = clamp((T - tJ)/Ts, 0, 1);
     return { pos: c.pos.addScaledVector(wDir, dist(T)), q: T < tEng ? qJ.clone().slerp(qW, smoother(x*1.15)) : qW.clone(), throttle: T < tEng ? .06*(1 - x) : 0 }; };
   const fB = P0B => T => ({ pos: P0B.clone().addScaledVector(wDir, dist(T) - D), q: qW.clone(), throttle: 0 });
-  return { fA, fB, dist, speed, tW0: tJ, tEng, tCru, tDec, tExit, Vw, D, wDir, galA: legA.gal.clone(), galB: legB.gal.clone(), frac, Vc, Dphys, s, vEx };
+  return { fA, fB, dist, speed, tW0: tJ, tEng, tCru, tDec, tExit, Vw, D, dE, wDir, galA: legA.gal.clone(), galB: legB.gal.clone(), frac, Vc, Dphys, s, vEx };
 }
 
 function planVisit(leg, hero, tArrive, arriveDir, arr){
@@ -757,16 +942,25 @@ function planVisit(leg, hero, tArrive, arriveDir, arr){
   const toNext = nextLeg.gal.clone().sub(leg.gal).normalize();
   // relais : 6 fois sur 10 (?relay=), obligatoire après 2 systèmes avec le même héros ; imposé par le sélecteur (C.pending)
   const pend = C.pending; if(pend) C.pending = null;
-  const handover = !!pend || (OPT.traffic && !C.followHero && ((hero.heroVisits || 0) >= 2 || R() < RELAY_P));
+  const pendCap = !pend || canLeave(pend.model, pend.opts);
+  const handover = !!pend || !hero.ftl || (OPT.traffic && !C.followHero && ((hero.heroVisits || 0) >= 2 || R() < RELAY_P));
   let departer = hero, depOrbit = heroOrbit;
   const segsHero = [arriveSeg, { kind:'transfer', t0: tT0, f: transfer }, { kind:'orbit', t0: tO0, f: heroOrbit, blend: 3 }];
   if(handover){
-    let m, n = 0; if(pend) m = pend.model; else do { m = pickW(HERO_POOL); n++; } while(n < 30 && (m === hero.model || heroHist.slice(-2).includes(m)));   // modèles variés
-    departer = makeShip(m, leg); if(pend && pend.opts) departer.pref = pend.opts;
+    let m, n = 0; if(pend && pendCap) m = pend.model; else do { m = pickW(DEP_POOL); n++; } while(n < 30 && (m === hero.model || heroHist.slice(-2).includes(m)));   // modèles variés, capables de partir
+    const po = pend && pendCap ? pend.opts : null;
+    departer = makeShip(m, leg, po); if(po) departer.pref = po;
     const rC = rO + 1.6*(hero.len + departer.len);                        // orbite un peu plus haute, en formation devant le héros
     depOrbit = orbitTraj(Cp, rC, u, w, 3*(hero.len + departer.len)/rC, Math.sqrt(target.GM/rC)/rC, tauO);
     leg.npcs.push(hero);                                                   // l'ancien héros reste en orbite dans ce système
   }
+  // vaisseau choisi au sélecteur mais sans moyen de quitter le système : vedette de l'orbite, un autre vaisseau assure le départ
+  let showcase = null;
+  if(pend && !pendCap){ showcase = makeShip(pend.model, leg, pend.opts); showcase.pref = pend.opts;
+    const rS = rO + 1.6*(hero.len + showcase.len) + 1.6*(departer.len + showcase.len);
+    showcase.traj = compositeTraj([{ kind:'orbit', t0: -1e9, f: orbitTraj(Cp, rS, u, w, -3*(hero.len + showcase.len)/rS, Math.sqrt(target.GM/rS)/rS, tauO) }]);
+    leg.npcs.push(showcase); }
+  if(C.pendingMil){ const k = C.pendingMil; C.pendingMil = null; showcase = ensureMil(leg, k) || showcase; }   // v7.5 : flotte choisie pendant le départ précédent
   // départ : poussée continue jusqu'au point de saut (25–45 rayons), dans la direction de l'étoile suivante
   const dJ = Rp*(target.kind.gas ? rr(10, 18) : rr(25, 45));
   const { pathD, upD } = departurePath(leg, target, depOrbit, depStart, toNext, dJ);
@@ -777,7 +971,9 @@ function planVisit(leg, hero, tArrive, arriveDir, arr){
   const jDir = pathD.d1.clone();
   // mode de départ : saut quantique ou vol supraluminique (réservé aux vaisseaux à anneaux de distorsion)
   const pref = departer.pref;                                                                 // préférences du sélecteur (distorsion / saut)
-  const mode = departer.ftl && (pref ? (pref.warp && (!pref.jump || R() < .5)) : (PARAMS.get('ftl') === 'warp' || (PARAMS.get('ftl') !== 'jump' && R() < .5))) ? 'warp' : 'jump';
+  const eqD = departer.equip || {};
+  const mode = eqD.warp && eqD.jump ? ((pref ? (pref.warp && (!pref.jump || R() < .5)) : (PARAMS.get('ftl') === 'warp' || (PARAMS.get('ftl') !== 'jump' && R() < .5))) ? 'warp' : 'jump')
+                                    : (eqD.warp ? 'warp' : 'jump');   // un seul moyen : celui-là (le partant en a toujours au moins un)
   let jumpSeg, extra = {};
   if(mode === 'jump'){ jumpSeg = { kind:'jump', t0: tJ, f: depart }; noteJump(departer, tJ); }
   else {
@@ -792,7 +988,7 @@ function planVisit(leg, hero, tArrive, arriveDir, arr){
   else hero.traj = compositeTraj(segsHero.concat(depSegs));
   const tEnd = mode === 'jump' ? tJ + JT.total : extra.tExit - .8;
   return Object.assign({ leg, hero, departer, target, tArrive, P0, transfer, tT0, tO0, depStart, depEnd, tJ, tEnd, nextLeg, jDir, toNext, handover, orbitR: rO, vOrb, mode, arrMode, kTr, kDep, profTr: prof, profDep: profD,
-    oU: u, oW: w, tauO, segsHero, depOrbit, dJ, userHero: !!pend }, extra);
+    oU: u, oW: w, tauO, segsHero, depOrbit, dJ, userHero: !!pend || !!showcase, showcase }, extra);
 }
 /* chemin de départ depuis une orbite jusqu'au point de saut (commun au plan de visite et au relais immédiat) */
 function departurePath(leg, target, depOrbit, depStart, toNext, dJ){
@@ -806,20 +1002,36 @@ function departurePath(leg, target, depOrbit, depStart, toNext, dJ){
    Le départ garde la même durée physique (poussée ajustée) : la carte du temps déjà planifiée reste valable. */
 function relayNow(vis, model, opts){
   const leg = vis.leg, old = vis.departer, hero = vis.hero, tg = vis.target;
-  const sh = makeShip(model, leg); if(opts) sh.pref = opts;
+  const sh = makeShip(model, leg, opts); if(opts) sh.pref = opts;
   const rC = vis.orbitR + 1.6*(hero.len + sh.len) + (old === hero ? 0 : 1.6*(old.len + sh.len));
   const depOrbit = orbitTraj(tg.position, rC, vis.oU, vis.oW, -3*(hero.len + sh.len)/rC, Math.sqrt(tg.GM/rC)/rC, vis.tauO);   // juste derrière le héros
   const { pathD, upD } = departurePath(leg, tg, depOrbit, vis.depStart, vis.toNext, vis.dJ);
   const D0 = vis.profDep.D, vs = depOrbit.speed, a = Math.max(.05, 2*(pathD.L - vs*D0)/(D0*D0));
   const profD = accelProfile(pathD.L, vs, a), depart = pathTraj(pathD, profD, tauAt(vis.depStart), upD);
   let jumpSeg;
-  if(vis.mode === 'jump'){ jumpSeg = { kind:'jump', t0: vis.tJ, f: depart }; noteJump(sh, vis.tJ); if(old.jumpTs) old.jumpTs = old.jumpTs.filter(t => t !== vis.tJ); }
-  else { const W = warpPlan(sh, leg, vis.nextLeg, vis.tJ, depart, pathD.d1.clone(), upD, vis.warp); sh.warps = [W]; vis.warp = W; jumpSeg = { kind:'warp', t0: vis.tJ, f: W.fA }; }
+  if(vis.mode === 'jump' && sh.equip.jump){ jumpSeg = { kind:'jump', t0: vis.tJ, f: depart }; noteJump(sh, vis.tJ); if(old.jumpTs) old.jumpTs = old.jumpTs.filter(t => t !== vis.tJ); }
+  else {                                                                     // distorsion (déjà prévue, ou bascule : le nouveau n'a que ses anneaux)
+    const sw = vis.mode === 'jump', W = warpPlan(sh, leg, vis.nextLeg, vis.tJ, depart, pathD.d1.clone(), upD, sw ? undefined : vis.warp);
+    if(sw){ if(old.jumpTs) old.jumpTs = old.jumpTs.filter(t => t !== vis.tJ);
+      Object.assign(vis, { mode: 'warp', arrB: arrivalPlan(vis.nextLeg), wDir: W.wDir, tExit: W.tExit, tCru: W.tCru, tEng: W.tEng, tEnd: W.tExit - .8, ringPlan: undefined }); }
+    sh.warps = [W]; vis.warp = W; jumpSeg = { kind:'warp', t0: vis.tJ, f: W.fA }; }
   sh.traj = compositeTraj([{ kind:'orbit', t0: -1e9, f: depOrbit }, { kind:'depart', t0: vis.depStart, f: depart }, jumpSeg]);
   if(old === hero) hero.traj = compositeTraj(vis.segsHero);                                  // l'ancien partant reste en orbite
   else old.traj = compositeTraj([{ kind:'orbit', t0: -1e9, f: vis.depOrbit }]);
   if(!leg.npcs.includes(old)) leg.npcs.push(old);
-  Object.assign(vis, { departer: sh, depOrbit, jDir: pathD.d1.clone(), profDep: profD, userHero: true, geodePlan: undefined, handover: true });
+  Object.assign(vis, { departer: sh, depOrbit, jDir: pathD.d1.clone(), profDep: profD, userHero: true, geodePlan: undefined, handover: true, showcase: null });
+  if(sh.bays) sh.bays.forEach((op, i) => opSchedule(op, Math.max(T, vis.tO0) + rr(2, 5) + i*rr(4, 7)));
+  return sh;
+}
+
+/* vaisseau choisi sans cœur de saut ni anneaux (v7.2.2) : il rejoint l'orbite et devient le sujet ; le partant prévu assure le départ */
+function showcaseNow(vis, model, opts){
+  const leg = vis.leg, hero = vis.hero, tg = vis.target;
+  const sh = makeShip(model, leg, opts); if(opts) sh.pref = opts;
+  const rS = vis.orbitR + 1.6*(hero.len + sh.len) + 1.6*(vis.departer.len + sh.len);
+  sh.traj = compositeTraj([{ kind:'orbit', t0: -1e9, f: orbitTraj(tg.position, rS, vis.oU, vis.oW, -3*(hero.len + sh.len)/rS, Math.sqrt(tg.GM/rS)/rS, vis.tauO) }]);
+  leg.npcs.push(sh);
+  Object.assign(vis, { showcase: sh, userHero: true, showcaseMsg: false });
   if(sh.bays) sh.bays.forEach((op, i) => opSchedule(op, Math.max(T, vis.tO0) + rr(2, 5) + i*rr(4, 7)));
   return sh;
 }
@@ -910,20 +1122,124 @@ function buildStreaks(){
   return mesh;
 }
 let streaks = null;
+/* ---------- départ en distorsion (v7.2.1) : traînée et gerbe violettes ----------
+   Le vaisseau démarre lentement (engagement de 2,2 s) en laissant une traînée lumineuse violette ; quand il disparaît
+   (fin de l'engagement : éclair, repli dans le plan de départ), une gerbe de particules se disperse là où il était, et la
+   traînée s'égrène en particules qui dérivent. Tout est dans le repère co-mobile de l'erre (celui du plan de départ) :
+   le groupe est posé au point d'engagement et suit la vitesse d'erre ; formes calculées dans les shaders (aucun calcul
+   par particule côté JavaScript). */
+const DEPFX = { NB: 1500, NT: 900, LIFE: 6 };
+function buildDepFX(){
+  const G = new THREE.Group(); G.visible = false; G.userData.center = new V3(); G.userData.r = 1;
+  // particules : gerbe (sphère + anneau de choc perpendiculaire à la route) puis égrenage de la traînée
+  const N = DEPFX.NB + DEPFX.NT, P = new Float32Array(N*4), Qa = new Float32Array(N*4), pos = new Float32Array(N*3);
+  for(let i = 0; i < N; i++){
+    const u = Math.random()*2 - 1, a = Math.random()*Math.PI*2, r = Math.sqrt(1 - u*u), burst = i < DEPFX.NB;
+    const sp = burst ? (Math.random() < .12 ? rr(1.4, 2.4) : .15 + 1.15*Math.pow(Math.random(), .7)) : .02 + .14*Math.random();
+    P.set([r*Math.cos(a), r*Math.sin(a), u, sp], i*4);
+    Qa.set([burst ? (i < DEPFX.NB*.62 ? -1 : -2) : Math.random(), 0, burst ? rr(2.8, 5.5) : rr(2.4, 4.6), Math.random()], i*4);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('aP', new THREE.BufferAttribute(P, 4)); g.setAttribute('aQ', new THREE.BufferAttribute(Qa, 4));
+  const U = { uT: { value: 0 }, uL: { value: 100 }, uW: { value: new V3(0, 0, 1) }, uDE: { value: 1 }, uTc: { value: 2.2 }, uPx: { value: 600 }, uHead: { value: 0 }, uWid: { value: 10 }, uFade: { value: 1 } };
+  const pm = new THREE.ShaderMaterial({ uniforms: U, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    vertexShader: `
+      attribute vec4 aP; attribute vec4 aQ;
+      uniform float uT, uL, uDE, uTc, uPx; uniform vec3 uW;
+      varying float vA; varying vec3 vC;
+      void main(){
+        float t0 = aQ.x < 0.0 ? uTc : aQ.y, t = uT - t0;                       /* gerbe : à la disparition ; traînée : au passage du vaisseau */
+        if(t < 0.0 || t > aQ.z){ gl_Position = vec4(2.0, 2.0, 2.0, 1.0); gl_PointSize = 0.0; vA = 0.0; vC = vec3(0.0); return; }
+        vec3 d = aP.xyz;
+        if(aQ.x < -1.5 || aQ.x >= 0.0) d = normalize(d - uW*dot(d, uW) + 1e-4);  /* anneau de choc, dérive latérale de la traînée */
+        float tau = aQ.x < 0.0 ? 1.1 : 1.8, r = aP.w*uL*tau*(1.0 - exp(-t/tau));
+        vec3 p = aQ.x < 0.0 ? uW*(uDE + uL*0.35*(1.0 - exp(-t/0.6))) : uW*(aQ.x*uDE);
+        p += d*r;
+        vec4 mv = modelViewMatrix*vec4(p, 1.0);
+        float life = t/aQ.z, fade = (1.0 - life)*(1.0 - life)*smoothstep(0.0, 0.06, t);
+        float tw = 0.65 + 0.35*sin(uT*(9.0 + aQ.w*13.0) + aQ.w*40.0);
+        vA = fade*tw*(aQ.x < 0.0 ? 1.0 : 0.55);
+        float h = fract(aQ.w*7.31);
+        vC = h < 0.6 ? vec3(0.62, 0.3, 1.0) : (h < 0.86 ? vec3(0.92, 0.55, 1.0) : vec3(0.55, 0.72, 1.0));
+        float sz = uL*(aQ.x < 0.0 ? 0.04 : 0.024)*(0.6 + 0.8*fract(aQ.w*3.7));
+        gl_PointSize = clamp(sz*uPx/max(-mv.z, 1e-3), 1.5, 22.0);
+        gl_Position = projectionMatrix*mv;
+      }`,
+    fragmentShader: `precision highp float; varying float vA; varying vec3 vC;
+      void main(){ vec2 q = gl_PointCoord*2.0 - 1.0; float d = dot(q, q); if(d > 1.0) discard; gl_FragColor = vec4(vC*vA*exp(-d*3.0)*1.7, 1.0); }` });
+  const pts = new THREE.Points(g, pm); pts.frustumCulled = false; pts.renderOrder = 9; G.add(pts);
+  // traînée : ruban face caméra le long de la route, étroit au départ, large derrière le vaisseau
+  const NS = 48, uv = new Float32Array((NS + 1)*2*2), rp = new Float32Array((NS + 1)*2*3), idx = [];
+  for(let i = 0; i <= NS; i++){ uv.set([i/NS, -1, i/NS, 1], i*4); if(i < NS){ const k = i*2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); } }
+  const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.BufferAttribute(rp, 3)); rg.setAttribute('aUV', new THREE.BufferAttribute(uv, 2)); rg.setIndex(idx);
+  const rm = new THREE.ShaderMaterial({ uniforms: U, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    vertexShader: `
+      attribute vec2 aUV; uniform float uHead, uWid; uniform vec3 uW; varying vec2 vUV;
+      void main(){
+        vec4 mv = modelViewMatrix*vec4(uW*(aUV.x*uHead), 1.0);
+        vec3 dv = normalize(mat3(modelViewMatrix)*uW), sd = cross(dv, normalize(mv.xyz));
+        sd = length(sd) > 1e-4 ? normalize(sd) : vec3(1.0, 0.0, 0.0);
+        mv.xyz += sd*aUV.y*uWid*(0.3 + 0.7*smoothstep(0.0, 0.85, aUV.x));
+        vUV = aUV; gl_Position = projectionMatrix*mv;
+      }`,
+    fragmentShader: `precision highp float; uniform float uFade, uT, uHead, uL; varying vec2 vUV;
+      void main(){
+        float across = exp(-vUV.y*vUV.y*3.2), along = pow(vUV.x, 1.3);
+        float ripple = 0.75 + 0.25*sin(vUV.x*uHead/(uL*0.35) - uT*14.0);
+        float k = across*along*ripple*uFade*smoothstep(0.0, uL*0.3, uHead);
+        vec3 col = mix(vec3(0.5, 0.24, 1.0), vec3(0.95, 0.82, 1.0), across*across*along*0.6);
+        gl_FragColor = vec4(col*k*1.2, 1.0);
+      }` });
+  const rib = new THREE.Mesh(rg, rm); rib.frustumCulled = false; rib.renderOrder = 9; G.add(rib);
+  G.userData.U = U; G.userData.pts = g; shipWorld.add(G);
+  return G;
+}
+let depFX = null;
+function updateDepFX(sh, W, T){
+  const G = depFX; if(!G) return;
+  if(!sh || !W || T < W.tEng || T > W.tCru + DEPFX.LIFE){ G.visible = false; return; }
+  const U = G.userData.U, L = sh.len;
+  if(G.userData.W !== W){                                   // nouvelle distorsion : repère co-mobile et instants de passage de la traînée
+    G.userData.W = W; G.userData.P0 = subjectState(sh, W.tEng).pos.clone(); G.userData.vm = velT(sh, W.tW0 + .3);
+    const Qa = G.userData.pts.attributes.aQ, Te = W.tCru - W.tEng;
+    for(let i = DEPFX.NB; i < DEPFX.NB + DEPFX.NT; i++){
+      const d = Qa.getX(i)*W.dE; let lo = 0, hi = Te;           // instant où le vaisseau passe à la distance d (bissection)
+      for(let k = 0; k < 24; k++){ const m = (lo + hi)/2; if(W.dist(W.tEng + m) < d) lo = m; else hi = m; }
+      Qa.setY(i, lo + .05);
+    }
+    Qa.needsUpdate = true;
+  }
+  const tl = T - W.tEng, Te = W.tCru - W.tEng;
+  G.position.copy(G.userData.P0).addScaledVector(G.userData.vm, tl); G.updateMatrixWorld();
+  U.uT.value = tl; U.uL.value = L; U.uW.value.copy(W.wDir); U.uDE.value = W.dE; U.uTc.value = Te;
+  U.uHead.value = Math.max(0, Math.min(W.dist(T), W.dE) - .45*L); U.uWid.value = .14*L;
+  U.uFade.value = T < W.tCru ? 1 : Math.exp(-(T - W.tCru)/1.5);
+  const sz = renderer.getDrawingBufferSize(_v2d); U.uPx.value = sz.y/(2*Math.tan(cam.fov*Math.PI/360));
+  G.userData.center.copy(G.position).addScaledVector(W.wDir, W.dE*.5); G.userData.r = W.dE*.5 + 3*L;
+  G.visible = true;
+}
+const _v2d = new THREE.Vector2();
 function warpFX(T){
   let active = null, W = null;
-  ships.forEach(sh => (sh.warps || []).forEach(w => { if(T >= w.tW0 && T <= w.tExit + 1.6){ active = sh; W = w; } }));
+  ships.forEach(sh => (sh.warps || []).forEach(w => { if(T >= w.tW0 - RING.PRE && T <= w.tExit + 1.6){ active = sh; W = w; } }));
   ships.forEach(sh => { if(sh !== active && sh.field) sh.field.value = .15; });
+  updateDepFX(active, W, T);
   if(!active){ streaks.visible = false; return false; }
   const st = active.traj(T), sp = W.speed(T)/W.s, s = W.s;
   let field = .15, lens = 0, chroma = 0, flash = 0, rip = 0, ripA = 0, stretch = 1, alpha = 0, spin = 1;
-  if(T < W.tEng){ const e = (T - W.tW0)/WT.spool; field = .15 + 1.2*e*e; lens = .1*smooth(e); spin = 1 + 7*e; chroma = .01*e; }
-  else if(T < W.tCru){ const e = (T - W.tEng)/WT.engage; field = 1.35 + .4*e; flash = .75*Math.sin(Math.min(1, e*1.6)*Math.PI); lens = .1 + .35*Math.sin(e*Math.PI) + .15*e; chroma = .02 + .03*e; stretch = 1 + .45*smooth(e); alpha = smooth(e); spin = 8; }
+  if(T < W.tW0){ const e = (T - W.tW0 + RING.PRE)/RING.PRE; field = .15 + .45*smooth(e); spin = 1 + 1.5*e; }            // pré-charge (v7.2)
+  else if(T < W.tEng){ const e = (T - W.tW0)/WT.spool; field = .6 + .75*e + .05*e*Math.sin(T*41); lens = .1*smooth(e); spin = 2.5 + 5.5*e; chroma = .01*e; }
+  else if(T < W.tCru){ const e = (T - W.tEng)/(W.tCru - W.tEng), e2 = smooth(clamp((e - .55)/.45, 0, 1)); field = 1.35 + .4*e; flash = .25*Math.sin(Math.min(1, e*5)*Math.PI); lens = .1 + .1*e + .3*e2; chroma = .02 + .03*e; stretch = 1 + .45*e2; alpha = e2; spin = 8; }   // v7.2.1 : démarrage lent, étirement à la fin
   else if(T < W.tDec){ field = 1.75; lens = .25; chroma = .018; stretch = 1.45; alpha = 1; spin = 8; }
   else if(T < W.tExit){ const e = (T - W.tDec)/WT.decel; field = 1.75; lens = .25 + .3*e; chroma = .02; stretch = 1.45 - .45*smooth(e); alpha = 1 - smooth(e*1.3); spin = 8 - 4*e; }
   else { const e = clamp((T - W.tExit)/1.6, 0, 1); field = 1.75 - 1.6*smooth(e); flash = e < .2 ? .7*Math.sin(e/.2*Math.PI) : 0; lens = .5*(1 - smooth(e)); rip = .02 + 1.2*e; ripA = .03*(1 - e); chroma = .03*(1 - e); spin = 4 - 3*e; }
+  if(T >= W.tCru - .15 && T < W.tCru + .5) flash = Math.max(flash, .9*Math.exp(-Math.pow((T - W.tCru)/.09, 2)));   // v7.2.1 : éclair à la disparition
+  // plan de départ : le vaisseau se replie en un trait et disparaît (dans les plans de poursuite, on reste dans la bulle : il reste visible)
+  const vanish = shot && shot.type === 'warpEngage' && T > W.tCru ? clamp((T - W.tCru)/.14, 0, 1) : 0;
+  if(vanish > 0){ lens *= 1 - vanish; chroma *= 1 - vanish; alpha *= 1 - vanish; }
   active.field.value = field; active.phase.value += .7*spin/60;
-  active.inner.scale.set(SCALE/Math.sqrt(stretch), SCALE/Math.sqrt(stretch), SCALE*stretch);
+  const sxy = Math.max(1e-4, SCALE/Math.sqrt(stretch)*(1 - vanish));
+  setInnerScale(active, sxy, sxy, SCALE*stretch*(1 + 1.5*vanish));
   FX.active = true; FX.center.copy(st.pos); FX.len = active.len; FX.lens = lens; FX.rip = rip; FX.ripA = ripA; FX.flash = flash; FX.chroma = chroma;
   FX.vignette = .25*alpha; FX.flashDom = .35*flash;
   // traînées (centre relatif à la caméra : origine flottante)
@@ -961,7 +1277,7 @@ function jumpOutFX(T, vis){
   if(sh.geode && !gone){ setGeode(sh, gp.p, ch); if(u < a){ depth += .1*gp.p; gRip = gp.age*.9; gRipA = .05*Math.exp(-gp.age*3.2)*(gp.age < 8 ? 1 : 0); } }
   sh.charge.value = sh.geode && u < a ? .3*ch + 1.25*gp.p : ch; sh.thr.value = thr;   // entre deux battements la géode retombe : les pulsations se lisent
   const S_ = 1 + 1.3*str, s_ = 1/(1 + .5*str);
-  sh.inner.scale.set(SCALE*s_, SCALE*s_, SCALE*S_);
+  setInnerScale(sh, SCALE*s_, SCALE*s_, SCALE*S_);
   if(gone) sh.root.visible = false;
   else if(u >= a){ const e = (u - a)/(JT.fold + JT.flash*.5); sh.root.position.addScaledVector(frameOf(st.q).up, -sh.len*.3*e*e); } // le vaisseau glisse dans le puits
   placeGrid(sh, st, 6.5);
@@ -984,7 +1300,7 @@ function arriveFX(T, vis){
   const flash = u < .32 ? Math.sin(u/.32*Math.PI) : 0;
   sh.root.visible = u >= .12;
   const str = u < .12 ? 1 : Math.max(0, 1 - (u-.12)/.55);
-  sh.inner.scale.set(SCALE/(1+.5*str), SCALE/(1+.5*str), SCALE*(1 + 1.3*str));
+  setInnerScale(sh, SCALE/(1+.5*str), SCALE/(1+.5*str), SCALE*(1 + 1.3*str));
   sh.charge.value = Math.max(0, .9*(1 - u/2.2)); sh.thr.value = Math.min(sh.thr.value, .08 + u*.1);
   const e = clamp(u/3.2, 0, 1);
   placeGrid(sh, st, 6.5); const gu = grid.material.uniforms;
@@ -1014,6 +1330,8 @@ function sliceUnits(){
   }
   if(grid.visible) out.push([grid.position, grid.scale.x*2.2]);
   if(streaks.visible) out.push([streaks.userData.center, streaks.userData.r]);
+  if(depFX && depFX.visible) out.push([depFX.userData.center, depFX.userData.r]);
+  if(GUN.grp && GUN.grp.visible) out.push([GUN.grp.userData.center, GUN.grp.userData.r]);
   return out;
 }
 function renderLayers(){
@@ -1076,7 +1394,8 @@ function renderFrame(){
    ===================================================================== */
 let shot = null;
 const shotLog = [];
-function subjectState(sh, T){ const st = sh.traj(T); if(!st.q) st.q = quatNose(st.nose, st.up); return st; }
+function subjectState(sh, T){ const st = sh.traj(T); if(!st.q) st.q = quatNose(st.nose, st.up); st.com = sh.com || null; return st; }
+function setInnerScale(sh, sx, sy, sz){ sh.inner.scale.set(sx, sy, sz); if(sh.com) sh.inner.position.set(-sh.com.x*sx, -sh.com.y*sy, -sh.com.z*sz); }   // étirement centré sur le centre de gravité
 function velT(sh, T){ const a = sh.traj(T - .05).pos, b = sh.traj(T + .05).pos; return b.sub(a).multiplyScalar(10); }   // m par seconde « écran »
 /* près d'une planète, place la caméra du côté extérieur (la planète en fond plutôt que le vide) */
 function outwardSide(vis, st, axis){ const pl = vis && nearestPlanet(vis.leg, st.pos); if(!pl) return R()<.5?-1:1; const rad = st.pos.clone().sub(pl.position); if(rad.length() > pl.radius*3) return R()<.5?-1:1; return axis.dot(rad) >= 0 ? 1 : -1; }
@@ -1124,10 +1443,32 @@ const SHOTS = {
       const pitch = clamp(Math.acos(clamp(pl.radius/rS, 0, 1)) + pitchOff, .2, 1.25);
       const pos = st.pos.clone().addScaledVector(fwdT, -a).addScaledVector(radial, a*Math.tan(pitch)).addScaledVector(rightT, side);
       return { pos, look: st.pos, fov, up: radial }; }; },
+  gunnery(sh, t0, d){ // v7.5 : exercice de tir — 2 cadrages : large de profil (tireur, traçantes et cible) ou depuis la cible (les traçantes arrivent vers nous)
+    const ts = sh.craft.turrets, tg = sh.gun.target, side = R()<.5?-1:1, fov = rr(42, 48), wide = C.gunVar ? C.gunVar === 'wide' : R() < .6;
+    return T => { const st = subjectState(sh, T), f = frameOf(st.q), tw = hw(st, 0, 0, 0), tp = tg.traj(T).pos, D = tp.distanceTo(tw), dir = tp.clone().sub(tw).normalize(), up = f.up;
+      const right = new V3().crossVectors(dir, up).normalize();
+      if(wide){ const M = tw.clone().addScaledVector(dir, D*.5); return { pos: M.clone().addScaledVector(right, side*D*.9).addScaledVector(up, D*.14), look: M, fov, up }; }
+      return { pos: tp.clone().addScaledVector(dir, 34).addScaledVector(right, side*26).addScaledVector(up, 12), look: tw.clone().lerp(tp, .12), fov: fov*.58, up }; }; },   // téléobjectif : le destroyer remplit le cadre, les traçantes filent vers nous
+  formation(sh, t0, d){ // v7.4 : patrouille en formation — caméra co-mobile avec le chef, sur le flanc, cadrée sur le centre du groupe
+    const grp = sh.formation || [sh], lead = grp[0], side = R()<.5?-1:1, E = 45 + 8*grp.length, a = rr(.9, 1.4), up = rr(.2, .5), fw = rr(-.2, .5), fov = rr(40, 50);
+    return T => { const st = subjectState(lead, T), f = frameOf(st.q), c = grp.reduce((acc, m) => acc.add(m.traj(T).pos), new V3()).multiplyScalar(1/grp.length);
+      return { pos: c.clone().addScaledVector(f.right, side*E*a).addScaledVector(f.up, E*up).addScaledVector(f.fwd, E*fw), look: c, fov, up: f.up }; }; },
+  turretClose(sh, t0, d){ // v7.4 : gros plan sur une tourelle qui balaie (destroyer, corvette)
+    const ts = sh.craft.turrets, u = ts[Math.floor(R()*ts.length)], s = u.s, side = R()<.5?-1:1, dv = u.ventral ? -1 : 1, fov = rr(42, 50);
+    const cp = u.pos.clone().add(v(side*s*rr(4.5, 6.5), dv*s*rr(2.2, 3.4), -s*rr(3, 6))), lk = u.pos.clone().add(v(0, dv*s*1.0, -s*1.5));
+    return T => { const st = subjectState(sh, T); return { pos: hw(st, cp.x, cp.y, cp.z), look: hw(st, lk.x, lk.y, lk.z), fov, up: frameOf(st.q).up.multiplyScalar(dv) }; }; },
+  warpRings(sh, t0, d, vis){ // v7.2 : gros plan co-mobile sur un anneau pendant la pré-charge et la charge (émetteurs, halo, lueur)
+    // trois-quarts arrière (les anneaux entourent le réacteur, près de la poupe ; la cage ou les réservoirs masqueraient l'avant)
+    const Rg = sh.rings, zs = Rg.list.map(r => r.z), zb = Math.max(...zs), zm = (Math.min(...zs) + zb)/2, side = R()<.5?-1:1, Rr = Rg.list[0].R;
+    const cp = v(side*Rr*rr(1.1, 1.4), Rr*rr(.4, .7), zb + Rr*rr(1.5, 1.9)), lk = v(side*Rr*.15, Rr*.05, zm), fov = rr(50, 56);
+    return T => { const st = subjectState(sh, T); return { pos: hw(st, cp.x, cp.y, cp.z), look: hw(st, lk.x, lk.y, lk.z), fov, up: frameOf(st.q).up }; }; },
   warpEngage(sh, t0, d, vis){ // plan fixe (co-mobile avec l'erre) : charge des bobines, bulle, puis le vaisseau file hors champ
     const W = vis.warp, s0 = subjectState(sh, W.tEng), vm = velT(sh, W.tW0 + .3), f = frameOf(s0.q), L = sh.len, side = R()<.5?-1:1;
-    const pos = s0.pos.clone().addScaledVector(W.wDir, -rr(2.6, 3.6)*L).addScaledVector(f.right, side*rr(2.2, 3.2)*L).addScaledVector(f.up, rr(.8, 1.4)*L);
-    return T => { const st = subjectState(sh, Math.min(T, W.tEng + .15)); return { pos: pos.clone().addScaledVector(vm, T - W.tEng), look: st.pos.clone().addScaledVector(vm, T - Math.min(T, W.tEng + .15)).addScaledVector(W.wDir, 1.2*L), fov: 52, up: f.up }; }; },
+    const pos = s0.pos.clone().addScaledVector(W.wDir, -rr(1.9, 2.6)*L).addScaledVector(f.right, side*rr(1.5, 2.2)*L).addScaledVector(f.up, rr(.6, 1.0)*L);   // v7.2.1 : plus près
+    const P0 = s0.pos.clone();
+    return T => { if(T <= W.tEng){ const st = subjectState(sh, T); return { pos: pos.clone().addScaledVector(vm, T - W.tEng), look: st.pos.clone().addScaledVector(W.wDir, 1.2*L), fov: 52, up: f.up }; }
+      const a = P0.clone().addScaledVector(vm, T - W.tEng), dd = Math.min(W.dist(T), W.dE);        // v7.2.1 : le regard accompagne le démarrage
+      return { pos: pos.clone().addScaledVector(vm, T - W.tEng), look: a.addScaledVector(W.wDir, 1.2*L + .5*dd), fov: 52, up: f.up }; }; },
   warpChase(sh, t0, d){ const L = sh.len, side = R()<.5?-1:1, a = rr(2.6, 3.6), h = rr(.6, 1.1), fov = rr(56, 64);
     return T => { const st = subjectState(sh, T), f = frameOf(st.q); return { pos: st.pos.clone().addScaledVector(f.fwd, -a*L).addScaledVector(f.up, h*L).addScaledVector(f.right, side*.7*L), look: st.pos.clone().addScaledVector(f.fwd, 3*L), fov, up: f.up }; }; },
   warpSide(sh, t0, d){ const L = sh.len, side = R()<.5?-1:1, k = rr(2.6, 3.6), fov = rr(50, 58);
@@ -1156,7 +1497,7 @@ const SHOTS = {
 };
 /* ---------- gros plans sur les vaisseaux (détails de coque, moteurs, RCS, géode) ----------
    caméras placées dans le repère du vaisseau, hors de sa boîte englobante (jamais dans la coque) */
-const CLOSE = { hullDolly:1, engineClose:1, bowClose:1, rcsClose:1, geodeClose:1, dockClose:1 };
+const CLOSE = { hullDolly:1, engineClose:1, bowClose:1, rcsClose:1, geodeClose:1, dockClose:1, warpRings:1, turretClose:1 };
 /* ---------- profondeur de champ (lot 3) : gros plans et manœuvres de baie ----------
    ouverture fixée au début du plan (0,45–0,75 % de la hauteur d'image, plus forte en longue focale), mise au point sur le point visé,
    lissée (pas de « pompage »), ouverture progressive en 0,4 s ; coupée si la résolution dynamique descend sous 0,7 */
@@ -1197,7 +1538,7 @@ function shakeIntensity(T, dt){
       if(u > 0 && u < JT.charge) I += aD*(.1*(u/JT.charge) + .42*geodePulse(u).p);                                         // battements de la géode
       else if(u >= JT.charge && u < JT.charge + JT.fold) I += aD*.6*smooth((u - JT.charge)/JT.fold);                     // l'espace se replie
       else if(u >= JT.charge + JT.fold) I += aD*Math.exp(-(u - JT.charge - JT.fold)/.35);                                  // éclair et onde
-    } else if(vis.warp){ const W = vis.warp; if(T > W.tW0 && T < W.tEng) I += aD*.18*smooth((T - W.tW0)/(W.tEng - W.tW0)); else if(T >= W.tEng) I += aD*.9*Math.exp(-(T - W.tEng)/.35); }
+    } else if(vis.warp){ const W = vis.warp; if(T > W.tW0 && T < W.tEng) I += aD*.18*smooth((T - W.tW0)/(W.tEng - W.tW0)); else if(T >= W.tEng){ I += aD*.25*Math.exp(-(T - W.tEng)/.35); if(T >= W.tCru) I += aD*.9*Math.exp(-(T - W.tCru)/.35); } }   // v7.2.1 : secousse à la disparition
   }
   if(vis.arrMode !== 'warp'){ const u = T - vis.tArrive; if(u > 0 && u < 2) I += att(vis.hero)*.7*Math.exp(-u/.3); }     // sortie de saut
   return Math.min(1, I);
@@ -1208,7 +1549,7 @@ function applyShake(T, dt, fov){
   const a = .011*I*clamp(fov/50, .5, 1.3);
   cam.rotateX(a*shakeNoise(T, 1.3)); cam.rotateY(a*shakeNoise(T, 4.1)); cam.rotateZ(.6*a*shakeNoise(T, 7.7));
 }
-function hw(st, x, y, z){ return new V3(x, y, z).applyQuaternion(st.q).add(st.pos); }   // repère coque → monde
+function hw(st, x, y, z){ const v_ = new V3(x, y, z); if(st.com) v_.sub(st.com); return v_.applyQuaternion(st.q).add(st.pos); }   // repère coque → monde (racine = centre de gravité)
 function sunBody(sh, T){ const st = subjectState(sh, T); return st.pos.clone().negate().normalize().applyQuaternion(st.q.clone().invert()); }   // direction de l'étoile dans le repère coque
 function litSide(sh, T){ const d = sunBody(sh, T); return (R() < .85 ? 1 : -1)*(d.x >= 0 ? 1 : -1); }   // 85 % côté éclairé
 function closeOpts(sh, phase){
@@ -1287,7 +1628,9 @@ function chooseShot(T){
       if(vis.geodePlan && T < vis.tJ + JT.charge - .35) return makeShot('geodeClose', dep, T, vis.tJ + JT.charge - .35, vis);  // la géode bat
       return makeShot('jump', dep, T, vis.tEnd + .05, vis);
     }
-    if(T < vis.tCru + .3) return makeShot('warpEngage', dep, T, vis.tCru + .45, vis);
+    if(vis.ringPlan === undefined) vis.ringPlan = !!(dep.rings && vis.warp && R() < .7);                     // v7.2 : anneaux en gros plan
+    if(vis.ringPlan && T < vis.warp.tEng - .2) return makeShot('warpRings', dep, T, vis.warp.tEng - .15, vis);
+    if(T < vis.tCru + 2.8) return makeShot('warpEngage', dep, T, vis.tCru + 3.0, vis);                          // v7.2.1 : on reste pour la dispersion
     const sh2 = makeShot(pick(['warpChase','warpSide','warpFront','warpChase']), dep, T, vis.tEnd + .05, vis);
     sh2.caption.planet = 'Superluminal transit → ' + vis.nextLeg.name + ' · ' + fmtInt(vis.warp.Vc) + ' c'; return sh2;
   }
@@ -1303,7 +1646,7 @@ function chooseShot(T){
     if(!(vis.shown && vis.shown.has('eclipse')) && R() < .55){ const ve = makeVista(T, Math.max(vd, Math.min(11, room)), vis, 'eclipse'); if(ve){ vis.shown.add('eclipse'); return ve; } }
     const vs = makeVista(T, vd, vis); if(vs) return vs;
   }
-  let subj = (T >= vis.depStart - 1 || vis.userHero) ? dep : vis.hero;
+  let subj = T >= vis.depStart - 1 ? dep : (vis.showcase || (vis.userHero ? dep : vis.hero));
   const seg = segAt(vis, subj, T + d*.5);
   // manœuvre de baie (un engin sort ou rentre par le champ de force) : plan dédié, prioritaire
   const bayShot = (who, tag) => {
@@ -1319,8 +1662,16 @@ function chooseShot(T){
   if(calm && R() < .5 && shotLog.slice(-2).indexOf('npc') < 0){ for(const s of npcs){ if(s.bays){ const b = bayShot(s, 'npc'); if(b){ b.type = 'bayOps'; return b; } } } }
   // présentation du prochain héros (relais) pendant l'orbite : le spectateur le voit avant qu'il ne parte
   if(vis.handover && !vis.userHero && !vis.depIntro && calm && T > vis.tO0 + 3 && T < vis.depStart - 6 && dep !== vis.hero){ vis.depIntro = true; return makeShot(pick(['orbitcam','lateral','tripod']), dep, T, T + d, vis, 'npc'); }
-  if(calm && npcs.length && R() < .35 && shotLog.slice(-2).indexOf('npc') < 0){
-    const s = pick(npcs); const t = pick(['lateral','tripod','orbitcam','chase','hullDolly','bowClose'].concat(s.hull && s.hull.docks && s.hull.docks.length ? ['dockClose'] : []));
+  const gunS = (vis.leg.npcs || []).find(x => x.gun && x.traj && gunActive(x));   // v7.5 : un exercice de tir en cours se filme
+  if(calm && gunS && shotLog[shotLog.length - 1] !== 'gunnery' && R() < .6) return makeShot('gunnery', gunS, T, T + Math.min(Math.max(d, 6), 9), vis, 'gunnery');
+  if(calm && subj.mil && R() < .6){                                          // vedette militaire (sélecteur FLEET)
+    const t = subj.gun && gunActive(subj) ? 'gunnery' : pick((subj.formation ? ['formation', 'formation'] : []).concat(subj.craft && subj.craft.turrets.length ? ['turretClose'] : []).concat(['lateral', 'chase', 'tripod']));
+    return makeShot(t, subj, T, T + d, vis); }
+  const milN = npcs.filter(x => x.mil);                                     // v7.4 : la flotte militaire, quand elle est là, se montre plus souvent
+  if(calm && npcs.length && R() < (milN.length ? .5 : .35) && shotLog.slice(-2).indexOf('npc') < 0){
+    const s = milN.length && R() < .6 ? pick(milN) : pick(npcs);
+    const t = s.mil ? (s.gun && gunActive(s) ? 'gunnery' : pick((s.formation ? ['formation', 'formation'] : []).concat(s.craft && s.craft.turrets && s.craft.turrets.length ? ['turretClose', 'turretClose'] : []).concat(['lateral', 'chase', 'tripod'])))
+                    : pick(['lateral','tripod','orbitcam','chase','hullDolly','bowClose'].concat(s.hull && s.hull.docks && s.hull.docks.length ? ['dockClose'] : []));
     return makeShot(t, s, T, T + d, vis, 'npc');
   }
   // silhouette du vaisseau devant son étoile (si la géométrie s'y prête)
@@ -1496,7 +1847,9 @@ function makeVista(T, d, vis, prefer){
 C.forceVista = function(kind, d){ shot = makeVista(T, d || 9, visit, kind) || shot; return shot && shot.type; };
 function makeShot(type, subj, t0, t1, vis, tag){
   if(type === 'bayOps' && !(subj.bays && subj.bays.length)) type = subj.hull ? 'hullDolly' : 'chase';
-  if(CLOSE[type] && (!subj.hull || (type === 'geodeClose' && !subj.geode) || (type === 'rcsClose' && !subj.hull.rcs.length) || (type === 'dockClose' && !(subj.hull.docks && subj.hull.docks.length)))) type = subj.hull ? 'hullDolly' : 'chase';   // gros plan impossible → repli
+  if(type === 'formation' && !subj.formation) type = 'chase';
+  if(type === 'gunnery' && !(subj.gun && subj.craft && subj.craft.turrets.length)) type = subj.craft && subj.craft.turrets && subj.craft.turrets.length ? 'turretClose' : 'chase';
+  if(CLOSE[type] && (!subj.hull || (type === 'geodeClose' && !subj.geode) || (type === 'warpRings' && !subj.rings) || (type === 'turretClose' && !(subj.craft && subj.craft.turrets && subj.craft.turrets.length)) || (type === 'rcsClose' && !subj.hull.rcs.length) || (type === 'dockClose' && !(subj.hull.docks && subj.hull.docks.length)))) type = subj.hull ? 'hullDolly' : 'chase';   // gros plan impossible → repli
   const cam_ = SHOTS[type](subj, t0, t1 - t0, vis);
   shotLog.push(tag || type); if(shotLog.length > 10) shotLog.shift();
   const s0 = subj.traj(Math.max(t0, type === 'arrive' ? vis.tArrive : t0));
@@ -1544,7 +1897,7 @@ C.initA = function(){                                                    // nett
   shipWorld.add(driveLight);
   renderer.autoClear = false;
   grid = buildWellGrid();
-  streaks = buildStreaks();
+  streaks = buildStreaks(); depFX = buildDepFX(); buildGunFx();
   if(window.__AST && !__AST.ready) console.log('[cine] asteroids', JSON.stringify(__AST.init(String(SEED))));
 };
 C.initB = function(){                                                    // premier système et son héros
@@ -1552,7 +1905,7 @@ C.initB = function(){                                                    // prem
   const first = ROUTE.legs[0] ? legFromStar({ name: ROUTE.legs[0].name, star: ROUTE.legs[0].star, position: ROUTE.legs[0].starPosition, cell: ROUTE.legs[0].cell })
                               : legFromStar(findNextWaypoint(new V3(), v(0,0,-1), new Set(), -1).data);
   recentCells.push(first.cell);
-  const hero = makeShip(pickW(HERO_POOL), first);
+  const hero = makeShip(pickW(DEP_POOL), first);                            // il arrive par saut : cœur de saut requis
   visit = startVisit(first, hero, 2.2, null);
   galPos.copy(first.gal);
   T = 0; shot = null;
@@ -1614,6 +1967,7 @@ function updateShips(dt){
       h.value += (th - h.value)*(th > h.value ? 1 - Math.exp(-dt*.9) : 1 - Math.exp(-dt*.2)); }
     updateRcs(sh, T, dt);
     if(sh.geode) spinGeode(sh, T);
+    if(sh.rings) spinRings(sh, T);
     if(sh.drive && sh.drive.units && window.__SHIPDRIVE){                    // cardans : suivent le couple demandé, vibration pendant la poussée
       const a = sh.alpha, th = st.throttle || 0, g = sh.gimb || (sh.gimb = { x: 0, y: 0, idle: false });
       const tx = a ? -clamp(a.x/RCS_REF, -1, 1)*GIMBAL : 0, ty = a ? -clamp(a.y/RCS_REF, -1, 1)*GIMBAL : 0, kk = 1 - Math.exp(-dt*5);
@@ -1637,7 +1991,7 @@ C.step = function(dt, noRender){
     const next = vis.nextLeg;
     if(!next.group) buildSystem(next);
     const hero = vis.departer; hero.charge.value = 0;
-    if(vis.mode === 'jump') hero.inner.scale.setScalar(SCALE);
+    if(vis.mode === 'jump') setInnerScale(hero, SCALE, SCALE, SCALE);
     if(hero.geode) setGeode(hero, 0, 0);
     const oldLeg = vis.leg; oldLeg.group && (oldLeg.group.visible = false);
     tasks.unshift(() => disposeSystem(oldLeg));                       // l'ancien système (et son trafic) est libéré
@@ -1655,7 +2009,7 @@ C.step = function(dt, noRender){
   if(shot.gal){ galView = { pos: c.pos, fov: c.fov, q: new Q() }; const m = new THREE.Matrix4().lookAt(c.pos, c.look, c.up || v(0,1,0)); galView.q.setFromRotationMatrix(m); sysHidden = true; cam.fov = c.fov; }
   else {
     const subjPos = shot.subj.traj(T).pos;
-    const noMin = shot.vista || CLOSE[shot.type] || shot.type === 'bayOps' || shot.type === 'arrive' || shot.type === 'jump' || shot.type === 'shipTransit' || shot.type === 'warpArrive';
+    const noMin = shot.vista || CLOSE[shot.type] || shot.type === 'bayOps' || shot.type === 'gunnery' || shot.type === 'formation' || shot.type === 'arrive' || shot.type === 'jump' || shot.type === 'shipTransit' || shot.type === 'warpArrive';
     safeCam(c.pos, leg, noMin ? null : subjPos, shot.subj.len*1.4, !!shot.low);
     cam.position.copy(c.pos); if(c.up) cam.up.copy(c.up); else cam.up.set(0,1,0); cam.lookAt(c.look); cam.fov = c.fov;
     updateDof(dt, c); applyShake(T, dt, c.fov);
@@ -1669,12 +2023,16 @@ C.step = function(dt, noRender){
   // visibilité : vaisseaux du système affiché
   ships.forEach(sh => sh.root.visible = sh.leg === leg);
   updateShips(dt);
+  updateGunnery(dt);                                                         // v7.5 : exercices de tir
   updateCrafts(dt);
   // effets de saut
   FX.active = false; grid.visible = false; FX.vignette = 0; FX.flashDom = 0;
   if(visit.arrMode !== 'warp') arriveFX(T, visit);
   if(visit.mode === 'jump') jumpOutFX(T, visit);
   warpFX(T);
+  if(visit.showcase && !visit.showcaseMsg && T >= visit.depStart - 1.5 && window.__DEMO){       // v7.2.2 : la vedette ne peut pas partir
+    visit.showcaseMsg = true; const a = visit.showcase, d = visit.departer, e = s => String(s).replace(/[&<>]/g, '');
+    __DEMO.toast('<span class="a">RELAY</span> · ' + e(a.type) + ' <span class="c">has no jump core or warp rings — the journey continues aboard</span> ' + e(d.type) + ' / ' + e(d.name)); }
   if(visit.arrMode !== 'warp' && T < visit.tArrive + .12) visit.hero.root.visible = false;
   if(visit.mode === 'jump' && T > visit.tJ + JT.charge + JT.fold + JT.flash*.5) visit.departer.root.visible = false;
   updatePuffs(T);
@@ -1711,7 +2069,11 @@ C.setFollow = f => { C.followHero = !!f; return C.followHero; };
 C.setHero = function(model, opts, follow){
   if(follow !== undefined) C.followHero = !!follow;
   const vis = visit; if(!vis || !SHIPGEN.MODELS.some(m => m.id === model)) return 'invalid';
-  if(T < vis.depStart - 4 && !(vis.mode === 'warp' && !FTL[model])){ relayNow(vis, model, opts); shot = null; return 'now'; }
+  if(T < vis.depStart - 4){
+    if(!canLeave(model, opts)){ showcaseNow(vis, model, opts); shot = null; return 'now'; }                  // v7.2.2 : vedette, départ par un autre
+    const eq = equipOf(model, opts);
+    if(vis.mode === 'warp' ? eq.warp : true){ relayNow(vis, model, opts); shot = null; return 'now'; }       // saut prévu : bascule en distorsion si besoin
+  }
   C.pending = { model, opts }; return 'next';                                                   // départ déjà engagé : relais au système suivant
 };
 C.heroInfo = () => { const s = shot && shot.subj && shot.subj.type ? shot.subj : visit.departer; return { model: s.model, type: s.type, name: s.name, follow: C.followHero, pending: C.pending ? C.pending.model : null }; };
@@ -1728,6 +2090,34 @@ C.debugView = function(leg, camPos, look, fov, up){
 };
 C.buildLeg = function(cellStr){ const c = cellStr.split(',').map(Number); const sd = starDataForCell(c[0], c[1], c[2]); if(!sd) return null; return buildSystem(legFromStar(sd)); };
 C.legFromCell = function(x,y,z){ const sd = starDataForCell(x,y,z); return sd ? legFromStar(sd) : null; };
+C.bayAxisDbg = function(t1){                          // test : écart des engins à l'axe de leur baie pendant qu'ils la franchissent
+  const out = [];
+  ships.forEach(sh => (sh.bays || []).forEach((op, i) => {
+    const d = op.d, N = d.N, ax0 = op.cPark.clone(); let worst = 0, wt = null, wseg = null, n = 0;
+    for(let t = T; t < T + (t1 || 400); t += .25){
+      const r = opPose(op, t); if(!r.vis || (r.s !== 'out' && r.s !== 'in' && r.s !== 'away')) continue;
+      if(r.s === 'away'){ const k = op.plan.indexOf(r.seg), pv = op.plan[k - 1], nx = op.plan[k + 1];
+        if(!((pv && pv.s === 'out' && t - r.seg.t0 < 3) || (nx && nx.s === 'in' && r.seg.t1 - t < 3))) continue; }
+      const c = r.center, sAx = c.clone().sub(ax0).dot(N), depthOut = c.clone().sub(d.C).dot(N);
+      if(depthOut > op.ext + 3 || depthOut < -op.ext*2) continue;           // seulement quand l'engin est dans l'embrasure ou juste devant
+      const lat = c.clone().sub(ax0).addScaledVector(N, -sAx).length(); n++;
+      if(lat > worst){ worst = lat; wt = +(t - T).toFixed(2); wseg = r.s; }
+    }
+    out.push({ ship: sh.model, bay: i, mode: d.mode, kind: op.kind, n, worst: +worst.toFixed(2), at: wt, seg: wseg, cb: op.cb.toArray().map(x => +x.toFixed(2)), ext: +op.ext.toFixed(1) });
+  }));
+  return out;
+};
+C.pendingMil = null;
+C.showMilitary = function(kind){                                             // v7.5 : panneau FLEET — la flotte choisie devient le sujet de l'orbite
+  const vis = visit; if(!vis || !['station', 'patrol', 'escort'].includes(kind)) return 'invalid';
+  if(T >= vis.depStart - 4){ C.pendingMil = kind; return 'next'; }
+  const s = ensureMil(vis.leg, kind); if(!s) return 'invalid';
+  Object.assign(vis, { showcase: s, userHero: true, showcaseMsg: false }); shot = null; return 'now';
+};
+C.gunNow = () => { const d = (visit.leg.npcs || []).find(x => x.gun); if(!d) return null; d.gun.ph = ((d.gun.per - T % d.gun.per) + d.gun.per) % d.gun.per; return { rate: rateAt(T), active: gunActive(d) }; };   // test : ouvre une fenêtre de tir maintenant
+C.gunDbg = () => { const d = (visit.leg.npcs || []).find(x => x.gun); return d ? { active: gunActive(d), tracers: GUN.pool.filter(t => T - t.t0 <= t.life).length, visible: GUN.grp.visible, shot: shot && shot.type, camD: Math.round(cam.position.distanceTo(d.root.position)), tgD: Math.round(d.gun.target.root.position.distanceTo(d.root.position)), subj: shot && shot.subj && shot.subj.model, dr: GUN.heads.geometry.drawRange.count } : null; };
+C.warpDbg = () => { const d = visit.departer; return { shot: shot && shot.type, model: d.model, rings: d.rings ? d.rings.list.length : 0, a: d.rings ? +(ringAngle(d, T) % 6.2832).toFixed(3) : null, field: +d.field.value.toFixed(2), pad: d.rings ? +d.rings.padMesh()[0].material.emissiveIntensity.toFixed(2) : null, ringU: d.ringU ? +d.ringU.value.toFixed(2) : null }; };
+C.ringSpin = (sh, T0, T1, n) => { const out = []; for(let i = 0; i <= n; i++) out.push(ringAngle(sh, T0 + (T1 - T0)*i/n)); return out; };
 C.geodeSpin = (sh, T0, T1, n) => { const out = []; for(let i = 0; i <= n; i++){ const t = T0 + (T1 - T0)*i/n; let a = GEO_W0*t; (sh.jumpTs || []).forEach(tJ => a += geodeExtra(t - tJ)); out.push(a); } return out; };
 C.setDof = on => { DOF_ON = !!on; DOF.shot = null; return DOF_ON; };
 C.dof = () => ({ k: +DOF.k.toFixed(3), want: DOF.want, focus: DOF.focus && +DOF.focus.toFixed(2), r: +DOF.r.toFixed(4), off: DOF.off, shake: +SHAKE.I.toFixed(3) });
@@ -1737,7 +2127,7 @@ C.flipWindow = function(){ const tr = visit.transfer, f = x => { let lo = visit.
 C.ages = () => [...ships].filter(s => s.root.visible).map(s => s.model + ':' + s.age.toFixed(2));
 C.rcsDebug = () => [...ships].filter(s => s.rcs && s.root.visible).map(s => s.model + ':' + s.rcs.map(j => j.lvl.toFixed(2)).join(','));
 C.timings = () => ({ tArrive: visit.tArrive, tT0: visit.tT0, tO0: visit.tO0, depStart: visit.depStart, tJ: visit.tJ, tEnd: visit.tEnd, handover: visit.handover, mode: visit.mode, arrMode: visit.arrMode,
-  tEng: visit.tEng, tCru: visit.tCru, tExit: visit.tExit, departer: visit.departer.model, kTr: Math.round(visit.kTr), kDep: Math.round(visit.kDep),
+  tEng: visit.tEng, tCru: visit.tCru, tExit: visit.tExit, departer: visit.departer.model, depEquip: visit.departer.equip, depGeode: !!visit.departer.geode, depRings: !!visit.departer.rings, showcase: visit.showcase ? visit.showcase.model : null, kTr: Math.round(visit.kTr), kDep: Math.round(visit.kDep),
   trD_h: +(visit.profTr.D/3600).toFixed(2), trVmax_kms: +(visit.profTr.vm/1e3).toFixed(1), depD_h: +(visit.profDep.D/3600).toFixed(2), vJ_kms: +(visit.profDep.ve/1e3).toFixed(1), vOrb_kms: +(visit.vOrb/1e3).toFixed(2),
   target: visit.target.properName, R_km: Math.round(visit.target.radius/1e3), a_AU: +(visit.target.orbitA/AU).toFixed(3), Rs_Rsun: +(visit.leg.Rs/RSUN).toFixed(3), warpC: visit.warp ? Math.round(visit.warp.Vc) : 0 });
 C.scale = () => { const leg = visit.leg; return { star: leg.name, cls: leg.designation, Rs_km: Math.round(leg.Rs/1e3), lum: leg.lum,
@@ -1753,7 +2143,7 @@ C.scale = () => { const leg = visit.leg; return { star: leg.name, cls: leg.desig
 let UID = 0;
 const uidOf = s => s.uid || (s.uid = ++UID);
 const REG_P = ['MIR','KAI','VEGA','ORIN','TALA','NOVA','SUR','HELI'];         // immatriculations du jeu : préfixe-NN
-function regOf(s){ if(s.reg) return s.reg; let h = 2166136261; const k = s.name + '/' + s.model; for(let i = 0; i < k.length; i++){ h ^= k.charCodeAt(i); h = Math.imul(h, 16777619); } h >>>= 0; return (s.reg = REG_P[h % 8] + '-' + (10 + (h >>> 3) % 89)); }
+function regOf(s){ if(s.reg) return s.reg; if(s.mil){ let hm = 0; for(let i = 0; i < s.name.length; i++) hm = (hm*31 + s.name.charCodeAt(i)) >>> 0; return (s.reg = 'MIL-' + (100 + hm % 900)); } let h = 2166136261; const k = s.name + '/' + s.model; for(let i = 0; i < k.length; i++){ h ^= k.charCodeAt(i); h = Math.imul(h, 16777619); } h >>>= 0; return (s.reg = REG_P[h % 8] + '-' + (10 + (h >>> 3) % 89)); }
 C.fmtU = function(m){ const a = Math.abs(m); for(const [k, u] of [[1e12, 'Tu'], [1e9, 'Gu'], [1e6, 'Mu'], [1e3, 'ku']]) if(a >= k*.9995){ const x = m/k; return (Math.abs(x) >= 99.95 ? x.toFixed(0) : Math.abs(x) >= 9.995 ? x.toFixed(1) : x.toFixed(2)) + ' ' + u; } return Math.round(m) + ' u'; };
 C.UNIT_GAL = UNIT_GAL; C.AU = AU;
 function present(s){ const vis = visit;                                       // hors champ : héros pas encore sorti du saut, partant déjà replié
@@ -1796,7 +2186,7 @@ C.shipsInfo = function(){
   const vis = visit, out = [], subj = shot && !shot.vista ? shot.subj : null;
   ships.forEach(s => { if(s.leg !== vis.leg || !s.traj || !present(s)) return;
     const st = subjectState(s, T), f = frameOf(st.q);
-    out.push({ uid: uidOf(s), name: s.name, type: s.type, model: s.model, reg: regOf(s), len: s.len, pos: st.pos.toArray(), fwd: f.fwd.toArray(), hero: s === vis.departer, subj: s === subj, craft: !!s.craft, seg: st.seg || 'orbit', thr: st.throttle || 0 }); });
+    out.push({ uid: uidOf(s), name: s.name, type: s.type, model: s.model, reg: regOf(s), len: s.len, pos: st.pos.toArray(), fwd: f.fwd.toArray(), hero: s === vis.departer, subj: s === subj, craft: !!s.craft && !s.mil, mil: !!s.mil, seg: st.seg || 'orbit', thr: st.throttle || 0 }); });
   return out;
 };
 /* radar : contacts autour du sujet filmé, dans son repère (x droite, y avant, z haut) ; engins de baie compris */
@@ -1806,8 +2196,8 @@ C.radarState = function(){
   if(!subj || !subj.traj || subj.leg !== vis.leg && !subj.carrier) return null;
   const st = subjectState(subj, T), f = frameOf(st.q), P = st.pos, out = [];
   const add = (s, pos, craft, carrier) => { const rel = pos.clone().sub(P), d = rel.length(); if(d < 1e-3) return;
-    out.push({ uid: uidOf(s), name: s.name, type: s.type, reg: regOf(s), d, x: rel.dot(f.right), y: rel.dot(f.fwd), z: rel.dot(f.up), craft, carrier: carrier ? carrier.name : null, hero: s === vis.departer }); };
-  const bays = (s, ss) => (s.bays || []).forEach(op => { const r = opPose(op, T); if(r.vis === false || r.s === 'parked') return; add(op.c, r.center.clone().applyQuaternion(ss.q).add(ss.pos), true, s); });
+    out.push({ uid: uidOf(s), name: s.name, type: s.type, reg: regOf(s), d, x: rel.dot(f.right), y: rel.dot(f.fwd), z: rel.dot(f.up), craft: craft && !s.mil, mil: !!s.mil, carrier: carrier ? carrier.name : null, hero: s === vis.departer }); };
+  const bays = (s, ss) => (s.bays || []).forEach(op => { const r = opPose(op, T); if(r.vis === false || r.s === 'parked') return; add(op.c, r.center.clone().sub(s.com || new V3()).applyQuaternion(ss.q).add(ss.pos), true, s); });
   ships.forEach(s => { if(s.leg !== vis.leg || !s.traj || !present(s)) return; const ss = s === subj ? st : subjectState(s, T); if(s !== subj) add(s, ss.pos, !!s.craft); bays(s, ss); });
   out.sort((a, b) => a.d - b.d);
   return { name: subj.name, type: subj.type, reg: regOf(subj), speed: velT(subj, T).length()/Math.max(1, kNow), contacts: out };

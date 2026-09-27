@@ -82,7 +82,7 @@
     d.contacts.forEach((ct, i) => {
       const b = Math.atan2(ct.x, ct.y), inR = ct.d <= rg, rr = inR ? Math.max(11, R*Math.sqrt(ct.d/rg)) : R,   /* 11 px au moins : jamais sous le vaisseau central */ X = c + Math.sin(b)*rr, Y = c - Math.cos(b)*rr;
       if(!inR){ if(i > 12) return; g.fillStyle = 'rgba(93,111,146,.9)'; g.save(); g.translate(X, Y); g.rotate(b); g.beginPath(); g.moveTo(0, -4); g.lineTo(3, 1); g.lineTo(-3, 1); g.closePath(); g.fill(); g.restore(); return; }
-      const near = i === 0, col = near ? '#ffb454' : (ct.craft ? '#8ea0c4' : '#5eead4');
+      const near = i === 0, col = near ? '#ffb454' : (ct.mil ? '#ff6b5e' : (ct.craft ? '#8ea0c4' : '#5eead4'));   // v7.4 : militaires en rouge
       const da = ((sw - b) % TAU + TAU) % TAU, boost = red ? 0 : Math.exp(-da*2.2);
       if(boost > .05){ g.fillStyle = (near ? 'rgba(255,180,84,' : 'rgba(94,234,212,') + (boost*.45) + ')'; g.beginPath(); g.arc(X, Y, 4 + 4*boost, 0, TAU); g.fill(); }
       g.fillStyle = col; g.beginPath(); g.arc(X, Y, ct.craft ? 1.8 : (near ? 3.2 : 2.6), 0, TAU); g.fill();

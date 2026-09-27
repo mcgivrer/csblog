@@ -8,7 +8,7 @@ const ROOT = 'file://' + require('path').resolve(__dirname, '..') + '/';   // ra
  p.on('pageerror',e=>console.log('ERR',e.message.slice(0,300)));
  p.on('console',m=>{ if(m.type()==='error' && !/ERR_FAILED/.test(m.text())) console.log('C', m.text().slice(0,1500)); });
  await p.route(/fonts\.g/, r=>r.abort());
- await p.goto(ROOT + 'dist/observation-des-etoiles.html?seed=OBS-1');
+ await p.goto(ROOT + 'dist/observation-des-etoiles.html?seed=OBS-1' + (process.env.Q || ''));
  await p.waitForFunction(()=>document.querySelector('#sttStart.ready'), null, {timeout:180000, polling:250});
  await p.evaluate((t)=>{ window.__THR = t; }, +(process.env.THR||0)); if(process.argv[7] === 'abs') await p.evaluate(()=>{ window.__ABS = true; });
  const info = await p.evaluate(([model, age, dark])=>{

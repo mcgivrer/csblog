@@ -1,0 +1,863 @@
+  :root{
+    --bg:#0b1220;
+    --bg-2:#0e1729;
+    --panel:#0f1a30;
+    --line:#25375c;
+    --ink:#e8edf5;
+    --muted:#8ea0c4;
+    --muted-2:#5d6f92;
+    --amber:#ffb454;
+    --amber-dim:#a97a3d;
+    --cyan:#5eead4;
+    /* étapes de l'itinéraire (§ amélioration v2.4) : vert = à venir, bleu =
+       franchie — délibérément hors de la paire ambre/cyan de la charte,
+       pour un code couleur d'état à trois valeurs (vert/bleu/ambre-en-cours)
+       qui ne se confonde pas avec les accents de marque déjà en usage. */
+    --nav-upcoming:#4ade80;
+    --nav-done:#5b9dff;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; width:100%; height:100%; overflow:hidden;
+    background:var(--bg); color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:'JetBrains Mono',monospace;}
+  canvas#scene{ position:fixed; inset:0; display:block; z-index:0; }
+
+  /* ---------- vignette + scanlines d'ambiance ---------- */
+  .atmo{
+    position:fixed; inset:0; z-index:1; pointer-events:none;
+    background:
+      radial-gradient(ellipse at center, transparent 45%, rgba(2,5,12,0.55) 100%),
+      repeating-linear-gradient(rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 3px);
+  }
+  .speedlines{
+    position:fixed; inset:0; z-index:1; pointer-events:none;
+    background: repeating-conic-gradient(from 0deg, rgba(255,255,255,0.05) 0deg 0.7deg, transparent 0.7deg 6deg);
+    mix-blend-mode:screen;
+    opacity:0;
+    transition:opacity .5s ease;
+  }
+
+  /* ---------- HUD ---------- */
+  #hud{ position:fixed; inset:0; z-index:2; pointer-events:none; }
+  /* carte stellaire (§23) : masque le HUD normal ET les étiquettes de
+     ciblage (étoiles/planètes/vaisseaux, #starLabels) pendant que la carte
+     est ouverte — sans ça, ces éléments HTML restent visibles, figés à
+     leur dernière position (la boucle qui les repositionne s'arrête avec
+     le reste du jeu, gamePaused), et se superposent au rendu de la carte
+     plutôt que de laisser un plein écran propre comme la maquette (§23.6). */
+  body.starmap-open #hud, body.starmap-open #starLabels{ display:none; }
+  /* travelling de fond de l'écran-titre (demande utilisateur) : même
+     principe — masque le HUD et les étiquettes pendant que l'écran-titre
+     occupe l'écran, pour un arrière-plan qui ne montre que l'espace généré. */
+  body.title-active #hud, body.title-active #starLabels{ display:none; }
+  .panel{
+    position:absolute;
+    border:1px solid var(--line);
+    background:linear-gradient(180deg, rgba(94,234,212,0.04), transparent 60%), rgba(15,26,48,0.72);
+    backdrop-filter:blur(2px);
+  }
+  .panel::before, .panel::after{
+    content:""; position:absolute; width:10px; height:10px; border:1.5px solid var(--amber);
+  }
+  .panel::before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }
+  .panel::after{ bottom:-1px; right:-1px; border-left:none; border-top:none; }
+
+  .hud-top{
+    position:absolute; top:0; left:0; right:0;
+    display:flex; justify-content:space-between; align-items:center;
+    padding:10px 18px;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg, rgba(11,18,32,0.85), rgba(11,18,32,0.35));
+    font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted-2);
+  }
+  .hud-top .amber{ color:var(--amber); }
+  .hud-top .live{ color:var(--cyan); }
+  .hud-top .live::before{ content:"●"; margin-right:6px; animation:blink 1.8s infinite; }
+  @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:.25;} }
+
+  .hud-left{ top:64px; left:18px; width:190px; padding:12px 14px; }
+
+  /* ---------- plan de vol ---------- */
+  .hud-route{
+    position:absolute; left:18px; top:210px; width:230px;
+    padding:10px 0 8px;
+    max-height:calc(100vh - 280px);
+    display:flex; flex-direction:column;
+  }
+  .route-title{
+    font-family:'JetBrains Mono',monospace; font-size:10px;
+    letter-spacing:0.14em; text-transform:uppercase; color:var(--muted-2);
+    padding:0 14px 8px; border-bottom:1px solid var(--line);
+  }
+  .route-title .amber{ color:var(--amber); }
+  .route-list{ overflow:hidden; padding:6px 0 0; }
+  /* Gabarit DEUX LIGNES : le nom du port occupe sa propre ligne en pleine
+     largeur (seul le numéro reste en préfixe), la désignation stellaire
+     passe en dessous, plus petite. Sur une seule ligne, nom et désignation
+     se partageaient la largeur et le nom était tronqué dès qu'il dépassait
+     une centaine de pixels — ce que la seule augmentation de largeur du
+     panneau n'aurait pas suffi à corriger. */
+  .route-leg{
+    display:grid;
+    grid-template-columns:18px 1fr;
+    grid-template-areas:'num nm' '.  dd';
+    gap:0 8px;
+    padding:5px 14px;
+    font-family:'JetBrains Mono',monospace; font-size:11px;
+    color:var(--muted-2);
+    border-left:2px solid transparent;
+  }
+  .route-leg .num{ grid-area:num; font-size:9px; color:var(--muted-2); line-height:1.5; }
+  .route-leg .nm{ grid-area:nm; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; line-height:1.35; }
+  .route-leg .dd{ grid-area:dd; font-size:9px; opacity:0.7; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; line-height:1.3; }
+  /* étape franchie */
+  .route-leg.done{ color:var(--muted-2); opacity:0.42; }
+  .route-leg.done .nm{ text-decoration:line-through; }
+  /* étape en cours : clignote */
+  .route-leg.next{
+    color:var(--amber); border-left-color:var(--amber);
+    background:linear-gradient(90deg, rgba(255,180,84,0.10), transparent);
+    animation:legblink 1.4s ease-in-out infinite;
+  }
+  .route-leg.next .num, .route-leg.next .dd{ color:var(--amber); }
+  @keyframes legblink{ 0%,100%{opacity:1;} 50%{opacity:0.38;} }
+  /* étapes à venir */
+  .route-leg.todo{ color:var(--muted); }
+  @media (prefers-reduced-motion: reduce){
+    .route-leg.next{ animation:none; }
+  }
+  @media (max-width:760px){
+    .hud-route{ display:none; }
+  }
+  .hud-right{ top:64px; right:18px; width:240px; padding:12px 14px; }
+
+  .row{ display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px dashed var(--line); }
+  .row:last-child{ border-bottom:none; }
+  .k{ font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted-2); }
+  .v{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--ink); font-weight:500; }
+
+  .hud-right .k{ margin-bottom:8px; }
+  .obj-body{ display:flex; gap:10px; align-items:flex-start; margin-top:2px; }
+  .obj-icon{ flex:none; width:52px; height:52px; border-radius:50%; background:rgba(0,0,0,0.25); }
+  .obj-text{ flex:1; min-width:0; }
+  .obj-name{ font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:700; color:var(--amber); line-height:1.25; min-height:20px; }
+  .obj-meta{ font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--cyan); margin-top:6px; line-height:1.7; }
+  .obj-meta sub{ font-size:8px; }
+
+  .hud-hint{
+    position:absolute; bottom:16px; left:50%; transform:translateX(-50%);
+    font-size:10.5px; letter-spacing:0.05em; color:var(--muted);
+    background:rgba(15,26,48,0.6); border:1px solid var(--line); padding:7px 14px;
+    white-space:nowrap; transition:opacity .6s ease;
+  }
+  .hud-mode{ position:absolute; top:64px; left:50%; transform:translateX(-50%);
+    padding:5px 14px; border:1px solid var(--line); background:rgba(15,26,48,0.72);
+    font-size:10px; letter-spacing:0.16em; text-transform:uppercase; color:var(--muted-2);
+  }
+  .hud-mode.manual{ color:var(--amber); border-color:var(--amber-dim); }
+  .hud-mode.auto{ color:var(--cyan); }
+
+  /* ---------- croix de fermeture, commune à tous les panneaux ---------- */
+  .panel-close-btn{
+    position:absolute; top:3px; right:3px; z-index:1; pointer-events:auto;
+    width:16px; height:16px; padding:0; display:flex; align-items:center; justify-content:center;
+    background:none; border:none; color:var(--muted-2); font-size:13px; line-height:1;
+    cursor:pointer; font-family:'JetBrains Mono',monospace;
+  }
+  .panel-close-btn:hover{ color:#ff6b57; }
+
+  /* ---------- aide clavier — overlay centré (amélioration, remplace
+     l'ancienne bande fixe en bas d'écran) ---------- */
+  #helpOverlay{
+    position:fixed; inset:0; z-index:6; display:flex; align-items:center; justify-content:center;
+    background:rgba(2,5,12,0.72); backdrop-filter:blur(2px);
+    opacity:0; pointer-events:none; transition:opacity .2s ease;
+  }
+  #helpOverlay.visible{ opacity:1; pointer-events:auto; }
+  .help-panel{
+    position:relative; border:1px solid var(--line);
+    background:linear-gradient(180deg, rgba(94,234,212,0.05), transparent 60%), rgba(15,26,48,0.94);
+    padding:26px 34px 20px; max-width:920px; width:92vw; max-height:82vh; overflow:auto;
+  }
+  .help-panel::before, .help-panel::after{
+    content:""; position:absolute; width:14px; height:14px; border:1.5px solid var(--amber);
+  }
+  .help-panel::before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }
+  .help-panel::after{ bottom:-1px; right:-1px; border-left:none; border-top:none; }
+  .help-title{
+    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:15px;
+    letter-spacing:0.14em; color:var(--amber); margin-bottom:16px; text-align:center;
+  }
+  /* aide sur 2 colonnes (demande explicite) : répartition équilibrée en CSS
+     pur (column-count), pas un découpage manuel du tableau en JS — chaque
+     ligne [touche, description] reste un bloc insécable (break-inside:avoid)
+     pour ne jamais couper une touche de sa description entre les deux
+     colonnes. Gagne environ moitié moins de hauteur qu'une colonne unique. */
+  .help-grid{ column-count:2; column-gap:28px; font-size:12px; }
+  /* repli une colonne sous 680px : repéré sur émulation iPhone — de force,
+     deux colonnes étroites font se chevaucher touche et description plutôt
+     que de gagner de la place (texte plus long que la colonne, §17.2 pour
+     l'esprit déjà suivi : mieux vaut une colonne lisible que deux cassées). */
+  @media (max-width:680px){ .help-grid{ column-count:1; } }
+  .help-row{
+    display:grid; grid-template-columns:auto 1fr; gap:8px 16px; align-items:center;
+    break-inside:avoid; -webkit-column-break-inside:avoid; margin-bottom:8px;
+  }
+  .help-grid .hk{
+    font-family:'JetBrains Mono',monospace; color:var(--cyan); white-space:nowrap;
+    border:1px solid var(--line); border-radius:3px; padding:1px 7px; text-align:center; height:fit-content;
+  }
+  .help-grid .hv{ color:var(--ink); align-self:center; }
+  .help-foot{ margin-top:16px; text-align:center; font-size:10px; color:var(--muted-2); letter-spacing:0.05em; }
+
+  /* ---------- carte stellaire (§23) — même famille visuelle que Pause/
+     Aide (fond assombri, coins ambrés), plein écran plutôt qu'un panneau
+     centré : le contenu (carte 3D + panneau cible) a besoin de la place. */
+  #starMapOverlay{
+    position:fixed; inset:0; z-index:6; display:flex; align-items:center; justify-content:center;
+    background:transparent; opacity:0; pointer-events:none; transition:opacity .2s ease;
+  }
+  #starMapOverlay.visible{ opacity:1; pointer-events:auto; }
+  .starmap-panel{
+    position:relative; border:1px solid var(--line);
+    background:transparent;
+    width:min(1200px, 94vw); height:min(760px, 90vh);
+    display:flex; flex-direction:column; padding:0;
+  }
+  .starmap-panel::before, .starmap-panel::after{
+    content:""; position:absolute; width:16px; height:16px; border:1.5px solid var(--amber);
+  }
+  .starmap-panel::before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }
+  .starmap-panel::after{ bottom:-1px; right:-1px; border-left:none; border-top:none; }
+  .starmap-titlebar{
+    position:relative; background:rgba(15,26,48,0.94);
+    display:flex; justify-content:space-between; align-items:center;
+    padding:14px 20px; border-bottom:1px solid var(--line);
+  }
+  .starmap-title{ font-weight:700; font-size:15px; letter-spacing:0.12em; color:var(--ink); }
+  .starmap-hint{ font-size:11px; color:var(--muted-2); }
+  .starmap-body{ flex:1; display:flex; gap:16px; padding:16px 20px; min-height:0; }
+  .starmap-viewport{ flex:1; position:relative; border:1px dashed rgba(216,222,233,0.35); min-width:0; background:transparent; }
+  .starmap-side{ width:270px; flex:none; display:flex; flex-direction:column; gap:14px; }
+  .starmap-target-box, .starmap-locked-box{
+    border:1px dashed var(--line); background:rgba(15,26,48,0.94); padding:14px; font-size:12px; color:var(--muted);
+  }
+  .starmap-box-title{ font-weight:700; font-size:12px; letter-spacing:0.08em; color:var(--ink); margin-bottom:10px; }
+  .starmap-empty{ color:var(--muted-2); font-size:11.5px; line-height:1.5; }
+  .starmap-target-name{ font-size:14px; color:var(--ink); margin-bottom:4px; }
+  .starmap-target-line{ font-size:11.5px; color:var(--muted-2); margin-bottom:2px; }
+  .starmap-confirm-btn{
+    width:100%; margin-top:12px; padding:10px; background:transparent;
+    border:1.5px solid var(--amber); color:var(--amber); font-family:'JetBrains Mono',monospace;
+    font-weight:700; font-size:12.5px; letter-spacing:0.06em; cursor:pointer; border-radius:2px;
+  }
+  .starmap-confirm-btn:hover{ background:rgba(255,180,84,0.14); }
+  .starmap-confirm-btn.starmap-disabled{ border-color:var(--muted-2); color:var(--muted-2); cursor:not-allowed; }
+  .starmap-subhint{ margin-top:8px; font-size:9.5px; color:var(--muted-2); text-align:center; }
+  .starmap-legend{
+    position:relative; background:rgba(15,26,48,0.94);
+    display:flex; gap:22px; padding:10px 20px; border-top:1px solid var(--line);
+    font-size:10.5px; color:var(--muted-2);
+  }
+  .starmap-legend .dot{
+    display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align:middle;
+    border:1.5px solid var(--muted-2);
+  }
+  .starmap-legend .dot.built{ background:var(--muted-2); }
+  .starmap-legend .dot.range{ background:none; }
+  .starmap-legend .dot.sel{ border-color:var(--amber); box-shadow:0 0 0 2px rgba(255,180,84,0.25); }
+
+  /* bannière de séquence de saut (§23.5) — même style que .hud-mode, sa
+     propre instance pour ne pas entrer en conflit avec modeBadge, réécrit
+     chaque image par la logique de vol normale. */
+  #jumpBanner{ color:var(--cyan); border-color:#1d7a70; letter-spacing:0.14em; }
+  .jump-vignette{
+    position:fixed; inset:0; z-index:3; pointer-events:none;
+    background:radial-gradient(ellipse at center, transparent 35%, rgba(94,234,212,0.35) 100%);
+    opacity:0; transition:opacity .3s ease;
+  }
+  .jump-flash{
+    position:fixed; inset:0; z-index:7; pointer-events:none;
+    background:#ffffff; opacity:0;
+  }
+  /* ---------- réglage des volumes (demande utilisateur) — même gabarit
+     que .help-panel (fond, coins ambrés), en plus étroit et plus court */
+  #audioOverlay{
+    position:fixed; inset:0; z-index:6; display:flex; align-items:center; justify-content:center;
+    background:rgba(2,5,12,0.75);
+    opacity:0; pointer-events:none; transition:opacity .2s ease;
+  }
+  #audioOverlay.visible{ opacity:1; pointer-events:auto; }
+  .audio-panel{
+    position:relative; border:1px solid var(--line);
+    background:rgba(15,26,48,0.96);
+    padding:26px 30px 18px; width:340px;
+  }
+  .audio-panel::before, .audio-panel::after{
+    content:""; position:absolute; width:14px; height:14px; border:1.5px solid var(--amber);
+  }
+  .audio-panel::before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }
+  .audio-panel::after{ bottom:-1px; right:-1px; border-left:none; border-top:none; }
+  .audio-title{
+    font-weight:700; font-size:15px; letter-spacing:0.12em; color:var(--amber);
+    text-align:center; margin-bottom:20px;
+  }
+  .audio-row{ display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+  .audio-label{ width:70px; font-size:12px; color:var(--ink); flex:none; }
+  .audio-pct{ width:38px; font-size:11px; color:var(--muted); text-align:right; flex:none; }
+  .audio-row input[type="range"]{
+    flex:1; accent-color:var(--amber); height:4px; cursor:pointer;
+  }
+  .audio-foot{ margin-top:8px; text-align:center; font-size:10px; color:var(--muted-2); letter-spacing:0.05em; }
+  /* étiquettes de la carte stellaire : noms d'étoiles (discrets, la
+     sphère+halo déjà colorée est le repère principal) et lettres de
+     grille (repères de coordonnées, cf. demande utilisateur) */
+  #starMapLabels{ position:fixed; inset:0; z-index:6; pointer-events:none; overflow:hidden; }
+  .starmap-label{
+    position:absolute; transform:translate(-50%,4px);
+    font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.04em;
+    color:var(--ink); text-shadow:0 1px 3px rgba(0,0,0,0.9); white-space:nowrap;
+  }
+  .starmap-grid-letter{
+    position:absolute; transform:translate(-50%,-50%);
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:700;
+    color:rgba(255,255,255,0.55); text-shadow:0 1px 2px rgba(0,0,0,0.9);
+  }
+
+  /* ---------- rangée basse : température · propulsion · commandes ----------
+     Les trois panneaux vivaient séparément (dont un flottant, projeté en 3D
+     à côté du vaisseau) ; ils sont désormais regroupés dans une seule
+     rangée fixe au bas de l'écran, plus lisible et plus stable. */
+  .hud-bottom-row{
+    position:absolute; left:50%; bottom:58px; transform:translateX(-50%);
+    display:flex; align-items:flex-end; gap:14px; z-index:1;
+  }
+  .hud-bottom-row > .panel{ position:relative; }
+
+  /* ---------- panneau de jauges moteur ---------- */
+  .hud-engines{
+    padding:6px 14px 6px;
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+  }
+  .engines-title{
+    font-size:8px; letter-spacing:0.16em; color:var(--muted-2);
+  }
+  .engines-row{ display:flex; align-items:flex-end; gap:5px; }
+  .gauge{
+    display:flex; flex-direction:column; align-items:center; gap:2px;
+  }
+  .gauge-track{
+    position:relative; background:#060a14; border:1px solid var(--line);
+    overflow:hidden;
+  }
+  .gauge.main .gauge-track{ width:18px; height:42px; }
+  .gauge.rcs  .gauge-track{ width:7px;  height:28px; }
+  .gauge-fill{
+    position:absolute; left:0; right:0; bottom:0; height:0%;
+    transition:height 0.08s linear;
+  }
+  .gauge.main .gauge-fill{ background:linear-gradient(0deg, #1a5fbf, #6cb8ff); }
+  .gauge.rcs  .gauge-fill{ background:linear-gradient(0deg, var(--amber-dim), var(--amber)); }
+  .gauge.rcs.axis-yaw   .gauge-fill{ background:linear-gradient(0deg, #1d7a70, var(--cyan)); }
+  .gauge.rcs.axis-roll  .gauge-fill{ background:linear-gradient(0deg, #7a4d1d, #ffb454); }
+  .gauge-label{
+    font-size:7.5px; letter-spacing:0.02em; color:var(--muted-2); text-align:center;
+    line-height:1.1;
+  }
+  .gauge-pct{ font-size:7.5px; color:var(--muted); }
+  .gauge-sep{ width:1px; height:28px; align-self:flex-end; background:var(--line); margin:0 2px; }
+  /* carburant (§22) : cinquième jauge, même famille visuelle que M1-M4
+     (Option B des maquettes filaires — fusionné avec PROPULSION plutôt
+     qu'un panneau dédié, pour ne pas multiplier les fenêtres alors que les
+     deux se lisent au même moment). Vert par défaut, ambre puis rouge sous
+     les seuils définis en §22.4 (25% / 10%), via une classe plutôt qu'un
+     recalcul de couleur en JS à chaque image. */
+  .gauge.fuel .gauge-track{ width:18px; height:42px; }
+  .gauge.fuel .gauge-fill{ background:linear-gradient(0deg, #1d7a4a, #4ade80); }
+  .gauge.fuel.warn .gauge-fill{ background:linear-gradient(0deg, var(--amber-dim), var(--amber)); }
+  .gauge.fuel.crit .gauge-fill{ background:linear-gradient(0deg, #7a1d1d, #ef4444); }
+  @media (max-width:900px){ .hud-engines{ display:none; } }
+
+  /* ---------- commandes moteur — panneau fixe, plus flottant projeté ---------- */
+  .hud-telemetry{
+    min-width:190px;
+    padding:8px 10px;
+    font-size:10px; line-height:1.6; color:var(--cyan);
+  }
+  .hud-telemetry .tm-title{
+    font-size:8.5px; letter-spacing:0.12em; color:var(--muted-2);
+    border-bottom:1px solid rgba(94,234,212,0.2);
+    padding-bottom:4px; margin-bottom:4px;
+  }
+  .hud-telemetry .tm-line{ display:flex; justify-content:space-between; gap:10px; white-space:nowrap; }
+  .hud-telemetry .tm-off{ color:var(--muted-2); opacity:0.6; }
+  .hud-telemetry .tm-amber{ color:var(--amber); }
+  @media (max-width:900px){ .hud-telemetry{ display:none !important; } }
+
+  /* ---------- température moteur ---------- */
+  .hud-temp{
+    min-width:150px;
+    padding:8px 10px;
+    font-size:10px; line-height:1.6; color:var(--ink);
+  }
+  .hud-temp .tm-title{
+    font-size:8.5px; letter-spacing:0.12em; color:var(--muted-2);
+    border-bottom:1px solid var(--line);
+    padding-bottom:4px; margin-bottom:4px;
+  }
+  .hud-temp .tm-line{ display:flex; justify-content:space-between; gap:10px; white-space:nowrap; }
+  .hud-temp .tm-normal{ color:var(--cyan); }
+  .hud-temp .tm-warm{ color:var(--amber); }
+  .hud-temp .tm-hot{ color:#ff6b57; }
+  @media (max-width:900px){ .hud-temp{ display:none !important; } }
+
+  /* ---------- itinéraire (§ amélioration v2.4) — bas droite, juste
+     au-dessus de la barre d'icônes du HUD. Fenêtre glissante d'étapes
+     espacées régulièrement (comme le plan de vol) plutôt qu'à l'échelle
+     réelle des distances : certaines étoiles sont à peine plus loin que la
+     précédente, d'autres à l'autre bout de la carte — un tracé proportionnel
+     rendrait la plupart des étapes illisibles, collées les unes aux autres. */
+  .hud-itinerary{ right:18px; bottom:58px; width:220px; padding:10px 14px 12px; }
+  @media (max-width:900px){ .hud-itinerary{ display:none !important; } }
+  .touch-mode .hud-itinerary{ display:none !important; }   /* chevauche joystick/boost en tactile, cf. commentaire JS */
+  .itin-track{ position:relative; height:20px; margin-top:10px; }
+  .itin-line{ position:absolute; left:6px; right:6px; top:50%; height:2px; background:var(--line); transform:translateY(-50%); }
+  .itin-step{
+    position:absolute; top:50%; width:9px; height:9px; border-radius:50%;
+    transform:translate(-50%,-50%); background:var(--bg);
+    border:1.6px solid var(--nav-upcoming); transition:left 0.2s ease;
+  }
+  .itin-step.done{ border-color:var(--nav-done); background:var(--nav-done); }
+  .itin-step.current{
+    width:12px; height:12px; border-color:var(--amber); background:var(--amber);
+    box-shadow:0 0 0 3px rgba(255,180,84,0.25);
+  }
+  .itin-ship{
+    position:absolute; top:50%; width:7px; height:7px; border-radius:50%;
+    background:var(--ink); transform:translate(-50%,-50%);
+    box-shadow:0 0 6px 1px rgba(232,237,245,0.85);
+    transition:left 0.25s linear; pointer-events:none;
+  }
+
+  /* ---------- orientation / point de Lagrange (§ amélioration v2.4) — bas
+     gauche. Le point visé n'est pas simulé en toute rigueur (les masses
+     réelles des planètes générées ne sont pas modélisées) : c'est un point
+     fixe placé sur l'axe étoile→planète de l'étape en cours, à 92% de la
+     distance en partant de l'étoile — une approximation assumée de L1,
+     suffisante pour donner un cap et une distance à suivre, pas une
+     simulation à N corps. */
+  .hud-lagrange{ left:18px; bottom:58px; width:196px; padding:10px 14px 12px; }
+  @media (max-width:900px){ .hud-lagrange{ display:none !important; } }
+  .touch-mode .hud-lagrange{ display:none !important; }
+  .lagrange-body{ display:flex; align-items:center; gap:12px; margin-top:8px; }
+  .lagrange-dial{ width:52px; height:52px; flex:none; }
+  #lagrangeNeedle{ transform-origin:30px 30px; transition:transform 0.15s linear; }
+  .lagrange-info{ display:flex; flex-direction:column; gap:3px; min-width:0; }
+  .lagrange-dist{ font-family:'JetBrains Mono',monospace; font-size:15px; font-weight:700; color:var(--amber); }
+  .lagrange-name{ font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--muted-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  /* ---------- canal radio — échanges équipage / contrôle du port ---------- */
+  .hud-radio{
+    position:absolute; right:18px; top:230px; width:300px;
+    padding:10px 12px 8px;
+    display:none; flex-direction:column;
+    opacity:0; transition:opacity .5s ease;
+  }
+  .hud-radio.visible{ display:flex; opacity:1; }
+  .radio-title{
+    font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted-2);
+    border-bottom:1px solid var(--line); padding-bottom:6px; margin-bottom:6px;
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .radio-title .dot{ color:var(--cyan); animation:blink 1.8s infinite; }
+  .llm-indicator{
+    display:inline-block; position:relative; margin-right:7px; font-size:12px;
+    opacity:0.35; filter:grayscale(1); transition:opacity .3s ease, filter .3s ease;
+    pointer-events:auto; cursor:default;
+  }
+  .llm-indicator.active{
+    opacity:1; filter:none;
+    text-shadow:0 0 5px rgba(94,234,212,0.7);
+  }
+  .llm-indicator.inactive::after{
+    content:''; position:absolute; left:-1px; top:50%; width:calc(100% + 2px); height:1.5px;
+    background:var(--muted-2); transform:translateY(-50%) rotate(-42deg);
+  }
+  .radio-mute{
+    pointer-events:auto; cursor:pointer;
+    background:none; border:1px solid var(--line); color:var(--muted-2);
+    font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1;
+    padding:3px 6px; margin-left:8px;
+  }
+  .radio-mute:hover{ border-color:var(--cyan); color:var(--cyan); }
+  .radio-log{ display:flex; flex-direction:column; gap:7px; max-height:270px; overflow:hidden; }
+  .radio-line{
+    font-size:10.5px; line-height:1.4;
+    opacity:0; transform:translateY(4px);
+    animation:radioIn .4s ease forwards;
+    display:flex; align-items:flex-start; gap:6px;
+  }
+  @keyframes radioIn{ to{ opacity:1; transform:translateY(0); } }
+  .radio-avatar{
+    flex:none; width:15px; height:15px; margin-top:1px;
+    stroke:currentColor; stroke-width:1.8; fill:none; stroke-linecap:round; stroke-linejoin:round;
+  }
+  .radio-line.tower .radio-avatar{ color:var(--cyan); }
+  .radio-line.ship .radio-avatar{ color:var(--amber); }
+  .radio-line .who{ font-weight:700; letter-spacing:0.04em; margin-right:5px; }
+  .radio-line.tower .who{ color:var(--cyan); }
+  .radio-line.ship .who{ color:var(--amber); }
+  .radio-line .txt{ color:var(--ink); }
+  @media (max-width:900px){ .hud-radio{ display:none !important; } }
+  @media (prefers-reduced-motion: reduce){ .radio-line{ animation:none; opacity:1; transform:none; } }
+
+  /* ---------- services portuaires (#9, palier 1) ---------- */
+  .hud-port{
+    position:absolute; right:18px; top:230px; width:300px;
+    padding:10px 12px 12px;
+    display:none; flex-direction:column; gap:9px;
+    opacity:0; transition:opacity .5s ease;
+  }
+  .hud-port.visible{ display:flex; opacity:1; }
+  .port-title{
+    font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted-2);
+    border-bottom:1px solid var(--line); padding-bottom:6px;
+  }
+  .port-row{ display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--ink); }
+  .port-dots{ color:var(--cyan); letter-spacing:0.12em; font-size:12px; }
+  .port-buy-btn{
+    pointer-events:auto; cursor:pointer; width:100%;
+    background:none; border:1px solid var(--amber-dim); color:var(--amber);
+    font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.05em;
+    padding:8px 6px; transition:border-color .15s ease, background .15s ease;
+  }
+  .port-buy-btn:hover{ border-color:var(--amber); background:rgba(255,180,84,0.12); }
+  .port-buy-btn.port-disabled{
+    cursor:default; color:var(--muted-2); border-color:var(--line); background:none;
+  }
+  .port-buy-btn.port-maxed{
+    cursor:default; color:var(--cyan); border-color:var(--line); background:none;
+  }
+
+  /* ---------- étiquettes des étoiles connues, projetées en écran ---------- */
+  #starLabels{ position:fixed; inset:0; z-index:2; pointer-events:none; overflow:hidden; }
+  .star-label{
+    position:absolute;
+    display:none;
+    transition:opacity .2s linear;
+  }
+  /* cercle de désignation, centré exactement sur la position projetée de
+     l'astre — la position/top:left du conteneur pointe cet endroit précis */
+  .star-label .star-ring{
+    position:absolute; left:0; top:0; transform:translate(-50%,-50%);
+    width:15px; height:15px; border-radius:50%;
+    border:1px solid var(--cyan);
+    box-shadow:0 0 4px rgba(94,234,212,0.5);
+  }
+  /* flèche : simple liaison fine entre le cercle et le nom */
+  .star-label .star-arrow{
+    position:absolute; left:0; top:-7px; transform:translate(-50%,-100%);
+    width:1px; height:13px; background:var(--cyan); opacity:0.85;
+  }
+  .star-label .star-text{
+    position:absolute; left:0; top:-20px; transform:translate(-50%,-100%);
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    color:var(--cyan);
+    text-shadow:0 0 6px rgba(94,234,212,0.6), 0 1px 3px rgba(0,0,0,0.85);
+    white-space:nowrap;
+  }
+
+  /* ---------- étiquettes de planètes et de lunes — même vocabulaire visuel
+     que les étoiles (cercle + flèche), coloré différemment pour distinguer
+     l'échelle : ambre pour les planètes (couleur des cibles/ports), plus
+     discret et sans cercle pour les lunes, simples satellites. ---------- */
+  .planet-label .star-ring{ border-color:var(--amber); box-shadow:0 0 4px rgba(255,180,84,0.5); }
+  .planet-label .star-arrow{ background:var(--amber); }
+  .planet-label .star-text{ color:var(--amber); text-shadow:0 0 6px rgba(255,180,84,0.6), 0 1px 3px rgba(0,0,0,0.85); }
+  .planet-label.is-port .star-text{ color:var(--ink); font-weight:700; }
+  .planet-label.is-port .star-ring{ border-color:var(--ink); animation:blink 1.6s infinite; }
+
+  /* ---------- étiquettes de vaisseaux (cargo + navettes) — amélioration
+     demandée : même vocabulaire (cercle + flèche + texte), mais l'anneau
+     doit ENTOURER l'objet, donc dimensionné dynamiquement selon sa taille
+     apparente à l'écran plutôt que fixe comme pour étoiles/planètes (dont
+     la taille angulaire reste toujours minuscule). Largeur/hauteur de
+     l'anneau, position de la flèche et du texte sont donc fixées en ligne
+     par projectShipLabel plutôt que par cette règle, qui ne pose ici que
+     la couleur (vert, troisième teinte distincte de cyan/ambre). ---------- */
+  .ship-label .star-ring{ border-color:#3ddc84; box-shadow:0 0 4px rgba(61,220,132,0.5); }
+  .ship-label .star-arrow{ background:#3ddc84; }
+  .ship-label .star-text{ color:#3ddc84; text-shadow:0 0 6px rgba(61,220,132,0.6), 0 1px 3px rgba(0,0,0,0.85); }
+  .moon-label .star-ring{ width:9px; height:9px; border-color:var(--muted-2); box-shadow:none; }
+  .moon-label .star-arrow{ background:var(--muted-2); height:10px; }
+  .moon-label .star-text{ top:-17px; font-size:9.5px; color:var(--muted); text-shadow:0 1px 3px rgba(0,0,0,0.85); }
+
+  @media (max-width:760px){
+    .hud-left{ width:150px; font-size:11px; }
+    .hud-right{ width:180px; }
+    .hud-hint{ font-size:9px; padding:6px 10px; max-width:90vw; white-space:normal; text-align:center; }
+  }
+
+  /* =========================================================================
+     CONTRÔLE TACTILE (smartphone/tablette) — §15 de la spec v2.1.
+     Détection par capacité de pointage (pointer:coarse), pas par taille
+     d'écran : un ordinateur portable à petite fenêtre n'est pas une tablette.
+     Aucune maquette antérieure retrouvée pour ce chantier — première
+     implémentation, pas la reprise d'un travail déjà validé.
+     ========================================================================= */
+  .touch-mode .hud-hint{ display:none !important; } /* aide clavier hors-sujet au tactile */
+
+  /* Visibilité des 7 panneaux d'info, PILOTÉE PAR LA BARRE D'ICÔNES DU HUD
+     (§12) — un mécanisme UNIQUE, valable aussi bien au clavier/souris qu'au
+     tactile : .panel-hidden masque, son absence montre. Par défaut les
+     panneaux sont visibles partout SAUF en portrait tactile, où le script
+     d'initialisation les masque tous au démarrage (pas la place de les
+     garder ouverts en continu) — révélés un par un via la même barre.
+     Remplace l'ancien mécanisme .panel-open, propre au tactile seul, qui
+     dupliquait ce que fait maintenant la barre unifiée. */
+  .panel-hidden{ display:none !important; }
+  /* le canal radio garde SA PROPRE bascule (.visible, ouverte/fermée
+     automatiquement à chaque escale) — mais reste joignable au tactile
+     même sous les 900px où le desktop le masque entièrement */
+  .touch-mode .hud-radio.visible{ display:flex !important; }
+
+  /* ---------- barre d'icônes du HUD (§12) — unifiée bureau + tactile ----------
+     Bureau ET tactile : fixe EN BAS, toujours visible (demande explicite —
+     l'ancien choix de la remonter en haut au tactile est abandonné). Les
+     commandes de pilotage (joystick, roulis, boost, regard) sont donc
+     décalées plus haut pour lui laisser la place, cf. plus bas. */
+  #hudIconBar{
+    position:fixed; z-index:3; display:flex; gap:6px; pointer-events:auto;
+    left:18px; bottom:18px;
+  }
+  .touch-mode #hudIconBar{ left:50%; bottom:8px; transform:translateX(-50%); gap:3px; }
+  .hud-icon-btn{
+    position:relative; width:34px; height:34px; padding:0;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(15,26,48,0.78); border:1px solid var(--line); cursor:pointer;
+    color:var(--muted); -webkit-tap-highlight-color:transparent; touch-action:none;
+    transition:border-color .15s ease, color .15s ease, background .15s ease;
+  }
+  .hud-icon-btn::before, .hud-icon-btn::after{
+    content:""; position:absolute; width:6px; height:6px; border:1.2px solid var(--amber);
+    opacity:0; transition:opacity .15s ease;
+  }
+  .hud-icon-btn::before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }
+  .hud-icon-btn::after{ bottom:-1px; right:-1px; border-left:none; border-top:none; }
+  .hud-icon-btn svg{ width:18px; height:18px; stroke:currentColor; stroke-width:1.6; fill:none; stroke-linecap:round; stroke-linejoin:round; }
+  .hud-icon-btn:hover{ border-color:var(--muted); color:var(--ink); }
+  .hud-icon-btn.active{ color:var(--cyan); border-color:var(--cyan); background:rgba(94,234,212,0.1); }
+  .hud-icon-btn.active::before, .hud-icon-btn.active::after{ opacity:1; }
+  .hud-icon-btn.disabled{ opacity:0.32; cursor:default; }
+  .hud-icon-btn.disabled:hover{ border-color:var(--line); color:var(--muted); }
+  .touch-mode .hud-icon-btn{ width:27px; height:27px; }
+  .touch-mode .hud-icon-btn svg{ width:14px; height:14px; }
+
+  .touch-controls{ position:fixed; inset:0; z-index:4; pointer-events:none; display:none; }
+  .touch-mode .touch-controls{ display:block; }
+  .touch-btn{
+    position:absolute; pointer-events:auto; touch-action:none;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(15,26,48,0.82); border:1.5px solid var(--line); border-radius:9px;
+    color:var(--cyan); font-family:'JetBrains Mono',monospace; -webkit-tap-highlight-color:transparent;
+    user-select:none;
+  }
+  .touch-btn:active, .touch-btn.active{ border-color:var(--cyan); background:rgba(94,234,212,0.16); }
+  /* décalées vers le haut (+44px environ) par rapport à la version
+     précédente, pour laisser la barre d'icônes tenir tout en bas */
+  #touchRollMinus, #touchRollPlus{ width:44px; height:44px; font-size:16px; }
+  .portrait-touch #touchRollMinus{ left:190px; bottom:196px; }
+  .portrait-touch #touchRollPlus{ left:244px; bottom:196px; }
+  .landscape-touch #touchRollMinus{ left:172px; bottom:70px; }
+  .landscape-touch #touchRollPlus{ left:220px; bottom:70px; }
+  #touchBoostBtn{
+    border-radius:50%; border-color:var(--amber-dim); color:var(--amber);
+    font-size:11px; letter-spacing:0.04em;
+  }
+  #touchBoostBtn.active{ background:rgba(255,180,84,0.18); border-color:var(--amber); }
+  .portrait-touch #touchBoostBtn{ width:74px; height:74px; right:22px; bottom:164px; }
+  .landscape-touch #touchBoostBtn{ width:60px; height:60px; right:22px; bottom:64px; }
+  #touchJoyBase{
+    border-radius:50%; background:rgba(15,26,48,0.55); border:2px solid var(--line);
+  }
+  .portrait-touch #touchJoyBase{ width:126px; height:126px; left:22px; bottom:156px; }
+  .landscape-touch #touchJoyBase{ width:100px; height:100px; left:22px; bottom:64px; }
+  #touchJoyNub{
+    position:absolute; top:50%; left:50%; width:46%; height:46%; border-radius:50%;
+    background:rgba(94,234,212,0.22); border:1.5px solid var(--cyan);
+    transform:translate(-50%,-50%); pointer-events:none;
+  }
+  /* bouton de regard libre — équivalent tactile de CTRL+souris (amélioration
+     demandée, remplace le glisser-sans-modificateur qui n'avait pas
+     d'affordance visuelle propre) : maintenu enfoncé, il autorise le
+     glisser-regard sur la vue 3D, exactement comme CTRL maintenu au clavier. */
+  #touchLookBtn{ font-size:15px; }
+  #touchLookBtn.active{ border-color:var(--cyan); background:rgba(94,234,212,0.18); color:var(--cyan); }
+  .portrait-touch #touchLookBtn{ width:50px; height:50px; left:217px; bottom:250px; }
+  .landscape-touch #touchLookBtn{ width:44px; height:44px; left:196px; bottom:124px; }
+
+  /* ---------- mode Pause (§11) ---------- */
+  body.game-paused *{ animation-play-state: paused !important; }
+  #pauseOverlay{
+    position:fixed; inset:0; z-index:7; display:flex; align-items:center; justify-content:center;
+    background:rgba(2,5,12,0.78); backdrop-filter:blur(2px);
+    opacity:0; pointer-events:none; transition:opacity .25s ease;
+  }
+  #pauseOverlay.visible{ opacity:1; pointer-events:auto; }
+  .pause-panel{
+    position:relative; border:1px solid var(--line);
+    background:linear-gradient(180deg, rgba(94,234,212,0.05), transparent 60%), rgba(15,26,48,0.92);
+    padding:34px 46px; display:flex; flex-direction:column; align-items:center; gap:14px; min-width:300px;
+  }
+  .pause-panel::before, .pause-panel::after{
+    content:""; position:absolute; width:14px; height:14px; border:1.5px solid var(--amber);
+  }
+  .pause-panel::before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }
+  .pause-panel::after{ bottom:-1px; right:-1px; border-left:none; border-top:none; }
+  .pause-title{
+    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:26px;
+    letter-spacing:0.16em; color:var(--amber);
+  }
+  .pause-sub{ font-size:12px; color:var(--muted); letter-spacing:0.05em; margin-top:-8px; }
+  .pause-btn{
+    width:100%; padding:11px 20px; background:none; border:1px solid var(--line); color:var(--ink);
+    font-family:'JetBrains Mono',monospace; font-size:13px; letter-spacing:0.08em; cursor:pointer;
+    transition:border-color .15s ease, background .15s ease; text-align:center;
+  }
+  .pause-btn:hover{ border-color:var(--cyan); background:rgba(94,234,212,0.1); color:var(--cyan); }
+  .pause-btn-quit:hover{ border-color:#ff6b57; background:rgba(255,107,87,0.1); color:#ff6b57; }
+  .pause-hint{ font-size:10px; color:var(--muted-2); letter-spacing:0.04em; margin-top:4px; }
+
+  /* ---------- écran de démarrage ---------- */
+  #boot{
+    position:fixed; inset:0; z-index:5; background:var(--bg);
+    display:flex; align-items:center; justify-content:center;
+    transition:opacity .8s ease; cursor:pointer;
+  }
+  #boot.hidden{ opacity:0; pointer-events:none; }
+  #boot .term{
+    font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--cyan);
+    line-height:1.9; white-space:pre-wrap; max-width:560px; padding:0 20px;
+  }
+  #boot .term .amber{ color:var(--amber); }
+  #boot .skip{ position:absolute; bottom:24px; font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--muted-2); letter-spacing:0.1em; text-transform:uppercase; }
+
+  /* ---------- écran-titre : choix de la langue ---------- */
+  #titleScreen{
+    position:fixed; inset:0; z-index:6; background:transparent;
+    display:flex; align-items:center; justify-content:center;
+    transition:opacity .6s ease;
+  }
+  #titleScreen.hidden{ opacity:0; pointer-events:none; }
+  /* voile doux derrière le texte/boutons plutôt qu'un fond plein écran
+     opaque (bug corrigé — masquait entièrement le travelling de fond
+     demandé, pourtant bien rendu sous ce voile) : juste assez de contraste
+     pour rester lisible par-dessus un arrière-plan qui varie (étoile
+     brillante, nébuleuse colorée...), sans effacer ce qu'il y a dessous. */
+  .title-inner{
+    text-align:center; max-width:640px; padding:36px 24px;
+    background:radial-gradient(ellipse at center, rgba(11,18,32,0.72) 0%, rgba(11,18,32,0.32) 70%, transparent 100%);
+  }
+  .title-eyebrow{
+    font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.18em;
+    color:var(--muted-2); margin-bottom:18px; text-shadow:0 1px 4px rgba(0,0,0,0.9);
+  }
+  .title-main{
+    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:34px;
+    letter-spacing:0.03em; color:var(--ink); margin-bottom:14px;
+    text-shadow:0 2px 8px rgba(0,0,0,0.9);
+  }
+  .title-main .amber{ color:var(--amber); }
+  .title-sub{
+    font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--muted);
+    margin-bottom:34px; letter-spacing:0.04em; text-shadow:0 1px 4px rgba(0,0,0,0.9);
+  }
+  .title-langs{ display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
+  /* mention légale en bas de l'écran-titre (demande utilisateur) : blanc
+     sur fond transparent, discrète, hors de .title-inner (qui porte son
+     propre voile de fond, §25) pour rester un simple filet de texte. */
+  .title-copyright{
+    position:absolute; left:0; right:0; bottom:16px; text-align:center;
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#ffffff;
+    letter-spacing:0.03em; opacity:0.75; pointer-events:none;
+  }
+  .lang-btn{
+    font-family:'JetBrains Mono',monospace; cursor:pointer;
+    background:rgba(11,18,32,0.75); border:1px solid var(--line); color:var(--ink);
+    padding:14px 22px; display:flex; flex-direction:column; align-items:center; gap:6px;
+    min-width:96px; transition:border-color .15s ease, background .15s ease;
+  }
+  .lang-btn:hover{ border-color:var(--cyan); background:rgba(94,234,212,0.12); }
+  /* focus clavier (demande utilisateur) : distinct du survol, pour rester
+     visible même sans souris — bordure ambrée plutôt que la teinte cyan du
+     survol, cohérent avec l'ambre déjà utilisé pour la sélection ailleurs
+     dans le HUD (cercle de sélection de la carte stellaire, §23). */
+  .lang-btn.focused{
+    border-color:var(--amber); background:rgba(255,180,84,0.12);
+    box-shadow:0 0 0 2px rgba(255,180,84,0.35);
+  }
+  .lang-btn:focus{ outline:none; }
+  .lang-btn .lang-flag{ font-size:15px; font-weight:700; color:var(--cyan); letter-spacing:0.08em; }
+  .lang-btn .lang-name{ font-size:11px; color:var(--muted); }
+
+  /* ---------- v2.13 : sélection du vaisseau (dialogue provisoire, future boutique) ---------- */
+  #shipSelect{ position:fixed; inset:0; z-index:9000; display:none; align-items:center; justify-content:center;
+    background:rgba(5,8,14,0.55); font-family:'JetBrains Mono', monospace; color:var(--ink); }
+  #shipSelect.open{ display:flex; }
+  .ss-panel{ position:relative; width:min(1120px, 94vw); height:min(660px, 90vh); background:rgba(11,18,32,0.94);
+    border:1px solid var(--line); display:flex; flex-direction:column; padding:18px 20px; box-sizing:border-box; }
+  .ss-c{ position:absolute; width:18px; height:18px; border:0 solid var(--amber); pointer-events:none; }
+  .ss-c.tl{ top:-1px; left:-1px; border-top-width:2px; border-left-width:2px; }
+  .ss-c.tr{ top:-1px; right:-1px; border-top-width:2px; border-right-width:2px; }
+  .ss-c.bl{ bottom:-1px; left:-1px; border-bottom-width:2px; border-left-width:2px; }
+  .ss-c.br{ bottom:-1px; right:-1px; border-bottom-width:2px; border-right-width:2px; }
+  .ss-head h2{ margin:0; font:800 20px/1.2 'JetBrains Mono', monospace; color:var(--amber); }
+  .ss-note{ margin:4px 0 0; font:12px/1.5 'JetBrains Mono', monospace; color:var(--muted); }
+  .ss-body{ flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1.35fr) minmax(260px,1fr); gap:18px; margin-top:14px; }
+  .ss-carousel{ position:relative; display:flex; flex-direction:column; min-height:0; border:1px solid var(--line); background:#05070c; }
+  #ssCanvas{ flex:1; width:100%; min-height:0; display:block; }
+  .ss-count{ position:absolute; top:10px; left:12px; font:500 11.5px 'JetBrains Mono', monospace; color:var(--muted); pointer-events:none; }
+  .ss-arrow{ position:absolute; top:40%; width:40px; height:56px; background:rgba(11,18,32,0.8); border:1px solid var(--line);
+    color:var(--amber); font:700 22px/1 'JetBrains Mono', monospace; cursor:pointer; }
+  .ss-arrow:hover, .ss-arrow:focus-visible{ border-color:var(--amber); outline:none; }
+  .ss-prev{ left:8px; } .ss-next{ right:8px; }
+  .ss-strip{ display:flex; gap:4px; overflow-x:auto; padding:8px; border-top:1px solid var(--line); background:rgba(11,18,32,0.92); }
+  .ss-strip button{ flex:none; font:500 11.5px/1.25 'JetBrains Mono', monospace; color:var(--muted); background:transparent;
+    border:1px solid var(--line); padding:5px 8px; cursor:pointer; text-align:left; }
+  .ss-strip button small{ display:block; opacity:0.75; }
+  .ss-strip button[aria-current="true"]{ color:#0b1220; background:var(--amber); border-color:var(--amber); }
+  .ss-strip button:focus-visible{ outline:2px solid var(--amber); outline-offset:1px; }
+  .ss-specs{ display:flex; flex-direction:column; min-height:0; }
+  .ss-name{ font:800 24px/1.15 'JetBrains Mono', monospace; }
+  .ss-type{ font:500 13px/1.4 'JetBrains Mono', monospace; color:var(--cyan); margin:4px 0 12px; }
+  .ss-prop{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; margin:0 0 12px; font:12px/1.3 'JetBrains Mono', monospace; color:var(--muted); }
+  .ss-seg{ display:flex; gap:6px; }
+  .ss-base{ font:600 12px 'JetBrains Mono', monospace; color:var(--ink); }
+  .ss-seg button{ font:600 12px 'JetBrains Mono', monospace; color:var(--ink); background:transparent; border:1px solid var(--line); padding:6px 10px; cursor:pointer; }
+  .ss-seg button[aria-pressed="true"]{ background:var(--amber); border-color:var(--amber); color:#0b1220; }
+  .ss-seg button:disabled{ opacity:0.4; cursor:not-allowed; }
+  .ss-seg button:focus-visible{ outline:2px solid var(--amber); outline-offset:1px; }
+  .ss-prop-note{ width:100%; font-size:11.5px; }
+  .ss-prop-note:empty{ display:none; }
+  .ss-kv{ display:grid; grid-template-columns:auto 1fr; gap:6px 14px; margin:0; font:12.5px/1.35 'JetBrains Mono', monospace;
+    overflow:auto; border-top:1px solid var(--line); padding-top:12px; }
+  .ss-kv dt{ color:var(--muted); }
+  .ss-kv dd{ margin:0; text-align:right; }
+  .ss-kv dd.yes{ color:var(--cyan); } .ss-kv dd.no{ color:var(--muted); }
+  .ss-foot{ margin-top:auto; padding-top:14px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .ss-confirm{ font:700 14px 'JetBrains Mono', monospace; color:#0b1220; background:var(--amber); border:1px solid var(--amber); padding:10px 22px; cursor:pointer; }
+  .ss-confirm:focus-visible{ outline:2px solid var(--ink); outline-offset:2px; }
+  .ss-hint{ font-size:11.5px; color:var(--muted); }
+  @media (max-width:760px){
+    .ss-panel{ height:auto; max-height:94vh; overflow:auto; }
+    .ss-body{ grid-template-columns:1fr; }
+    #ssCanvas{ flex:none; height:36vh; }
+    .ss-hint{ display:none; }
+  }
