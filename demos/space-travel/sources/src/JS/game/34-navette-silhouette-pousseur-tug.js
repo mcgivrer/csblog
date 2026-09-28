@@ -149,31 +149,35 @@ const LOAD_T_RELEASE = 2.5;   /* dépose sur la pince de la navette */
    conteneur de stock, tous deux ancrés sur le dock/le point de stockage —
    qui suivent le vaisseau tant qu'il orbite, cf. updateShuttleLoading(). */
 function startShuttleLoading(withCutaway){
-  const sh = buildShuttle();
+  /* lot N : navette-cargo (P2) et conteneur ISO 20' réels, en mètres (plus de mise à l'échelle) */
+  const sh = CARGO.buildCargoShuttle(_shuttleIdCounter + 11);
+  const pts = CARGO.armPoints();
   const dockPos = new THREE.Vector3();
   if(window.shipDockAnchor) window.shipDockAnchor.getWorldPosition(dockPos);
   else dockPos.copy(shipRig.position);
   sh.group.position.copy(dockPos);
   sh.group.quaternion.copy(shipRig.quaternion);
-  if(REAL.active){ const fs = REAL.shipScale(); sh.group.children.forEach(function(c){ c.position.multiplyScalar(fs); c.scale.multiplyScalar(fs); }); }   /* L2.3 */
   LAYERS.shipWorld.add(sh.group);
   LAYERS.shipWorld.add(sh.trail);
 
-  const container = buildContainerMesh();
+  const container = CARGO.buildIsoContainer(_shuttleIdCounter*7 + 3);
   const stagePos = new THREE.Vector3();
   if(window.shipCargoStageAnchor) window.shipCargoStageAnchor.getWorldPosition(stagePos);
   else stagePos.copy(dockPos);
   container.position.copy(stagePos);
   container.quaternion.copy(shipRig.quaternion);
-  if(REAL.active) container.scale.multiplyScalar(REAL.shipScale());
   LAYERS.shipWorld.add(container);
 
   const camSeq = SHUTTLE_CAMERA_SEQUENCES[Math.floor(Math.random()*SHUTTLE_CAMERA_SEQUENCES.length)];
   const id = ++_shuttleIdCounter;
 
+  /* la navette attend là où la pince dépose (berceau dorsal sous le point de dépose), le conteneur là où elle saisit */
+  const rest = pts ? pts.place.clone().sub(sh.clampGroup.position) : null, stage = pts ? pts.stage.clone() : null;
+  if(rest){ sh.group.position.copy(CARGO.shipPoint(rest)); container.position.copy(CARGO.shipPoint(stage)); }
+  sh.rest = rest;
   orbitState.loading = {
     id:id, shuttle:sh, container:container, t:0, duration:SHUTTLE_CLOSEUP_DURATION,
-    camSeq:camSeq, grabbed:false, released:false
+    camSeq:camSeq, grabbed:false, released:false, rest:rest, stage:stage
   };
 
   if(withCutaway){

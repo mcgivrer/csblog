@@ -70,3 +70,16 @@ Aide-moi à raffiner ces besoins et correctifs :
 2. il y a toujours ce bug de tressautement de la camera ou des objets cible de la camera: en gros plan les cargo et navette semble sacadées ou tressauter. Il faut revoir l'algorithme de positionnement de la camera et celui de calcul de la position des vaisseaux.
 
 3. Lorsque le carburant est vide, les moteurs principaux s'arrêtent, le cargo se met alors à dériver en continuant sa route, mais en décélérant lentement. Une alerte est affichée dans un nouveau dialogue sur fond orange (alerte/warning) et un message explicite indique la raison de la panne. 2 options sont alors proposée, arrếter la partie (1), oubien demander de l'aide (2). Si le joueur choisit l'option 1, il est renvoyé sur l'écran de titre, après confirmation. Si il choixi l'option 2 et si il a assez de crédits, un vaisseau de ravittaillement (type vaisseau citerne) arrive après une certaine attente (entre 5 et 20 s) et s'arime au cargo pour le transfert de carburant.  la jauge de carburant dremonte et une fois à 100% les crédits sont débités et le vaisseau citerne se désarime et part.  Si le joueur interompt la manoeuvre (ESAPCE, propulsion, etc.) le vaisseau citerne est automatiquement désarimé (sysème de sécurité). l'intégralité de la somme due est prélevé malgré un plein non complet !  En cas de désarrimage demandé, une confirmation est demandée pour valider l'opération.
+
+## 2026/09/28
+
+### Améliorations
+
+1. J'ai joint la spécification d'origine de la version 2.16. Au chapitre 24, on parle de ports orbitaux. Prépare une spécification d'implémentation et propose-moi des options. Les missions et escorteurs pourront également être trouvés sur ces ports. Il faut prévoir des docks d'amarrage (type pontons), et prévoir les séquences d'amarrage des vaisseaux (à adapter en fonction des tailles des vaisseaux)
+
+2. Ensuite tu pourras redessiner intégralement la navette de livraison de conteneur pour qu'elle s'accorde au nouveau design général du jeu.
+
+3. À l'issue, en dernière étape, tu devras mettre à jour la spec pour la dernière version en reprenant tous les chapitres concernés pour intégrer les nouveautés.
+
+4. Il faudra également mettre à jour le fichier README.md  ainsi que le fichier TODO.md
+(attachés ici).

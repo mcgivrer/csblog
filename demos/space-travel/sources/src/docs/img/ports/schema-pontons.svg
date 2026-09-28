@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560" font-family="JetBrains Mono, ui-monospace, monospace">
+  <rect width="960" height="560" fill="#0b1220"/>
+  <text x="24" y="34" fill="#ffb454" font-size="13" letter-spacing="2">PORT ORBITAL « MOYEU À PONTONS » — VUE DE DESSUS (principe, à l'échelle approximative)</text>
+  <g stroke="#25375c" stroke-width="1"><line x1="0" y1="52" x2="960" y2="52"/></g>
+  <!-- moyeu -->
+  <circle cx="330" cy="300" r="46" fill="#0f1a30" stroke="#8ea0c4" stroke-width="2"/>
+  <text x="330" y="296" fill="#e8edf5" font-size="11" text-anchor="middle">MOYEU</text>
+  <text x="330" y="312" fill="#5d6f92" font-size="9" text-anchor="middle">Ø 90 m · baies</text>
+  <!-- ponton L (vers la droite) -->
+  <rect x="376" y="292" width="300" height="16" fill="#1d2a44" stroke="#8ea0c4"/>
+  <text x="690" y="304" fill="#ffb454" font-size="11">PONTON L · 300 m</text>
+  <rect x="420" y="250" width="237" height="34" fill="none" stroke="#ffb454" stroke-dasharray="5 4"/>
+  <text x="430" y="272" fill="#ffb454" font-size="10">poste L · ≤ 240 m, accostage latéral</text>
+  <rect x="420" y="316" width="180" height="30" fill="none" stroke="#5eead4" stroke-dasharray="5 4"/>
+  <text x="430" y="336" fill="#5eead4" font-size="10">poste M · ≤ 180 m</text>
+  <!-- ponton M (en haut à gauche) -->
+  <g transform="rotate(-120 330 300)"><rect x="376" y="292" width="220" height="16" fill="#1d2a44" stroke="#8ea0c4"/>
+    <rect x="400" y="316" width="180" height="30" fill="none" stroke="#5eead4" stroke-dasharray="5 4"/>
+    <rect x="400" y="254" width="100" height="30" fill="none" stroke="#e8edf5" stroke-dasharray="5 4"/></g>
+  <text x="24" y="86" fill="#5eead4" font-size="11">PONTON M · 220 m</text>
+  <text x="24" y="102" fill="#8ea0c4" font-size="10">postes M (≤ 180 m) et S (≤ 100 m)</text>
+  <!-- ponton S (en bas à gauche) -->
+  <g transform="rotate(120 330 300)"><rect x="376" y="292" width="140" height="16" fill="#1d2a44" stroke="#8ea0c4"/>
+    <rect x="392" y="316" width="100" height="30" fill="none" stroke="#e8edf5" stroke-dasharray="5 4"/>
+    <rect x="392" y="254" width="100" height="30" fill="none" stroke="#e8edf5" stroke-dasharray="5 4"/></g>
+  <text x="96" y="470" fill="#e8edf5" font-size="11">PONTON S · 140 m</text>
+  <text x="96" y="486" fill="#8ea0c4" font-size="10">2 postes S (≤ 100 m)</text>
+  <!-- couloir d'approche vers le poste L -->
+  <g stroke="#5eead4" fill="none"><path d="M 900 120 C 820 170, 760 210, 700 240" stroke-dasharray="3 6"/>
+    <rect x="860" y="100" width="26" height="26" transform="rotate(20 873 113)"/><rect x="800" y="146" width="22" height="22" transform="rotate(25 811 157)"/><rect x="746" y="190" width="18" height="18" transform="rotate(30 755 199)"/></g>
+  <circle cx="700" cy="240" r="6" fill="#ffb454"/>
+  <text x="712" y="232" fill="#ffb454" font-size="10">point d'attente</text>
+  <text x="712" y="246" fill="#8ea0c4" font-size="9">≈ 1,5 × longueur du vaisseau</text>
+  <text x="780" y="92" fill="#5eead4" font-size="10">couloir holographique (manuel)</text>
+  <!-- baies petits engins -->
+  <g fill="#5eead4"><rect x="300" y="250" width="14" height="6"/><rect x="346" y="344" width="14" height="6"/></g>
+  <text x="420" y="392" fill="#5eead4" font-size="10">▪ baies à champ de force du moyeu : petits engins (&lt; 40 m)</text>
+  <!-- légende -->
+  <g font-size="10"><rect x="24" y="520" width="12" height="8" fill="none" stroke="#ffb454" stroke-dasharray="3 2"/><text x="42" y="528" fill="#8ea0c4">poste L</text>
+    <rect x="110" y="520" width="12" height="8" fill="none" stroke="#5eead4" stroke-dasharray="3 2"/><text x="128" y="528" fill="#8ea0c4">poste M</text>
+    <rect x="196" y="520" width="12" height="8" fill="none" stroke="#e8edf5" stroke-dasharray="3 2"/><text x="214" y="528" fill="#8ea0c4">poste S</text>
+    <text x="300" y="528" fill="#5d6f92">Classes : S ≤ 100 m · M ≤ 180 m · L ≤ 240 m (flotte actuelle : 61 à 237 m) · petits engins &lt; 40 m</text></g>
+</svg>

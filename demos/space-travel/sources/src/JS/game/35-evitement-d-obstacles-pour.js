@@ -60,11 +60,12 @@ function updateShuttleLoading(dt){
   const dockPos = new THREE.Vector3();
   if(window.shipDockAnchor) window.shipDockAnchor.getWorldPosition(dockPos);
   else dockPos.copy(shipRig.position);
-  L.shuttle.group.position.copy(dockPos);
+  L.shuttle.group.position.copy(L.rest ? CARGO.shipPoint(L.rest) : dockPos);   /* lot N : sous le point de dépose de la pince */
   L.shuttle.group.quaternion.copy(shipRig.quaternion);
   if(!L.grabbed){
     const stagePos = new THREE.Vector3();
-    if(window.shipCargoStageAnchor) window.shipCargoStageAnchor.getWorldPosition(stagePos);
+    if(L.stage) stagePos.copy(CARGO.shipPoint(L.stage));                   /* exactement là où la pince saisit */
+    else if(window.shipCargoStageAnchor) window.shipCargoStageAnchor.getWorldPosition(stagePos);
     else stagePos.copy(dockPos);
     L.container.position.copy(stagePos);
     L.container.quaternion.copy(shipRig.quaternion);
@@ -82,6 +83,7 @@ function updateShuttleLoading(dt){
       window.shipArm.gripper.add(L.container);
       L.container.position.set(0, 0, 0.25);
       L.container.rotation.set(0, 0, 0);
+      L.container.scale.setScalar(1/CARGO.DOCK_SCALE);   /* lot N : conteneur en mètres, pince à l'échelle du module d'amarrage */
     }
   } else if(L.t < LOAD_T_PLACE){
     applyArmPose(lerpArmPose(ARM_POSE_REACH, ARM_POSE_PLACE, THREE.MathUtils.clamp((L.t-LOAD_T_GRAB)/(LOAD_T_PLACE-LOAD_T_GRAB), 0, 1)));
@@ -93,6 +95,7 @@ function updateShuttleLoading(dt){
          navette, qui l'emporte au lancement */
       window.shipArm.gripper.remove(L.container);
       L.shuttle.clampGroup.add(L.container);
+      L.container.scale.setScalar(1);   /* le berceau de la navette porte déjà l'échelle : sinon f² */
       L.container.position.set(0, 0, 0);
       L.container.rotation.set(0, 0, 0);
       L.shuttle.hasCargo = true;
@@ -110,13 +113,14 @@ function updateShuttleLoading(dt){
 /* La navette, déjà chargée, part réellement vers la planète — reprend le
    rôle de l'ancienne spawnShuttle(), mais sans reconstruire le modèle. */
 function launchLoadedShuttle(sh, id, dockPos, camSeq){
+  if(sh.craft && sh.craft.thr) sh.craft.thr.value = .9;   /* lot N : tuyères de la navette-cargo allumées en vol */
   const arcOffset = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5)
-    .normalize().multiplyScalar(50 + Math.random()*70);
+    .normalize().multiplyScalar((50 + Math.random()*70)*REAL.shipScale());   /* échelle du vaisseau */
   orbitState.shuttles.push({
     id:id, group:sh.group, glow:sh.glow, navLights:sh.navLights,
     trail:sh.trail, trailHistory:[],
     startPos:dockPos.clone(), t:0, duration:11+Math.random()*3, arcOffset:arcOffset,
-    camSeq:camSeq, phase:'outbound'
+    camSeq:camSeq, phase:'outbound', rest:sh.rest || null, engineBack:sh.engineBack || 1.95, craft:sh.craft || null
   });
 }
 
@@ -134,8 +138,23 @@ const _dockPosNow = new THREE.Vector3();
 const _clearPos = new THREE.Vector3();
 
 const _shuttleTarget = new THREE.Vector3();
+/* orientation d'une navette : nez (−Z) selon dir, « haut » = verticale de la planète ; si la route est presque
+   verticale (descente vers le port), le haut de secours est l'avant du vaisseau — plus de repère dégénéré */
+const _shM = new THREE.Matrix4(), _shZero = new THREE.Vector3();
+function shuttleAttitude(dir, pos){
+  const d = dir.clone().normalize(), up = pos.clone().sub(orbitState.center || _shZero).normalize();
+  let u = up; if(Math.abs(d.dot(u)) > .96) u = new THREE.Vector3(0, 0, -1).applyQuaternion(shipRig.quaternion);
+  _shM.lookAt(_shZero, d, u); return new THREE.Quaternion().setFromRotationMatrix(_shM);
+}
 function updateShuttles(dt, elapsed){
   updateShuttleLoading(dt);
+  /* distances de la sortie de soute à l'échelle du vaisseau (unités de l'ancien vaisseau de 40 u sinon) */
+  const fS = REAL.shipScale(), DROP_D = OUTBOUND_DROP_DIST*fS, CLEAR_D = OUTBOUND_CLEAR_DIST*fS;
+  /* traînées dans le repère du vaisseau : en orbite, tout avance à ~8 km/s — des positions absolues
+     s'étireraient en une ligne de plusieurs centaines de mètres le long de l'orbite */
+  if(!orbitState._lastShip) orbitState._lastShip = shipRig.position.clone();
+  const _shipDelta = shipRig.position.clone().sub(orbitState._lastShip); orbitState._lastShip.copy(shipRig.position);
+  if(_shipDelta.lengthSq() > 1e12) _shipDelta.set(0, 0, 0);   /* changement de système : pas de report */
   for(let i=orbitState.shuttles.length-1; i>=0; i--){
     const s = orbitState.shuttles[i];
     s.t += dt;
@@ -151,40 +170,44 @@ function updateShuttles(dt, elapsed){
         _shuttleTarget.copy(orbitState.planet.position);
       }
     } else if(window.shipDockAnchor){
-      window.shipDockAnchor.getWorldPosition(_shuttleTarget);
+      if(s.rest) _shuttleTarget.copy(CARGO.shipPoint(s.rest)); else window.shipDockAnchor.getWorldPosition(_shuttleTarget);
     } else {
       _shuttleTarget.copy(shipRig.position);
     }
 
-    let pos, lookDir;
+    let pos, lookDir, targetQ = null, snap = false;
     if(s.phase === 'outbound'){
       /* repère du vaisseau réévalué CHAQUE image : le cargo est en train
          de manœuvrer en orbite pendant tout ce temps, la chute et
          l'éloignement doivent rester solidaires de sa position/orientation
          RÉELLE au moment présent, pas d'un instantané figé au largage. */
       _shipDown.set(0,-1,0).applyQuaternion(shipRig.quaternion);
-      if(window.shipDockAnchor) window.shipDockAnchor.getWorldPosition(_dockPosNow);
+      if(s.rest) _dockPosNow.copy(CARGO.shipPoint(s.rest));                  /* lot N : point de repos sous la pince */
+      else if(window.shipDockAnchor) window.shipDockAnchor.getWorldPosition(_dockPosNow);
       else _dockPosNow.copy(shipRig.position);
 
       if(f < OUTBOUND_DROP_FRAC){
         /* phase 1 : translation verticale pure, part du centre du dock */
         const t2 = f/OUTBOUND_DROP_FRAC, e2 = t2*t2*(3-2*t2);
-        pos = _dockPosNow.clone().addScaledVector(_shipDown, OUTBOUND_DROP_DIST*e2);
+        pos = _dockPosNow.clone().addScaledVector(_shipDown, DROP_D*e2);
         lookDir = _shipDown;
+        targetQ = shipRig.quaternion.clone(); snap = true;   /* sortie de soute : attitude du vaisseau */
       } else if(f < OUTBOUND_CLEAR_FRAC){
         /* phase 2 : poursuite du même axe, la navette s'éloigne encore du cargo */
         const t2 = (f-OUTBOUND_DROP_FRAC)/(OUTBOUND_CLEAR_FRAC-OUTBOUND_DROP_FRAC), e2 = t2*t2*(3-2*t2);
-        pos = _dockPosNow.clone().addScaledVector(_shipDown, OUTBOUND_DROP_DIST + OUTBOUND_CLEAR_DIST*e2);
+        pos = _dockPosNow.clone().addScaledVector(_shipDown, DROP_D + CLEAR_D*e2);
         lookDir = _shipDown;
+        targetQ = shipRig.quaternion.clone().slerp(shuttleAttitude(_shuttleTarget.clone().sub(pos), pos), e2);   /* pivote vers sa route */
       } else {
         /* phase 3 : dégagée du cargo, la navette amorce enfin sa descente
            vers le port — même lerp+arc qu'avant, mais reparti du point de
            dégagement plutôt que du dock lui-même */
-        _clearPos.copy(_dockPosNow).addScaledVector(_shipDown, OUTBOUND_DROP_DIST + OUTBOUND_CLEAR_DIST);
+        _clearPos.copy(_dockPosNow).addScaledVector(_shipDown, DROP_D + CLEAR_D);
         const t2 = (f-OUTBOUND_CLEAR_FRAC)/(1-OUTBOUND_CLEAR_FRAC), e2 = t2*t2*(3-2*t2);
         pos = _clearPos.clone().lerp(_shuttleTarget, e2);
         pos.addScaledVector(s.arcOffset, Math.sin(Math.PI*t2));
         lookDir = _shuttleTarget.clone().sub(pos);
+        targetQ = shuttleAttitude(lookDir, pos);
       }
     } else {
       /* retour au dock : trajet inchangé, un simple lerp+arc suffit —
@@ -192,12 +215,14 @@ function updateShuttles(dt, elapsed){
       pos = s.startPos.clone().lerp(_shuttleTarget, ease);
       pos.addScaledVector(s.arcOffset, Math.sin(Math.PI*f));
       lookDir = _shuttleTarget.clone().sub(pos);
+      targetQ = shuttleAttitude(lookDir, pos);
+      if(f > .8){ const b = (f - .8)/.2; targetQ.slerp(shipRig.quaternion, b*b*(3 - 2*b)); }   /* réalignement pour l'arrimage */
     }
     s.group.position.copy(pos);
 
-    if(lookDir.lengthSq() > 1e-6){
-      const m4 = new THREE.Matrix4().lookAt(new THREE.Vector3(0,0,0), lookDir.clone().normalize(), new THREE.Vector3(0,1,0));
-      s.group.quaternion.setFromRotationMatrix(m4);
+    if(targetQ){
+      if(snap) s.group.quaternion.copy(targetQ);
+      else s.group.quaternion.slerp(targetQ, 1 - Math.exp(-dt*4));   /* rotations lissées */
     }
     /* rétrécissement + fondu en fin de trajectoire : simulation d'un
        atterrissage — à la livraison comme à l'amerrissage au dock */
@@ -222,19 +247,24 @@ function updateShuttles(dt, elapsed){
       if(s.lastTrailPos){
         const vel = pos.clone().sub(s.lastTrailPos);
         if(vel.lengthSq() > 1e-6){
-          engineWorld = pos.clone().addScaledVector(vel.normalize(), -1.95*shrink);
+          engineWorld = pos.clone().addScaledVector(vel.normalize(), -(s.engineBack || 1.95)*shrink);
         }
       }
       /* première image, ou vaisseau ponctuellement immobile (dt≈0) :
          retombe sur l'orientation du modèle, faute de mieux */
       if(!engineWorld){
         engineWorld = pos.clone().addScaledVector(
-          new THREE.Vector3(0,0,1).applyQuaternion(s.group.quaternion), 1.95*shrink
+          new THREE.Vector3(0,0,1).applyQuaternion(s.group.quaternion), (s.engineBack || 1.95)*shrink
         );
       }
       s.lastTrailPos = pos.clone();
+      s.trailHistory.forEach(function(p){ p.add(_shipDelta); });   /* repère du vaisseau */
       s.trailHistory.unshift(engineWorld);
       if(s.trailHistory.length > SHUTTLE_TRAIL_LEN) s.trailHistory.length = SHUTTLE_TRAIL_LEN;
+      /* longueur plafonnée à ~3 longueurs de navette : à ~30 km/s, neuf images d'historique donnaient une ligne de
+         10 à 15 km ; dans l'ancien jeu, la traînée faisait une demi-navette — c'est un panache, pas une trajectoire */
+      const _tMax = 24*REAL.shipScale(), _tLen = s.trailHistory[0].distanceTo(s.trailHistory[s.trailHistory.length - 1]);
+      if(_tLen > _tMax){ const k = _tMax/_tLen, h = s.trailHistory[0]; for(let j = 1; j < s.trailHistory.length; j++) s.trailHistory[j].sub(h).multiplyScalar(k).add(h); }
       const posAttr = s.trail.geometry.attributes.position;
       const colAttr = s.trail.geometry.attributes.color;
       for(let k=0;k<SHUTTLE_TRAIL_LEN;k++){
@@ -272,7 +302,7 @@ function updateShuttles(dt, elapsed){
         s.t = 0;
         s.startPos = pos.clone();
         s.arcOffset = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5)
-          .normalize().multiplyScalar(50 + Math.random()*70);
+          .normalize().multiplyScalar((50 + Math.random()*70)*REAL.shipScale());   /* échelle du vaisseau */
         s.duration = 9 + Math.random()*2;
         s.group.scale.setScalar(1);
         s.glow.material.opacity = 1;

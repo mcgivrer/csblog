@@ -42,9 +42,10 @@ const LAYERS = (function(){
     /* 1) couche galactique : caméra du jeu en v2.16 ; à l'échelle réelle (L2.2), caméra galactique
        placée à la position galactique du vaisseau et orientée comme la caméra du jeu */
     const real = (typeof REAL !== 'undefined') && REAL.active;
-    Rn.render(scene, (real && REAL.started) ? REAL.galCam : camera);
+    const sysOn = real && (REAL.started || REAL.titleActive);   /* séquence de titre : systèmes réels aussi */
+    Rn.render(scene, sysOn ? REAL.galCam : camera);
     calls += Rn.info.render.calls; tris += Rn.info.render.triangles;
-    if(real && !REAL.started){ Rn.autoClear = autoClear; stats.calls = calls; stats.triangles = tris; stats.slices = 0; return; }
+    if(real && !sysOn){ Rn.autoClear = autoClear; stats.calls = calls; stats.triangles = tris; stats.slices = 0; return; }
     /* 2) couche système, de la tranche la plus lointaine à la plus proche */
     const cp = camera.position;
     rcam.position.set(0, 0, 0); rcam.quaternion.copy(camera.quaternion);

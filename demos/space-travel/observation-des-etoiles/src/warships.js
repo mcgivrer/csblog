@@ -133,6 +133,7 @@ CR.register('fighter', buildFighter, PAINTS, 'Fighter');
 CR.register('corvette', buildCorvette, PAINTS, 'Corvette');
 CR.register('destroyer', buildDestroyer, PAINTS, 'Destroyer');
 /* animation des tourelles : balayage lent (lacet), canons qui se lèvent et s'abaissent ; les tourelles de défense rapprochée plus vives */
+CR.turret = turret;                                                           // v7.6 : réutilisée par le porte-vaisseaux militaire
 CR.aimTurrets = function(c, t, seed){
   (c.turrets || []).forEach((u, i) => { const ph = (seed || 0)*1.7 + i*2.3, sp = u.main ? .12 : .35;
     u.yaw.rotation.y = 1.1*Math.sin(t*sp + ph) + (u.main ? 0 : .5*Math.sin(t*sp*2.7 + ph*1.3));

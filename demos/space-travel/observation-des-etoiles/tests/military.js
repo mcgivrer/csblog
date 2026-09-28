@@ -11,7 +11,7 @@ const fs = require('fs');
  await p.goto(ROOT + (process.env.HTML || 'dist/observation-des-etoiles.html') + '?seed=' + seed + '&music=0&military=all&dof=1');
  await p.waitForFunction(()=>document.querySelector('#sttStart.ready'), null, {timeout:180000, polling:250});
  await p.evaluate(()=>{ window.__DEMO_NOLOOP = true; }); await p.click('#sttStart'); await p.waitForTimeout(200);
- const info = await p.evaluate(()=>{ const t = __CINE.timings(); while(__CINE.time() < t.tO0 + 4) __CINE.step(.25, true);
+ const info = await p.evaluate(()=>{ const t = __CINE.timings(); while(__CINE.time() < t.tO0 + 4) __CINE.step(.25, true); for(let i = 0; i < 80 && !__CINE.radarState(); i++) __CINE.step(.25, true);   // plan de découverte : pas de radar
    const sh = __CINE.shipsInfo(), mil = sh.filter(s => s.mil);
    return { n: sh.length, mil: mil.map(s => s.type + ' ' + s.reg + ' ' + Math.round(s.len) + 'm'), radarMil: __CINE.radarState().contacts ? __CINE.radarState().contacts.filter(c => c.mil).length : null }; });
  console.log(JSON.stringify(info));

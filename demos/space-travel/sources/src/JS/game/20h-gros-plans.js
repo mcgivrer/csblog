@@ -69,25 +69,49 @@ function pickShot(){
 }
 /* ---------- plans des navettes (escale) ---------- */
 function shuttleLen(){ return 8*(REAL.shipScale ? REAL.shipScale() : 1); }
+function hullLen(group){
+  const bx = new THREE.Box3(); group.updateMatrixWorld(true);
+  group.traverse(o => { if(o.isMesh && !o.isSprite && o.geometry){ o.geometry.computeBoundingBox(); bx.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld)); } });
+  return bx.isEmpty() ? shuttleLen() : Math.max(3, bx.getSize(new V3()).length()*.8);
+}
 function loadShot(L){
-  const s = Math.random() < .5 ? -1 : 1;
-  return { type: 'shuttleLoad', dur: 3.4, t: 0, h: Math.random(), eval: k => { const A = window.shipDockAnchor ? window.shipDockAnchor.getWorldPosition(new V3()) : shipRig.position.clone(), a = axes(), sl = shuttleLen();
-    const C = L.container ? L.container.getWorldPosition(new V3()) : A;
-    return { pos: A.clone().addScaledVector(a.up, -4.5*sl).addScaledVector(a.rt, s*3.2*sl).addScaledVector(a.fw, -(1.2 + .6*k)*sl), look: C, up: a.up, fov: 40 }; } };
+  const s = Math.random() < .5 ? -1 : 1, len = L.shuttle ? hullLen(L.shuttle.group) : shuttleLen();   /* longueur réelle de la navette */
+  return { type: 'shuttleLoad', dur: 3.4, t: 0, h: Math.random(), ship: true, eval: k => { const A = window.shipDockAnchor ? window.shipDockAnchor.getWorldPosition(new V3()) : shipRig.position.clone(), a = axes(), sl = len;
+    /* point visé pris sur les ancres DU VAISSEAU (à jour) : avant la saisie et après la pose, conteneur et navette sont
+       replacés contre le dock plus tard dans l'image — leur position du moment a une image de retard, ≈ 330 m en orbite */
+    let C = A;
+    if(!L.grabbed && window.shipCargoStageAnchor) C = window.shipCargoStageAnchor.getWorldPosition(new V3());
+    else if(L.grabbed && !L.released && L.container) C = L.container.getWorldPosition(new V3());   /* sur la pince : suit le vaisseau */
+    /* lot N : plan resserré sur la navette et le point de dépose (≈ 2 longueurs de navette) — l'ancien cadrage,
+       prévu pour la petite navette d'origine, montrait tout le vaisseau et rendait la manœuvre du bras illisible */
+    const Sp = L.shuttle ? L.shuttle.group.getWorldPosition(new V3()) : A, mid = Sp.clone().lerp(C, .5);
+    return { pos: mid.clone().addScaledVector(a.up, -1.1*sl).addScaledVector(a.rt, s*2.1*sl).addScaledVector(a.fw, -(.9 + .35*k)*sl), look: mid, up: a.up, fov: 44 }; } };
 }
 function followShot(sh){
-  const s = Math.random() < .5 ? -1 : 1; let prev = null, dir = null;
+  const s = Math.random() < .5 ? -1 : 1;
   /* longueur réelle de la navette (boîte englobante) : l'estimation d'après la taille du vaisseau la surévaluait ×3 */
   const bx = new THREE.Box3(); sh.group.updateMatrixWorld(true);
   sh.group.traverse(o => { if(o.isMesh && !o.isSprite && o.geometry){ o.geometry.computeBoundingBox(); bx.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld)); } });   /* coque seule : la lueur du moteur (sprite) gonflait la mesure */
   const len = Math.max(3, bx.isEmpty() ? 8 : bx.getSize(new V3()).length()*.8);
-  return { type: 'shuttleFollow', dur: 4.2, t: 0, h: Math.random(), eval: k => { const P0 = sh.group.getWorldPosition(new V3()), sl = len;
-    /* la navette (~30 km/s) est déplacée APRÈS ce calcul dans l'image : sa position est extrapolée d'une image,
-       sinon la caméra viserait toujours l'image précédente et la perdrait (≈ 1 km de retard mesuré) */
-    const step = prev ? P0.clone().sub(prev) : new V3(), P = P0.clone().add(step);
-    if(prev && step.lengthSq() > 1e-6){ const d = step.clone().normalize(); dir = dir ? dir.lerp(d, .2).normalize() : d; }
-    prev = P0.clone();
-    const C = orbitState.center || new V3(), up = P.clone().sub(C).normalize(), fw = dir || C.clone().sub(P).normalize(), rt = new V3().crossVectors(fw, up).normalize();
+  let fwS = null, fwH = null;                             /* cap de la caméra, lissé (τ = 0,7 s) ; dernier cap horizontal valable */
+  return { type: 'shuttleFollow', dur: 4.2, t: 0, h: Math.random(), eval: (k, dt) => { const P0 = sh.group.getWorldPosition(new V3()), sl = len;
+    /* position de l'image EN COURS : les navettes sont désormais mises à jour avant les caméras (boucle, module 41) —
+       l'ancienne extrapolation d'une image ne tenait qu'à cadence régulière et faisait trembler le plan en jeu */
+    const P = P0;
+    /* repère de la NAVETTE (son attitude, lissée) — le déplacement, lui, mélange la vitesse orbitale (~8 km/s) au trajet
+       vers le port et faisait tourner le plan dans tous les sens */
+    const C = orbitState.center || new V3(), up = P.clone().sub(C).normalize();
+    /* la caméra SUIT le cap de la navette avec un retard lissé au lieu d'y être rivée : quand la navette pivote de
+       l'attitude du vaisseau vers sa route, un repère rigide faisait basculer tout le décor (7,5 rad/s mesurés) */
+    const fwN = new V3(0, 0, -1).applyQuaternion(sh.group.quaternion);
+    fwS = fwS ? fwS.lerp(fwN, 1 - Math.exp(-(dt || 0)/.7)).normalize() : fwN.clone();
+    /* navette plongeant presque à la verticale vers le port : son cap horizontal devient minuscule et instable — on
+       garde alors le dernier cap horizontal valable (ramené dans le plan horizontal local) */
+    const h = fwS.clone().addScaledVector(up, -fwS.dot(up));
+    if(h.lengthSq() > .0625 || !fwH) fwH = h.lengthSq() > 1e-8 ? h.normalize() : new V3(1, 0, 0).applyQuaternion(shipRig.quaternion);
+    else fwH.addScaledVector(up, -fwH.dot(up)).normalize();
+    const fw = fwH.clone();
+    let rt = new V3().crossVectors(fw, up); if(rt.lengthSq() < 1e-4) rt = new V3(1, 0, 0).applyQuaternion(shipRig.quaternion); rt.normalize();
     return { pos: P.clone().addScaledVector(rt, s*2.8*sl).addScaledVector(up, .7*sl).addScaledVector(fw, -(1.1 - .9*k)*sl), look: P.clone().addScaledVector(fw, .35*sl), up: up, fov: 44 }; } };
 }
 function blocked(){
@@ -109,7 +133,7 @@ function setDof(shot, dt){
 }
 function apply(shot, dt){
   shot.t += dt;
-  const c = shot.eval(clamp(shot.t/shot.dur, 0, 1)), pos = shot.ship ? outside(c.pos) : c.pos;
+  const c = shot.eval(clamp(shot.t/shot.dur, 0, 1), dt), pos = shot.ship ? outside(c.pos) : c.pos;
   if(S.baseFov === null) S.baseFov = camera.fov;
   if(camera.fov !== c.fov){ camera.fov = c.fov; camera.updateProjectionMatrix(); }
   camera.position.copy(pos); camera.up.copy(c.up); camera.lookAt(c.look); camera.updateMatrixWorld();

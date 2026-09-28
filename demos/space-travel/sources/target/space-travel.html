@@ -1929,9 +1929,10 @@ const LAYERS = (function(){
     /* 1) couche galactique : caméra du jeu en v2.16 ; à l'échelle réelle (L2.2), caméra galactique
        placée à la position galactique du vaisseau et orientée comme la caméra du jeu */
     const real = (typeof REAL !== 'undefined') && REAL.active;
-    Rn.render(scene, (real && REAL.started) ? REAL.galCam : camera);
+    const sysOn = real && (REAL.started || REAL.titleActive);   /* séquence de titre : systèmes réels aussi */
+    Rn.render(scene, sysOn ? REAL.galCam : camera);
     calls += Rn.info.render.calls; tris += Rn.info.render.triangles;
-    if(real && !REAL.started){ Rn.autoClear = autoClear; stats.calls = calls; stats.triangles = tris; stats.slices = 0; return; }
+    if(real && !sysOn){ Rn.autoClear = autoClear; stats.calls = calls; stats.triangles = tris; stats.slices = 0; return; }
     /* 2) couche système, de la tranche la plus lointaine à la plus proche */
     const cp = camera.position;
     rcam.position.set(0, 0, 0); rcam.quaternion.copy(camera.quaternion);
@@ -3497,7 +3498,7 @@ function installShip(id, opts){
   const nBefore = shipBody.children.length;
   buildDockModule(shipBody, dp.x, dp.y - 1.15, dp.z);
   if(typeof REAL !== 'undefined' && REAL.active){           /* L2.3 : dock dessiné pour un vaisseau de 40 u → mis à l'échelle du vaisseau réel */
-    const fs = gameLen40(), o = new THREE.Vector3(dp.x, dp.y, dp.z);
+    const fs = (typeof CARGO !== 'undefined') ? CARGO.DOCK_SCALE : gameLen40(), o = new THREE.Vector3(dp.x, dp.y, dp.z);   /* lot N : taillé pour le conteneur ISO 20' */
     shipBody.children.slice(nBefore).forEach(function(ch){ ch.position.sub(o).multiplyScalar(fs).add(o); ch.scale.multiplyScalar(fs); });
   }
   CAM_OFFSET.set(0, 12*f, 46*f);
@@ -4381,6 +4382,305 @@ SHIPGEN.build = function(model, opts){
     if(r){ b.glass = r; b.docks = r.docks; }
   }
   return b;
+};
+})();
+
+/* Copie de la démo « Observation des étoiles » v7.2.2 (src/smallcraft.js), inchangée — petits engins ; sert à la navette-cargo (20p-navette.js) et au trafic (L9). */
+/* =====================================================================
+   PETITS ENGINS — générateur procédural (remplace les navettes du jeu dans la démo)
+   Style mixte : base réaliste (structure, réservoirs, radiateurs, tuyères, blocs RCS, usure)
+   + touches « space opera » : carénages anguleux, détails en relief, feux bleus.
+   Types : 'maint' (navette de maintenance, bras manipulateurs, projecteurs),
+           'crew' (navette de transport court : cockpit, hublots, ailerons radiateurs, 2 tuyères),
+           'drone' (variantes 'inspect' | 'relay' | 'cargo'),
+           'lighter' (gabare à conteneurs : poutre, cabine, 1 ou 2 conteneurs).
+   Unités : mètres ; nez vers −Z, dos vers +Y (même repère que SHIPGEN).
+   CRAFT.build(kind, { variant, age, seed, slim }) → { group, kind, variant, len, box, rcs, rcsLen, nav, lamps, thr, bay, dispose }
+   Les pièces d'un même matériau sont fusionnées (4 à 8 appels de dessin par engin).
+   Dans un hangar, bay.uBayP (plan de la baie dans le repère de l'engin) éteint le soleil
+   et baigne l'engin de la lumière bleue du hangar.
+   ===================================================================== */
+(function(){
+'use strict';
+const CR = window.__CRAFT = {};
+const V3 = THREE.Vector3;
+const ORDER = (window.__SHIPGLASS && __SHIPGLASS.RENDER_ORDER) ? __SHIPGLASS.RENDER_ORDER.craft : 7;
+
+/* ---------- textures partagées ---------- */
+/* v7.1 : textures tracées 4 fois plus fines (2 avec ?quality=low) — même dessin en unités de base, net en gros plan ; filtrage anisotrope maximal */
+const TEX_K = new URLSearchParams(location.search).get('quality') === 'low' ? 2 : 4;
+function canvasTex(w, h, draw){ const c = document.createElement('canvas'); c.width = w*TEX_K; c.height = h*TEX_K; const g = c.getContext('2d'); g.scale(TEX_K, TEX_K); draw(g, w, h); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = typeof renderer !== 'undefined' ? renderer.capabilities.getMaxAnisotropy() : 8; t.encoding = THREE.sRGBEncoding; return t; }
+let rs = 11; const rnd = () => (rs = (rs*16807) % 2147483647)/2147483647;
+const PANEL = canvasTex(256, 256, (g, w, h) => {
+  g.fillStyle = '#c9cdd3'; g.fillRect(0, 0, w, h);
+  (function split(x, y, a, b, d){
+    if(d > 0 && (a > 40 || b > 40) && rnd() < .85){ if(a > b){ const s = Math.round(a*(.3 + .4*rnd())); split(x, y, s, b, d - 1); split(x + s, y, a - s, b, d - 1); } else { const s = Math.round(b*(.3 + .4*rnd())); split(x, y, a, s, d - 1); split(x, y + s, a, b - s, d - 1); } return; }
+    const l = 190 + Math.floor(30*rnd()); g.fillStyle = `rgb(${l},${l + 2},${l + 6})`; g.fillRect(x + 1, y + 1, a - 2, b - 2);
+    g.strokeStyle = 'rgba(30,34,40,.65)'; g.lineWidth = 1.5; g.strokeRect(x + 1, y + 1, a - 2, b - 2);
+    if(rnd() < .35){ g.fillStyle = 'rgba(40,45,52,.5)'; for(let i = 5; i < a - 5; i += 8){ g.beginPath(); g.arc(x + i + .75, y + 3.75, .8, 0, 6.2832); g.fill(); g.beginPath(); g.arc(x + i + .75, y + b - 4.25, .8, 0, 6.2832); g.fill(); } }
+    if(rnd() < .12){ g.fillStyle = 'rgba(30,34,40,.35)'; g.fillRect(x + a*.3, y + b*.3, a*.4, b*.4); }
+  })(0, 0, w, h, 6);
+});
+const HAZARD = canvasTex(128, 32, (g, w, h) => { g.fillStyle = '#1d1f23'; g.fillRect(0, 0, w, h); g.fillStyle = '#e8a91c';
+  for(let x = -32; x < w + 32; x += 32){ g.beginPath(); g.moveTo(x, h); g.lineTo(x + 16, h); g.lineTo(x + 32, 0); g.lineTo(x + 16, 0); g.closePath(); g.fill(); } });
+const CARGO = [0xb4542a, 0x2f6fa8, 0x6f7f2c, 0xc9a227, 0x7a3d8c, 0x8e9aa6];
+
+/* ---------- matériaux (par engin : l'usure et l'éclairage de hangar sont propres à chaque engin) ---------- */
+const BAY_PARS_V = `\nuniform vec4 uBayP; varying float vBayS;`;
+const BAY_PARS_F = `\nuniform float uBayOn; uniform vec3 uBayCol; varying float vBayS;`;
+function bayOBC(bay){
+  return function(shader){
+    shader.uniforms.uBayP = bay.uBayP; shader.uniforms.uBayOn = bay.uBayOn; shader.uniforms.uBayCol = bay.uBayCol;
+    shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>' + BAY_PARS_V)
+      .replace('#include <project_vertex>', '#include <project_vertex>\n  vBayS = dot(transformed, uBayP.xyz) + uBayP.w;');
+    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>' + BAY_PARS_F)
+      .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+  { float kb = uBayOn*smoothstep(0.4, -0.8, vBayS);          /* dans le hangar : pas de soleil, lumière bleue diffuse */
+    reflectedLight.directDiffuse *= 1.0 - 0.92*kb; reflectedLight.directSpecular *= 1.0 - 0.92*kb;
+    reflectedLight.indirectDiffuse += kb*uBayCol*diffuseColor.rgb; }`);
+  };
+}
+function mats(bay, paint, accentHex){
+  const std = (color, o) => { const m = new THREE.MeshStandardMaterial(Object.assign({ color, metalness: .4, roughness: .6, flatShading: true }, o || {})); m.color.convertSRGBToLinear(); if(m.emissive) m.emissive.convertSRGBToLinear(); m.userData.lin = true;
+    m.onBeforeCompile = bayOBC(bay); m.customProgramCacheKey = () => 'craft-bay-v1'; return m; };
+  const out = {
+    paint: std(paint, { map: PANEL, bumpMap: PANEL, bumpScale: .02, metalness: .3, roughness: .62 }),
+    mid: std(0x8a9098, { map: PANEL, bumpMap: PANEL, bumpScale: .015, metalness: .5, roughness: .5 }),
+    dark: std(0x2c3036, { metalness: .6, roughness: .5 }),
+    noz: std(0x3a3c41, { metalness: .85, roughness: .35, side: THREE.DoubleSide, emissive: 0x2a4a7a, emissiveIntensity: .25 }),
+    hazard: std(0xffffff, { map: HAZARD, metalness: .2, roughness: .7 }),
+    accent: std(0x0a0e14, { emissive: accentHex || 0x2f86ff, emissiveIntensity: 1.3, metalness: .2, roughness: .4 }),
+    lamp: std(0x111111, { emissive: 0xfff4e0, emissiveIntensity: 3, metalness: 0, roughness: .3 }),
+    cargo: {}, std
+  };
+  // usure : pas de « tôles remplacées » (cellules de 4 m, trop grandes pour un petit engin)
+  [out.paint, out.mid, out.hazard, out.accent, out.lamp].forEach(m => m.userData.wearKind = 4); out.dark.userData.wearKind = 2; out.noz.userData.wearKind = 1;
+  const std0 = out.std; out.std = (c, o) => { const m = std0(c, o); m.userData.wearKind = 4; return m; };
+  return out;
+}
+CR.mats = mats;
+
+/* ---------- primitives ---------- */
+function T(g){ const n = g.index ? g.toNonIndexed() : g; if(!n.attributes.uv){ const uv = new Float32Array(n.attributes.position.count*2); n.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); }
+  // UV planaires en mètres (panneaux de 2,5 m) : cohérents d'une pièce à l'autre
+  const p = n.attributes.position, uv = n.attributes.uv, a = new V3(), b = new V3(), c = new V3(), nn = new V3();
+  for(let i = 0; i < p.count; i += 3){ a.fromBufferAttribute(p, i); b.fromBufferAttribute(p, i + 1); c.fromBufferAttribute(p, i + 2);
+    nn.crossVectors(b.clone().sub(a), c.clone().sub(a)); const ax = Math.abs(nn.x), ay = Math.abs(nn.y), az = Math.abs(nn.z);
+    [a, b, c].forEach((v, j) => { let u, w; if(ax >= ay && ax >= az){ u = v.z; w = v.y; } else if(ay >= az){ u = v.x; w = v.z; } else { u = v.x; w = v.y; } uv.setXY(i + j, u/2.5, w/2.5); }); }
+  n.computeVertexNormals(); return n; }
+function part(G, geo, mat, x, y, z, rx, ry, rz){ const m = new THREE.Mesh(T(geo), mat); m.position.set(x || 0, y || 0, z || 0); m.rotation.set(rx || 0, ry || 0, rz || 0); G.add(m); return m; }
+function box(G, w, h, d, mat, x, y, z, rx, ry, rz){ return part(G, new THREE.BoxGeometry(w, h, d), mat, x, y, z, rx, ry, rz); }
+/* prisme à pans coupés le long de Z, effilé : (w0,h0) à l'avant (−Z), (w1,h1) à l'arrière */
+function prism(G, w0, h0, w1, h1, len, ch, mat, x, y, z, dy0, dy1){
+  const s = new THREE.Shape(), r = .5, c = ch;
+  s.moveTo(-r + c, -r); s.lineTo(r - c, -r); s.lineTo(r, -r + c); s.lineTo(r, r - c); s.lineTo(r - c, r); s.lineTo(-r + c, r); s.lineTo(-r, r - c); s.lineTo(-r, -r + c); s.closePath();
+  const g = new THREE.ExtrudeGeometry(s, { depth: 1, bevelEnabled: false, curveSegments: 1 });
+  const p = g.attributes.position;
+  for(let i = 0; i < p.count; i++){ const t = p.getZ(i); p.setXYZ(i, p.getX(i)*(w0 + (w1 - w0)*t), p.getY(i)*(h0 + (h1 - h0)*t) + (dy0 || 0)*(1 - t) + (dy1 || 0)*t, (t - .5)*len); }
+  return part(G, g, mat, x, y, z);
+}
+function cyl(G, r0, r1, len, seg, mat, x, y, z, rx, ry, rz){ return part(G, new THREE.CylinderGeometry(r0, r1, len, seg || 10, 1), mat, x, y, z, rx, ry, rz); }
+function rod(G, A, B, r, mat){ const d = B.clone().sub(A), L = d.length(); const m = cyl(G, r, r, L, 6, mat); m.position.copy(A).addScaledVector(d, .5); m.quaternion.setFromUnitVectors(new V3(0, 1, 0), d.normalize()); return m; }
+function bell(G, r0, r1, len, mat, x, y, z){ const pts = [[.55*r0, 0], [r0, .12*len], [.8*r0, .32*len], [.6*r1, .7*len], [r1, len]].map(q => new THREE.Vector2(q[0], q[1]));
+  const g = new THREE.LatheGeometry(pts, 14); g.rotateX(Math.PI/2); return part(G, g, mat, x, y, z); }
+/* bloc RCS (cube + 3 buses) ; la démo anime les panaches par couple (buses radiales nx, ny) */
+function rcsPod(G, M, rcs, x, y, z, nx, ny, s){ box(G, s, s, s, M.mid, x, y, z);
+  [[nx, ny, 0], [0, 0, 1], [0, 0, -1]].forEach(n => { const c = cyl(G, .1*s*2.2, .22*s*2.2, .5*s, 6, M.noz); c.quaternion.setFromUnitVectors(new V3(0, -1, 0), new V3(n[0], n[1], n[2])); c.position.set(x + .72*s*n[0], y + .72*s*n[1], z + .72*s*n[2]); });
+  rcs.push({ x: x + s*nx*1.1, y: y + s*ny*1.1, z, nx, ny }); }
+
+/* ---------- panache de tuyère (torche bleue compacte, billboard le long de l'axe +Z) ---------- */
+const PLUME_V = `uniform float uLen; uniform float uRad; uniform float uThr; varying vec2 vU; varying float vEnd;
+void main(){ vec3 o = (modelMatrix*vec4(0.0, 0.0, 0.0, 1.0)).xyz; vec3 ax = (modelMatrix*vec4(0.0, 0.0, 1.0, 0.0)).xyz; float sc = length(ax); ax /= sc;
+  float L = uLen*(0.3 + 0.7*uThr)*sc; vec3 tc = normalize(cameraPosition - (o + ax*L*0.5)); vec3 sd = cross(ax, tc); float sl = length(sd); sd = sl > 1e-4 ? sd/sl : normalize(cross(ax, vec3(0.0, 1.0, 0.0)));
+  vU = vec2(uv.x*2.0 - 1.0, uv.y); vEnd = abs(dot(ax, normalize(cameraPosition - o)));
+  vec3 wp = o + ax*(uv.y*L) + sd*((uv.x*2.0 - 1.0)*uRad*sc); gl_Position = projectionMatrix*viewMatrix*vec4(wp, 1.0); }`;
+const PLUME_F = `precision highp float; uniform float uThr; uniform float uTime; uniform float uSeed; varying vec2 vU; varying float vEnd;
+void main(){ float z = vU.y, x = vU.x; float w = mix(0.22, 0.5, z); float a = x/w; float core = exp(-a*a*3.0)*exp(-z*2.4); float sh = exp(-a*a)*exp(-z*1.3);
+  float fl = 0.9 + 0.1*sin(uTime*37.0 + uSeed*11.0);
+  vec3 col = (vec3(0.9, 0.96, 1.0)*core*1.6 + vec3(0.3, 0.55, 1.0)*sh*0.6)*uThr*fl*(1.0 - smoothstep(0.6, 1.0, z))*(1.0 - smoothstep(0.85, 0.99, vEnd));
+  gl_FragColor = vec4(vec3(1.0) - exp(-col*1.3), 1.0); }`;
+CR.TIME = { value: 0 };
+function plume(G, thr, x, y, z, r, len, seed){
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).translate(.5, .5, 0), new THREE.ShaderMaterial({ uniforms: { uLen: { value: len }, uRad: { value: r*1.6 }, uThr: thr, uTime: CR.TIME, uSeed: { value: seed } },
+    vertexShader: PLUME_V, fragmentShader: PLUME_F, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+  m.position.set(x, y, z); m.frustumCulled = false; m.renderOrder = ORDER + 3; m.userData.noFrame = true; m.userData.keep = true; G.add(m); return m;
+}
+/* ---------- feux (sprites additifs) ---------- */
+function glowMat(color){ return new THREE.SpriteMaterial({ map: (typeof glowTex !== 'undefined') ? glowTex : null, color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }); }
+function navLight(G, nav, color, x, y, z, size, period, duty, phase, peak){ const s = new THREE.Sprite(glowMat(color)); s.position.set(x, y, z); s.scale.setScalar(size); s.renderOrder = ORDER + 2; s.userData.noFrame = true; s.userData.keep = true; G.add(s);
+  nav.push({ mat: s.material, sprite: s, period, duty, phase, peak }); return s; }
+/* cône de projecteur (volume lumineux discret) */
+function lampCone(G, lamps, x, y, z, dir, len, ang){
+  const g = new THREE.ConeGeometry(Math.tan(ang)*len, len, 16, 1, true); g.translate(0, -len/2, 0);
+  const m = new THREE.Mesh(g, new THREE.ShaderMaterial({ uniforms: { uOn: { value: 0 } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    vertexShader: 'varying float vY; varying vec3 vN; varying vec3 vV; void main(){ vY = -position.y; vec4 mv = modelViewMatrix*vec4(position, 1.0); vN = normalize(normalMatrix*normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix*mv; }',
+    fragmentShader: `precision highp float; uniform float uOn; varying float vY; varying vec3 vN; varying vec3 vV; void main(){ float e = abs(dot(vN, vV)); float k = uOn*0.10*exp(-vY/${(len*.45).toFixed(2)})*pow(e, 1.5); gl_FragColor = vec4(vec3(1.0, 0.95, 0.85)*k, 1.0); }` }));
+  m.position.set(x, y, z); m.quaternion.setFromUnitVectors(new V3(0, -1, 0), dir.clone().normalize()); m.renderOrder = ORDER + 1; m.userData.noFrame = true; m.userData.keep = true; G.add(m);
+  lamps.push(m.material.uniforms.uOn); return m;
+}
+
+/* ---------- fusion par matériau ---------- */
+function merge(G){
+  const groups = new Map();
+  G.children.slice().forEach(m => { if(!m.isMesh || m.userData.keep) return; const k = m.material; if(!groups.has(k)) groups.set(k, []); groups.get(k).push(m); });
+  groups.forEach((list, mat) => {
+    const pos = [], nor = [], uvs = [];
+    list.forEach(m => { m.updateMatrix(); const g = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone(); g.applyMatrix4(m.matrix);
+      pos.push(g.attributes.position.array); nor.push(g.attributes.normal.array); uvs.push(g.attributes.uv ? g.attributes.uv.array : new Float32Array(g.attributes.position.count*2)); g.dispose(); m.geometry.dispose(); G.remove(m); });
+    const cat = (arrs) => { const n = arrs.reduce((a, p) => a + p.length, 0), out = new Float32Array(n); let o = 0; arrs.forEach(p => { out.set(p, o); o += p.length; }); return out; };
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(cat(pos), 3)); g.setAttribute('normal', new THREE.BufferAttribute(cat(nor), 3)); g.setAttribute('uv', new THREE.BufferAttribute(cat(uvs), 2));
+    g.computeBoundingSphere(); const m = new THREE.Mesh(g, mat); m.renderOrder = ORDER; G.add(m);
+  });
+}
+
+/* =====================================================================
+   MODÈLES
+   ===================================================================== */
+const PAINT = { maint: [0xd9a21b, 0xd06a1c, 0xc9c24a], crew: [0xe4e7ea, 0xcfd4d9, 0x9aa3ad], drone: [0x3a3f47, 0x4b525c, 0x2d3238], lighter: [0x6b7a5a, 0x8a8f96, 0x5d6b78] };
+
+function buildMaint(G, M, o, R){   // navette de maintenance : cabine vitrée, soute d'équipement, bras, projecteurs (≈ 8,5 m)
+  const w = o.slim ? 2.5 : 3.3, h = 2.6;
+  prism(G, w*.86, h*.8, w, h, 3.2, .18, M.paint, 0, 0, -2.4);                    // cabine
+  prism(G, w, h, w*.96, h*.92, 3.8, .14, M.mid, 0, 0, 1.1);                        // soute d'équipement
+  box(G, w*1.02, .22, 3.6, M.hazard, 0, h*.47, 1.1);                                // bande de danger dorsale
+  box(G, w*.7, .5, 1.6, M.dark, 0, h*.5 + .25, .6);                                 // caisson de treuil
+  greeble(G, M, R, 12, -w*.35, w*.35, h*.46, -3.6, -1.0);
+  [-1, 1].forEach(s => { cyl(G, .42, .42, 3.2, 10, M.paint, s*(w/2 + .35), -.35, 1.2, Math.PI/2);   // réservoirs latéraux
+    box(G, .06, 1.3, 2.2, M.mid, s*(w/2 + .1), h*.25, 1.6);                         // radiateur
+    const sh = new V3(s*w*.3, -h*.42, -3.4), el = new V3(s*w*.42, -h*.7, -4.5), wr = new V3(s*w*.2, -h*.55, -5.4);   // bras manipulateur
+    rod(G, sh, el, .11, M.paint); rod(G, el, wr, .08, M.paint);
+    part(G, new THREE.SphereGeometry(.18, 8, 6), M.dark, sh.x, sh.y, sh.z); part(G, new THREE.SphereGeometry(.15, 8, 6), M.dark, el.x, el.y, el.z);
+    [-1, 1].forEach(k => rod(G, wr, wr.clone().add(new V3(k*.18, -.05, -.35)), .035, M.dark));
+    box(G, .38, .26, .3, M.dark, s*w*.32, h*.52, -3.3);                              // projecteur
+    box(G, .3, .2, .02, M.lamp, s*w*.32, h*.52, -3.46);
+  });
+  // tuyères arrière (4) et blocs RCS (4 coins)
+  const nz = []; [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(c => { const x = c[0]*w*.26, y = c[1]*h*.22; bell(G, .16, .3, .6, M.noz, x, y, 3.0); nz.push([x, y, 3.6]); });
+  [[-1, 1], [1, 1], [-1, -1], [1, -1]].forEach((c, i) => rcsPod(G, M, o.rcs, c[0]*(w/2 + .15), c[1]*(h/2 - .2), i < 2 ? -3.6 : 2.6, c[0], 0, .34));
+  box(G, w*.5, .06, .5, M.accent, 0, -h*.42, -3.9);                                 // feu bleu sous la cabine
+  box(G, .05, .5, 2.6, M.accent, w/2 + .01, .1, 1.1); box(G, .05, .5, 2.6, M.accent, -w/2 - .01, .1, 1.1);
+  return { len: 8.8, nozzles: nz, nozR: .3, windows: [
+    { kind: 'bridge', C: new V3(0, .15, -4.0 - .01), T: new V3(-1, 0, 0), N: new V3(0, 0, -1), w: w*.62, h: h*.42, D: 1.6, floor: .6 },
+    { kind: 'bridge', C: new V3(w*.462, .25, -2.6), T: new V3(0, 0, -1), N: new V3(1, 0, -.07).normalize(), w: 1.3, h: .8, D: 1.4, lift: .05 },
+    { kind: 'bridge', C: new V3(-w*.462, .25, -2.6), T: new V3(0, 0, 1), N: new V3(-1, 0, -.07).normalize(), w: 1.3, h: .8, D: 1.4, lift: .05 } ],
+    lamps: [[w*.32, h*.52, -3.5, new V3(0, -.35, -1)], [-w*.32, h*.52, -3.5, new V3(0, -.35, -1)]], navY: h*.5, navX: w/2 + .5, navZ: -2 };
+}
+function buildCrew(G, M, o, R){   // navette de transport court : nez effilé, cabine à hublots, ailerons radiateurs (≈ 16 m)
+  const w = 4.4, h = 3.8, L = 16;
+  prism(G, w*.45, h*.5, w*.92, h*.95, 4.2, .22, M.paint, 0, 0, -L/2 + 2.1, -.25, 0);            // nez
+  prism(G, w*.92, h*.95, w, h, 7.2, .2, M.paint, 0, 0, -L/2 + 7.8);                              // cabine
+  prism(G, w, h, w*.8, h*.78, 4.6, .18, M.mid, 0, 0, L/2 - 2.3);                                 // section propulsion
+  box(G, w*1.01, .12, 7.0, M.accent, 0, -h*.12, -L/2 + 7.8);                                      // liseré lumineux
+  greeble(G, M, R, 26, -w*.28, w*.28, h*.5 - .02, -L/2 + 4.8, L/2 - 1.5);
+  box(G, w*.6, .25, 2.2, M.dark, 0, h*.5 + .1, -L/2 + 8.5);                                       // collier d'amarrage dorsal
+  cyl(G, .9, .9, .5, 16, M.mid, 0, h*.5 + .35, -L/2 + 8.5);
+  // ailerons radiateurs en flèche (dorsaux) et ventraux, comme sur l'image
+  [-1, 1].forEach(s => {
+    const f = new THREE.Shape(); f.moveTo(0, 0); f.lineTo(3.2, 0); f.lineTo(4.4, 2.4); f.lineTo(2.6, 2.4); f.closePath();
+    const g = new THREE.ExtrudeGeometry(f, { depth: .12, bevelEnabled: false }); g.translate(0, 0, -.06); g.rotateY(Math.PI/2);
+    const m = part(G, g, M.mid, s*w*.28, h*.42, L/2 - 1.2); m.rotation.z = s*.35;
+    const g2 = new THREE.ExtrudeGeometry(f, { depth: .1, bevelEnabled: false }); g2.translate(0, 0, -.05); g2.rotateY(Math.PI/2); g2.scale(1, .6, .7);
+    const m2 = part(G, g2, M.dark, s*w*.3, -h*.42, L/2 - 1.2); m2.rotation.z = Math.PI - s*.5;
+    box(G, .16, 1.0, 3.4, M.dark, s*(w/2 + .08), -h*.3, L/2 - 3.2);                              // carénage de réservoir
+    rcsPod(G, M, o.rcs, s*(w/2 + .2), h*.25, -L/2 + 3.2, s, 0, .42); rcsPod(G, M, o.rcs, s*(w/2 + .1), h*.2, L/2 - 1.4, s, 0, .42);
+  });
+  rcsPod(G, M, o.rcs, 0, h/2 + .15, -L/2 + 2.6, 0, 1, .4); rcsPod(G, M, o.rcs, 0, -h/2 - .15, L/2 - 2, 0, -1, .4);
+  box(G, w*.7, h*.6, .3, M.dark, 0, 0, L/2 + .1);                                                 // plaque de poussée
+  const nz = []; [-1, 1].forEach(s => { bell(G, .32, .62, 1.3, M.noz, s*w*.2, 0, L/2 + .2); nz.push([s*w*.2, 0, L/2 + 1.5]); });
+  // hublots de la cabine (intérieurs simulés) et verrière du cockpit
+  const win = [];
+  [-1, 1].forEach(s => { for(let k = 0; k < 6; k++){ const z = -L/2 + 5.2 + k*1.05, t = (z - (-L/2 + 4.2))/7.2, hw = (.92 + .08*t)*w/2;
+    win.push({ kind: 'port', C: new V3(s*hw, .45, z), T: new V3(0, 0, -s), N: new V3(s, 0, -.024).normalize(), w: .52, D: 2.0, room: [-.9, .9, -1.4, 1.0], lift: .04 }); } });
+  const tn = .55, ytop = .7 + 1.105*tn;                                                            // pare-brise sur la pente du nez
+  win.push({ kind: 'bridge', C: new V3(0, ytop + .02, -L/2 + tn*4.2), T: new V3(-1, 0, 0), N: new V3(0, 1, -.263).normalize(), w: 1.5, h: 1.1, D: 1.6, floor: .6, lift: .04 });
+  return { len: L + 1.5, nozzles: nz, nozR: .62, windows: win, lamps: [[0, -h*.45, -L/2 + 1.2, new V3(0, -.3, -1)]], navY: h*.2, navX: w/2 + .15, navZ: -1 };
+}
+function buildDrone(G, M, o, R){   // drones : inspection (quadri-propulseur à tourelle), relais (antenne, panneaux), cargo (caisse)
+  const v = o.variant || 'inspect', nz = [];
+  if(v === 'inspect'){
+    part(G, new THREE.IcosahedronGeometry(.8, 0), M.paint, 0, 0, 0);
+    box(G, .5, .4, .6, M.dark, 0, -.6, -.35); box(G, .22, .22, .05, M.accent, 0, -.6, -.66);          // tourelle caméra
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(c => { const P = new V3(c[0]*1.1, .1, c[1]*1.0); rod(G, new V3(c[0]*.5, 0, c[1]*.45), P, .06, M.dark);
+      cyl(G, .18, .22, .4, 8, M.mid, P.x, P.y, P.z); rcsRadial(c); });
+    cyl(G, .95, .95, .06, 20, M.accent, 0, .12, 0);                                                 // anneau lumineux
+    nz.push([0, 0, .9]);
+    return { len: 2.4, nozzles: nz, nozR: .14, windows: [], lamps: [[0, -.6, -.7, new V3(0, -.2, -1)]], navY: .4, navX: 1.25, navZ: 0 };
+  }
+  if(v === 'relay'){
+    box(G, 1.1, .9, 1.6, M.paint, 0, 0, 0);
+    [-1, 1].forEach(s => { box(G, 2.6, .04, 1.1, M.accent, s*2.0, 0, .1); rod(G, new V3(s*.55, 0, .1), new V3(s*.8, 0, .1), .05, M.dark); });   // panneaux solaires bleutés
+    const dish = new THREE.SphereGeometry(.9, 14, 6, 0, Math.PI*2, 0, .55); dish.rotateX(-Math.PI/2);
+    part(G, dish, M.mid, 0, .3, -1.2); rod(G, new V3(0, .3, -.8), new V3(0, .3, -1.7), .03, M.dark);
+    bell(G, .08, .16, .3, M.noz, 0, 0, .8); nz.push([0, 0, 1.1]);
+    rcsRadial([1, 1]); rcsRadial([-1, -1]);
+    return { len: 3.4, nozzles: nz, nozR: .16, windows: [], lamps: [], navY: .5, navX: 3.3, navZ: .1 };
+  }
+  // cargo
+  const k = CARGO[Math.floor(R()*CARGO.length)]; if(!M.cargo[k]) M.cargo[k] = M.std(k, { map: PANEL, metalness: .25, roughness: .7 });
+  box(G, 1.6, 1.4, 2.2, M.cargo[k], 0, -.2, 0);
+  [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(c => { rod(G, new V3(c[0]*.85, .6, c[1]*1.15), new V3(c[0]*.85, -.95, c[1]*1.15), .05, M.dark); cyl(G, .16, .2, .35, 8, M.mid, c[0]*1.05, .65, c[1]*1.2); rcsRadial(c); });
+  box(G, 1.9, .12, 2.6, M.dark, 0, .62, 0); box(G, 1.6, .05, .1, M.accent, 0, .7, -1.3);
+  nz.push([0, .62, 1.4]);
+  return { len: 2.8, nozzles: nz, nozR: .14, windows: [], lamps: [], navY: .7, navX: 1.1, navZ: 0 };
+  function rcsRadial(c){ o.rcs.push({ x: c[0]*1.2, y: 0, z: (c[1] || 0)*1.0, nx: c[0], ny: 0 }); }
+}
+function buildLighter(G, M, o, R){   // gabare : cabine à l'avant, poutre en treillis, 1–2 conteneurs de 12 m, moteur (≈ 22–34 m)
+  const n = o.containers || (R() < .5 ? 1 : 2), Lc = 12.2, sp = 1.2, Ls = n*(Lc + .6) + 1.2, L = Ls + 7;
+  const z0 = -L/2 + 3.2;
+  prism(G, 2.6, 2.4, 3.4, 3.0, 3.2, .2, M.paint, 0, .4, z0 - 1.6 + .0);                            // cabine
+  box(G, 3.5, .3, 1.2, M.hazard, 0, -1.2, z0 - .4);
+  const zs = z0, ze = zs + Ls;
+  [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(c => box(G, .28, .28, Ls, M.dark, c[0]*sp*.55, c[1]*sp*.55 - 1.8, (zs + ze)/2));   // poutre sous les conteneurs
+  for(let k = 0; k <= n*3; k++){ const z = zs + k*Ls/(n*3); box(G, sp*1.2, .18, .18, M.dark, 0, -1.8 + sp*.55, z); box(G, sp*1.2, .18, .18, M.dark, 0, -1.8 - sp*.55, z); }
+  for(let i = 0; i < n; i++){
+    const k = CARGO[Math.floor(R()*CARGO.length)]; if(!M.cargo[k]) M.cargo[k] = M.std(k, { map: PANEL, metalness: .25, roughness: .7 });
+    const zc = zs + .6 + i*(Lc + .6) + Lc/2;
+    box(G, 2.5, 2.6, Lc, M.cargo[k], 0, .1, zc);
+    [-1, 1].forEach(e => box(G, 2.62, 2.72, .18, M.dark, 0, .1, zc + e*Lc*.47));                      // cadres d'extrémité
+    [-1, 1].forEach(s => box(G, .22, .5, .5, M.hazard, s*1.35, -1.25, zc));                            // verrous
+  }
+  prism(G, 2.4, 2.2, 2.0, 1.8, 3.4, .2, M.mid, 0, -.4, ze + 1.7);                                     // section propulsion
+  const nz = []; bell(G, .5, .9, 1.6, M.noz, 0, -.4, ze + 3.4); nz.push([0, -.4, ze + 5.0]);
+  [-1, 1].forEach(s => { rcsPod(G, M, o.rcs, s*1.9, .4, z0 - 1.6, s, 0, .38); rcsPod(G, M, o.rcs, s*1.5, -.4, ze + 2.4, s, 0, .38); box(G, .05, .1, Ls*.9, M.accent, s*(sp*.66 + .05), -1.8, (zs + ze)/2); });
+  const win = [{ kind: 'bridge', C: new V3(0, .75, z0 - 3.21), T: new V3(-1, 0, 0), N: new V3(0, 0, -1), w: 2.0, h: .9, D: 2.4, floor: .8 },
+    { kind: 'bridge', C: new V3(1.49, .8, z0 - 1.7), T: new V3(0, 0, -1), N: new V3(1, 0, -.125).normalize(), w: 1.4, h: .7, D: 1.8, lift: .05 },
+    { kind: 'bridge', C: new V3(-1.49, .8, z0 - 1.7), T: new V3(0, 0, 1), N: new V3(-1, 0, -.125).normalize(), w: 1.4, h: .7, D: 1.8, lift: .05 }];
+  return { len: L + 2, nozzles: nz, nozR: .9, windows: win, lamps: [[0, -1.2, z0 - 3.0, new V3(0, -.4, -1)]], navY: 1.7, navX: 1.9, navZ: z0 };
+}
+/* détails en relief (« greebles ») semés sur une face supérieure */
+function greeble(G, M, R, n, x0, x1, y, z0, z1){
+  for(let i = 0; i < n; i++){ const a = .15 + .45*R(), b = .15 + .6*R(), hh = .06 + .22*R();
+    box(G, a, hh, b, R() < .6 ? M.dark : M.mid, x0 + (x1 - x0)*R(), y + hh/2, z0 + (z1 - z0)*R()); }
+}
+const BUILDERS = { maint: buildMaint, crew: buildCrew, drone: buildDrone, lighter: buildLighter };
+CR.NAMES = { maint: 'Maintenance tender', crew: 'Crew shuttle', lighter: 'Container lighter', drone: { inspect: 'Inspection drone', relay: 'Relay drone', cargo: 'Cargo drone' } };
+
+CR.build = function(kind, opts){
+  opts = opts || {};
+  let s = ((opts.seed || 1) >>> 0) || 1; const R = () => ((s = (s*16807) % 2147483647) - 1)/2147483646;
+  const G = new THREE.Group();
+  const bay = { uBayP: { value: new THREE.Vector4(0, 0, 0, 1e6) }, uBayOn: { value: 0 }, uBayCol: { value: new THREE.Color(.05, .16, .42) } };
+  const pal = PAINT[kind] || PAINT.crew, paint = opts.paint || pal[Math.floor(R()*pal.length)];
+  const M = mats(bay, paint, opts.accent);
+  const o = { rcs: [], variant: opts.variant, slim: opts.slim, containers: opts.containers };
+  const spec = BUILDERS[kind](G, M, o, R);
+  const thr = { value: 0 };
+  spec.nozzles.forEach((p, i) => plume(G, thr, p[0], p[1], p[2], spec.nozR, spec.len*(kind === 'drone' ? .6 : .9), i + R()*9));
+  const nav = [], lamps = [];
+  navLight(G, nav, 0xff3030, -spec.navX, spec.navY, spec.navZ, spec.len*.07 + .25, 1.6, .5, 0, .9);
+  navLight(G, nav, 0x30ff60, spec.navX, spec.navY, spec.navZ, spec.len*.07 + .25, 1.6, .5, 0, .9);
+  navLight(G, nav, 0xffffff, 0, spec.navY*.6, spec.len*.42, spec.len*.1 + .4, 1.3, .08, R(), 1);
+  if(kind === 'drone') navLight(G, nav, 0x5aa8ff, 0, spec.navY, 0, .9, .9, .35, R(), .9);
+  (spec.lamps || []).forEach(l => lampCone(G, lamps, l[0], l[1], l[2], l[3], kind === 'maint' ? 14 : 9, .28));
+  merge(G);
+  if(spec.windows.length && window.__SHIPGLASS){ const gm = __SHIPGLASS.addWindows(G, spec.windows, opts.age || 0, s); gm.renderOrder = ORDER; }
+  if(window.__SHIPWEAR) __SHIPWEAR.apply(G, opts.age || 0, s, 1);                     // v7.1 : aussi neuf (micro-relief des gros plans)
+  G.traverse(m => { if(m.isMesh && m.renderOrder < ORDER) m.renderOrder = ORDER; });
+  const box3 = new THREE.Box3(); G.traverse(m => { if(m.isMesh && !m.userData.noFrame){ m.geometry.computeBoundingBox(); box3.union(m.geometry.boundingBox.clone().applyMatrix4(m.matrix)); } });
+  return { group: G, kind, variant: o.variant || null, name: kind === 'drone' ? CR.NAMES.drone[o.variant || 'inspect'] : CR.NAMES[kind], len: spec.len, box: box3,
+    rcs: o.rcs, rcsLen: Math.max(1.2, spec.len*.18), nav, lamps, thr, bay,
+    dispose(){ G.traverse(m => { if(m.geometry) m.geometry.dispose(); if(m.material){ (Array.isArray(m.material) ? m.material : [m.material]).forEach(x => x.dispose()); } }); G.parent && G.parent.remove(G); } };
 };
 })();
 
@@ -7723,8 +8023,45 @@ function arrival(leg, target){
   return { target: target, pos: Cp.clone().addScaledVector(dir, dA), dA: dA };
 }
 
+/* ---------- séquence de titre : un système construit et animé SANS vaisseau (caméra seule) ---------- */
+R.titleActive = false;
+R.titleEnter = function(g){
+  if(R.leg){ disposeSystem(R.leg); R.leg = null; }
+  const leg = buildSystem(localLeg(g));
+  R.leg = leg; R.hideCell = leg.cell; R.galPos.copy(leg.gal); R.titleActive = true;
+  if(ROUTE.gates) ROUTE.gates.visible = false;
+  return leg;
+};
+R.titleExit = function(){
+  R.titleActive = false; R.galOverride = null;
+  if(R.leg && !R.started){ disposeSystem(R.leg); R.leg = null; }
+  LAYERS.sysWorld.visible = true;
+};
+const _tSun = new V3(), _tWhite = new THREE.Color(1, 1, 1), _tBuf = new THREE.Vector2();
+R.titleUpdate = function(dt){
+  const leg = R.leg; if(!leg) return;
+  R.T += dt; R.cloudT += dt;
+  camera.updateMatrixWorld();
+  if(R.galOverride) R.galPos.copy(R.galOverride); else R.galPos.copy(leg.gal).addScaledVector(camera.position, 1/UNIT_GAL);
+  const g = R.galCam;
+  g.position.copy(R.galPos); g.quaternion.copy(camera.quaternion);
+  g.fov = camera.fov; g.aspect = camera.aspect; g.zoom = camera.zoom; g.near = .1; g.far = 6000;
+  g.updateProjectionMatrix(); g.updateMatrixWorld();
+  leg.planets.forEach(p => {
+    if(!p.mesh) return;
+    p.mesh.rotation.y += 2*Math.PI/p.dayLen*dt*40;            /* rotation propre accélérée ×40 : la surface vit à l'écran */
+    if(p.fx) window.__PLANETS.update(p, new V3(), leg.sunColor, R.T, camera.position, R.cloudT);
+    (p.moonPivots || []).forEach(m => m.rotation.y += (m.userData.n || 0)*dt*40);
+  });
+  if(leg.star3) leg.star3.lastOcc = window.__STARS.update(leg.star3, R.T, dt, camera, bodiesOf(leg));
+  window.__PLANETS.setPixelAngle(camera.fov, renderer.getDrawingBufferSize(_tBuf).y);
+  _tSun.copy(camera.position).negate().normalize();
+  starLight.position.copy(_tSun); starLight.target.position.set(0, 0, 0); starLight.target.updateMatrixWorld();
+  starLight.color.copy(leg.sunColor).lerp(_tWhite, .45); starLight.intensity = 1.65;
+};
 R.enterSystem = function(gameLeg){
   if(!gameLeg) return;
+  if(R.titleActive){ R.titleActive = false; R.galOverride = null; LAYERS.sysWorld.visible = true; }   /* fin de la séquence de titre */
   if(R.leg){ disposeSystem(R.leg); R.leg = null; }
   if(R.corridor){ R.corridor.children.forEach(c => { c.geometry.dispose(); c.material.dispose(); }); LAYERS.detach(R.corridor); R.corridor = null; }
   const leg = buildSystem(localLeg(gameLeg));
@@ -7790,7 +8127,7 @@ R.update = function(dt){
 /* occupation des tranches (sliceUnits de cine.js) : seules les tranches traversées par un objet sont rendues */
 LAYERS.units = function(){
   const out = [], leg = R.leg;
-  if(!R.started || !leg) return null;
+  if(!(R.started || R.titleActive) || !leg) return null;
   out.push([shipRig.position, SHIP_GAME_LEN*1.6]);
   out.push([camera.position, 7e5]);   /* L2.3 : couche vaisseau (couloir, navettes) = tranches d'échelle 1, jusqu'à 800 km */
   leg.planets.forEach(p => { out.push([p.position, p.radius*(p.hasRings ? 3.4 : 1.12)]);
@@ -8261,7 +8598,7 @@ R.radialUp = function(){ return shipRig.position.clone().sub(orbitState.center).
 return R;
 })();
 /* position galactique courante (unités du jeu) : le vaisseau en v2.16, l'étoile visitée à l'échelle réelle */
-function galPosition(){ return (REAL.active && REAL.started) ? REAL.galPos : shipRig.position; }
+function galPosition(){ return (REAL.active && (REAL.started || REAL.titleActive)) ? REAL.galPos : shipRig.position; }
 
 /* =========================================================================
    L3 — COMMERCE LOCAL (lot 3, fusion de la démo v7.2.2)
@@ -9032,25 +9369,49 @@ function pickShot(){
 }
 /* ---------- plans des navettes (escale) ---------- */
 function shuttleLen(){ return 8*(REAL.shipScale ? REAL.shipScale() : 1); }
+function hullLen(group){
+  const bx = new THREE.Box3(); group.updateMatrixWorld(true);
+  group.traverse(o => { if(o.isMesh && !o.isSprite && o.geometry){ o.geometry.computeBoundingBox(); bx.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld)); } });
+  return bx.isEmpty() ? shuttleLen() : Math.max(3, bx.getSize(new V3()).length()*.8);
+}
 function loadShot(L){
-  const s = Math.random() < .5 ? -1 : 1;
-  return { type: 'shuttleLoad', dur: 3.4, t: 0, h: Math.random(), eval: k => { const A = window.shipDockAnchor ? window.shipDockAnchor.getWorldPosition(new V3()) : shipRig.position.clone(), a = axes(), sl = shuttleLen();
-    const C = L.container ? L.container.getWorldPosition(new V3()) : A;
-    return { pos: A.clone().addScaledVector(a.up, -4.5*sl).addScaledVector(a.rt, s*3.2*sl).addScaledVector(a.fw, -(1.2 + .6*k)*sl), look: C, up: a.up, fov: 40 }; } };
+  const s = Math.random() < .5 ? -1 : 1, len = L.shuttle ? hullLen(L.shuttle.group) : shuttleLen();   /* longueur réelle de la navette */
+  return { type: 'shuttleLoad', dur: 3.4, t: 0, h: Math.random(), ship: true, eval: k => { const A = window.shipDockAnchor ? window.shipDockAnchor.getWorldPosition(new V3()) : shipRig.position.clone(), a = axes(), sl = len;
+    /* point visé pris sur les ancres DU VAISSEAU (à jour) : avant la saisie et après la pose, conteneur et navette sont
+       replacés contre le dock plus tard dans l'image — leur position du moment a une image de retard, ≈ 330 m en orbite */
+    let C = A;
+    if(!L.grabbed && window.shipCargoStageAnchor) C = window.shipCargoStageAnchor.getWorldPosition(new V3());
+    else if(L.grabbed && !L.released && L.container) C = L.container.getWorldPosition(new V3());   /* sur la pince : suit le vaisseau */
+    /* lot N : plan resserré sur la navette et le point de dépose (≈ 2 longueurs de navette) — l'ancien cadrage,
+       prévu pour la petite navette d'origine, montrait tout le vaisseau et rendait la manœuvre du bras illisible */
+    const Sp = L.shuttle ? L.shuttle.group.getWorldPosition(new V3()) : A, mid = Sp.clone().lerp(C, .5);
+    return { pos: mid.clone().addScaledVector(a.up, -1.1*sl).addScaledVector(a.rt, s*2.1*sl).addScaledVector(a.fw, -(.9 + .35*k)*sl), look: mid, up: a.up, fov: 44 }; } };
 }
 function followShot(sh){
-  const s = Math.random() < .5 ? -1 : 1; let prev = null, dir = null;
+  const s = Math.random() < .5 ? -1 : 1;
   /* longueur réelle de la navette (boîte englobante) : l'estimation d'après la taille du vaisseau la surévaluait ×3 */
   const bx = new THREE.Box3(); sh.group.updateMatrixWorld(true);
   sh.group.traverse(o => { if(o.isMesh && !o.isSprite && o.geometry){ o.geometry.computeBoundingBox(); bx.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld)); } });   /* coque seule : la lueur du moteur (sprite) gonflait la mesure */
   const len = Math.max(3, bx.isEmpty() ? 8 : bx.getSize(new V3()).length()*.8);
-  return { type: 'shuttleFollow', dur: 4.2, t: 0, h: Math.random(), eval: k => { const P0 = sh.group.getWorldPosition(new V3()), sl = len;
-    /* la navette (~30 km/s) est déplacée APRÈS ce calcul dans l'image : sa position est extrapolée d'une image,
-       sinon la caméra viserait toujours l'image précédente et la perdrait (≈ 1 km de retard mesuré) */
-    const step = prev ? P0.clone().sub(prev) : new V3(), P = P0.clone().add(step);
-    if(prev && step.lengthSq() > 1e-6){ const d = step.clone().normalize(); dir = dir ? dir.lerp(d, .2).normalize() : d; }
-    prev = P0.clone();
-    const C = orbitState.center || new V3(), up = P.clone().sub(C).normalize(), fw = dir || C.clone().sub(P).normalize(), rt = new V3().crossVectors(fw, up).normalize();
+  let fwS = null, fwH = null;                             /* cap de la caméra, lissé (τ = 0,7 s) ; dernier cap horizontal valable */
+  return { type: 'shuttleFollow', dur: 4.2, t: 0, h: Math.random(), eval: (k, dt) => { const P0 = sh.group.getWorldPosition(new V3()), sl = len;
+    /* position de l'image EN COURS : les navettes sont désormais mises à jour avant les caméras (boucle, module 41) —
+       l'ancienne extrapolation d'une image ne tenait qu'à cadence régulière et faisait trembler le plan en jeu */
+    const P = P0;
+    /* repère de la NAVETTE (son attitude, lissée) — le déplacement, lui, mélange la vitesse orbitale (~8 km/s) au trajet
+       vers le port et faisait tourner le plan dans tous les sens */
+    const C = orbitState.center || new V3(), up = P.clone().sub(C).normalize();
+    /* la caméra SUIT le cap de la navette avec un retard lissé au lieu d'y être rivée : quand la navette pivote de
+       l'attitude du vaisseau vers sa route, un repère rigide faisait basculer tout le décor (7,5 rad/s mesurés) */
+    const fwN = new V3(0, 0, -1).applyQuaternion(sh.group.quaternion);
+    fwS = fwS ? fwS.lerp(fwN, 1 - Math.exp(-(dt || 0)/.7)).normalize() : fwN.clone();
+    /* navette plongeant presque à la verticale vers le port : son cap horizontal devient minuscule et instable — on
+       garde alors le dernier cap horizontal valable (ramené dans le plan horizontal local) */
+    const h = fwS.clone().addScaledVector(up, -fwS.dot(up));
+    if(h.lengthSq() > .0625 || !fwH) fwH = h.lengthSq() > 1e-8 ? h.normalize() : new V3(1, 0, 0).applyQuaternion(shipRig.quaternion);
+    else fwH.addScaledVector(up, -fwH.dot(up)).normalize();
+    const fw = fwH.clone();
+    let rt = new V3().crossVectors(fw, up); if(rt.lengthSq() < 1e-4) rt = new V3(1, 0, 0).applyQuaternion(shipRig.quaternion); rt.normalize();
     return { pos: P.clone().addScaledVector(rt, s*2.8*sl).addScaledVector(up, .7*sl).addScaledVector(fw, -(1.1 - .9*k)*sl), look: P.clone().addScaledVector(fw, .35*sl), up: up, fov: 44 }; } };
 }
 function blocked(){
@@ -9072,7 +9433,7 @@ function setDof(shot, dt){
 }
 function apply(shot, dt){
   shot.t += dt;
-  const c = shot.eval(clamp(shot.t/shot.dur, 0, 1)), pos = shot.ship ? outside(c.pos) : c.pos;
+  const c = shot.eval(clamp(shot.t/shot.dur, 0, 1), dt), pos = shot.ship ? outside(c.pos) : c.pos;
   if(S.baseFov === null) S.baseFov = camera.fov;
   if(camera.fov !== c.fov){ camera.fov = c.fov; camera.updateProjectionMatrix(); }
   camera.position.copy(pos); camera.up.copy(c.up); camera.lookAt(c.look); camera.updateMatrixWorld();
@@ -9103,6 +9464,343 @@ function update(dt){
   } else if(S.shot || S.baseFov !== null){ release(); }
 }
 return { update, dof, state: S, SHOTS, pickShot };
+})();
+
+/* =========================================================================
+   NAVETTE-CARGO ET CONTENEUR ISO 20' (lot N — refonte de la navette, choix P2)
+   - Conteneur ISO 20' réel : 6,058 × 2,438 × 2,591 m ; tôle ondulée, rails, pièces de coin, portes à
+     barres de verrouillage, code propriétaire (texture générée, une par combinaison couleur/code) ;
+     couleur d'armateur tirée par graine. Un seul maillage (6 faces texturées).
+   - Navette-cargo : corps de la navette de transport de la démo (smallcraft.js, 17,5 m : cockpit,
+     hublots, ailerons radiateurs, 2 tuyères à torche, RCS, feux, usure) + BERCEAU DORSAL à 4 pinces.
+     Dorsal et non ventral (rendu de principe) : pendant le chargement, la navette attend sous le module
+     d'amarrage et le bras descend le conteneur depuis la soute — il le pose donc sur son dos.
+   - Même interface que l'ancienne navette (group, glow, clampGroup, navLights, trail, hasCargo) : le
+     chargement, le vol et les plans de caméra existants s'en servent sans autre changement.
+   - Module d'amarrage dimensionné pour le conteneur ISO (DOCK_SCALE m par unité d'origine) au lieu de la
+     taille du vaisseau : le conteneur passe la porte de la soute quel que soit le modèle.
+   ========================================================================= */
+const CARGO = (function(){
+const V3 = THREE.Vector3;
+const ISO = { L: 6.058, W: 2.438, H: 2.591 };
+const DOCK_SCALE = ISO.L/1.2;                                  /* le module d'origine était dessiné pour un conteneur de 1,2 u */
+const COLORS = ['#9c3b2a', '#2f5d8c', '#3f7a4a', '#d9822b', '#7d8691', '#d8d6cc', '#5b3f7a', '#b8a032'];
+const OWNERS = ['STTU', 'MCGU', 'VYGU', 'ORNU', 'KSLU', 'ASTU'];
+const cache = {};
+function rng(seed){ let s = (seed >>> 0) || 1; return () => { s = (s*16807) % 2147483647; return s/2147483647; }; }
+function shade(hex, k){ const n = parseInt(hex.slice(1), 16), c = [n >> 16, n >> 8 & 255, n & 255].map(v => Math.max(0, Math.min(255, Math.round(v*k)))); return 'rgb(' + c.join(',') + ')'; }
+function tex(key, w, h, draw){ if(cache[key]) return cache[key]; const cv = document.createElement('canvas'); cv.width = w; cv.height = h; draw(cv.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(cv); t.anisotropy = 4; if(renderer && renderer.outputEncoding !== undefined) t.encoding = THREE.sRGBEncoding; cache[key] = t; return t; }
+/* flanc : ondulations verticales, rails haut/bas, pièces de coin, salissures, code propriétaire */
+function sideTex(col, code, big, r){
+  return tex('s' + col + code + big, 1024, 448, (g, w, h) => {
+    g.fillStyle = col; g.fillRect(0, 0, w, h);
+    for(let x = 0; x < w; x += 16){ g.fillStyle = shade(col, 1.14); g.fillRect(x, 0, 6, h); g.fillStyle = shade(col, .8); g.fillRect(x + 9, 0, 5, h); }
+    g.fillStyle = shade(col, .62); g.fillRect(0, 0, w, 22); g.fillRect(0, h - 26, w, 26);
+    g.fillStyle = '#2b2b2b'; [[0, 0], [w - 44, 0], [0, h - 44], [w - 44, h - 44]].forEach(([x, y]) => g.fillRect(x, y, 44, 44));
+    for(let i = 0; i < 26; i++){ g.fillStyle = 'rgba(70,40,20,' + (.05 + .12*r()) + ')'; const x = r()*w, y = r()*h; g.fillRect(x, y, 6 + 40*r(), 2 + 90*r()); }
+    if(big){ g.fillStyle = 'rgba(255,255,255,.88)'; g.font = 'bold 54px JetBrains Mono, monospace'; g.fillText(big, 70, 120); }
+    g.fillStyle = 'rgba(255,255,255,.85)'; g.font = 'bold 26px JetBrains Mono, monospace'; g.fillText(code, w - 320, 76);
+    g.font = '18px JetBrains Mono, monospace'; g.fillText('22G1 · MAX 30 480 KG', w - 320, 104);
+  });
+}
+function endTex(col, door){
+  return tex('e' + col + door, 256, 272, (g, w, h) => {
+    g.fillStyle = col; g.fillRect(0, 0, w, h);
+    g.fillStyle = shade(col, .62); g.fillRect(0, 0, w, 18); g.fillRect(0, h - 18, w, 18); g.fillRect(0, 0, 16, h); g.fillRect(w - 16, 0, 16, h);
+    g.fillStyle = '#2b2b2b'; [[0, 0], [w - 30, 0], [0, h - 30], [w - 30, h - 30]].forEach(([x, y]) => g.fillRect(x, y, 30, 30));
+    if(door){ g.fillStyle = shade(col, .5); g.fillRect(w/2 - 2, 18, 4, h - 36);
+      [.16, .36, .64, .84].forEach(k => { g.fillStyle = '#c8c8c0'; g.fillRect(k*w - 4, 22, 8, h - 44); g.fillStyle = '#6b6b66'; g.fillRect(k*w - 10, h*.5 - 6, 20, 12); }); }
+  });
+}
+function topTex(col){ return tex('t' + col, 256, 512, (g, w, h) => { g.fillStyle = shade(col, .9); g.fillRect(0, 0, w, h); for(let y = 0; y < h; y += 24){ g.fillStyle = shade(col, .78); g.fillRect(0, y, w, 8); } }); }
+function buildIsoContainer(seed){
+  const r = rng(seed || 7), col = COLORS[Math.floor(r()*COLORS.length)], own = OWNERS[Math.floor(r()*OWNERS.length)];
+  const num = String(Math.floor(r()*900000) + 100000), code = own + ' ' + num + ' ' + Math.floor(r()*10), big = r() < .5 ? own.slice(0, 3) : '';
+  const std = (map) => new THREE.MeshStandardMaterial({ map: map, metalness: .35, roughness: .62 });
+  const side = std(sideTex(col, code, big, r));
+  const mats = [side, side, std(topTex(col)), std(topTex(col)), std(endTex(col, true)), std(endTex(col, false))];   /* +x −x +y −y +z(portes) −z */
+  const m = new THREE.Mesh(new THREE.BoxGeometry(ISO.W, ISO.H, ISO.L), mats);
+  const g = new THREE.Group(); g.add(m); g.userData.iso = true; g.userData.code = code;
+  return g;
+}
+/* traînée (identique à l'ancienne navette : polyligne en coordonnées monde, fondu par assombrissement) */
+function buildTrail(){
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(SHUTTLE_TRAIL_LEN*3), 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(SHUTTLE_TRAIL_LEN*3), 3));
+  const tr = new THREE.Line(geo, new THREE.LineBasicMaterial({ vertexColors: true, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: .85 }));
+  tr.frustumCulled = false; return tr;
+}
+function buildCargoShuttle(seed){
+  const c = window.__CRAFT.build('crew', { age: typeof SHIP_WEAR !== 'undefined' ? SHIP_WEAR.age : .1, seed: seed || 1 });
+  if(c.thr) c.thr.value = .15;
+  const g = new THREE.Group(); g.add(c.group);
+  const b = c.box.clone(), top = b.max.y, zc = (b.min.z + b.max.z)/2 + .4;
+  /* berceau dorsal : deux rails et quatre pinces */
+  const mDark = new THREE.MeshStandardMaterial({ color: 0x3b4252, metalness: .6, roughness: .45 });
+  const mAmb = new THREE.MeshStandardMaterial({ color: 0x2a1c08, emissive: 0xffb454, emissiveIntensity: .8 });
+  [-1, 1].forEach(sx => { const rail = new THREE.Mesh(new THREE.BoxGeometry(.28, .3, ISO.L + .6), mDark); rail.position.set(sx*(ISO.W/2 - .3), top + .15, zc); g.add(rail);
+    [-1, 1].forEach(sz => { const cl = new THREE.Mesh(new THREE.BoxGeometry(.34, .75, .34), mDark); cl.position.set(sx*(ISO.W/2 + .12), top + .45, zc + sz*(ISO.L/2 - .35)); g.add(cl);
+      const led = new THREE.Mesh(new THREE.BoxGeometry(.12, .12, .12), mAmb); led.position.set(sx*(ISO.W/2 + .12), top + .86, zc + sz*(ISO.L/2 - .35)); g.add(led); }); });
+  const clampGroup = new THREE.Group(); clampGroup.position.set(0, top + .3 + ISO.H/2, zc); g.add(clampGroup);
+  /* lueur de propulsion à l'arrière (utilisée par le vol : fondu à l'arrivée) */
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0x9fd4ff, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: 1 }));
+  glow.position.set(0, (b.min.y + b.max.y)/2, b.max.z + .8); glow.scale.setScalar(3.2); g.add(glow);
+  return { group: g, glow: glow, clampGroup: clampGroup, navLights: c.nav || [], hasCargo: false, trail: buildTrail(), craft: c,
+           engineBack: b.max.z + .8, len: b.max.z - b.min.z };
+}
+/* points de saisie et de dépose de la pince, dans le repère du vaisseau (une fois par chargement) :
+   le conteneur attend EXACTEMENT où la pince le saisit, la navette se place EXACTEMENT où elle le dépose */
+const _q = new THREE.Quaternion();
+function armPoints(){
+  if(!window.shipArm) return null;
+  const grip = () => { shipRig.updateMatrixWorld(true); return window.shipArm.gripper.localToWorld(new V3(0, 0, .25)); };
+  applyArmPose(ARM_POSE_REACH); const pR = grip(); applyArmPose(ARM_POSE_PLACE); const pP = grip(); applyArmPose(ARM_POSE_REST); shipRig.updateMatrixWorld(true);
+  _q.copy(shipRig.quaternion).invert();
+  return { stage: pR.sub(shipRig.position).applyQuaternion(_q), place: pP.sub(shipRig.position).applyQuaternion(_q) };
+}
+function shipPoint(local){ return local.clone().applyQuaternion(shipRig.quaternion).add(shipRig.position); }
+return { ISO, DOCK_SCALE, buildIsoContainer, buildCargoShuttle, armPoints, shipPoint };
+})();
+
+/* =========================================================================
+   SÉQUENCE DE TITRE — plans-séquences dans des systèmes réels
+   Remplace l'ancienne cinématique (ciel en unités compressées, sans système). Un plan-séquence continu
+   par système, les systèmes les plus spectaculaires du voisinage s'enchaînant en boucle :
+   - choix : tous les systèmes à ≤ 2 cellules du point de départ sont notés d'après leurs données
+     (REAL.systemInfo, sans rien construire) — anneaux, lunes, planète habitable, géantes, étoile
+     bleue ou géante ; les 4 meilleurs sont visités de proche en proche, en boucle ;
+   - dans chaque système (~30 s) : approche de l'étoile (couronne, éruptions), puis les 2 plus belles
+     planètes — avec une lune : on longe la planète côté jour puis on glisse vers la lune, la planète
+     passant derrière elle ; sans lune : arc lent du jour vers le terminateur ; transits doux
+     (distance interpolée en échelle logarithmique), jamais à travers un astre ;
+   - d'un système à l'autre : FONDU AU NOIR (0,8 s + 0,25 s de noir + 0,8 s) ; le système suivant est
+     construit pendant le noir, sa prise commence pendant la remontée du fondu (la caméra bouge déjà) ;
+   - le titre et ses boutons restent par-dessus ; le jeu démarre comme avant (TITLE.stop).
+   ========================================================================= */
+const TITLE = (function(){
+const V3 = THREE.Vector3, Q = THREE.Quaternion;
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const smooth = x => { x = clamp(x, 0, 1); return x*x*(3 - 2*x); };
+const smoother = x => { x = clamp(x, 0, 1); return x*x*x*(x*(6*x - 15) + 10); };
+const T = { STAR: 5, PLANET: 7, EXIT: 2.4, FADE: .8, BLACK: .25 };
+const S = { on: false, list: [], idx: 0, segs: [], i: 0, t: 0, leg: null, fade: null, veil: null, chunk: 0, lookQ: new Q(), started: false };
+const _m4 = new THREE.Matrix4();
+/* interpolation d'orientation SANS « plus court chemin » à chaque image : près d'un demi-tour, le plus court chemin
+   change de côté d'une image à l'autre (saut mesuré à 53 rad/s) ; le côté est choisi au départ du segment, puis la
+   cible est maintenue dans le même hémisphère que l'image précédente (continuité) */
+function steadySlerp(seg, qa, qb, t){
+  if(!seg.qbPrev){ if(qa.dot(qb) < 0) qb.set(-qb.x, -qb.y, -qb.z, -qb.w); }
+  else if(qb.dot(seg.qbPrev) < 0) qb.set(-qb.x, -qb.y, -qb.z, -qb.w);
+  seg.qbPrev = qb.clone();
+  const c = clamp(qa.dot(qb), -1, 1), th = Math.acos(c);
+  if(th < 1e-5) return qa.clone();
+  const sn = Math.sin(th), a = Math.sin((1 - t)*th)/sn, b = Math.sin(t*th)/sn;
+  return new Q(qa.x*a + qb.x*b, qa.y*a + qb.y*b, qa.z*a + qb.z*b, qa.w*a + qb.w*b).normalize();
+}
+function lookQ(pos, target, up){
+  const d = target.clone().sub(pos).normalize(); let u = (up || new V3(0, 1, 0)).clone();
+  if(Math.abs(u.dot(d)) > .985) u = Math.abs(d.y) < .9 ? new V3(0, 1, 0) : new V3(1, 0, 0);   /* visée presque selon le « haut » : repère de secours */
+  _m4.lookAt(pos, target, u); return new Q().setFromRotationMatrix(_m4);
+}
+
+/* ---------- choix des systèmes ---------- */
+function scoreSystem(info){
+  if(!info || !info.planets.length) return -1;
+  let s = 0;
+  info.planets.forEach(p => { s += (p.rings ? 3 : 0) + Math.min(p.moons, 3)*1.2 + (p.gas ? .8 : 0) + (p.hab ? 2 : 0) + (p.kind === 'ocean' || p.kind === 'continental' ? .6 : 0); });
+  if(info.temp > 9000) s += 2; else if(info.temp < 3800) s += .6;
+  if(/I/.test(String(info.lumLabel || '')) && !/V/.test(String(info.lumLabel || ''))) s += 2;   /* géante / supergéante */
+  if(info.planets.length >= 3) s += 1;
+  return s;
+}
+function pickSystems(){
+  const out = [];
+  for(let x = -2; x <= 2; x++) for(let y = -2; y <= 2; y++) for(let z = -2; z <= 2; z++){
+    const sd = starDataForCell(x, y, z); if(!sd) continue;
+    const info = REAL.systemInfo(sd.cell); const sc = scoreSystem(info);
+    if(sc > 0) out.push({ sd: sd, info: info, score: sc });
+  }
+  out.sort((a, b) => b.score - a.score);
+  const top = out.slice(0, 4); if(!top.length) return [];
+  /* de proche en proche à partir du meilleur : traversées courtes */
+  const ord = [top.shift()];
+  while(top.length){ const last = ord[ord.length - 1].sd.position; let bi = 0, bd = Infinity;
+    top.forEach((c, i) => { const d = c.sd.position.distanceTo(last); if(d < bd){ bd = d; bi = i; } }); ord.push(top.splice(bi, 1)[0]); }
+  return ord;
+}
+function gameLeg(sd){ return { name: sd.name, designation: sd.star.designation, starPosition: sd.position, cell: sd.cell, star: sd.star }; }
+
+/* ---------- plan d'un système ---------- */
+/* un transit rectiligne peut frôler l'étoile (planète de l'autre côté) : la caméra, qui la regarde encore, pivoterait
+   alors de ~180° en quelques images — courbe de Bézier qui la contourne à ≥ 12 rayons stellaires */
+function transitCtrl(p0, p1, Rs, N){
+  const d = p1.clone().sub(p0), L2 = d.lengthSq(); if(L2 < 1) return null;
+  const t = clamp(-p0.dot(d)/L2, 0, 1), c = p0.clone().addScaledVector(d, t), dmin = c.length(), R = 12*Rs;
+  if(dmin >= R) return null;
+  let away = dmin > 1 ? c.clone().normalize() : new V3().crossVectors(d, N).normalize();
+  if(away.lengthSq() < .5) away = N.clone();
+  return p0.clone().add(p1).multiplyScalar(.5).addScaledVector(away, 2*(R - dmin) + R);
+}
+function planetScore(p){ return (p.hasRings ? 3 : 0) + Math.min(p.moonCount || 0, 3)*1.2 + (p.kind.gas ? .8 : 0) + (p.isHabitable ? 2 : 0); }
+function bigMoon(p){ let best = null, br = 0; (p.moonPivots || []).forEach(pv => { const m = pv.children[0]; if(m && m.scale.x > br){ br = m.scale.x; best = m; } }); return best; }
+function orbitNormal(leg){
+  const n = new V3(); for(let i = 0; i + 1 < leg.planets.length; i++) n.add(new V3().crossVectors(leg.planets[i].position, leg.planets[i + 1].position).normalize());
+  if(n.lengthSq() < 1e-6) n.set(0, 1, 0); if(n.y < 0) n.negate(); return n.normalize();
+}
+function planSystem(leg, dIn, dOut){
+  const N = orbitNormal(leg), Rs = leg.Rs, segs = [];
+  /* 1) l'étoile : arrivée du côté de l'étoile précédente, léger arc en se rapprochant */
+  const side = new V3().crossVectors(dIn, N).normalize();
+  const S0 = dIn.clone().multiplyScalar(-16*Rs).addScaledVector(N, 3.5*Rs);
+  const S1 = S0.clone().applyAxisAngle(N, .35).setLength(10*Rs).addScaledVector(N, 1.5*Rs);
+  segs.push({ kind: 'path', dur: T.STAR, up: N, p: k => S0.clone().lerp(S1, smooth(k)), look: () => new V3() });
+  S.entry = S0;
+  /* 2) les deux plus belles planètes, de proche en proche */
+  const cand = leg.planets.slice().sort((a, b) => planetScore(b) - planetScore(a)).slice(0, 2);
+  let A = S1.clone(), lookA = new V3();
+  const ordered = []; let cur = A.clone();
+  while(cand.length){ let bi = 0, bd = Infinity; cand.forEach((p, i) => { const d = p.position.distanceTo(cur); if(d < bd){ bd = d; bi = i; } }); const p = cand.splice(bi, 1)[0]; ordered.push(p); cur = p.position; }
+  ordered.forEach(p => {
+    const P = p.position, R = p.radius, lit = P.clone().negate().normalize(), inc = P.clone().sub(A).normalize();
+    const Sp = P.clone().addScaledVector(lit.clone().multiplyScalar(.65).addScaledVector(inc, -.45).addScaledVector(N, .3).normalize(), 3.4*R);
+    const dist = A.distanceTo(Sp), dur = clamp(1.8 + .55*Math.log10(Math.max(1, dist/1e6)), 2.4, 4);   /* ≥ 2,4 s : un demi-tour de regard reste doux */
+    segs.push({ kind: 'transit', dur: dur, up: N, p0: A.clone(), p1: Sp.clone(), c: transitCtrl(A, Sp, Rs, N), look0: lookA.clone(), look1: () => P.clone() });
+    const m = bigMoon(p);
+    if(m){
+      /* planète puis glissement vers la lune, la planète passant derrière elle */
+      const M0 = m.getWorldPosition(new V3()), rm = m.scale.x;
+      const E = M0.clone().addScaledVector(M0.clone().sub(P).normalize(), 12*rm).addScaledVector(N, 3*rm);   /* assez loin pour que la lune ne défile pas trop vite */
+      /* arc AUTOUR de la planète (et non une courbe de Bézier qui pouvait la traverser) : direction interpolée sur la
+         sphère, distance interpolée en échelle logarithmique — jamais plus près que min(départ, arrivée) ≥ 3,4 R */
+      const us = Sp.clone().sub(P), ue = E.clone().sub(P), rs = us.length(), re = ue.length(); us.normalize(); ue.normalize();
+      const opp = us.dot(ue) < -.985, qArc = new Q().setFromUnitVectors(us, ue);
+      const arc = k => { const e = smoother(k), q = opp ? new Q().setFromAxisAngle(N, Math.PI*e) : new Q().slerp(qArc, e);
+        return P.clone().addScaledVector(us.clone().applyQuaternion(q), Math.exp(Math.log(rs)*(1 - e) + Math.log(re)*e)); };
+      segs.push({ kind: 'path', dur: T.PLANET, up: N, p: arc, look: k => { const Mn = m.getWorldPosition(new V3()); return P.clone().lerp(Mn, .35*smooth((k - .3)/.45)); }, moon: m, planet: p });   /* regard vers la planète : la lune passe au premier plan (et ne défile plus en gros plan) */
+      A = E.clone(); lookA = M0.clone();
+    } else {
+      /* arc lent du jour vers le terminateur */
+      const axis = new V3().crossVectors(Sp.clone().sub(P), N).normalize().cross(Sp.clone().sub(P).normalize()).normalize();
+      const rel = Sp.clone().sub(P);
+      segs.push({ kind: 'path', dur: T.PLANET, up: N, p: k => P.clone().add(rel.clone().applyAxisAngle(N, 1.2*smooth(k))), look: () => P.clone(), planet: p });
+      A = P.clone().add(rel.clone().applyAxisAngle(N, 1.2)); lookA = P.clone();
+    }
+  });
+  /* 3) sortie : on se tourne vers l'étoile suivante */
+  const Aend = A.clone(), la = lookA.clone();
+  /* orientation interpolée (et non le point visé : entre un astre proche et un point à l'infini, il partait presque d'un coup) */
+  segs.push({ kind: 'turn', dur: T.EXIT, up: N, p: k => Aend.clone().addScaledVector(dOut, Rs*3*smooth(k)), from: la, dir: dOut.clone() });
+  return segs;
+}
+
+/* ---------- application d'un segment ---------- */
+function applySeg(seg, k, leg, dt){
+  let pos, look;
+  if(seg.kind === 'transit'){
+    const e = smoother(k), D0 = seg.p0.distanceTo(seg.p1), dl = Math.exp(Math.log(Math.max(D0, 1))*(1 - e));
+    if(seg.c){                                                     /* même loi (distance restante logarithmique), sur la courbe */
+      const u = e >= 1 ? 1 : clamp(1 - (dl - 1)/Math.max(D0 - 1, 1), 0, 1), a = 1 - u;
+      pos = seg.p0.clone().multiplyScalar(a*a).addScaledVector(seg.c, 2*a*u).addScaledVector(seg.p1, u*u);
+    } else pos = seg.p1.clone().addScaledVector(seg.p0.clone().sub(seg.p1).normalize(), e >= 1 ? 0 : dl - (1 - e));
+    /* orientation de départ FIGÉE (fin du plan précédent) : recalculée vers l'astre qu'on quitte, de très près et en
+       accélérant, elle tournait à ~90 rad/s */
+    if(!seg.q0) seg.q0 = camera.quaternion.clone();
+    const qa = seg.q0, qb = lookQ(pos, seg.look1(), seg.up);
+    camera.position.copy(pos); camera.quaternion.copy(steadySlerp(seg, qa, qb, smoother(k)));   /* pivot réparti sur tout le transit, sens constant */
+  } else if(seg.kind === 'turn'){
+    pos = seg.p(k);
+    if(!seg.q0) seg.q0 = camera.quaternion.clone();
+    const qa = seg.q0, qb = lookQ(pos, pos.clone().add(seg.dir), seg.up);
+    camera.position.copy(pos); camera.quaternion.copy(steadySlerp(seg, qa, qb, smoother(k)));
+  } else {
+    pos = seg.p(k); look = seg.look(k);
+    const d = look.clone().sub(pos).normalize(), up0 = (seg.up || new V3(0, 1, 0)).clone();
+    let up = up0.addScaledVector(d, -up0.dot(d));
+    if(up.lengthSq() < .02){ const prev = new V3(0, 1, 0).applyQuaternion(camera.quaternion); up = prev.addScaledVector(d, -prev.dot(d)); }
+    camera.position.copy(pos); camera.up.copy(up.normalize()); camera.lookAt(look);
+  }
+  /* jamais à travers un astre */
+  leg.planets.forEach(p => { const v = camera.position.clone().sub(p.position), m = v.length(), rmin = p.radius*1.3;
+    if(m < rmin && m > 1e-6) camera.position.copy(p.position).addScaledVector(v.multiplyScalar(1/m), rmin); });
+  const vs = camera.position.length(); if(vs < leg.Rs*3) camera.position.setLength(leg.Rs*3);
+  camera.updateMatrixWorld();
+}
+
+/* ---------- fondu au noir d'un système à l'autre ---------- */
+function veil(){
+  if(!S.veil){ const v = document.createElement('div'); v.id = 'titleVeil';
+    v.style.cssText = 'position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:2';   /* au-dessus de la scène, sous le titre */
+    const c = document.getElementById('scene'); c.parentNode.insertBefore(v, c.nextSibling); S.veil = v; }
+  return S.veil;
+}
+function startFade(){ S.fade = { t: 0, swapped: false }; }
+function updateFade(dt){
+  const F = S.fade; F.t += dt;
+  const tin = F.t - T.FADE - T.BLACK;
+  veil().style.opacity = String(F.t < T.FADE ? smooth(F.t/T.FADE) : (tin < 0 ? 1 : 1 - smooth(tin/T.FADE)));
+  if(!F.swapped && F.t >= T.FADE){                                  /* dans le noir : système suivant construit, sa prise démarre */
+    F.swapped = true;
+    const from = S.list[S.idx]; S.idx = (S.idx + 1) % S.list.length; const to = S.list[S.idx], next = S.list[(S.idx + 1) % S.list.length];
+    let dIn = to.sd.position.clone().sub(from.sd.position); dIn = dIn.lengthSq() > 0 ? dIn.normalize() : new V3(.6, -.2, .77).normalize();
+    let dOut = next.sd.position.clone().sub(to.sd.position); dOut = dOut.lengthSq() > 0 ? dOut.normalize() : dIn.clone();
+    const leg = REAL.titleEnter(gameLeg(to.sd));
+    S.segs = planSystem(leg, dIn, dOut); S.i = 0; S.t = 0; S.leg = leg;
+    applySeg(S.segs[0], 0, leg, 0);
+  }
+  if(tin >= T.FADE){ S.fade = null; veil().style.opacity = '0'; }
+}
+
+/* ---------- ciel galactique (hors partie) ---------- */
+function updateSky(dt, elapsed){
+  const g = REAL.galPos;
+  S.chunk += dt; if(S.chunk > .5){ S.chunk = 0; refreshField(STAR_CELL, STAR_RADIUS, starField, buildStarCell); refreshField(NEBULA_CELL, NEBULA_RADIUS, nebulaField, buildNebulaCell); }
+  starField.forEach((o, key) => { if(!o) return;
+    if(key === REAL.hideCell){ o.mesh.visible = false; if(o.label) o.label.style.display = 'none'; return; }
+    o.mesh.visible = true; if(o.label) o.label.style.display = 'none';
+    const d = o.mesh.position.distanceTo(g), angular = THREE.MathUtils.clamp(o.baseCore*26/Math.max(d, 1), .3, 9);
+    o.core.scale.setScalar(angular); o.core.material.uniforms.time.value = elapsed;
+    const mag = apparentMagnitude(o.star.lum, Math.max(d/38, 1e-3)), perceived = THREE.MathUtils.clamp(Math.pow(Math.pow(10, -.4*(mag - 4)), .25), 0, 6);
+    o.halo.scale.setScalar(o.baseHalo*(.55 + perceived*.55)); o.halo.material.opacity = THREE.MathUtils.clamp(.25 + perceived*.35, .15, 1);
+  });
+  nebulaField.forEach(o => { if(!o) return; o.mesh.material.uniforms.uTime.value = elapsed;
+    const ud = o.mesh.userData; if(ud && ud.currentFade < ud.targetFade - .001){ ud.currentFade += (ud.targetFade - ud.currentFade)*Math.min(1, dt*.5); o.mesh.material.uniforms.uFade.value = ud.currentFade; } });
+  backdrop.position.copy(g);
+  backdrop.children.forEach(c => { if(c.material && c.material.uniforms && c.material.uniforms.uTime) c.material.uniforms.uTime.value = elapsed; });
+}
+
+/* ---------- par image, tant que la partie n'a pas commencé ---------- */
+function start(){
+  S.started = true;
+  S.list = pickSystems(); if(!S.list.length) return false;
+  S.idx = 0;
+  const first = S.list[0], next = S.list[1 % S.list.length];
+  const leg = REAL.titleEnter(gameLeg(first.sd));
+  const dIn = new V3(.6, -.2, .77).normalize(), dOut = next !== first ? next.sd.position.clone().sub(first.sd.position).normalize() : dIn;
+  S.segs = planSystem(leg, dIn, dOut); S.i = 0; S.t = 0; S.leg = leg; S.on = true;
+  shipRig.visible = false;
+  return true;
+}
+function tick(dt, elapsed){
+  if(!S.started && !start()) return false;
+  if(!S.on) return false;
+  if(S.fade) updateFade(dt);
+  let seg = S.segs[S.i]; S.t += dt;
+  while(seg && S.t >= seg.dur){ S.t -= seg.dur; S.i++; seg = S.segs[S.i]; }
+  if(!seg){ seg = S.segs[S.segs.length - 1]; S.i = S.segs.length - 1; S.t = seg.dur; if(!S.fade) startFade(); }
+  else if(!S.fade && S.i === S.segs.length - 1 && seg.dur - S.t <= T.FADE) startFade();   /* fondu pendant le dernier mouvement */
+  applySeg(seg, clamp(S.t/seg.dur, 0, 1), S.leg, dt);
+  REAL.titleUpdate(dt);
+  updateSky(dt, elapsed);
+  return true;
+}
+function stop(){
+  if(!S.on) return;
+  S.on = false; S.fade = null; if(S.veil) S.veil.style.opacity = '0';
+  REAL.titleExit();
+}
+return { tick, stop, state: S, pickSystems, scoreSystem };
 })();
 
 /* Copie de la démo « Observation des étoiles » v7.2.2 (src/starmap.js), adaptée au jeu (lot L4) :
@@ -11898,31 +12596,35 @@ const LOAD_T_RELEASE = 2.5;   /* dépose sur la pince de la navette */
    conteneur de stock, tous deux ancrés sur le dock/le point de stockage —
    qui suivent le vaisseau tant qu'il orbite, cf. updateShuttleLoading(). */
 function startShuttleLoading(withCutaway){
-  const sh = buildShuttle();
+  /* lot N : navette-cargo (P2) et conteneur ISO 20' réels, en mètres (plus de mise à l'échelle) */
+  const sh = CARGO.buildCargoShuttle(_shuttleIdCounter + 11);
+  const pts = CARGO.armPoints();
   const dockPos = new THREE.Vector3();
   if(window.shipDockAnchor) window.shipDockAnchor.getWorldPosition(dockPos);
   else dockPos.copy(shipRig.position);
   sh.group.position.copy(dockPos);
   sh.group.quaternion.copy(shipRig.quaternion);
-  if(REAL.active){ const fs = REAL.shipScale(); sh.group.children.forEach(function(c){ c.position.multiplyScalar(fs); c.scale.multiplyScalar(fs); }); }   /* L2.3 */
   LAYERS.shipWorld.add(sh.group);
   LAYERS.shipWorld.add(sh.trail);
 
-  const container = buildContainerMesh();
+  const container = CARGO.buildIsoContainer(_shuttleIdCounter*7 + 3);
   const stagePos = new THREE.Vector3();
   if(window.shipCargoStageAnchor) window.shipCargoStageAnchor.getWorldPosition(stagePos);
   else stagePos.copy(dockPos);
   container.position.copy(stagePos);
   container.quaternion.copy(shipRig.quaternion);
-  if(REAL.active) container.scale.multiplyScalar(REAL.shipScale());
   LAYERS.shipWorld.add(container);
 
   const camSeq = SHUTTLE_CAMERA_SEQUENCES[Math.floor(Math.random()*SHUTTLE_CAMERA_SEQUENCES.length)];
   const id = ++_shuttleIdCounter;
 
+  /* la navette attend là où la pince dépose (berceau dorsal sous le point de dépose), le conteneur là où elle saisit */
+  const rest = pts ? pts.place.clone().sub(sh.clampGroup.position) : null, stage = pts ? pts.stage.clone() : null;
+  if(rest){ sh.group.position.copy(CARGO.shipPoint(rest)); container.position.copy(CARGO.shipPoint(stage)); }
+  sh.rest = rest;
   orbitState.loading = {
     id:id, shuttle:sh, container:container, t:0, duration:SHUTTLE_CLOSEUP_DURATION,
-    camSeq:camSeq, grabbed:false, released:false
+    camSeq:camSeq, grabbed:false, released:false, rest:rest, stage:stage
   };
 
   if(withCutaway){
@@ -11999,11 +12701,12 @@ function updateShuttleLoading(dt){
   const dockPos = new THREE.Vector3();
   if(window.shipDockAnchor) window.shipDockAnchor.getWorldPosition(dockPos);
   else dockPos.copy(shipRig.position);
-  L.shuttle.group.position.copy(dockPos);
+  L.shuttle.group.position.copy(L.rest ? CARGO.shipPoint(L.rest) : dockPos);   /* lot N : sous le point de dépose de la pince */
   L.shuttle.group.quaternion.copy(shipRig.quaternion);
   if(!L.grabbed){
     const stagePos = new THREE.Vector3();
-    if(window.shipCargoStageAnchor) window.shipCargoStageAnchor.getWorldPosition(stagePos);
+    if(L.stage) stagePos.copy(CARGO.shipPoint(L.stage));                   /* exactement là où la pince saisit */
+    else if(window.shipCargoStageAnchor) window.shipCargoStageAnchor.getWorldPosition(stagePos);
     else stagePos.copy(dockPos);
     L.container.position.copy(stagePos);
     L.container.quaternion.copy(shipRig.quaternion);
@@ -12021,6 +12724,7 @@ function updateShuttleLoading(dt){
       window.shipArm.gripper.add(L.container);
       L.container.position.set(0, 0, 0.25);
       L.container.rotation.set(0, 0, 0);
+      L.container.scale.setScalar(1/CARGO.DOCK_SCALE);   /* lot N : conteneur en mètres, pince à l'échelle du module d'amarrage */
     }
   } else if(L.t < LOAD_T_PLACE){
     applyArmPose(lerpArmPose(ARM_POSE_REACH, ARM_POSE_PLACE, THREE.MathUtils.clamp((L.t-LOAD_T_GRAB)/(LOAD_T_PLACE-LOAD_T_GRAB), 0, 1)));
@@ -12032,6 +12736,7 @@ function updateShuttleLoading(dt){
          navette, qui l'emporte au lancement */
       window.shipArm.gripper.remove(L.container);
       L.shuttle.clampGroup.add(L.container);
+      L.container.scale.setScalar(1);   /* le berceau de la navette porte déjà l'échelle : sinon f² */
       L.container.position.set(0, 0, 0);
       L.container.rotation.set(0, 0, 0);
       L.shuttle.hasCargo = true;
@@ -12049,13 +12754,14 @@ function updateShuttleLoading(dt){
 /* La navette, déjà chargée, part réellement vers la planète — reprend le
    rôle de l'ancienne spawnShuttle(), mais sans reconstruire le modèle. */
 function launchLoadedShuttle(sh, id, dockPos, camSeq){
+  if(sh.craft && sh.craft.thr) sh.craft.thr.value = .9;   /* lot N : tuyères de la navette-cargo allumées en vol */
   const arcOffset = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5)
-    .normalize().multiplyScalar(50 + Math.random()*70);
+    .normalize().multiplyScalar((50 + Math.random()*70)*REAL.shipScale());   /* échelle du vaisseau */
   orbitState.shuttles.push({
     id:id, group:sh.group, glow:sh.glow, navLights:sh.navLights,
     trail:sh.trail, trailHistory:[],
     startPos:dockPos.clone(), t:0, duration:11+Math.random()*3, arcOffset:arcOffset,
-    camSeq:camSeq, phase:'outbound'
+    camSeq:camSeq, phase:'outbound', rest:sh.rest || null, engineBack:sh.engineBack || 1.95, craft:sh.craft || null
   });
 }
 
@@ -12073,8 +12779,23 @@ const _dockPosNow = new THREE.Vector3();
 const _clearPos = new THREE.Vector3();
 
 const _shuttleTarget = new THREE.Vector3();
+/* orientation d'une navette : nez (−Z) selon dir, « haut » = verticale de la planète ; si la route est presque
+   verticale (descente vers le port), le haut de secours est l'avant du vaisseau — plus de repère dégénéré */
+const _shM = new THREE.Matrix4(), _shZero = new THREE.Vector3();
+function shuttleAttitude(dir, pos){
+  const d = dir.clone().normalize(), up = pos.clone().sub(orbitState.center || _shZero).normalize();
+  let u = up; if(Math.abs(d.dot(u)) > .96) u = new THREE.Vector3(0, 0, -1).applyQuaternion(shipRig.quaternion);
+  _shM.lookAt(_shZero, d, u); return new THREE.Quaternion().setFromRotationMatrix(_shM);
+}
 function updateShuttles(dt, elapsed){
   updateShuttleLoading(dt);
+  /* distances de la sortie de soute à l'échelle du vaisseau (unités de l'ancien vaisseau de 40 u sinon) */
+  const fS = REAL.shipScale(), DROP_D = OUTBOUND_DROP_DIST*fS, CLEAR_D = OUTBOUND_CLEAR_DIST*fS;
+  /* traînées dans le repère du vaisseau : en orbite, tout avance à ~8 km/s — des positions absolues
+     s'étireraient en une ligne de plusieurs centaines de mètres le long de l'orbite */
+  if(!orbitState._lastShip) orbitState._lastShip = shipRig.position.clone();
+  const _shipDelta = shipRig.position.clone().sub(orbitState._lastShip); orbitState._lastShip.copy(shipRig.position);
+  if(_shipDelta.lengthSq() > 1e12) _shipDelta.set(0, 0, 0);   /* changement de système : pas de report */
   for(let i=orbitState.shuttles.length-1; i>=0; i--){
     const s = orbitState.shuttles[i];
     s.t += dt;
@@ -12090,40 +12811,44 @@ function updateShuttles(dt, elapsed){
         _shuttleTarget.copy(orbitState.planet.position);
       }
     } else if(window.shipDockAnchor){
-      window.shipDockAnchor.getWorldPosition(_shuttleTarget);
+      if(s.rest) _shuttleTarget.copy(CARGO.shipPoint(s.rest)); else window.shipDockAnchor.getWorldPosition(_shuttleTarget);
     } else {
       _shuttleTarget.copy(shipRig.position);
     }
 
-    let pos, lookDir;
+    let pos, lookDir, targetQ = null, snap = false;
     if(s.phase === 'outbound'){
       /* repère du vaisseau réévalué CHAQUE image : le cargo est en train
          de manœuvrer en orbite pendant tout ce temps, la chute et
          l'éloignement doivent rester solidaires de sa position/orientation
          RÉELLE au moment présent, pas d'un instantané figé au largage. */
       _shipDown.set(0,-1,0).applyQuaternion(shipRig.quaternion);
-      if(window.shipDockAnchor) window.shipDockAnchor.getWorldPosition(_dockPosNow);
+      if(s.rest) _dockPosNow.copy(CARGO.shipPoint(s.rest));                  /* lot N : point de repos sous la pince */
+      else if(window.shipDockAnchor) window.shipDockAnchor.getWorldPosition(_dockPosNow);
       else _dockPosNow.copy(shipRig.position);
 
       if(f < OUTBOUND_DROP_FRAC){
         /* phase 1 : translation verticale pure, part du centre du dock */
         const t2 = f/OUTBOUND_DROP_FRAC, e2 = t2*t2*(3-2*t2);
-        pos = _dockPosNow.clone().addScaledVector(_shipDown, OUTBOUND_DROP_DIST*e2);
+        pos = _dockPosNow.clone().addScaledVector(_shipDown, DROP_D*e2);
         lookDir = _shipDown;
+        targetQ = shipRig.quaternion.clone(); snap = true;   /* sortie de soute : attitude du vaisseau */
       } else if(f < OUTBOUND_CLEAR_FRAC){
         /* phase 2 : poursuite du même axe, la navette s'éloigne encore du cargo */
         const t2 = (f-OUTBOUND_DROP_FRAC)/(OUTBOUND_CLEAR_FRAC-OUTBOUND_DROP_FRAC), e2 = t2*t2*(3-2*t2);
-        pos = _dockPosNow.clone().addScaledVector(_shipDown, OUTBOUND_DROP_DIST + OUTBOUND_CLEAR_DIST*e2);
+        pos = _dockPosNow.clone().addScaledVector(_shipDown, DROP_D + CLEAR_D*e2);
         lookDir = _shipDown;
+        targetQ = shipRig.quaternion.clone().slerp(shuttleAttitude(_shuttleTarget.clone().sub(pos), pos), e2);   /* pivote vers sa route */
       } else {
         /* phase 3 : dégagée du cargo, la navette amorce enfin sa descente
            vers le port — même lerp+arc qu'avant, mais reparti du point de
            dégagement plutôt que du dock lui-même */
-        _clearPos.copy(_dockPosNow).addScaledVector(_shipDown, OUTBOUND_DROP_DIST + OUTBOUND_CLEAR_DIST);
+        _clearPos.copy(_dockPosNow).addScaledVector(_shipDown, DROP_D + CLEAR_D);
         const t2 = (f-OUTBOUND_CLEAR_FRAC)/(1-OUTBOUND_CLEAR_FRAC), e2 = t2*t2*(3-2*t2);
         pos = _clearPos.clone().lerp(_shuttleTarget, e2);
         pos.addScaledVector(s.arcOffset, Math.sin(Math.PI*t2));
         lookDir = _shuttleTarget.clone().sub(pos);
+        targetQ = shuttleAttitude(lookDir, pos);
       }
     } else {
       /* retour au dock : trajet inchangé, un simple lerp+arc suffit —
@@ -12131,12 +12856,14 @@ function updateShuttles(dt, elapsed){
       pos = s.startPos.clone().lerp(_shuttleTarget, ease);
       pos.addScaledVector(s.arcOffset, Math.sin(Math.PI*f));
       lookDir = _shuttleTarget.clone().sub(pos);
+      targetQ = shuttleAttitude(lookDir, pos);
+      if(f > .8){ const b = (f - .8)/.2; targetQ.slerp(shipRig.quaternion, b*b*(3 - 2*b)); }   /* réalignement pour l'arrimage */
     }
     s.group.position.copy(pos);
 
-    if(lookDir.lengthSq() > 1e-6){
-      const m4 = new THREE.Matrix4().lookAt(new THREE.Vector3(0,0,0), lookDir.clone().normalize(), new THREE.Vector3(0,1,0));
-      s.group.quaternion.setFromRotationMatrix(m4);
+    if(targetQ){
+      if(snap) s.group.quaternion.copy(targetQ);
+      else s.group.quaternion.slerp(targetQ, 1 - Math.exp(-dt*4));   /* rotations lissées */
     }
     /* rétrécissement + fondu en fin de trajectoire : simulation d'un
        atterrissage — à la livraison comme à l'amerrissage au dock */
@@ -12161,19 +12888,24 @@ function updateShuttles(dt, elapsed){
       if(s.lastTrailPos){
         const vel = pos.clone().sub(s.lastTrailPos);
         if(vel.lengthSq() > 1e-6){
-          engineWorld = pos.clone().addScaledVector(vel.normalize(), -1.95*shrink);
+          engineWorld = pos.clone().addScaledVector(vel.normalize(), -(s.engineBack || 1.95)*shrink);
         }
       }
       /* première image, ou vaisseau ponctuellement immobile (dt≈0) :
          retombe sur l'orientation du modèle, faute de mieux */
       if(!engineWorld){
         engineWorld = pos.clone().addScaledVector(
-          new THREE.Vector3(0,0,1).applyQuaternion(s.group.quaternion), 1.95*shrink
+          new THREE.Vector3(0,0,1).applyQuaternion(s.group.quaternion), (s.engineBack || 1.95)*shrink
         );
       }
       s.lastTrailPos = pos.clone();
+      s.trailHistory.forEach(function(p){ p.add(_shipDelta); });   /* repère du vaisseau */
       s.trailHistory.unshift(engineWorld);
       if(s.trailHistory.length > SHUTTLE_TRAIL_LEN) s.trailHistory.length = SHUTTLE_TRAIL_LEN;
+      /* longueur plafonnée à ~3 longueurs de navette : à ~30 km/s, neuf images d'historique donnaient une ligne de
+         10 à 15 km ; dans l'ancien jeu, la traînée faisait une demi-navette — c'est un panache, pas une trajectoire */
+      const _tMax = 24*REAL.shipScale(), _tLen = s.trailHistory[0].distanceTo(s.trailHistory[s.trailHistory.length - 1]);
+      if(_tLen > _tMax){ const k = _tMax/_tLen, h = s.trailHistory[0]; for(let j = 1; j < s.trailHistory.length; j++) s.trailHistory[j].sub(h).multiplyScalar(k).add(h); }
       const posAttr = s.trail.geometry.attributes.position;
       const colAttr = s.trail.geometry.attributes.color;
       for(let k=0;k<SHUTTLE_TRAIL_LEN;k++){
@@ -12211,7 +12943,7 @@ function updateShuttles(dt, elapsed){
         s.t = 0;
         s.startPos = pos.clone();
         s.arcOffset = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5)
-          .normalize().multiplyScalar(50 + Math.random()*70);
+          .normalize().multiplyScalar((50 + Math.random()*70)*REAL.shipScale());   /* échelle du vaisseau */
         s.duration = 9 + Math.random()*2;
         s.group.scale.setScalar(1);
         s.glow.material.opacity = 1;
@@ -12999,6 +13731,7 @@ function animate(){
      de ciblage. worldReadyForCinematic protège contre un premier appel
      avant que finish() n'ait eu la main (cf. générique). */
   if(!gameStarted){
+    if(worldReadyForCinematic && typeof TITLE !== 'undefined' && TITLE.tick(dt, elapsed)){ renderMain(); return; }   /* séquence de titre à l'échelle réelle */
     if(worldReadyForCinematic){
       updateTitleCinematic(dt);
       /* bug remonté en jeu (étoiles de décoration trop rapides / passant
@@ -13063,6 +13796,10 @@ function animate(){
 
   if(REAL.active && REAL.started) REAL.flight(dt);   /* L2.3 : transfert, approche, départ, passage */
   updateFlight(dt, elapsed);
+  /* navettes et conteneurs déplacés AVANT les caméras (REAL.update → survol, gros plans) : placés après, ils étaient
+     toujours filmés à leur position de l'image précédente — à ~30 km/s, une image de retard fait des centaines de
+     mètres, et la compensation par extrapolation ne tient qu'à cadence parfaitement régulière (saccades en jeu) */
+  updateShuttles(dt*arrivalTimeScale, elapsed);
   if(REAL.active && REAL.started) REAL.update(dt);   /* L2.2 : système en mètres, caméra galactique */
 
   chunkAccum += dt;
@@ -13101,7 +13838,6 @@ function animate(){
   /* navettes de livraison : indépendantes de la phase de vol, pour qu'une
      navette encore en approche termine son trajet même si le vaisseau
      principal a déjà repris sa route */
-  updateShuttles(dt*arrivalTimeScale, elapsed);
 
   /* portiques : la luminosité est recalculée dans le shader à partir de la
      position et du cap du vaisseau — un seul envoi d'uniformes par image */
@@ -13332,6 +14068,7 @@ function animate(){
 
   function startGame(){
     gameStarted = true;
+    if(typeof TITLE !== 'undefined') TITLE.stop();   /* fin de la séquence de titre (distorsion, système affiché) */
     if(REAL.active) REAL.enterSystem(ROUTE.legs[0]);   /* L2.2 : vaisseau posé au point d'arrivée de la première étape */
     /* premier rafraîchissement de la barre d'icônes — différé jusqu'ici
        (cf. commentaires dans initHudIconBar/initTouchControls) car il

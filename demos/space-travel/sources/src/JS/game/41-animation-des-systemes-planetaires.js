@@ -41,6 +41,7 @@ function animate(){
      de ciblage. worldReadyForCinematic protège contre un premier appel
      avant que finish() n'ait eu la main (cf. générique). */
   if(!gameStarted){
+    if(worldReadyForCinematic && typeof TITLE !== 'undefined' && TITLE.tick(dt, elapsed)){ renderMain(); return; }   /* séquence de titre à l'échelle réelle */
     if(worldReadyForCinematic){
       updateTitleCinematic(dt);
       /* bug remonté en jeu (étoiles de décoration trop rapides / passant
@@ -105,6 +106,10 @@ function animate(){
 
   if(REAL.active && REAL.started) REAL.flight(dt);   /* L2.3 : transfert, approche, départ, passage */
   updateFlight(dt, elapsed);
+  /* navettes et conteneurs déplacés AVANT les caméras (REAL.update → survol, gros plans) : placés après, ils étaient
+     toujours filmés à leur position de l'image précédente — à ~30 km/s, une image de retard fait des centaines de
+     mètres, et la compensation par extrapolation ne tient qu'à cadence parfaitement régulière (saccades en jeu) */
+  updateShuttles(dt*arrivalTimeScale, elapsed);
   if(REAL.active && REAL.started) REAL.update(dt);   /* L2.2 : système en mètres, caméra galactique */
 
   chunkAccum += dt;
@@ -143,7 +148,6 @@ function animate(){
   /* navettes de livraison : indépendantes de la phase de vol, pour qu'une
      navette encore en approche termine son trajet même si le vaisseau
      principal a déjà repris sa route */
-  updateShuttles(dt*arrivalTimeScale, elapsed);
 
   /* portiques : la luminosité est recalculée dans le shader à partir de la
      position et du cap du vaisseau — un seul envoi d'uniformes par image */

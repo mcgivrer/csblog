@@ -133,8 +133,45 @@ function arrival(leg, target){
   return { target: target, pos: Cp.clone().addScaledVector(dir, dA), dA: dA };
 }
 
+/* ---------- séquence de titre : un système construit et animé SANS vaisseau (caméra seule) ---------- */
+R.titleActive = false;
+R.titleEnter = function(g){
+  if(R.leg){ disposeSystem(R.leg); R.leg = null; }
+  const leg = buildSystem(localLeg(g));
+  R.leg = leg; R.hideCell = leg.cell; R.galPos.copy(leg.gal); R.titleActive = true;
+  if(ROUTE.gates) ROUTE.gates.visible = false;
+  return leg;
+};
+R.titleExit = function(){
+  R.titleActive = false; R.galOverride = null;
+  if(R.leg && !R.started){ disposeSystem(R.leg); R.leg = null; }
+  LAYERS.sysWorld.visible = true;
+};
+const _tSun = new V3(), _tWhite = new THREE.Color(1, 1, 1), _tBuf = new THREE.Vector2();
+R.titleUpdate = function(dt){
+  const leg = R.leg; if(!leg) return;
+  R.T += dt; R.cloudT += dt;
+  camera.updateMatrixWorld();
+  if(R.galOverride) R.galPos.copy(R.galOverride); else R.galPos.copy(leg.gal).addScaledVector(camera.position, 1/UNIT_GAL);
+  const g = R.galCam;
+  g.position.copy(R.galPos); g.quaternion.copy(camera.quaternion);
+  g.fov = camera.fov; g.aspect = camera.aspect; g.zoom = camera.zoom; g.near = .1; g.far = 6000;
+  g.updateProjectionMatrix(); g.updateMatrixWorld();
+  leg.planets.forEach(p => {
+    if(!p.mesh) return;
+    p.mesh.rotation.y += 2*Math.PI/p.dayLen*dt*40;            /* rotation propre accélérée ×40 : la surface vit à l'écran */
+    if(p.fx) window.__PLANETS.update(p, new V3(), leg.sunColor, R.T, camera.position, R.cloudT);
+    (p.moonPivots || []).forEach(m => m.rotation.y += (m.userData.n || 0)*dt*40);
+  });
+  if(leg.star3) leg.star3.lastOcc = window.__STARS.update(leg.star3, R.T, dt, camera, bodiesOf(leg));
+  window.__PLANETS.setPixelAngle(camera.fov, renderer.getDrawingBufferSize(_tBuf).y);
+  _tSun.copy(camera.position).negate().normalize();
+  starLight.position.copy(_tSun); starLight.target.position.set(0, 0, 0); starLight.target.updateMatrixWorld();
+  starLight.color.copy(leg.sunColor).lerp(_tWhite, .45); starLight.intensity = 1.65;
+};
 R.enterSystem = function(gameLeg){
   if(!gameLeg) return;
+  if(R.titleActive){ R.titleActive = false; R.galOverride = null; LAYERS.sysWorld.visible = true; }   /* fin de la séquence de titre */
   if(R.leg){ disposeSystem(R.leg); R.leg = null; }
   if(R.corridor){ R.corridor.children.forEach(c => { c.geometry.dispose(); c.material.dispose(); }); LAYERS.detach(R.corridor); R.corridor = null; }
   const leg = buildSystem(localLeg(gameLeg));
@@ -200,7 +237,7 @@ R.update = function(dt){
 /* occupation des tranches (sliceUnits de cine.js) : seules les tranches traversées par un objet sont rendues */
 LAYERS.units = function(){
   const out = [], leg = R.leg;
-  if(!R.started || !leg) return null;
+  if(!(R.started || R.titleActive) || !leg) return null;
   out.push([shipRig.position, SHIP_GAME_LEN*1.6]);
   out.push([camera.position, 7e5]);   /* L2.3 : couche vaisseau (couloir, navettes) = tranches d'échelle 1, jusqu'à 800 km */
   leg.planets.forEach(p => { out.push([p.position, p.radius*(p.hasRings ? 3.4 : 1.12)]);
@@ -671,4 +708,4 @@ R.radialUp = function(){ return shipRig.position.clone().sub(orbitState.center).
 return R;
 })();
 /* position galactique courante (unités du jeu) : le vaisseau en v2.16, l'étoile visitée à l'échelle réelle */
-function galPosition(){ return (REAL.active && REAL.started) ? REAL.galPos : shipRig.position; }
+function galPosition(){ return (REAL.active && (REAL.started || REAL.titleActive)) ? REAL.galPos : shipRig.position; }

@@ -154,6 +154,7 @@
 
   function startGame(){
     gameStarted = true;
+    if(typeof TITLE !== 'undefined') TITLE.stop();   /* fin de la séquence de titre (distorsion, système affiché) */
     if(REAL.active) REAL.enterSystem(ROUTE.legs[0]);   /* L2.2 : vaisseau posé au point d'arrivée de la première étape */
     /* premier rafraîchissement de la barre d'icônes — différé jusqu'ici
        (cf. commentaires dans initHudIconBar/initTouchControls) car il

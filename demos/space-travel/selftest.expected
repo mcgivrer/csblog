@@ -1,7 +1,0 @@
-# Références de selftest.sh (graine TEST). Régénérées par : ./selftest.sh --update
-legs=9
-route=d12a2d50
-i18n=60a44562
-scale=actuel
-starLights=3
-geomGrowthMax=60

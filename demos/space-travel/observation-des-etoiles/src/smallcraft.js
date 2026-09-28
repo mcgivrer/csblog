@@ -283,11 +283,11 @@ CR.build = function(kind, opts){
   const o = { rcs: [], variant: opts.variant, slim: opts.slim, containers: opts.containers };
   const spec = BUILDERS[kind](G, M, o, R);
   const thr = { value: 0 };
-  spec.nozzles.forEach((p, i) => plume(G, thr, p[0], p[1], p[2], spec.nozR, spec.len*(kind === 'drone' ? .6 : .9), i + R()*9));
-  const nav = [], lamps = [];
-  navLight(G, nav, 0xff3030, -spec.navX, spec.navY, spec.navZ, spec.len*.07 + .25, 1.6, .5, 0, .9);
-  navLight(G, nav, 0x30ff60, spec.navX, spec.navY, spec.navZ, spec.len*.07 + .25, 1.6, .5, 0, .9);
-  navLight(G, nav, 0xffffff, 0, spec.navY*.6, spec.len*.42, spec.len*.1 + .4, 1.3, .08, R(), 1);
+  spec.nozzles.forEach((p, i) => plume(G, thr, p[0], p[1], p[2], spec.nozR, spec.plumeLen || spec.len*(kind === 'drone' ? .6 : .9), i + R()*9));   // v7.6 : longueur imposable (porte-vaisseaux)
+  const nav = [], lamps = [], ns = spec.navSize || spec.len*.07 + .25;
+  navLight(G, nav, 0xff3030, -spec.navX, spec.navY, spec.navZ, ns, 1.6, .5, 0, .9);
+  navLight(G, nav, 0x30ff60, spec.navX, spec.navY, spec.navZ, ns, 1.6, .5, 0, .9);
+  navLight(G, nav, 0xffffff, 0, spec.navY*.6, spec.len*.42, spec.navSize ? ns*1.4 : spec.len*.1 + .4, 1.3, .08, R(), 1);
   if(kind === 'drone') navLight(G, nav, 0x5aa8ff, 0, spec.navY, 0, .9, .9, .35, R(), .9);
   (spec.lamps || []).forEach(l => lampCone(G, lamps, l[0], l[1], l[2], l[3], kind === 'maint' ? 14 : 9, .28));
   merge(G);
@@ -301,7 +301,7 @@ CR.build = function(kind, opts){
   const box3 = new THREE.Box3(); G.updateMatrixWorld(true); G.traverse(m => { if(m.isMesh && !m.userData.noFrame){ m.geometry.computeBoundingBox(); box3.union(m.geometry.boundingBox.clone().applyMatrix4(m.matrixWorld)); } });
   if(spec.floods && wearU && __SHIPWEAR.floods) __SHIPWEAR.floods(wearU, box3, spec.floods);   // v7.4 : projecteurs de coque (coques sombres)
   return { group: G, kind, variant: o.variant || null, name: kind === 'drone' ? CR.NAMES.drone[o.variant || 'inspect'] : CR.NAMES[kind], len: spec.len, box: box3,
-    rcs: o.rcs, rcsLen: Math.max(1.2, spec.len*.18), nav, lamps, thr, bay, turrets: spec.turrets || [], mil: !!mil, wear: wearU, docks, extra: spec.extra || null,
-    dispose(){ G.traverse(m => { if(m.geometry) m.geometry.dispose(); if(m.material){ (Array.isArray(m.material) ? m.material : [m.material]).forEach(x => x.dispose()); } }); G.parent && G.parent.remove(G); } };
+    rcs: o.rcs, rcsLen: spec.rcsLen || Math.max(1.2, spec.len*.18), nav, lamps, thr, bay, turrets: spec.turrets || [], mil: !!mil, wear: wearU, docks, extra: spec.extra || null,
+    dispose(){ G.traverse(m => { if(m.geometry) m.geometry.dispose(); if(m.material){ (Array.isArray(m.material) ? m.material : [m.material]).forEach(x => { if(x.userData && x.userData.ownMap && x.map) x.map.dispose(); x.dispose(); }); } }); G.parent && G.parent.remove(G); } };   // v7.6 : textures propres (porte-vaisseaux)
 };
 })();

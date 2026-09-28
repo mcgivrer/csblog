@@ -64,7 +64,7 @@ commerce local (vaisseau de départ) → long-courrier (distorsion) → module d
 | L6 ✅ | Greffons vaisseau : moteurs, usure et livrées, textures HD, anneaux, tremblement | L1 |
 | L7 ✅ | Hublots, baies et hangars réalistes | L1 |
 | L8 | ~~Soleils « cinéma »~~ — absorbé par L2.2 | — |
-| L9 | Trafic, petits engins, baies à champ de force, concurrence et escorte, radar | L2, L4 |
+| L9 | Trafic, petits engins, baies à champ de force, concurrence et escorte, radar — **spécifié** : [`spec-L9-jeu.md`](spec-L9-jeu.md), [`spec-L9-technique.md`](spec-L9-technique.md) | L2, L4 |
 | L10 ✅ | Profondeur de champ, gros plans | L6 |
 
 ## 4 bis. Avancement du lot 2
@@ -349,6 +349,43 @@ au chargement 22 (hors champ) → 0,4. Avant : 6 échecs sur 7 ; après : 7/7.
 `vol_test.py` exclut désormais aussi les plans de suivi des navettes de sa vérification « caméra près du vaisseau »
 (24 relevés jusqu'à 8,9 longueurs pendant ces plans ; 2,7 au plus en dehors).
 
+## 4 octies. Séquence de titre — plans-séquences dans des systèmes réels
+
+Remplace l'ancienne cinématique de titre (ciel en unités compressées, sans aucun système). `20i-sequence-titre.js`
+(`TITLE`), avec `REAL.titleEnter/titleExit/titleUpdate` (système construit et animé SANS vaisseau, caméra seule).
+Choix (joueur) : systèmes les plus spectaculaires du voisinage, fondu au noir, ~30 s par système.
+- **Choix des systèmes** : tous les systèmes à ≤ 2 cellules notés d'après leurs données (`REAL.systemInfo`, rien de
+  construit) — anneaux, lunes, planète habitable, géantes, étoile bleue ou géante ; les 4 meilleurs, de proche en
+  proche, en boucle (seed TITRE-TEST : notes 10,6 à 13,6 pour une médiane de 5,8 sur 54 systèmes).
+- **Un plan-séquence par système** : approche de l'étoile (couronne, taches, éruptions) jusqu'à ~9 rayons stellaires,
+  puis les 2 plus belles planètes — avec une lune : on longe la planète puis on glisse jusque derrière la lune, regard
+  vers la planète (la lune au premier plan) ; sans lune : arc lent du jour vers le terminateur ; transits en échelle
+  logarithmique, contournement de l'étoile par une courbe si besoin.
+- **Fondu au noir** (0,8 s + 0,25 s + 0,8 s) : le système suivant est construit dans le noir, sa prise démarre
+  pendant la remontée ; voile sous le titre (couche 2 < titre 6).
+- Démarrage de la partie : séquence arrêtée, système de titre libéré, premier système de l'itinéraire construit.
+Défauts trouvés et corrigés par le test (`titre_test.py`) : glissement planète→lune tracé par une courbe de Bézier qui
+traversait la planète (caméra repoussée à 1,30 R) → arc autour de la planète (≥ 2,98 R) ; « haut » de caméra fixe
+(verticale absolue), dégénéré → normale au plan des orbites + garde ; orientation de départ des transits recalculée
+vers l'astre quitté → figée ; interpolation « plus court chemin » qui changeait de côté près d'un demi-tour (53 rad/s)
+→ sens choisi au départ du segment ; fin de glissement regardant la lune toute proche → regard vers la planète.
+Rotation maximale de la caméra dans un système : 1,95 rad/s.
+
+## 4 nonies. Correctif : saccades des plans rapprochés de navettes (signalé en jeu)
+
+**Cause** : les navettes étaient déplacées APRÈS le placement des caméras dans la boucle (module 41 :
+`REAL.update` → gros plans, puis `updateShuttles`). La caméra filmait toujours la navette de l'image précédente ; le
+correctif précédent l'extrapolait d'une image, ce qui ne tient qu'à cadence parfaitement régulière. Les tests
+d'alors avançaient à pas constant : le défaut n'y apparaissait pas.
+**Correction** : `updateShuttles` appelée juste après `updateFlight`, avant `REAL.update` ; extrapolation supprimée ;
+cap de la caméra de suivi lissé (τ = 0,7 s) au lieu d'être rivé à l'attitude de la navette ; dernier cap horizontal
+conservé quand la navette plonge presque à la verticale vers le port.
+**Preuve** — `saccades_test.py` (nouveau), à **cadence irrégulière** (images de 10 à 45 ms), sur le plan de suivi :
+tremblement de la navette à l'écran 2 242 → 0,0003 (2 = largeur d'écran) ; saut de distance caméra–navette par image
+30 → 0,003 longueur de navette ; rotation max de la caméra 13,5 → 1,3 rad/s ; décor (planète) stable (0,0002 rad).
+Défauts de mesure corrigés en route : navette mesurée ≠ navette filmée (plusieurs en route à la fois) ; stabilité du
+décor d'abord « nulle » faute de relevés (centre de la planète au-delà du plan lointain) → mesure par direction.
+
 ## 5. Build et tests
 
 ```
@@ -366,6 +403,8 @@ Tests : `smoke_test.py` (démarrage, route, déplacement, passe de lentille, nav
 `survol_test.py` (survol du système : déclenchement, chaque planète, légendes, retour, G, interruption) ;
 `gros_plans_test.py` (mode gros plans, coque, cadrage, profondeur de champ, plans des navettes) ;
 `largage_test.py` (largage : échelle du conteneur, rotations de la navette et de la caméra, traînée, cadrage du chargement) ;
+`titre_test.py` (séquence de titre : choix des systèmes, étoile, planètes, lune, fondu, continuité, démarrage du jeu) ;
+`saccades_test.py` (plans de suivi de navette à cadence irrégulière : tremblement à l'écran, distance, rotation, décor) ;
 `commerce_test.py` (commerce local : tableau de contrats, livraison sur cible quelconque, boucle, achat au chantier naval, bascule long-courrier).
 `carte_test.py` (carte 2D : ouverture, traduction, secteur et système, règles du ciblage, saut vers la cible, itinéraire recalculé, escale hors itinéraire).
 `couches_test.py` : supprimé en v2.17 (voir §4 ter).

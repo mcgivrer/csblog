@@ -18,6 +18,22 @@ const clamp = (x,a,b) => Math.max(a, Math.min(b, x));
 const PARS_V = `
 attribute vec3 aShip;
 varying vec3 vShip;`;
+/* v7.6 : soute d'un porte-vaisseaux — pas d'ombres portées dans le moteur : pour un fragment dans le volume du dock, le rayon vers
+   le soleil n'éclaire que s'il sort par une des deux ouvertures latérales (±X) ; plafond lumineux = lumière directionnelle descendante */
+const HOLD_F = `
+uniform mat4 uHoldM; uniform vec4 uHoldH; uniform vec3 uHoldUp; uniform vec4 uHoldCol;
+float holdK = 0.0;
+float holdSun(vec3 pv, vec3 Lv){
+  if(uHoldH.w < 0.5) return 1.0;
+  vec3 p = (uHoldM*vec4(pv, 1.0)).xyz, q = abs(p) - uHoldH.xyz;
+  holdK = smoothstep(2.5, -0.5, max(q.x, max(q.y, q.z)));
+  if(holdK <= 0.0) return 1.0;
+  vec3 L = normalize(mat3(uHoldM)*Lv), sg = sign(L) + vec3(equal(L, vec3(0.0)));
+  vec3 t = (uHoldH.xyz + 1.0 - sg*p)/max(abs(L), vec3(1e-4));                  /* distance de sortie par axe */
+  float lit = smoothstep(-4.0, 4.0, min(t.y, t.z) - t.x);                        /* sortie par une ouverture (X) avant le plafond, le sol ou les cloisons */
+  return mix(1.0, lit, holdK);
+}
+`;
 const PARS_F = `
 uniform float uAge; uniform float uWSeed; uniform vec2 uZr; uniform float uWLen; uniform float uWKind; uniform float uDark; uniform float uFlood; uniform vec4 uSpotP[4]; uniform vec4 uSpotD[4]; uniform vec4 uRing; uniform float uRingI;
 varying vec3 vShip;
@@ -150,16 +166,25 @@ const AFTER_NORMAL = `
   vec3 wgrad = sign(wdet)*(whx*wr1 + why*wr2)*0.08;
   normal = normalize(abs(wdet)*normal - wgrad);
 }`;
+const LIGHTS_HOLD = THREE.ShaderChunk.lights_fragment_begin.replace('getDirectionalDirectLightIrradiance( directionalLight, geometry, directLight );',
+  'getDirectionalDirectLightIrradiance( directionalLight, geometry, directLight );\n\t\tdirectLight.color *= holdSun( geometry.position, directLight.direction );') + `
+#if defined( RE_Direct )
+  if(holdK > 0.0){ directLight.direction = uHoldUp; directLight.color = uHoldCol.rgb*(uHoldCol.w*holdK); directLight.visible = true;      /* plafond lumineux du dock */
+    RE_Direct( directLight, geometry, material, reflectedLight ); reflectedLight.indirectDiffuse += diffuseColor.rgb*uHoldCol.rgb*(0.12*uHoldCol.w*holdK); }
+#endif
+`;
+/* uniformes globaux de la soute (un porte-vaisseaux actif à la fois : le plus proche de la caméra ; la démo les met à jour à chaque image) */
+W.HOLD = { uHoldM: { value: new THREE.Matrix4() }, uHoldH: { value: new THREE.Vector4(1, 1, 1, 0) }, uHoldUp: { value: new THREE.Vector3(0, 1, 0) }, uHoldCol: { value: new THREE.Vector4(1, .95, .86, .5) } };
 function WEAR_OBC(shader){
   Object.assign(shader.uniforms, this.userData.wear);
   shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>' + PARS_V).replace('#include <begin_vertex>', '#include <begin_vertex>\n  vShip = aShip;');
-  shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>' + PARS_F)
+  shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>' + HOLD_F + PARS_F).replace('#include <lights_fragment_begin>', LIGHTS_HOLD)
     .replace('#include <map_fragment>', '#include <map_fragment>' + AFTER_MAP)
     .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>' + AFTER_METAL)
     .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>' + AFTER_NORMAL)
     .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>' + FLOOD);
 }
-const WEAR_KEY = () => 'shipwear-v2';
+const WEAR_KEY = () => 'shipwear-v3';
 function kindOf(m){
   if(m.userData && m.userData.wearKind !== undefined) return m.userData.wearKind;   // pièce qui déclare sa nature (ex. moteurs de shipdrive.js)
   if(m.bumpMap) return 0;                                                            // coque à tôles
@@ -228,6 +253,7 @@ W.apply = function(group, age, seed, unit){
   const inv = new THREE.Matrix4().copy(group.matrixWorld).invert();
   const U = { uAge:{ value: age }, uWSeed:{ value: ((seed >>> 0) % 997)*.113 + .37 }, uZr:{ value: new THREE.Vector2() }, uWLen:{ value: 1 },
     uDark:{ value: 0 }, uFlood:{ value: 0 }, uRing:{ value: new THREE.Vector4() }, uRingI:{ value: 0 }, uSpotP:{ value: [0, 1, 2, 3].map(() => new THREE.Vector4(0, 0, 0, 1)) }, uSpotD:{ value: [0, 1, 2, 3].map(() => new THREE.Vector4(0, 0, 1, 2)) } };
+  Object.assign(U, W.HOLD);                                               // v7.6 : soute (uniformes partagés)
   const pal = W.livery;                                                   // livrée choisie par l'enveloppe (v7.2), sinon couleurs du jeu
   if(pal && pal.dark) U.uDark.value = pal.dark;
   const mats = new Map(), v = new THREE.Vector3(); let zmin = Infinity, zmax = -Infinity;
@@ -250,7 +276,7 @@ W.apply = function(group, age, seed, unit){
       mm.userData = Object.assign({}, m.userData);            // copie superficielle : les uniformes d'autres modules restent liés
       mm.userData.wear = Object.assign({ uWKind:{ value: kindOf(m) } }, U);
       const pre = m.onBeforeCompile !== THREE.Material.prototype.onBeforeCompile ? m.onBeforeCompile : null;   // injection existante (moteurs) : enchaînée
-      if(pre){ const preKey = m.customProgramCacheKey ? m.customProgramCacheKey() : ''; mm.onBeforeCompile = function(sh, r){ pre.call(this, sh, r); WEAR_OBC.call(this, sh, r); }; mm.customProgramCacheKey = () => 'shipwear-v2+' + preKey; }
+      if(pre){ const preKey = m.customProgramCacheKey ? m.customProgramCacheKey() : ''; mm.onBeforeCompile = function(sh, r){ pre.call(this, sh, r); WEAR_OBC.call(this, sh, r); }; mm.customProgramCacheKey = () => 'shipwear-v3+' + preKey; }
       else { mm.onBeforeCompile = WEAR_OBC; mm.customProgramCacheKey = WEAR_KEY; }
       mm.extensions = Object.assign({}, mm.extensions || {}, { derivatives: true });
       mats.set(m, mm); return mm;

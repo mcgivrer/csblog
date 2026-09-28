@@ -12,6 +12,8 @@ Quatre livraisons, dans l'ordre : les deux bugs et le sélecteur d'abord (v6.7),
 | v6.8 | Lot 2 : carte de l'univers détaillée + radar McGivrer | élevé | forte : la démo devient explorable | moyen (interface, performances de la carte) |
 | v6.9 | Lot 3 : profondeur de champ, tuyères orientables, tremblement caméra | moyen | forte en gros plan | moyen (coût GPU du flou) |
 | v7.0 | Lot 4 : cabines multi-hublots, cadre de la géode en rotation | faible | moyenne | faible |
+| v7.1 | Textures haute résolution (×4) + détail procédural sous le texel | moyen | forte en gros plan : plus de pixels visibles | faible (≈ 22 Mo GPU, aucun coût par image) |
+| v6.9 | Lot 5 : barre de progression sur l'écran de génération de l'univers | faible | moyenne : l'attente devient lisible | faible |
 
 Le principe ne change pas : le moteur du jeu (v2.15) reste intact, tout passe par les modules de la démo.
 
@@ -130,6 +132,35 @@ Deux finitions peu coûteuses, dont une corrige une limite connue de la v6.5.
 - Pendant la charge du saut : chaque battement de la géode donne une impulsion ; la vitesse monte par paliers, jusqu'à ≈ 3 tours/s au repli, puis retombe après le saut. La rotation suit donc exactement le rythme des pulsations de la v6.4.
 - Coût nul (une rotation par image) ; l'angle est calculé depuis le temps, donc correct aussi pour les plans qui anticipent.
 
+## Lot 5 — progression du chargement (à planifier)
+
+Ajouté le 26 septembre 2026. Aujourd'hui, l'écran d'accueil affiche « GENERATING UNIVERSE… » sans aucune indication d'avancement pendant que le moteur génère le monde, puis que la démo prépare le premier système. Une barre de progression rendrait l'attente lisible.
+
+- **Étapes suivies** : moteur prêt, champ d'étoiles et nébuleuses, premier système (planètes, étoile, lunes), vaisseaux et trafic, compilation des shaders et premier rendu.
+- **Option recommandée — barre par jalons** : chaque étape a un poids mesuré une fois (temps moyen) ; la barre avance par jalons et progresse doucement pendant l'étape en cours, avec son libellé. Effort faible, valeur forte, aucun changement du moteur.
+- **Alternative — progression mesurée** : compter les cellules et objets réellement générés (caches du moteur observés de l'extérieur). Plus exacte, mais effort moyen et risque d'à-coups, car le moteur ne publie pas son avancement.
+- **Minimum — barre indéterminée** : animation sans pourcentage. Effort nul, valeur faible.
+- **Charte McGivrer** : filet `#25375c`, barre ambre de 2 px, pourcentage en JetBrains Mono, libellé d'étape en `#8ea0c4`, coins en équerre ; animation réduite si `prefers-reduced-motion`.
+- **Test** : la barre atteint 100 % au moment où « CLICK TO LAUNCH » apparaît, sans recul, sur 5 graines et en version minifiée.
+
+## Lots 6 à 9 — modernisation et flotte militaire (v7.2 → v7.5)
+
+Décisions du 26 septembre : D8 à D11 (options recommandées retenues).
+
+| Version | Lot | Contenu | Effort | Valeur |
+| --- | --- | --- | --- | --- |
+| v7.2 | 6 — hublots, livrées, anneaux | Hublots hexagonaux par famille, verrières en nid d'abeille, portes de hangar à pans coupés ; ≈ 30 % de livrées sombres, usure inversée, projecteurs de coque ; anneaux en rotation, charge visible | moyen | forte |
+| v7.3 | 7 — intérieurs | 3 ambiances (hospitalité, industriel, rétro-futur), hangars animés, passerelles avec équipage | élevé | forte |
+| v7.4 | 8 — flotte militaire I | warships.js : chasseur, corvette, destroyer ; patrouille, escorte, station ; plans dédiés ; carte et radar | élevé | forte |
+| v7.5 | 9 — flotte militaire II | Catapultage, exercices de tir sans destruction, panneau FLEET (touche G) | moyen | moyenne |
+
+### Architecture de la v7.2
+
+- **Hublots** (shipglass.js) : la forme est une fonction de distance ; ajout d'un hexagone allongé en trois variantes choisies par famille de modèle. Cadre en relief et embrasure suivent la même distance ; le quadrilatère est agrandi pour contenir la forme. Au-delà de 0,68 d'âge, le hublot reste rond (ancienne génération).
+- **Livrées** (shipwear.js) : le module copie déjà les matériaux de chaque vaisseau ; la palette change les 3 teintes du moteur (coque, intermédiaire, livrée). Tirage par graine et par famille ; paramètre d'URL pour les tests. La poussière éclaircit une peinture sombre. Projecteurs : 2 à 4 cônes analytiques dans le shader d'usure, allumés côté ombre.
+- **Anneaux** (cine.js) : pré-charge visuelle de 3 s avant la charge actuelle (trajectoires inchangées), halo additif, arcs entre anneaux, lueur sur la coque ; rotation de l'anneau et d'émetteurs ajoutés, supports fixes.
+- **Risques** : cadre hexagonal plus large que le hublot d'origine (espacement à vérifier sur les 10 modèles) ; vaisseaux sombres illisibles côté ombre ; halo additif sous profondeur de champ.
+
 ## Architecture
 
 Deux nouveaux modules d'interface et un module d'effets s'ajoutent ; `cine.js` gagne une petite API de pilotage pour qu'ils ne touchent jamais à ses données internes.
@@ -168,7 +199,7 @@ Le principal risque technique est la profondeur de champ (coût GPU et interacti
 
 ## Décisions à prendre
 
-Six choix conditionnent la suite ; l'option recommandée est en premier et sera appliquée par défaut sans contre-indication.
+Les six options recommandées sont validées le 26 septembre 2026 ; pour D6, l'unité \`u\` s'adapte à la distance (u, ku, Mu) ; D7 (barre par jalons, livrée avec la v6.9) est validée le même jour.
 
 | # | Question | Option recommandée | Alternative | Coût / effort | Valeur |
 | --- | --- | --- | --- | --- | --- |
@@ -178,5 +209,253 @@ Six choix conditionnent la suite ; l'option recommandée est en premier et sera 
 | D4 | Double-clic sur une étoile lointaine | **Devient le prochain saut** (le héros y va, sans rupture) | Téléportation immédiate de la caméra (1–2 s de chargement du système) | faible / moyen | forte / moyenne |
 | D5 | Profondeur de champ (lot 3) | **Selon la profondeur** du premier plan (vrai flou d'optique) | Flou du seul arrière-plan, sans profondeur | moyen / faible | forte / moyenne |
 | D6 | Unité `u` du radar (lot 2) | **1 u = 1 m** (échelle des coques du jeu), `ku` et `Mu` au-delà de 10 000 | Unité galactique du jeu (1 u ≈ 0,026 pc), inadaptée aux distances entre vaisseaux | nul | cohérence |
+| D7 | Barre de chargement (lot 5) : quand et comment | **Barre par jalons**, livrée avec la v6.9 | Progression mesurée sur les caches du moteur, ou livraison séparée | faible / moyen | moyenne / moyenne |
+| D8 | Forme des hublots | Retenue : hexagones par famille (horizontal, fente blindée, petit), rond pour les très vieux vaisseaux | Hexagone horizontal partout ; hexagone vertical | faible | forte |
+| D9 | Intérieurs | Retenue : 3 ambiances (hospitalité, industriel, rétro-futur) + hangars et passerelles | Style unique ; version maximale avec salon et pont-jardin | élevé | forte en gros plan |
+| D10 | Livrées sombres | Retenue : palettes (≈ 30 % sombres) + usure inversée + projecteurs de coque | Palettes seules ; + immatriculations peintes | moyen | forte |
+| D11 | Flotte militaire | Retenue : générateur warships.js en 2 phases (v7.4 : 3 classes et comportements ; v7.5 : catapultage, exercices, sélecteur) | Variantes militarisées ; flotte complète d'emblée | élevé puis moyen | forte |
 
-Dès validation, la v6.7 (bugs + sélecteur) peut démarrer : elle ne dépend que de D1 et D2.
+La v6.7 (bugs + sélecteur) est livrée le 26 septembre 2026 : plus de marche arrière sous 3,3 rayons planétaires, 13 à 15 héros différents sur 20 min, sélecteur sur l'accueil et en démo.
+
+La v6.8 (lot 2) est livrée le 26 septembre 2026 : carte en trois niveaux (secteur, système, orbite) enchaînés par le zoom, double-clic vers la caméra ou le prochain saut (départ replanifié sans rupture, mise en attente si trop tard), radar McGivrer avec immatriculations et distances en u adaptées, usage tactile. Mesures : radar 0,05 à 0,35 ms, carte 0,1 à 2,8 ms par dessin, rien quand ils sont fermés.
+
+La v6.9 (lots 3 et 5) est livrée le 26 septembre 2026 : profondeur de champ dans les gros plans (profondeur réelle du premier plan, flou pondéré, FXAA), tuyères orientables qui suivent le couple et vibrent en poussée, tremblement de caméra sur allumage, saut et distorsion, barre de chargement par jalons avec shaders compilés avant le lancement.
+
+La v7.0 (lot 4) est livrée le 26 septembre 2026 : une pièce par cabine (répartition du générateur rejouée, vérifiée sur les 10 modèles, coin salon des suites, repli automatique) et cadre de la géode en rotation, jusqu'à 3 tours/s au repli. Le plan est terminé ; prochaine étape : la résolution des textures demandée le 26 septembre.
+
+La v7.1 est livrée le 26 septembre 2026 : les 4 textures partagées du générateur (tôles 512 px pour \~7 m de coque, soit 25 à 75 px par mètre) sont redessinées en 4× à partir des recettes du moteur (même graine, rivets ronds, filtrage anisotrope), les petits engins aussi ; le shader d'usure ajoute martelage, grain et rayures sous le texel, effacés au-delà du pixel, et ses seuils sont anticrénelés (plus de points isolés). Coût : ≈ 22 Mo de mémoire GPU (5,5 Mo avec quality=low), rien par image ; non-régression passée (démarrage, 20 min simulées, cabines). Demande suivante : publication sur GitHub Pages.
+
+Demandes du 26 septembre à planifier (v7.2 → v7.5) :
+
+- **Hublots et baies** : hexagones allongés au lieu de ronds ; verrières en nid d'abeille pour les baies, portes de hangar à pans coupés.
+- **Intérieurs modernisés** (cabines, baies, passerelles, hangars), inspirés de 2010, Star Trek et The Expanse, avec des silhouettes originales.
+- **Livrées plus sombres** pour une partie de la flotte (lisibilité : projecteurs de coque, feux, usure inversée).
+- **Flotte militaire** : chasseurs, corvettes, destroyers, avec patrouilles, escortes et catapultage.
+- **Anneaux de distorsion** : faire tourner les anneaux et rendre l'effet de charge visible. Diagnostic : l'effet s'active bien (champ 0,15 → 1,35, liaison des uniformes vérifiée), mais il ne dure que 2,6 s, avec une montée quadratique et sans halo.
+- **GitHub Pages** : en attente (pas de dépôt rattaché à la session ; licence de la musique à vérifier avant diffusion publique).
+
+La v7.2 (lot 6) est livrée le 26 septembre 2026 :
+
+- **Hublots** : hexagonaux par famille (ronds pour les très vieux vaisseaux) ; verrières en nid d'abeille ; hangars et passerelles à pans coupés.
+- **Livrées** : ≈ 30 % de vaisseaux sombres (anthracite, bleu nuit, bouteille, bordeaux, noir, acier), avec usure inversée et projecteurs de coque côté ombre.
+- **Anneaux de distorsion** : rotation dans leurs colliers, 12 émetteurs, halo, voile et lueur sur la coque. Une pré-charge visuelle de 3 s précède le départ, et un plan rapproché `warpRings` est tourné 7 fois sur 10.
+- **Non-régression** passée (démarrage, 20 min simulées, cabines).
+
+La v7.2.1 est livrée le 26 septembre 2026. Le départ en distorsion a été repris :
+
+- **Engagement** : 2,2 s au lieu de 0,75 s ; le vaisseau démarre lentement, puis s'arrache en laissant une traîne violette.
+- **Disparition** : éclair, secousse et repli du vaisseau dans le plan de départ.
+- **Particules** : une gerbe de 1 500 particules violettes se disperse là où il était, et la traîne s'égrène en 900 particules.
+- **Montage** : le plan de départ est prolongé et la croisière allongée.
+- **Non-régression** passée (démarrage, 20 min, changements de cible en distorsion).
+
+La v7.2.2 (corrections) est livrée le 26 septembre 2026 :
+
+- **Moyens de saut** : un vaisseau n'emploie que ce dont il est équipé, géode et/ou anneaux, selon le modèle et le sélecteur.
+  - Seuls les 4 modèles supraluminiques quittent un système.
+  - Un vaisseau sans moyen de saut devient la vedette de l'orbite ; le départ se fait avec le partant prévu.
+- **Retournements** : ils se font autour du centre de gravité.
+- **Baies** : les engins sortent dans l'axe (écart nul mesuré sur 35 manœuvres).
+- **Éjection coronale** : le bord est adouci et déchiqueté.
+
+La v7.3 (lot 7) est livrée le 26 septembre 2026 :
+
+- **Ambiances intérieures** : hospitalité pour les paquebots et les coureurs, industriel pour les cargos et les pousseurs, rétro-futur pour les très vieux vaisseaux.
+- **Pièces** : arêtes du plafond à pans coupés.
+- **Passerelles** : opérateurs assis et table tactique holographique.
+- **Hangars** : plot hexagonal, feux chenillards, portique roulant et salle de contrôle vitrée.
+- **Coût** : +20 % en gros plan plein écran d'un hangar (rendu logiciel).
+
+Prochaine étape : v7.4, flotte militaire (phase 1).
+
+La v7.4 (lot 8) est livrée le 26 septembre 2026 :
+
+- **Générateur** warships.js : chasseur (≈ 15 m), corvette (≈ 80 m) et destroyer (≈ 250 m), à tourelles animées.
+- **Scénarios** (un par système, dans 6 systèmes sur 10) : station (destroyer et ronde de chasseurs), patrouille en formation, escorte de cargo.
+- **Plans** : formation et gros plan de tourelle.
+- **Carte et radar** : contacts militaires en rouge.
+- **Coût** : 25 à 60 appels de dessin par groupe à l'écran.
+
+La v7.5 (lot 9) est livrée le 26 septembre 2026 :
+
+- **Hangars du destroyer** : deux baies latérales à champ de force ; les chasseurs sont catapultés (2,6 s), font une ronde autour du destroyer puis rentrent.
+- **Exercices de tir** sur un drone-cible, en temps réel seulement : traçantes et obus, ≈ 70 % de coups au but, bouclier d'entraînement qui s'illumine, aucune destruction. Anticipation calculée dans le repère du destroyer.
+- **Plan gunnery** à deux cadrages : large de profil, ou téléobjectif depuis la cible.
+- **Panneau FLEET** (touche G) : patrouille, station ou escorte, suivie par la caméra. Remplace l'onglet du sélecteur prévu (le sélecteur du jeu reste inchangé).
+- **Coût** : 2 appels de dessin pour les tirs, groupe caché hors exercice ; mémoire stable sur 20 min simulées.
+
+En attente : publication (GitHub Pages ou Vercel, licence musicale à vérifier) et voyage des vaisseaux sans moyen supraluminique.
+
+## Porte-vaisseaux — cadrage (27 septembre 2026)
+
+But : faire voyager d'un système à l'autre les vaisseaux sans moyen supraluminique (e18, p10, x1, remorqueurs), à bord d'un nouveau type de vaisseau.
+
+Décisions :
+
+- **Concept** : dock semi-ouvert, hangar en vraie géométrie (plans filmés dans le hangar).
+- **Ouverture** : latérale ; le vaisseau se range à couple, puis glisse de côté dans son poste.
+- **Capacité** : 2 places (le vaisseau suivi et un second vaisseau garé).
+- **Usage** : toujours en mode Suivre ; une fois sur deux en mode Auto (sinon, relais actuel vers un vaisseau supraluminique).
+
+Conséquences :
+
+- **Dimensions visées** : soute d'environ 290 × 75 × 55 m (deux postes de 135 m ; passager le plus long : tL, 120 m ; le plus large : x1, 63 m ; le plus haut : e18, 38 m) ; porteur d'environ 650 à 700 m.
+- **Effort** : élevé (au lieu de moyen+ pour la soute fermée).
+- **Risque principal** : le moteur n'a pas d'ombres portées, donc le hangar et les vaisseaux garés seraient éclairés par le soleil à travers la coque. Parade : ombre calculée pour la soute (éclairé seulement si le rayon vers le soleil sort par l'ouverture).
+- **Coût estimé** : 80 à 110 appels de dessin pour le porteur et ses passagers à l'écran.
+
+Découpage retenu (3 lots) :
+
+- **v7.6** : le porteur, son dock, les deux postes et l'ombre de soute ; un vaisseau garé en décor ; entrée « SHIP CARRIER » dans le panneau FLEET pour aller le voir.
+- **v7.7** : rangement et sortie à couple, pinces et bras d'avitaillement, plans de caméra dédiés.
+- **v7.8** : voyage complet (départ en distorsion avec le passager, arrivée, débarquement, carte, radar, mode Suivre).
+
+## Porte-vaisseaux — architecture (étape 2)
+
+### Dimensions
+
+| Élément | Taille | Justification |
+| --- | --- | --- |
+| Poste | 135 × 75 × 55 m | tL 120 m de long, x1 63 m de large, e18 38 m de haut, marges de 6 à 8 m |
+| Soute (2 postes en ligne) | ≈ 290 × 75 × 55 m | ouverture sur tout le flanc, sans montant vertical (le vaisseau entre de côté) |
+| Porteur | ≈ 650 × 120 × 95 m | proue ≈ 110 m, soute ≈ 290 m, arrière (anneaux et moteurs) ≈ 250 m |
+
+### Modules
+
+- **carrier.js** (nouveau, après warships.js) : générateur du porteur sur les outils des petits engins (formes, tôles, fusion par matériau, usure, projecteurs, hublots simulés). Rendu : coque, dock en vraie géométrie (sol, fond, plafond, cloisons de bout, nervures, passerelles, portique roulant, deux salles de contrôle vitrées), deux berceaux à pinces, 2 anneaux de distorsion à l'arrière (même structure que warpring.js, pour que l'effet de départ fonctionne tel quel), balisage (feux d'approche chenillards, numéros de poste peints).
+- **Ombre de soute** (injection dans le shader d'usure) : pour chaque fragment dans le volume de la soute, rayon vers le soleil ; éclairé seulement s'il sort par l'ouverture, bord adouci. S'applique au dock et aux vaisseaux garés ou en manœuvre. Matrice vue → soute mise à jour juste avant le dessin (rendu en tranches). Éclairage propre du hangar : projecteurs analytiques déjà utilisés pour les coques.
+- **Champ de force** (option) : voile translucide sur l'ouverture, même aspect que les baies actuelles, onde au passage d'un vaisseau.
+- **cine.js** : scénario « porteur » (orbite haute, un vaisseau sans moyen de saut garé au poste 2), trajectoire « à quai » dans le repère du porteur ; v7.7 : manœuvres à couple ; v7.8 : branchement sur le relais existant (le porteur part, le passager redevient héros à l'arrivée).
+- **live2.js** : entrée SHIP CARRIER dans le panneau FLEET. **radar.js / starmap.js** : contact et fiche (v7.8 : « à bord de … »).
+
+### Performances
+
+- Budget : porteur ≈ 45 à 60 appels de dessin (coque et dock fusionnés par matériau), vaisseau garé 20 à 40, soit 80 à 110 à l'écran (médiane actuelle ≈ 280 par image).
+- Optimisations : fusion par matériau ; détails du dock (portique, pinces, passerelles) cachés au-delà de ≈ 3 km ; ombre de soute compilée seulement dans les matériaux concernés ; feux de balisage en un seul nuage de points ; shaders compilés pendant le chargement ; en distorsion (v7.8), passager masqué quand l'ouverture n'est pas visible.
+
+### Risques
+
+| Risque | Impact | Parade |
+| --- | --- | --- |
+| Soleil à travers la coque (pas d'ombres) | fort | ombre de soute calculée |
+| Échelle illisible (650 m) | moyen | repères humains : passerelles, rangées de hublots, drones de service dans le dock, numéros peints |
+| Intégration au calendrier (v7.8) | fort | relais existant réutilisé, tests moyens de saut, héros, carte |
+| Ombres portées hors soute (coque sur un vaisseau à couple) | faible | non traitées (limite documentée) |
+| À-coup à la première apparition | faible | compilation au chargement |
+
+### Choix de conception (28 septembre 2026)
+
+- **Silhouette catamaran** : une coque dorsale et une coque ventrale, réunies à la proue et à la poupe. Le dock traverse le vaisseau de bord à bord (on voit les étoiles à travers) : entrée d'un côté, sortie de l'autre. L'ombre de soute gère deux ouvertures.
+- **Fermeture** : deux champs de force, allumés en transit et en distorsion, éteints pendant les manœuvres.
+- **Identité** : civile ou militaire, tirée au hasard par système (paramètre ?carrier=civil ou mil pour l'imposer).
+- **Fréquence en v7.6** : environ 1 système sur 3, plus l'entrée SHIP CARRIER du panneau FLEET et ?carrier=1.
+
+La v7.6 (lot 10) est livrée le 28 septembre 2026 :
+
+- **Porteur** d'environ 640 m, en silhouette catamaran. Le dock traverse le vaisseau de bord à bord et contient deux postes, un pylone en treillis, un portique roulant, deux salles de contrôle vitrées, des feux chenillards et deux champs de force. Deux anneaux de distorsion à l'arrière.
+- **Ombre de soute** calculée dans le shader d'usure, plus la lumière du plafond. Elle vaut pour le dock, le vaisseau garé et les drones.
+- **Identité** civile (SC nnn) ou militaire (FC nnn, tourelles), tirée par système.
+- **Présence** dans environ 1 système sur 3 : un vaisseau sans moyen de saut garé au poste 2 et deux drones dans le poste libre.
+- **Plans** dockPass, dockInterior et dockBerth ; entrée SHIP CARRIER dans le panneau FLEET.
+- **Coût** : le porteur fait 34 à 45 appels de dessin. Le vaisseau garé coûte comme un cargo du trafic. Porteur et flotte militaire sont compilés au chargement, donc sans à-coup à leur apparition.
+
+Correctif v7.6.1 (28 septembre 2026), à la demande de Frédéric : le porteur a implicitement le **saut quantique**, sa raison d'être. Il porte la géode du jeu sur un mât, entre les anneaux, et possède donc les deux moyens supraluminiques. En v7.8, il partira par saut quantique par défaut.
+
+Correctif v7.6.2 (28 septembre 2026), à la demande de Frédéric : le porteur reçoit les **moteurs de la dernière version**, les mêmes ensembles que les vaisseaux du jeu (cloches Rao, col incandescent, bobines, cardans, jets de torche de fusion). Coût : environ 7 appels de dessin par moteur, soit environ 64 pour le porteur civil.
+
+## Plan d'implémentation par lots (28 septembre 2026)
+
+Nouvelles demandes :
+
+- propulsion « hard SF » du porteur, un design original dans l'esprit de *The Expanse* (sans copier le Canterbury) ;
+- des éclipses rares ;
+- des travellings planétaires lents ;
+- des plans-séquences cinéma ;
+- des trajets de planète en planète.
+
+Elles s'ajoutent aux deux lots prévus du porte-vaisseaux (rangement à couple, voyage complet), qui sont renumérotés.
+
+Ordre retenu :
+
+1. d'abord ce qui se voit tout de suite et risque peu, la réalisation ;
+2. puis la propulsion, avant les plans de manœuvre du porteur, pour ne recadrer ces plans qu'une fois ;
+3. et le calendrier des visites (voyage, escales) en dernier.
+
+| Lot | Version | Contenu | Effort | Valeur | Risque |
+| --- | --- | --- | --- | --- | --- |
+| 11 | v7.7 | Réalisation I : éclipses rares, travellings planétaires lents, lever de planète, terminateur, contre-champ d'arrivée | faible à moyen | forte | faible |
+| 12 | v7.8 | Propulsion hard-SF du porteur (option A+) | moyen+ | forte | moyen |
+| 13 | v7.9 | Réalisation II : révélation, parallaxe d'anneaux, tour du système | moyen | forte | moyen |
+| 14 | v7.10 | Porte-vaisseaux II : rangement et sortie à couple | moyen+ | forte | moyen |
+| 15 | v7.11 | Porte-vaisseaux III : voyage complet par saut quantique | élevé | très forte | élevé |
+| 16 | v7.12 | Escale interplanétaire | élevé | forte | élevé |
+
+### Lot 11 — v7.7 · Réalisation I
+
+- **Éclipses** : au plus une tous les 3 à 4 systèmes (probabilité d'environ 0,15), jamais deux systèmes de suite ; paramètre `?eclipse=` pour forcer ou couper.
+- **Travelling planétaire** : 15 à 25 s au lieu de 7 à 11, un mouvement 2 à 3 fois plus lent, choisi deux fois plus souvent parmi les plans de découverte ; raccourci si le départ approche.
+- **Lever de planète** (nouveau) : caméra derrière une lune ou au ras du limbe ; la planète monte lentement, le vaisseau en silhouette s'il est proche.
+- **Terminateur** (nouveau) : panoramique lent du jour vers la nuit, lumières des villes, arc de l'atmosphère.
+- **Contre-champ d'arrivée** (nouveau) : la caméra attend déjà près de la planète ; le vaisseau arrive du fond de l'image, par saut ou par distorsion.
+- **Tests** : statistiques de plans sur 20 minutes (éclipses par système, durées), capture de chaque nouveau plan, non-régression.
+- **Performances** : pas de coût nouveau, mais les plans lourds (planète plein écran) durent plus longtemps.
+- **À décider** : la fréquence exacte des éclipses ; la présence du vaisseau dans les travellings (absent, ou de temps en temps).
+
+### Lot 12 — v7.8 · Propulsion hard-SF du porteur (A+)
+
+- **Section de propulsion** derrière le bloc moteur (porteur d'environ 700 à 720 m) :
+  - une torche de fusion unique (tuyère d'environ 75 m, profil Rao, col incandescent, tubes de refroidissement) ;
+  - une pile de 6 bobines magnétiques, un bâti de poussée en treillis et 6 vérins de cardan géants ;
+  - un bouclier anti-radiations en disque, des conduites d'ergols et des réservoirs ;
+  - deux grandes ailes de radiateurs à canaux rougeoyants, plus vifs en poussée.
+- **Réutilisation** de shipdrive.js à grande échelle (profil, chauffe, cardan, jet de torche), en exposant une fonction de construction paramétrable.
+- **Jet** : cœur blanc très collimaté, longueur et éclat dosés pour les gros plans.
+- **Plans** : recadrage des plans du dock ; nouveaux plans en gros plan sur le moteur et en travelling le long des radiateurs.
+- **Option** : les mêmes principes à petite échelle pour le destroyer et la corvette, pour un effort faible.
+- **Budget** : 20 à 25 appels de dessin de plus pour le porteur ; shaders compilés au chargement.
+- **Risques** : éblouissement du jet en gros plan ; lisibilité de l'échelle (repères : passerelles, hublots, drones).
+- **À décider** : validation d'une première planche de rendus (3 vues, au repos et en pleine poussée) avant l'intégration.
+
+### Lot 13 — v7.9 · Réalisation II : plans-séquences
+
+- **Révélation** : 20 à 30 s d'un seul tenant ; caméra collée à la coque, puis recul et grue, et la planète apparaît derrière le vaisseau. La trajectoire est une courbe continue, sans coupe.
+- **Parallaxe d'anneaux** : travelling latéral au ras du plan des anneaux, particules au premier plan, planète derrière (planètes à anneaux seulement).
+- **Tour du système** (caméra seule) : vol documentaire accéléré de planète en planète, 20 à 30 s, avec la légende des planètes survolées. Choisi rarement, plutôt en début de visite.
+- **Risques** : caméra qui traverse un corps (contrôle de distance) ; cohérence du temps accéléré.
+- **Tests** : planches de captures en séquence, statistiques de fréquence.
+
+### Lot 14 — v7.10 · Porte-vaisseaux II : rangement et sortie à couple
+
+- **Manœuvre** :
+  - approche parallèle et mise à couple ;
+  - glissement latéral dans le poste aux propulseurs d'attitude ;
+  - fermeture des pinces, bras d'avitaillement ;
+  - champ de force coupé pendant la manœuvre, avec une onde au passage ;
+  - sortie par l'autre bord (dock traversant).
+- **Plans** : approche à couple, passage du champ, vue depuis la salle de contrôle, vue au ras du pont.
+- **Risques** : collisions (marges du poste) ; précision de la trajectoire dans le repère du porteur.
+
+### Lot 15 — v7.11 · Porte-vaisseaux III : voyage complet
+
+- **Départ par saut quantique** (géode du porteur, charge, onde) avec le passager à bord ; distorsion possible avec `?ftl=warp`.
+- **Arrivée** : débarquement, et le passager redevient le vaisseau suivi.
+- **Modes** : Suivre fonctionne pour tous les vaisseaux ; en mode Auto, le porteur intervient une fois sur deux (sinon, relais actuel).
+- **Carte et radar** : mention « à bord de … ».
+- **Risques** : on touche au calendrier des visites. Parade : réutiliser le relais existant, et tester les moyens de saut, les héros, la carte et 20 minutes simulées.
+
+### Lot 16 — v7.12 · Escale interplanétaire
+
+- **Escale** : de temps en temps (environ 1 visite sur 4), le vaisseau suivi s'arrête à une deuxième planète du système avant de partir.
+- **Trajet** : transfert (poussée, retournement, freinage), puis mise en orbite, avec de nouveaux plans ; la carte montre le trajet dans le système.
+- **Risques** : calendrier et temps accéléré (des dizaines de millions de km) ; cohérence de la carte et du radar. À faire en dernier, sur un calendrier stabilisé.
+
+### Rituel de livraison (chaque lot)
+
+- versions lisible et minifiée, zip du projet, README, planche d'images ;
+- tests de non-régression ;
+- mise à jour de ce plan ;
+- pause pour validation avant le lot suivant.
+
+Choix par défaut maintenus : le porteur garde ses anneaux en plus du saut quantique.
+
+Prochaine étape : v7.3, intérieurs.

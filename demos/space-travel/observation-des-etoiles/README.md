@@ -27,8 +27,10 @@ Pas de HUD imposé : l'univers est généré en continu, des vaisseaux y circule
 
 | Fichier | Contenu |
 |---|---|
-| `observation-des-etoiles-v7.5.html` | Version courante (**échelle réelle**, **RCS**, **vaisseaux vieillis**, **moteurs réalistes**, **gros plans**, **géode pulsante**, **hublots et hangars réalistes**, **baies à champ de force**, **petits engins**, **sélecteur de vaisseaux**, **carte de l'univers**, **radar**, **profondeur de champ**, **tuyères orientables**, **tremblement de caméra**, **barre de chargement**, **une pièce par cabine**, **géode en rotation**, **textures haute résolution**, **hublots hexagonaux**, **livrées sombres**, **anneaux de distorsion en rotation**, **départ en distorsion avec traînée et gerbe violettes**, **intérieurs à trois ambiances**, **flotte militaire**, **catapultage et exercices de tir**, **panneau FLEET**), code de la démo lisible et commenté |
-| `observation-des-etoiles-v7.5.min.html` | Même version, scripts de la démo minifiés (terser) et CSS compacté |
+| `observation-des-etoiles-v7.6.1.html` | Version courante (**échelle réelle**, **RCS**, **vaisseaux vieillis**, **moteurs réalistes**, **gros plans**, **géode pulsante**, **hublots et hangars réalistes**, **baies à champ de force**, **petits engins**, **sélecteur de vaisseaux**, **carte de l'univers**, **radar**, **profondeur de champ**, **tuyères orientables**, **tremblement de caméra**, **barre de chargement**, **une pièce par cabine**, **géode en rotation**, **textures haute résolution**, **hublots hexagonaux**, **livrées sombres**, **anneaux de distorsion en rotation**, **départ en distorsion avec traînée et gerbe violettes**, **intérieurs à trois ambiances**, **flotte militaire**, **catapultage et exercices de tir**, **panneau FLEET**, **porte-vaisseaux à dock traversant**), code de la démo lisible et commenté |
+| `observation-des-etoiles-v7.6.1.min.html` | Même version, scripts de la démo minifiés (terser) et CSS compacté |
+| `observation-des-etoiles-v7.6.html` / `.min.html` | Porte-vaisseaux sans cœur de saut quantique (anneaux seuls) |
+| `observation-des-etoiles-v7.5.html` / `.min.html` | Sans porte-vaisseaux |
 | `observation-des-etoiles-v7.4.html` / `.min.html` | Flotte militaire sans catapultage, tirs ni panneau FLEET |
 | `observation-des-etoiles-v7.3.html` / `.min.html` | Sans flotte militaire |
 | `observation-des-etoiles-v7.2.2.html` / `.min.html` | Intérieurs d'origine de la démo (pièces en boîte, style unique) |
@@ -51,17 +53,17 @@ Pas de HUD imposé : l'univers est généré en continu, des vaisseaux y circule
 | `observation-des-etoiles-v3.html` / `.min.html` | Version stabilisée (sans aurores) |
 | `space-travel-universe-tour.html` | Première démo : visite scénarisée de 60 s en boucle (plans fixes) |
 
-Chaque fichier est **autonome** (≈ 7 Mo) : moteur du jeu, three.js r128, musique et code de la démo sont embarqués. L'essentiel du poids vient de la piste musicale encodée en base64 ; la minification ne fait gagner qu'environ 130 Ko (code de la démo : 513 Ko → 346 Ko).
+Chaque fichier est **autonome** (≈ 7 Mo) : moteur du jeu, three.js r128, musique et code de la démo sont embarqués. L'essentiel du poids vient de la piste musicale encodée en base64 ; la minification ne fait gagner qu'environ 130 Ko (code de la démo : 547 Ko → 367 Ko).
 
 Seules les polices *JetBrains Mono* / *Inter* sont chargées depuis Google Fonts (police système en repli si hors ligne).
 
-### Package source (`observation-des-etoiles-v7.5-projet.zip`)
+### Package source (`observation-des-etoiles-v7.6.1-projet.zip`)
 
 ```
 observation-des-etoiles/
 ├── README.md                              ce document
-├── observation-des-etoiles-v7.5.html      version lisible (prête à ouvrir)
-├── observation-des-etoiles-v7.5.min.html  version minifiée
+├── observation-des-etoiles-v7.6.1.html    version lisible (prête à ouvrir)
+├── observation-des-etoiles-v7.6.1.min.html version minifiée
 ├── package.json                           outils : terser, clean-css, playwright (tests)
 ├── engine/game.html                       build v2.15 du jeu (moteur, three.js r128, musique) — entrée du build, jamais modifiée
 ├── src/                                   code de la démo, dans l'ordre d'assemblage
@@ -72,6 +74,7 @@ observation-des-etoiles/
 │   ├── hitex.js                           textures haute résolution des coques
 │   ├── smallcraft.js                      générateur de petits engins (maintenance, transport, drones, gabares)
 │   ├── warships.js                        flotte militaire : chasseur, corvette, destroyer (tourelles, hangars), drone-cible
+│   ├── carrier.js                         porte-vaisseaux civil ou militaire : dock traversant, postes, ombre de soute
 │   ├── postfx.js                          profondeur de champ (passes plein écran)
 │   ├── cine.js                            simulation, réalisateur, rendu en couches, API carte et radar
 │   ├── starmap.js                         carte de l'univers (canevas 2D : secteur, système, orbite)
@@ -79,10 +82,10 @@ observation-des-etoiles/
 │   └── live2.js                           ④ écran d'accueil (barre de chargement), boucle temps réel, légende
 ├── build/build.py · build_min.js · package.py   assemblage → dist/, zip du projet
 ├── tests/                                 harnais Playwright + SwiftShader (rendu logiciel)
-└── docs/                                  planches d'images des versions 6.1 à 7.5
+└── docs/                                  planches d'images des versions 6.1 à 7.6
 ```
 
-Reconstruire : `python3 build/build.py` (aucune dépendance) puis `npm install` et `node build/build_min.js` ; les fichiers sortent dans `dist/`. Tests : `node tests/smoke.js` (démarrage et 200 s de simulation sur la version minifiée), `node tests/longrun.js LONG-10` (20 min simulées : erreurs, mémoire, types de plans), `node tests/shots.js OBS-8 30:bay@1:1 34:keep` (plans forcés — ici une sortie de baie —, captures), `node tests/hangar.js l20 0.5 "…"` (vaisseau isolé sous plusieurs angles), `node tests/geode.js`, `node tests/fleet.js`, `node tests/drawcalls.js` (objets par modèle), `node tests/framecalls.js` (appels de dessin par image), `node tests/orientation.js OBS-2` (nez / vitesse par phase), `node tests/heroes.js LONG-10` (rotation des héros), `node tests/selector.js` (sélecteur, clavier et souris), `node tests/map-api.js` (API de la carte), `node tests/map.js` (carte à la souris : niveaux, sélection, double-clic, prochain saut ; radar), `node tests/map-jumps.js OBS-5` (changement de cible en distorsion, saut en attente, nébuleuse, lune), `node tests/map-mobile.js` (téléphone, tactile, paysage, version minifiée, mouvement réduit) `node tests/map-stress.js` (double-tap, pincement, 200 ouvertures, mémoire, coûts), `node tests/loading-fx.js` (barre de chargement, cardans, tremblement), `node tests/dof.js OBS-3 engineClose,hullDolly` (même image avec et sans profondeur de champ, coût), `node tests/gimbal-shake.js` (cardans pendant un retournement, allumage) `node tests/jump-dof.js` (saut filmé en gros plan : flou + lentille, erreurs GL), `node tests/cabins.js` (cabines reconstituées pour chaque modèle, rotation de la géode) `node tests/suite.js l20` (gros plans d'une suite et d'une cabine confort), `node tests/textures-inventory.js` (inventaire des textures : taille, répétition, densité en pixels par mètre) `node tests/textures.js 1 hd` / `0 sd` (mêmes gros plans avec et sans textures HD), `node tests/liveries.js tM "jeu,anthracite,nuit,noir"` (un modèle en plusieurs livrées, au soleil et côté ombre) `node tests/warp-rings.js OBS-1` (départ en distorsion filmé : pré-charge, charge, rotation, champ), `node tests/cme.js OBS-1` (éjection de masse coronale filmée) `node tests/ftl-means.js OBS-2` (départs selon l'équipement réel, sélecteur : vedette sans moyens de saut, bascule saut → distorsion, relais au système suivant) `node tests/military.js OBS-4` (système avec station, patrouille et escorte : plans de formation et de tourelle, carte et radar), `node tests/military-2.js OBS-4` (exercice de tir ouvert à la demande et filmé, tourelle en tir, catapultage d'un chasseur depuis le hangar du destroyer, panneau FLEET au clic) et `node tests/interiors.js l20 0.2 int 0` (gros plans à travers un hublot, une passerelle, une baie panoramique et les hangars ; ambiance forcée en 4ᵉ argument, `DIST=0.75` pour coller à la vitre).
+Reconstruire : `python3 build/build.py` (aucune dépendance) puis `npm install` et `node build/build_min.js` ; les fichiers sortent dans `dist/`. Tests : `node tests/smoke.js` (démarrage et 200 s de simulation sur la version minifiée), `node tests/longrun.js LONG-10` (20 min simulées : erreurs, mémoire, types de plans), `node tests/shots.js OBS-8 30:bay@1:1 34:keep` (plans forcés — ici une sortie de baie —, captures), `node tests/hangar.js l20 0.5 "…"` (vaisseau isolé sous plusieurs angles), `node tests/geode.js`, `node tests/fleet.js`, `node tests/drawcalls.js` (objets par modèle), `node tests/framecalls.js` (appels de dessin par image), `node tests/orientation.js OBS-2` (nez / vitesse par phase), `node tests/heroes.js LONG-10` (rotation des héros), `node tests/selector.js` (sélecteur, clavier et souris), `node tests/map-api.js` (API de la carte), `node tests/map.js` (carte à la souris : niveaux, sélection, double-clic, prochain saut ; radar), `node tests/map-jumps.js OBS-5` (changement de cible en distorsion, saut en attente, nébuleuse, lune), `node tests/map-mobile.js` (téléphone, tactile, paysage, version minifiée, mouvement réduit) `node tests/map-stress.js` (double-tap, pincement, 200 ouvertures, mémoire, coûts), `node tests/loading-fx.js` (barre de chargement, cardans, tremblement), `node tests/dof.js OBS-3 engineClose,hullDolly` (même image avec et sans profondeur de champ, coût), `node tests/gimbal-shake.js` (cardans pendant un retournement, allumage) `node tests/jump-dof.js` (saut filmé en gros plan : flou + lentille, erreurs GL), `node tests/cabins.js` (cabines reconstituées pour chaque modèle, rotation de la géode) `node tests/suite.js l20` (gros plans d'une suite et d'une cabine confort), `node tests/textures-inventory.js` (inventaire des textures : taille, répétition, densité en pixels par mètre) `node tests/textures.js 1 hd` / `0 sd` (mêmes gros plans avec et sans textures HD), `node tests/liveries.js tM "jeu,anthracite,nuit,noir"` (un modèle en plusieurs livrées, au soleil et côté ombre) `node tests/warp-rings.js OBS-1` (départ en distorsion filmé : pré-charge, charge, rotation, champ), `node tests/cme.js OBS-1` (éjection de masse coronale filmée) `node tests/ftl-means.js OBS-2` (départs selon l'équipement réel, sélecteur : vedette sans moyens de saut, bascule saut → distorsion, relais au système suivant) `node tests/military.js OBS-4` (système avec station, patrouille et escorte : plans de formation et de tourelle, carte et radar), `node tests/military-2.js OBS-4` (exercice de tir ouvert à la demande et filmé, tourelle en tir, catapultage d'un chasseur depuis le hangar du destroyer, panneau FLEET au clic), `node tests/carrier-views.js carrier e18 "x,y,z,lx,ly,lz,fov;…" cv ".7,.6,-.3" 1` (porte-vaisseaux isolé avec un vaisseau garé, soleil et ombre de soute au choix, appels de dessin) et `node tests/carrier-demo.js OBS-4 c6 civil` (porte-vaisseaux dans la démo : plans `dockPass`, `dockInterior`, `dockBerth`, ombre de soute, entrée SHIP CARRIER du panneau FLEET) et `node tests/interiors.js l20 0.2 int 0` (gros plans à travers un hublot, une passerelle, une baie panoramique et les hangars ; ambiance forcée en 4ᵉ argument, `DIST=0.75` pour coller à la vitre).
 
 ---
 
@@ -100,7 +103,7 @@ Reconstruire : `python3 build/build.py` (aucune dépendance) puis `npm install` 
 | `L` | Mode **Auto** (relais entre vaisseaux) / **Suivre** (le vaisseau filmé reste le héros) |
 | `M` | Carte de l'univers (ouvrir / fermer ; aussi `Échap`) — dans la carte : molette ou `+` `−` zoom, glisser ou flèches pour se déplacer, `Retour arrière` niveau supérieur, `C` système courant, `Entrée` action sur la cible |
 | `R` | Radar (affiché par défaut) |
-| `G` | Panneau **FLEET** : suivre une patrouille de chasseurs, un destroyer en station ou une corvette d'escorte (`Échap` ferme) |
+| `G` | Panneau **FLEET** : suivre une patrouille de chasseurs, un destroyer en station, une corvette d'escorte ou le **porte-vaisseaux** (`Échap` ferme) |
 | `Espace` | Pause / reprise (musique comprise) |
 | `F` | Plein écran |
 
@@ -125,6 +128,7 @@ En démo, bouger la souris fait apparaître cinq boutons discrets en haut à dro
 | `dof` | `0` · `1` | `0` : pas de profondeur de champ. `1` : profondeur de champ gardée même quand la résolution dynamique baisse (sinon coupée sous 0,7). |
 | `shake` | `0` | Pas de tremblement de caméra (il est aussi coupé si le système demande de réduire les animations). |
 | `military` | `0` · `1` · `all` · `station` · `patrol` · `escort` | Présence militaire : `0` aucune, `1` dans chaque système (scénario tiré au hasard), `all` les trois scénarios partout, ou un scénario précis. Par défaut : ≈ 6 systèmes sur 10. |
+| `carrier` | `0` · `1` · `civil` · `mil` | Porte-vaisseaux : `0` aucun, `1` dans chaque système, `civil` / `mil` dans chaque système avec cette identité. Par défaut : ≈ 1 système sur 3, civil ou militaire au hasard. |
 | `livery` | `dark` · `light` · `anthracite` · `nuit` · `bouteille` · `bordeaux` · `noir` · `acier` · `jeu` | Impose la livrée : `dark` = palettes sombres tirées au hasard, `light` / `jeu` = couleurs du jeu, ou une palette précise. Par défaut : ≈ 30 % de vaisseaux sombres selon la famille. |
 | `age` | `0` à `1` | Impose l'âge de toute la flotte (0 = sortie de chantier, 0,5 = usée, 1 = épaves en fin de vie). Par défaut : mélange réaliste. |
 
@@ -458,6 +462,19 @@ Nouveau générateur `warships.js`, bâti sur les outils des petits engins (form
 - **Plan `gunnery`** : deux cadrages — large de profil (le destroyer, la ligne de tir et la cible dans l'image) ou depuis la cible (les traçantes arrivent vers la caméra) ; un exercice en cours est filmé en priorité (6 fois sur 10 quand le réalisateur coupe).
 - **Panneau FLEET** (touche `G` ou bouton **FLEET**) : patrouille de chasseurs, destroyer en station ou corvette d'escorte. Le groupe est ajouté au système courant (ou au suivant si un départ est engagé) et la caméra le suit comme vedette ; un message confirme le choix. API : `__CINE.showMilitary('patrol' | 'station' | 'escort')`.
 
+### Porte-vaisseaux — v7.6 (lot 10, phase 1)
+
+Nouveau type pour faire voyager, à terme, les vaisseaux sans moyen supraluminique (cargos e18 et p10, x1, remorqueurs). Générateur `carrier.js`, sur les outils des petits engins.
+
+- **Silhouette « catamaran »** (≈ 640 × 96 × 100 m) : une coque dorsale et une coque ventrale réunies par la proue (passerelle, antenne) et par le bloc arrière : **cœur de saut quantique** (v7.6.1 — la raison d'être du porteur : même géode que les vaisseaux du jeu, sur un mât entre les anneaux, qui tourne au repos et battra avant chaque saut), deux **anneaux de distorsion** qui tournent au repos, radiateurs, quatre tuyères. Le porteur a donc les deux moyens supraluminiques ; il partira par **saut quantique** par défaut (v7.8). Le **dock traverse le vaisseau de bord à bord** (≈ 290 × 96 × 55 m) : de profil, on voit les étoiles ou la planète à travers.
+- **Dock en vraie géométrie** : deux postes de 140 m séparés par un pylône en treillis ; pont à berceaux et pinces, bandes de danger, numéros de poste peints ; plafond lumineux, rails et **portique roulant** (un aller-retour en 2,5 min) ; passerelles, conduites, deux **salles de contrôle vitrées** (intérieurs simulés, opérateurs) ; **feux d'approche chenillards** le long des lèvres ; deux **champs de force** translucides (trame hexagonale, ondes) sur les ouvertures.
+- **Ombre de soute** (shader d'usure, `__SHIPWEAR.HOLD`) : le moteur n'a pas d'ombres portées ; pour chaque point situé dans le volume du dock, la direction du soleil est suivie jusqu'à la sortie de la boîte : éclairé seulement si elle sort par une des deux ouvertures (bord adouci), sinon à l'ombre. S'y ajoute la lumière du plafond (blanc chaud pour un porteur civil, froid pour un militaire). Vaut pour le dock et pour tout ce qui s'y trouve (vaisseau garé, drones).
+- **Identité** tirée par système : **civil** (coque claire, bande de couleur de l'armateur, immatriculation `SC nnn`, feux ambre) ou **militaire** (coque sombre, liserés rouges, `FC nnn`, 7 tourelles, feux rouges, contact rouge sur la carte et le radar).
+- **Présence** dans ≈ 1 système sur 3 (`?carrier=`), en orbite haute : un vaisseau sans moyen de saut **garé au poste 2** (il suit le porteur), **deux drones d'inspection** qui tournent dans le poste libre (repères d'échelle).
+- **Plans** : `dockPass` (passage latéral dans l'axe du dock, on voit à travers), `dockInterior` (au ras du pont, dans le poste libre, le vaisseau garé derrière le treillis), `dockBerth` (juste devant une ouverture, le vaisseau garé encadré par les lèvres du dock) ; quand un porteur est là, les coupes sur le trafic le montrent souvent.
+- **Panneau FLEET** : entrée **SHIP CARRIER** (touche `G`) ; le porteur devient la vedette, premier plan `dockPass`. API : `__CINE.showCarrier()`.
+- Suite prévue : v7.7 rangement et sortie à couple (pinces, bras d'avitaillement, plans dédiés) ; v7.8 voyage complet (départ par saut quantique avec le passager, distorsion possible, arrivée, débarquement, carte, radar, mode Suivre pour tous les vaisseaux).
+
 ### Intérieurs — v7.3
 
 Toujours en *interior mapping* (une pièce virtuelle calculée derrière chaque ouverture, sans géométrie), mais les pièces ne sont plus des boîtes : les arêtes du plafond sont coupées en biais (pans coupés, 0,4 à 0,75 m ; 1,3 m dans les hangars latéraux), et chaque vaisseau reçoit une **ambiance** selon sa famille (`SHIPGEN.build(modèle, { interior: 0|1|2 })` pour l'imposer) :
@@ -537,6 +554,7 @@ flowchart TB
       HX["hitex.js<br/>window.__HITEX<br/>textures de coque 4×"]
       SC["smallcraft.js<br/>window.__CRAFT<br/>petits engins : maintenance,<br/>transport, drones, gabares"]
       WS["warships.js<br/>flotte militaire : chasseur,<br/>corvette, destroyer, tourelles"]
+      CV["carrier.js<br/>porte-vaisseaux : dock traversant,<br/>postes, ombre de soute"]
       PF["postfx.js<br/>window.__POSTFX<br/>profondeur de champ"]
       CI["cine.js<br/>window.__CINE<br/>échelle réelle · temps τ<br/>itinéraires · réalisateur · effets<br/>API carte et radar"]
       SM["starmap.js<br/>window.__STARMAP<br/>carte 2D : secteur · système · orbite"]
@@ -573,6 +591,8 @@ flowchart TB
   SC -. "hublots simulés" .-> SG
   WS -. "outils et build des petits engins" .-> SC
   CI -- "station, patrouille, escorte ; tourelles" --> WS
+  CI -- "porteur, vaisseau garé, drones ; ombre de soute" --> CV
+  CV -. "outils des petits engins, anneaux, uniformes de soute" .-> SC
   L -- "frame(now), touches M R" --> SM
   L -- "frame(now), touche R" --> RD
   SM -- "mapState · systemInfo · shipsInfo<br/>focus · setNextStar" --> CI
@@ -715,8 +735,9 @@ Alternative écartée : le *logarithmic depth buffer* de three.js aurait imposé
 - Sphères planétaires plus fines (256 × 192 pour la surface, 224 × 168 pour les nuages) pour des horizons lisses à basse altitude.
 - Mémoire stable sur de longues sessions (vérifié sur 20 min simulées : 11 à 15 vaisseaux, tas JavaScript constant, nœuds de temps élagués).
 - Profondeur de champ (v6.9) : 4 passes plein écran (2 à demi-résolution), uniquement pendant les gros plans ; mesuré en rendu logiciel à 960 × 540 : +4 à +9 ms par image (processeur), soit de l'ordre de 1 à 2 ms sur un GPU intégré en 1080p. Coupée automatiquement si la résolution dynamique descend sous 0,7. Cardans et tremblement : coût négligeable.
+- v7.6 : porte-vaisseaux ≈ 37 appels de dessin (civil, géode comprise) à ≈ 48 (militaire, tourelles), émetteurs des anneaux fusionnés ; le vaisseau garé coûte comme un cargo du trafic (120 à 200 appels quand il est à l'écran) : en plan de dock, 340 à 450 appels par image au total (rendu logiciel, toutes tranches). Ombre de soute : quelques opérations par pixel de coque, sautées hors du volume du dock. Porte-vaisseaux et flotte militaire compilés pendant l'étape « COMPILING SHADERS » (≈ 0,8 s de plus en rendu logiciel) : plus d'à-coup à leur première apparition. Mémoire stable sur 20 min simulées.
 - v7.5 : exercices de tir en un seul lot de traçantes (1 appel), un lot de têtes lumineuses (1 appel) et 24 éclats réutilisés, groupe caché hors exercice ; hangars du destroyer : +2 appels (masques des baies). Tas JavaScript stable sur 20 min simulées.
-- v7.4 : un groupe militaire ajoute 25 à 60 appels de dessin quand il est à l'écran (destroyer ≈ 35, corvette ≈ 20, chasseur ≈ 12) ; ses matériaux (canaux de chaleur) compilent à leur première apparition.
+- v7.4 : un groupe militaire ajoute 25 à 60 appels de dessin quand il est à l'écran (destroyer ≈ 35, corvette ≈ 20, chasseur ≈ 12) ; ses matériaux (canaux de chaleur) compilaient à leur première apparition (v7.6 : pendant le chargement).
 - v7.2 : formes d'ouverture, livrées et anneaux sans coût mesurable par image (même nombre de programmes, 2 halos additifs et 24 émetteurs par vaisseau à anneaux, halos masqués hors charge) ; première compilation des shaders un peu plus longue (masquée par l'étape « COMPILING SHADERS » du chargement) ; tas JavaScript stable sur 20 min simulées (≈ 188 Mo).
 - Textures HD (v7.1) : canevas générés **une fois** pendant le chargement et partagés par toute la flotte (4 textures, ≈ 22 Mo de mémoire GPU avec les mipmaps en 4×, ≈ 5,5 Mo en `low`, contre ≈ 1,5 Mo auparavant) ; aucun coût par image : le nombre de textures et d'appels de dessin est inchangé. Le détail procédural ajoute quelques bruits dans le shader d'usure, négligeable devant les planètes. Tas JavaScript inchangé sur 20 min simulées (177 Mo).
 - Carte et radar (v6.8, mesurés en rendu logiciel, donc majorés) : **rien quand ils sont fermés** ; radar 0,05 à 0,26 ms par mise à jour (10/s) et 0,05 à 0,35 ms par dessin (≈ 30/s, fond pré-rendu) ; carte redessinée seulement à l'interaction, 5 fois par seconde pour les vaisseaux, 1 fois par seconde au niveau secteur : 0,1 ms en vue rapprochée, 2,8 ms au dézoom maximal (≈ 1 700 étoiles) ; ouverture ≈ 1 ms, étoiles chargées par lots de 4 ms ; 18 changements de prochain saut : systèmes abandonnés libérés (nombre d'objets stable).
@@ -733,6 +754,7 @@ Alternative écartée : le *logarithmic depth buffer* de three.js aurait imposé
 - Les étoiles du champ galactique gardent le rendu du jeu (points lumineux, taille angulaire bornée) ; seules les étoiles visitées ont le rendu « cinéma ».
 - Une ceinture réelle est invisible dans son ensemble : seul un amas local est montré de près.
 - RCS : seules les buses radiales des blocs sont animées (pas de roulis pur) ; les navettes du jeu n'ont pas de blocs RCS.
+- Porte-vaisseaux (v7.6) : décor et plans seulement — le vaisseau garé ne bouge pas (rangement, sortie et voyage en v7.7 et v7.8), pinces figées ouvertes ; l'ombre de soute ne concerne que le volume du dock (la coque n'ombre pas un vaisseau à couple, un vaisseau garé n'ombre pas le pont) et un seul porteur à la fois (le plus proche de la caméra).
 - Flotte militaire : pas de combat réel (exercices sans destruction, pas d'ennemis) ; le panneau FLEET remplace un onglet du sélecteur du jeu (celui-ci reste limité aux 10 modèles du catalogue) ; les traçantes ne sont pas occultées par les coques (effet additif) ; les formations sont rigides (décalages fixes dans le repère du chef) et la ronde des chasseurs autour du destroyer se fait en temps réel même en accéléré.
 - Seuls les 4 modèles supraluminiques passent d'un système à l'autre : les autres n'apparaissent qu'en trafic local ou comme vedette choisie au sélecteur.
 - Livrées et projecteurs : les projecteurs sont des cônes sans appareil visible ni ombre portée ; les petits engins gardent leurs couleurs. Anneaux : la pré-charge est un effet visuel (le calendrier des départs n'a pas changé) ; le halo additif prend le flou de ce qui est derrière lui en profondeur de champ.
@@ -760,6 +782,8 @@ Alternative écartée : le *logarithmic depth buffer* de three.js aurait imposé
 | v3 | Astéroïdes et lunes texturés, travellings de découverte sans vaisseau, vol supraluminique, version minifiée |
 | v4 | Aurores polaires et travellings en rase-mottes sous les aurores |
 | v5 | Soleils « cinéma » (granulation, taches, chromosphère, couronne, protubérances, éruptions), éclipses totales, levers d'étoile, transits |
+| v7.6.1 | Porte-vaisseaux : **cœur de saut quantique** (géode du jeu sur un mât entre les anneaux, charge propre, rotation au repos) — sa raison d'être ; équipement saut + distorsion ; message de relais adapté quand il est la vedette |
+| v7.6 | **Porte-vaisseaux** (phase 1) : générateur `carrier.js`, silhouette catamaran à dock traversant, deux postes, portique, salles de contrôle, champs de force, anneaux ; identité civile ou militaire ; **ombre de soute** calculée ; vaisseau garé et drones ; plans `dockPass`, `dockInterior`, `dockBerth` ; entrée SHIP CARRIER du panneau FLEET ; paramètre `carrier` ; shaders des engins tardifs compilés au chargement |
 | v7.5 | **Flotte militaire** (phase 2) : hangars latéraux du destroyer et **catapultage** des chasseurs ; **exercices de tir** sur drone-cible (traçantes, obus, éclats, bouclier d'entraînement, sans destruction) et plan `gunnery` à deux cadrages ; panneau **FLEET** (touche `G`) |
 | v7.4 | **Flotte militaire** (phase 1) : générateur `warships.js` — chasseur, corvette, destroyer à tourelles animées ; station (destroyer et ronde de chasseurs), patrouille en formation, escorte de cargo ; plans `formation` et `turretClose` ; contacts militaires sur la carte et le radar ; paramètre `military` |
 | v7.3 | **Intérieurs** à trois ambiances (hospitalité, industriel, rétro-futur) selon la famille et l'âge ; pièces à pans coupés ; passerelles avec opérateurs assis et table tactique holographique ; hangars : plot hexagonal, feux chenillards, portique roulant, salle de contrôle vitrée |

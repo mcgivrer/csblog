@@ -11,6 +11,7 @@
 09-les-vaisseaux-generateur-v2.js
 ../demo/shipdrive.js
 ../demo/shipglass.js
+../demo/smallcraft.js
 ../demo/warpring.js
 ../demo/shipwear.js
 ../demo/hitex.js
@@ -32,6 +33,8 @@
 20f-greffons-vaisseau.js
 20g-survol-systeme.js
 20h-gros-plans.js
+20p-navette.js
+20i-sequence-titre.js
 ../demo/starmap.js
 21-effets-de-saut-et.js
 22-commandes-de-vol-derive.js

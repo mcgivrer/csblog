@@ -1151,7 +1151,7 @@ function installShip(id, opts){
   const nBefore = shipBody.children.length;
   buildDockModule(shipBody, dp.x, dp.y - 1.15, dp.z);
   if(typeof REAL !== 'undefined' && REAL.active){           /* L2.3 : dock dessiné pour un vaisseau de 40 u → mis à l'échelle du vaisseau réel */
-    const fs = gameLen40(), o = new THREE.Vector3(dp.x, dp.y, dp.z);
+    const fs = (typeof CARGO !== 'undefined') ? CARGO.DOCK_SCALE : gameLen40(), o = new THREE.Vector3(dp.x, dp.y, dp.z);   /* lot N : taillé pour le conteneur ISO 20' */
     shipBody.children.slice(nBefore).forEach(function(ch){ ch.position.sub(o).multiplyScalar(fs).add(o); ch.scale.multiplyScalar(fs); });
   }
   CAM_OFFSET.set(0, 12*f, 46*f);

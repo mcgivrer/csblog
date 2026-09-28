@@ -123,7 +123,7 @@ function pathTraj(path, prof, tau0, up){ const f = T => pathState(path, prof, ta
 /* ---------- vaisseaux (dimensions réelles du générateur, en mètres) ---------- */
 const TYPE_EN = { e18:'Warehouse freighter', e140:'Warehouse bulk carrier', p10:'Spine freighter', p44:'Long spine freighter', g1:'Ice tanker', tS:'Light tug', tM:'Medium tug', tL:'Heavy tug', l20:'Liner', x1:'Fast light freighter', shuttle:'Cargo shuttle' };
 const FTL = { e140:1, p44:1, g1:1, l20:1 };
-const ACC = { e18:.9, e140:.55, p10:1, p44:.8, g1:.7, tS:3, tM:2.4, tL:1.8, l20:1.4, x1:2.8, shuttle:2, fighter:6, corvette:2.5, destroyer:1.2 };   // poussée en g
+const ACC = { e18:.9, e140:.55, p10:1, p44:.8, g1:.7, tS:3, tM:2.4, tL:1.8, l20:1.4, x1:2.8, shuttle:2, fighter:6, corvette:2.5, destroyer:1.2, carrier:.3, carrierMil:.35 };   // poussée en g
 const HERO_POOL = [['e18',1],['e140',1],['p10',1],['p44',1.2],['g1',1],['tM',.45],['tL',.5],['l20',1.2],['x1',1.3]];
 const DEP_POOL = HERO_POOL.filter(([m]) => FTL[m]);                   // v7.2.2 : seuls les vaisseaux à géode ou anneaux quittent un système
 const NPC_BIG = [['e18',1],['p10',1],['g1',.7],['x1',1],['e140',.5],['tL',.6]];
@@ -274,7 +274,7 @@ function makeShip(model, leg, opts){
     acc: (ACC[model] || 1)*G0*rr(.85, 1.15),
     dispose(){ (sh.bays || []).forEach(op => op.c.dispose()); disposeRcs(rcs); if(geode){ geode.spark.parent && geode.spark.parent.remove(geode.spark); geode.spark.material.dispose(); } root.parent && root.parent.remove(root); SHIPGEN.dispose(b.group); ships.delete(sh); } };
   ships.add(sh);
-  setupBays(sh);
+  if(!(opts && opts.noBays)) setupBays(sh);                                   // v7.6 : garé dans un porte-vaisseaux : baies au repos
   return sh;
 }
 /* ---------- géode du cœur de saut quantique (mât au-dessus du réacteur, vaisseaux équipés) ----------
@@ -808,6 +808,51 @@ function militaryTasks(leg, tasks, force){
     leg.npcs.push(c);
   });
 }
+/* ---------- porte-vaisseaux (v7.6) ----------
+   En orbite haute dans ≈ 1 système sur 3 (?carrier=0|1|civil|mil) : un vaisseau sans moyen supraluminique garé au poste 2,
+   deux drones d'inspection dans le poste libre, portique roulant, anneaux au repos. Tout ce qui est à bord suit le porteur
+   (trajectoires dans son repère). L'ombre de la soute du porteur le plus proche de la caméra est mise à jour à chaque image. */
+const NOFTL = ['e18', 'p10', 'tS', 'tM', 'tL', 'x1'];
+function dockTraj(car, lp, lq, x){ return T => { const st = car.traj(T), q = st.q || quatNose(st.nose, st.up), p = typeof lp === 'function' ? lp(T) : lp;
+  const qq = lq ? q.clone().multiply(typeof lq === 'function' ? lq(T) : lq) : q.clone();
+  return Object.assign({ pos: st.pos.clone().add(p.clone().applyQuaternion(q)), nose: v(0, 0, -1).applyQuaternion(qq), up: v(0, 1, 0).applyQuaternion(qq), q: qq, throttle: 0, seg: 'docked' }, x || {}); }; }
+function carrierTasks(leg, tasks, force){
+  if(!window.__CRAFT || !__CRAFT.CARRIER) return;
+  const pc = force || PARAMS.get('carrier'); if(pc === '0') return;
+  if(!(pc || R() < .34)) return;
+  tasks.push(() => ensureCarrier(leg, pc));
+}
+function ensureCarrier(leg, pc){
+  if(!window.__CRAFT || !__CRAFT.CARRIER) return null;
+  let c = leg.npcs.find(x => x.isCarrier); if(c) return c;
+  const kind = pc === 'mil' ? 'carrierMil' : (pc === 'civil' ? 'carrier' : (R() < .5 ? 'carrierMil' : 'carrier'));
+  c = makeCraft(kind, leg); const hab = leg.hab, u = randUnit(), w = perpTo(u), r = hab.radius*rr(1.3, 1.6);
+  c.traj = orbitTraj(hab.position, r, u, w, rr(0, 6.28), Math.sqrt(hab.GM/r)/r*(R() < .5 ? -1 : 1), 0); leg.npcs.push(c);
+  const X = c.craft.extra; c.isCarrier = true; c.dock = X; c.rings = X.rings; c.field = X.ring.uField; c.phase = X.ring.uPhase;
+  if(c.craft.wear && X.rings){ const L = X.rings.list; c.craft.wear.uRing.value.set(L[0].z, L[1].z, L[0].Rin, 2); c.ringU = c.craft.wear.uRingI; }
+  patchUniforms(c.craft.group, null, c.charge, X.ring.uField, X.ring.uPhase);    // halos des anneaux et géode : champ et charge propres au porteur
+  c.geode = findGeode(c.craft.group, c.charge); c.equip = { warp: !!X.rings, jump: !!c.geode }; c.ftl = true;   // v7.6.1 : saut quantique (raison d'être du porteur) et distorsion
+  const m = pick(NOFTL), s = makeShip(m, leg, { noBays: true }), hb = s.hull.box, B = X.berths[1];   // vaisseau garé au poste 2
+  const lp = new V3(B.C.x - ((hb.min.x + hb.max.x)/2 - s.com.x), B.C.y - (hb.min.y - s.com.y), B.C.z - ((hb.min.z + hb.max.z)/2 - s.com.z));
+  s.traj = dockTraj(c, lp); s.docked = c; leg.npcs.push(s); c.berthed = [null, s];
+  for(let i = 0; i < 2; i++){                                                // drones d'inspection dans le poste libre : échelle humaine
+    const d = makeCraft('drone', leg, { variant: 'inspect' }), zc = X.berths[0].C.z, ph = i*Math.PI + rr(0, 1), per = rr(55, 75);
+    const at = T => ph + 2*Math.PI*T/per;
+    d.traj = dockTraj(c, T => { const a = at(T); return new V3(Math.cos(a)*24, 4 + 7*Math.sin(2*a), zc + Math.sin(a)*46); },
+      T => { const a = at(T); return quatNose(new V3(-Math.sin(a)*24, 0, Math.cos(a)*46).normalize(), v(0, 1, 0)); }, { throttle: .12 });
+    d.docked = c; leg.npcs.push(d); }
+  return c;
+}
+function updateCarriers(){
+  let best = null, bd = 6000;
+  ships.forEach(sh => { if(!sh.isCarrier || !sh.root.visible) return; const X = sh.dock, g = X.gantry;
+    g.group.position.z = lerp(g.z0, g.z1, .5 + .5*Math.sin(T*2*Math.PI/150 + sh.len));   // portique : un aller-retour en 2,5 min
+    if(!sh.warps) sh.phase.value = T*.35;
+    const dd = sh.root.position.distanceTo(cam.position); if(dd < bd){ bd = dd; best = sh; } });
+  if(!window.__CRAFT || !__CRAFT.setHold) return;
+  if(best) __CRAFT.setHold(best.root.position, best.root.quaternion, best.dock.hold, cam.position, cam.quaternion, best.dock.civil);
+  else __CRAFT.setHold(null, null, null);
+}
 function ensureMil(leg, kind){                                               // groupe militaire du système (créé s'il manque)
   const find = () => kind === 'station' ? leg.npcs.find(x => x.model === 'destroyer') : (kind === 'escort' ? leg.npcs.find(x => x.model === 'corvette') : leg.npcs.find(x => x.patrol));
   let s = find(); if(s) return s;
@@ -846,6 +891,7 @@ function populateSystem(leg){
     leg.npcs.push(s);
   });
   militaryTasks(leg, tasks);                                                 // v7.4
+  carrierTasks(leg, tasks);                                                  // v7.6
   return tasks;
 }
 
@@ -960,7 +1006,8 @@ function planVisit(leg, hero, tArrive, arriveDir, arr){
     const rS = rO + 1.6*(hero.len + showcase.len) + 1.6*(departer.len + showcase.len);
     showcase.traj = compositeTraj([{ kind:'orbit', t0: -1e9, f: orbitTraj(Cp, rS, u, w, -3*(hero.len + showcase.len)/rS, Math.sqrt(target.GM/rS)/rS, tauO) }]);
     leg.npcs.push(showcase); }
-  if(C.pendingMil){ const k = C.pendingMil; C.pendingMil = null; showcase = ensureMil(leg, k) || showcase; }   // v7.5 : flotte choisie pendant le départ précédent
+  if(C.pendingMil){ const k = C.pendingMil; C.pendingMil = null; showcase = ensureMil(leg, k) || showcase; }
+  if(C.pendingCar){ C.pendingCar = false; showcase = ensureCarrier(leg, PARAMS.get('carrier')) || showcase; }   // v7.6 : porte-vaisseaux choisi pendant le départ précédent   // v7.5 : flotte choisie pendant le départ précédent
   // départ : poussée continue jusqu'au point de saut (25–45 rayons), dans la direction de l'étoile suivante
   const dJ = Rp*(target.kind.gas ? rr(10, 18) : rr(25, 45));
   const { pathD, upD } = departurePath(leg, target, depOrbit, depStart, toNext, dJ);
@@ -1449,6 +1496,19 @@ const SHOTS = {
       const right = new V3().crossVectors(dir, up).normalize();
       if(wide){ const M = tw.clone().addScaledVector(dir, D*.5); return { pos: M.clone().addScaledVector(right, side*D*.9).addScaledVector(up, D*.14), look: M, fov, up }; }
       return { pos: tp.clone().addScaledVector(dir, 34).addScaledVector(right, side*26).addScaledVector(up, 12), look: tw.clone().lerp(tp, .12), fov: fov*.58, up }; }; },   // téléobjectif : le destroyer remplit le cadre, les traçantes filent vers nous
+  dockPass(sh, t0, d){ // v7.6 : passage latéral devant le porte-vaisseaux, dans l'axe du dock : on voit les étoiles à travers
+    const K = __CRAFT.CARRIER, side = R()<.5?-1:1, D = rr(430, 560), y0 = rr(-25, 55), z0 = rr(170, 260)*(R()<.5?-1:1), z1 = -z0*rr(.5, .9), fov = rr(34, 42);
+    return T => { const st = subjectState(sh, T), k = smoother((T - t0)/d), z = lerp(z0, z1, k) + K.ZC;
+      return { pos: hw(st, side*D, y0, z), look: hw(st, 0, y0*.1, K.ZC + (z - K.ZC)*.3), fov, up: frameOf(st.q).up }; }; },
+  dockInterior(sh, t0, d){ // v7.6 : dans le poste libre, au ras du pont : le vaisseau garé derrière le treillis, drones, portique
+    const K = __CRAFT.CARRIER, side = R()<.5?-1:1, x0 = side*rr(16, 30), y0 = rr(-20, -8), zA = K.BERTHS[0] - rr(40, 55), zB = zA + rr(25, 40), fov = rr(60, 70);
+    const tgt = new V3(rr(-6, 6), rr(-10, 2), K.BERTHS[1]);
+    return T => { const st = subjectState(sh, T), k = smoother((T - t0)/d);
+      return { pos: hw(st, x0*(1 - .25*k), y0 + 3*k, lerp(zA, zB, k)), look: hw(st, tgt.x, tgt.y, tgt.z), fov, up: frameOf(st.q).up }; }; },
+  dockBerth(sh, t0, d){ // v7.6 : juste devant une ouverture, le vaisseau garé encadré par les lèvres du dock et le champ de force
+    const K = __CRAFT.CARRIER, side = R()<.5?-1:1, sz = R()<.5?-1:1, D = rr(80, 115), y0 = rr(-12, 18), zc = K.BERTHS[1], fov = rr(46, 54);
+    return T => { const st = subjectState(sh, T), k = smoother((T - t0)/d);
+      return { pos: hw(st, side*D, y0 - 6*k, zc + sz*lerp(85, 45, k)), look: hw(st, 0, -6, zc - sz*10), fov, up: frameOf(st.q).up }; }; },
   formation(sh, t0, d){ // v7.4 : patrouille en formation — caméra co-mobile avec le chef, sur le flanc, cadrée sur le centre du groupe
     const grp = sh.formation || [sh], lead = grp[0], side = R()<.5?-1:1, E = 45 + 8*grp.length, a = rr(.9, 1.4), up = rr(.2, .5), fw = rr(-.2, .5), fov = rr(40, 50);
     return T => { const st = subjectState(lead, T), f = frameOf(st.q), c = grp.reduce((acc, m) => acc.add(m.traj(T).pos), new V3()).multiplyScalar(1/grp.length);
@@ -1637,6 +1697,7 @@ function chooseShot(T){
   // 3) plan courant : type selon la phase, durée bornée pour ne pas chevaucher le plan du saut
   let d = rr(4.8, 8.2); if(T + d > jumpShotStart - 2.4) d = Math.max(3.2, jumpShotStart - 2.4 - T);
   const kWin = rateMax(T, T + d), calm = kWin < 3;             // temps réel (orbite) : plans co-mobiles et coupes sur le trafic possibles
+  if(vis.carFresh && vis.showcase && vis.showcase.isCarrier && calm && T < vis.depStart - 1){ vis.carFresh = false; return makeShot('dockPass', vis.showcase, T, T + Math.max(d, 7), vis); }   // v7.6 : premier plan après le choix FLEET
   // travelling de découverte (sans vaisseau) : parfois juste après l'arrivée, parfois en cours de route
   const room = jumpShotStart - 2.4 - T;
   const lastV = shotLog.slice(-3).some(x => /^vista/.test(x));
@@ -1658,16 +1719,20 @@ function chooseShot(T){
   };
   if(calm && shotLog[shotLog.length-1] !== 'bayOps' && R() < .8){ const b = bayShot(subj); if(b) return b; }
   // plan de coupe sur le trafic (en temps réel uniquement : en accéléré, les orbites basses défilent en quelques secondes)
-  const npcs = (vis.leg.npcs || []).filter(s => s !== subj && s.traj);
+  const npcs = (vis.leg.npcs || []).filter(s => s !== subj && s.traj && !s.docked);   // v7.6 : pas de coupe sur un engin à bord d'un porteur
   if(calm && R() < .5 && shotLog.slice(-2).indexOf('npc') < 0){ for(const s of npcs){ if(s.bays){ const b = bayShot(s, 'npc'); if(b){ b.type = 'bayOps'; return b; } } } }
   // présentation du prochain héros (relais) pendant l'orbite : le spectateur le voit avant qu'il ne parte
   if(vis.handover && !vis.userHero && !vis.depIntro && calm && T > vis.tO0 + 3 && T < vis.depStart - 6 && dep !== vis.hero){ vis.depIntro = true; return makeShot(pick(['orbitcam','lateral','tripod']), dep, T, T + d, vis, 'npc'); }
   const gunS = (vis.leg.npcs || []).find(x => x.gun && x.traj && gunActive(x));   // v7.5 : un exercice de tir en cours se filme
   if(calm && gunS && shotLog[shotLog.length - 1] !== 'gunnery' && R() < .6) return makeShot('gunnery', gunS, T, T + Math.min(Math.max(d, 6), 9), vis, 'gunnery');
+  const CAR_SHOTS = ['dockPass', 'dockPass', 'dockInterior', 'dockInterior', 'dockBerth', 'lateral', 'tripod'];
+  if(calm && subj.isCarrier && R() < .8){ let t, n = 0; do { t = pick(CAR_SHOTS); n++; } while(n < 5 && t === shotLog[shotLog.length - 1]); return makeShot(t, subj, T, T + Math.max(d, 6.5), vis); }   // v7.6 : vedette porte-vaisseaux
   if(calm && subj.mil && R() < .6){                                          // vedette militaire (sélecteur FLEET)
     const t = subj.gun && gunActive(subj) ? 'gunnery' : pick((subj.formation ? ['formation', 'formation'] : []).concat(subj.craft && subj.craft.turrets.length ? ['turretClose'] : []).concat(['lateral', 'chase', 'tripod']));
     return makeShot(t, subj, T, T + d, vis); }
-  const milN = npcs.filter(x => x.mil);                                     // v7.4 : la flotte militaire, quand elle est là, se montre plus souvent
+  const carN = npcs.find(x => x.isCarrier);                                 // v7.6 : un porte-vaisseaux se montre souvent
+  if(calm && carN && R() < .3 && shotLog.slice(-2).indexOf('npc') < 0) return makeShot(pick(CAR_SHOTS), carN, T, T + Math.max(d, 6.5), vis, 'npc');
+  const milN = npcs.filter(x => x.mil && !x.isCarrier);                    // v7.4 : la flotte militaire, quand elle est là, se montre plus souvent
   if(calm && npcs.length && R() < (milN.length ? .5 : .35) && shotLog.slice(-2).indexOf('npc') < 0){
     const s = milN.length && R() < .6 ? pick(milN) : pick(npcs);
     const t = s.mil ? (s.gun && gunActive(s) ? 'gunnery' : pick((s.formation ? ['formation', 'formation'] : []).concat(s.craft && s.craft.turrets && s.craft.turrets.length ? ['turretClose', 'turretClose'] : []).concat(['lateral', 'chase', 'tripod'])))
@@ -2009,7 +2074,7 @@ C.step = function(dt, noRender){
   if(shot.gal){ galView = { pos: c.pos, fov: c.fov, q: new Q() }; const m = new THREE.Matrix4().lookAt(c.pos, c.look, c.up || v(0,1,0)); galView.q.setFromRotationMatrix(m); sysHidden = true; cam.fov = c.fov; }
   else {
     const subjPos = shot.subj.traj(T).pos;
-    const noMin = shot.vista || CLOSE[shot.type] || shot.type === 'bayOps' || shot.type === 'gunnery' || shot.type === 'formation' || shot.type === 'arrive' || shot.type === 'jump' || shot.type === 'shipTransit' || shot.type === 'warpArrive';
+    const noMin = shot.vista || CLOSE[shot.type] || shot.type === 'bayOps' || shot.type === 'gunnery' || shot.type === 'formation' || shot.type === 'dockPass' || shot.type === 'dockInterior' || shot.type === 'dockBerth' || shot.type === 'arrive' || shot.type === 'jump' || shot.type === 'shipTransit' || shot.type === 'warpArrive';
     safeCam(c.pos, leg, noMin ? null : subjPos, shot.subj.len*1.4, !!shot.low);
     cam.position.copy(c.pos); if(c.up) cam.up.copy(c.up); else cam.up.set(0,1,0); cam.lookAt(c.look); cam.fov = c.fov;
     updateDof(dt, c); applyShake(T, dt, c.fov);
@@ -2025,6 +2090,7 @@ C.step = function(dt, noRender){
   updateShips(dt);
   updateGunnery(dt);                                                         // v7.5 : exercices de tir
   updateCrafts(dt);
+  updateCarriers();                                                          // v7.6 : portique, anneaux, ombre de soute
   // effets de saut
   FX.active = false; grid.visible = false; FX.vignette = 0; FX.flashDom = 0;
   if(visit.arrMode !== 'warp') arriveFX(T, visit);
@@ -2032,6 +2098,7 @@ C.step = function(dt, noRender){
   warpFX(T);
   if(visit.showcase && !visit.showcaseMsg && T >= visit.depStart - 1.5 && window.__DEMO){       // v7.2.2 : la vedette ne peut pas partir
     visit.showcaseMsg = true; const a = visit.showcase, d = visit.departer, e = s => String(s).replace(/[&<>]/g, '');
+    if(a.isCarrier) __DEMO.toast('<span class="a">RELAY</span> · ' + e(a.type) + ' <span class="c">stays in orbit, loading — the journey continues aboard</span> ' + e(d.type) + ' / ' + e(d.name)); else
     __DEMO.toast('<span class="a">RELAY</span> · ' + e(a.type) + ' <span class="c">has no jump core or warp rings — the journey continues aboard</span> ' + e(d.type) + ' / ' + e(d.name)); }
   if(visit.arrMode !== 'warp' && T < visit.tArrive + .12) visit.hero.root.visible = false;
   if(visit.mode === 'jump' && T > visit.tJ + JT.charge + JT.fold + JT.flash*.5) visit.departer.root.visible = false;
@@ -2107,13 +2174,30 @@ C.bayAxisDbg = function(t1){                          // test : écart des engin
   }));
   return out;
 };
-C.pendingMil = null;
+C.pendingMil = null; C.pendingCar = false;
 C.showMilitary = function(kind){                                             // v7.5 : panneau FLEET — la flotte choisie devient le sujet de l'orbite
   const vis = visit; if(!vis || !['station', 'patrol', 'escort'].includes(kind)) return 'invalid';
   if(T >= vis.depStart - 4){ C.pendingMil = kind; return 'next'; }
   const s = ensureMil(vis.leg, kind); if(!s) return 'invalid';
   Object.assign(vis, { showcase: s, userHero: true, showcaseMsg: false }); shot = null; return 'now';
 };
+C.prewarm = function(){                                                     // v7.6 : shaders des engins tardifs (porte-vaisseaux, flotte militaire) compilés au chargement
+  if(!window.__CRAFT || !__CRAFT.CARRIER || !renderer.compile) return 0;
+  const kinds = ['carrier', 'carrierMil', 'destroyer', 'corvette', 'fighter', 'target'], built = [];
+  kinds.forEach((k, i) => { try { const c = __CRAFT.build(k, { seed: 11 + i, age: .2 }); c.group.position.set(i*900, 0, -5e4); shipWorld.add(c.group); built.push(c); } catch(e){ console.error(e); } });
+  const t0 = performance.now(); renderer.compile(sysScene, cam);
+  built.forEach(c => { c.group.visible = false; });                          // gardés (cachés) : les programmes restent en cache
+  C.prewarmMs = Math.round(performance.now() - t0); return built.length;
+};
+C.showCarrier = function(){                                                  // v7.6 : panneau FLEET — le porte-vaisseaux devient le sujet de l'orbite
+  const vis = visit; if(!vis) return 'invalid';
+  if(T >= vis.depStart - 4){ C.pendingCar = true; return 'next'; }
+  const s = ensureCarrier(vis.leg, PARAMS.get('carrier')); if(!s) return 'invalid';
+  Object.assign(vis, { showcase: s, userHero: true, showcaseMsg: false, carFresh: true }); shot = null; return 'now';
+};
+C.carrierDbg = () => { const c = ((visit && visit.leg.npcs) || []).find(x => x.isCarrier); if(!c) return null; const H = window.__SHIPWEAR && __SHIPWEAR.HOLD;
+  return { kind: c.model, name: c.name, type: c.type, parked: c.berthed && c.berthed[1] ? c.berthed[1].model : null, shot: shot && shot.type, subj: shot && shot.subj && shot.subj.model,
+    camD: Math.round(cam.position.distanceTo(c.root.position)), hold: H ? H.uHoldH.value.w : null, geode: !!c.geode, equip: c.equip, drones: visit.leg.npcs.filter(x => x.docked === c && x.craft).length }; };
 C.gunNow = () => { const d = (visit.leg.npcs || []).find(x => x.gun); if(!d) return null; d.gun.ph = ((d.gun.per - T % d.gun.per) + d.gun.per) % d.gun.per; return { rate: rateAt(T), active: gunActive(d) }; };   // test : ouvre une fenêtre de tir maintenant
 C.gunDbg = () => { const d = (visit.leg.npcs || []).find(x => x.gun); return d ? { active: gunActive(d), tracers: GUN.pool.filter(t => T - t.t0 <= t.life).length, visible: GUN.grp.visible, shot: shot && shot.type, camD: Math.round(cam.position.distanceTo(d.root.position)), tgD: Math.round(d.gun.target.root.position.distanceTo(d.root.position)), subj: shot && shot.subj && shot.subj.model, dr: GUN.heads.geometry.drawRange.count } : null; };
 C.warpDbg = () => { const d = visit.departer; return { shot: shot && shot.type, model: d.model, rings: d.rings ? d.rings.list.length : 0, a: d.rings ? +(ringAngle(d, T) % 6.2832).toFixed(3) : null, field: +d.field.value.toFixed(2), pad: d.rings ? +d.rings.padMesh()[0].material.emissiveIntensity.toFixed(2) : null, ringU: d.ringU ? +d.ringU.value.toFixed(2) : null }; };

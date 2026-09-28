@@ -6,7 +6,7 @@ const R = path.join(__dirname, '..'), P = (...a) => path.join(R, ...a);
 (async()=>{
   const game = fs.readFileSync(P('engine', 'game.html'), 'utf8');
   const guard = fs.readFileSync(P('src', 'head_guard2.js'),'utf8');
-  const main = ['planets.js','asteroids.js','stars.js','shipdrive.js','shipglass.js', 'warpring.js', 'shipwear.js','hitex.js','smallcraft.js', 'warships.js', 'postfx.js','cine.js','starmap.js','radar.js'].map(f => fs.readFileSync(P('src', f),'utf8')).join('\n');
+  const main = ['planets.js','asteroids.js','stars.js','shipdrive.js','shipglass.js', 'warpring.js', 'shipwear.js','hitex.js','smallcraft.js', 'warships.js', 'carrier.js', 'postfx.js','cine.js','starmap.js','radar.js'].map(f => fs.readFileSync(P('src', f),'utf8')).join('\n');
   const live = fs.readFileSync(P('src', 'live2.js'),'utf8');
   const opt = { compress: { passes: 2 }, mangle: true, format: { comments: false } };
   const mg = (await minify(guard, opt)).code, mm = (await minify(main, opt)).code, ml = (await minify(live, opt)).code;

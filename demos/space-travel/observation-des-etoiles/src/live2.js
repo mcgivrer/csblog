@@ -40,7 +40,7 @@
     "#sttToast{position:fixed;left:50%;bottom:14vh;transform:translateX(-50%);z-index:13;font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.08em;color:#e8edf5;background:rgba(11,18,32,.9);border:1px solid #25375c;border-left:2px solid #ffb454;padding:10px 16px;opacity:0;transition:opacity .4s;pointer-events:none;max-width:80vw;text-align:center}" +
     "#sttToast.on{opacity:1}#sttToast .a{color:#ffb454}#sttToast .c{color:#5eead4}" +
     "#sttFleet{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:14;display:none;width:min(440px,92vw);font-family:'JetBrains Mono',monospace;background:rgba(11,18,32,.96);border:1px solid #25375c;border-left:2px solid #ff6b5e;padding:16px 16px 12px}" +
-    "#sttFleet.on{display:block}#sttFleet .hd{font-size:11px;letter-spacing:.14em;color:#ff6b5e;margin-bottom:10px}" +
+    "#sttFleet.on{display:block}#sttFleet .hd{font-size:11px;letter-spacing:.14em;color:#ff6b5e;margin-bottom:10px}#sttFleet .hd2{color:#5eead4;margin-top:6px}" +
     "#sttFleet button{display:block;width:100%;text-align:left;margin:0 0 8px;padding:10px 12px;background:#0f1a30;border:1px solid #25375c;color:#e8edf5;font:inherit;cursor:pointer}" +
     "#sttFleet button b{display:block;font-size:12px;letter-spacing:.1em;color:#ffb454}#sttFleet button span{font-size:11px;color:#8ea0c4}" +
     "#sttFleet button:hover,#sttFleet button:focus-visible{border-color:#ffb454;outline:none}#sttFleet button.x{text-align:center;color:#8ea0c4;margin:4px 0 0}" +
@@ -59,6 +59,8 @@
     '<button type="button" data-k="patrol"><b>FIGHTER PATROL</b><span>3 or 4 fighters in formation, low orbit</span></button>' +
     '<button type="button" data-k="station"><b>DESTROYER ON STATION</b><span>Destroyer, escort pair, launches and gunnery drills</span></button>' +
     '<button type="button" data-k="escort"><b>CORVETTE ESCORT</b><span>Corvette flying alongside a freighter</span></button>' +
+    '<div class="hd hd2">// SHIP CARRIER</div>' +
+    '<button type="button" data-k="carrier"><b>SHIP CARRIER</b><span>640 m through-dock carrier, a freighter berthed aboard</span></button>' +
     '<button type="button" data-k="close" class="x">CLOSE · Esc</button>');
   fleet.className = 'demo-ui'; fleet.setAttribute('role', 'dialog'); fleet.setAttribute('aria-label', 'Military fleet');
   function mount(){ [start, title, cap, credit, pause, ui, toast, fleet].forEach(function(e){ document.body.appendChild(e); }); start.querySelector('.cr').textContent = CREDIT; }
@@ -92,10 +94,11 @@
   var fleetOpen = false;
   function openFleet(){ if(!running || selOpen) return; if(window.__STARMAP && __STARMAP.isOpen()) __STARMAP.close(); fleetOpen = true; fleet.classList.add('on'); var b = fleet.querySelector('button'); b && b.focus(); }
   function closeFleet(){ fleetOpen = false; fleet.classList.remove('on'); }
-  var FLEET_NAMES = { patrol: 'Fighter patrol', station: 'Destroyer on station', escort: 'Corvette escort' };
+  var FLEET_NAMES = { patrol: 'Fighter patrol', station: 'Destroyer on station', escort: 'Corvette escort', carrier: 'Ship carrier' };
   fleet.addEventListener('click', function(e){ var b = e.target.closest('button'); if(!b) return; var k = b.getAttribute('data-k'); closeFleet(); if(k === 'close' || !window.__CINE) return;
-    var r = __CINE.showMilitary(k); if(r === 'invalid') return;
-    showToast('<span class="a">FLEET</span> · ' + FLEET_NAMES[k] + ' <span class="c">' + (r === 'now' ? '— camera follows it now' : '— at the next system') + '</span>'); });
+    var r = k === 'carrier' ? (__CINE.showCarrier ? __CINE.showCarrier() : 'invalid') : __CINE.showMilitary(k); if(r === 'invalid') return;   // v7.6 : porte-vaisseaux
+    var nm = FLEET_NAMES[k]; if(k === 'carrier' && __CINE.carrierDbg){ var cd = __CINE.carrierDbg(); if(cd && cd.type) nm = cd.type; }
+    showToast('<span class="a">FLEET</span> · ' + nm + ' <span class="c">' + (r === 'now' ? '— camera follows it now' : '— at the next system') + '</span>'); });
   function cancelSelector(){ if(!selOpen) return; selCancel = true; var b = document.getElementById('ssConfirm'); b && b.click(); }
   function toggleFollow(){ if(!window.__CINE) return; var f = __CINE.setFollow(!__CINE.followHero); refreshLock();
     var h = __CINE.heroInfo(); showToast(f ? '<span class="a">FOLLOW</span> · ' + esc(h.type) + ' / ' + esc(h.name) + ' <span class="c">stays the hero</span>' : '<span class="a">AUTO</span> <span class="c">· relays between ships resume</span>'); }
@@ -211,6 +214,7 @@
         console.log('[cine] ready', info);
         setProgress(.88, 'COMPILING SHADERS'); setProgress(.98, null, 1);
         nextPaint(function(){
+          try { __CINE.prewarm && __CINE.prewarm(); } catch(e){ console.error(e); }   // v7.6 : porte-vaisseaux et flotte militaire
           __CINE.step(0.001);                                               // premier rendu caché : shaders compilés avant le lancement
           mark('shaders');
           setProgress(1, 'UNIVERSE READY');

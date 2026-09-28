@@ -24,7 +24,7 @@ SAMPLE = """(n) => { window.__step(n); const L = REAL.leg, M = REAL.mission, p =
            ox: M ? Math.hypot(M.ox, M.oy)/(M.half || 1) : 0, orbR: os.active ? p.distanceTo(os.center)/os.radius : null,
            vo: M ? M.vo : 0, paid: !!os.creditsPaid, spawned: (os.spawned || []).filter(Boolean).length,
            gal: REAL.galPos.toArray(), nan: ![p.x, p.y, p.z, camera.position.x].every(Number.isFinite),
-           camShip: camera.position.distanceTo(p)/SHIP_GAME_LEN, sv: (typeof SURVOL !== 'undefined') && SURVOL.isActive() }; }"""
+           camShip: camera.position.distanceTo(p)/SHIP_GAME_LEN, sv: (typeof SURVOL !== 'undefined') && SURVOL.isActive(), gp: (typeof GP !== 'undefined' && GP.state.auto) ? GP.state.auto.type : null }; }"""
 SHOT = """() => { LAYERS.skipRender = false; window.__step(1); const u = renderer.domElement.toDataURL('image/jpeg', .85); LAYERS.skipRender = true; return u; }"""
 
 fails = []
@@ -81,8 +81,12 @@ check("orbite basse képlérienne (rayon constant)", ob and max(abs(s["orbR"] - 
 check("escale : navettes lancées et livraison payée", any(s["paid"] for s in samples), f"{max(s['spawned'] for s in samples)} navettes")
 check("jamais sous la surface", min(s["alt"] for s in samples) > 0.02, f"altitude minimale {min(s['alt'] for s in samples)*100:.1f} % du rayon")
 # hors survol du système (plan cinématique volontairement loin du vaisseau, vérifié par survol_test.py)
-cs = [s["camShip"] for s in samples if not s.get("sv")]
-check("caméra toujours près du vaisseau (co-mobile, hors survol)", max(cs) < 12, f"distance max {max(cs):.1f} longueurs de vaisseau · {sum(1 for s in samples if s.get('sv'))} s de survol exclues")
+# hors plans cinématiques volontairement loin du vaisseau : survol du système (survol_test.py) et suivi des navettes
+# à l'escale (gros_plans_test.py, largage_test.py)
+cs = [s["camShip"] for s in samples if not s.get("sv") and not s.get("gp")]
+gpf = [s["camShip"] for s in samples if s.get("gp")]
+print("   (plans des navettes : %d relevés, distance max %.1f longueurs — exclus)" % (len(gpf), max(gpf or [0])))
+check("caméra toujours près du vaisseau (co-mobile, hors survol et plans des navettes)", max(cs) < 12, f"distance max {max(cs):.1f} longueurs de vaisseau · {sum(1 for s in samples if s.get('sv'))} s de survol exclues")
 check("carburant consommé en Δv", samples[-1]["fuel"] < fuel0, f"{fuel0:.0f} → {samples[-1]['fuel']:.0f}")
 check("passage à l'étoile suivante", samples[-1]["hops"] >= 1 and samples[-1]["cell"] != cell0, f"{cell0} → {samples[-1]['cell']}")
 check("aucune valeur non finie", not any(s["nan"] for s in samples))
