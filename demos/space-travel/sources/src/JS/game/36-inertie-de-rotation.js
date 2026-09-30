@@ -420,8 +420,13 @@ function updateFlight(dt, elapsed){
     /* plafond défensif : si quelque chose empêchait radioDone/shuttlesDone
        de devenir vrais (cas non prévu), la manœuvre se termine quand même
        plutôt que de bloquer indéfiniment le vol. */
-    const hardCap = pauseTimer >= ARRIVAL_PAUSE_DURATION*2.5;
-    if((pauseTimer >= ARRIVAL_PAUSE_DURATION && radioDone && shuttlesDone) || hardCap){
+    /* lot N2 : la navette de baie manœuvre lentement près du vaisseau (≈ 100 s avant de partir, ≈ 170 s aller-retour) —
+       le plafond de 90 s terminait l'escale navette encore dehors : le vaisseau repartait et la navette le poursuivait
+       à des milliards de km (rotations aberrantes, plus de plan de suivi). Plafond prolongé pour les vaisseaux à baie. */
+    const hardCap = pauseTimer >= ARRIVAL_PAUSE_DURATION*2.5 + ((typeof CARGO !== 'undefined' && CARGO.hasBay()) ? 360 : 0);
+    /* M1 : escale sans livraison (départ, ou port sans mission à livrer) : terminée dès qu'une mission est acceptée */
+    const missionGo = !!os.missionGo && shuttlesDone;
+    if((pauseTimer >= ARRIVAL_PAUSE_DURATION && radioDone && shuttlesDone) || hardCap || missionGo){
       flightPhase = 'CRUISE';
       pauseTimer = 0;
       orbitState.active = false;

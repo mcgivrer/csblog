@@ -386,6 +386,21 @@ tremblement de la navette à l'écran 2 242 → 0,0003 (2 = largeur d'écran) ; 
 Défauts de mesure corrigés en route : navette mesurée ≠ navette filmée (plusieurs en route à la fois) ; stabilité du
 décor d'abord « nulle » faute de relevés (centre de la planète au-delà du plan lointain) → mesure par direction.
 
+## 4 decies. Lots N et N2 — navette-cargo et navettes de baie
+
+Voir [`spec-ports-orbitaux-navette.md`](spec-ports-orbitaux-navette.md) (décisions, chorégraphie, mesures). En bref :
+`20p-navette.js` (`CARGO`) — conteneur ISO 20' réel ; navette-cargo (corps de navette de la démo + berceau dorsal) ;
+**baie ventrale ajoutée aux 4 porte-conteneurs** (table `BELLY` de `shipglass.js`, seule modification de la copie) ;
+prise directe sur la pile ; engins de baie sans conteneur pour les autres vaisseaux ; plus aucun module d'amarrage.
+`smallcraft.js` de la démo copié tel quel. Tests : `navette_baie_test.py`, `escale_baie_test.py`, `largage_test.py`,
+`saccades_test.py` (fenêtres allongées à la durée d'une escale à baie).
+
+## 4 undecies. Lot P1 — ports orbitaux (génération et rendu)
+
+`20n-ports-orbitaux.js` (`PORTS`) : anneau, moyeu à pontons, tour d'amarrage, déclinés par graine ; poste L sur chaque
+port ; stations du commerce local absorbées (mêmes planètes et noms) ; toute géante gazeuse dotée d'une tour. Détails,
+rendus et mesures : [`spec-ports-orbitaux-navette.md`](spec-ports-orbitaux-navette.md) §B.3 bis. Test : `ports_test.py`.
+
 ## 5. Build et tests
 
 ```
@@ -405,6 +420,9 @@ Tests : `smoke_test.py` (démarrage, route, déplacement, passe de lentille, nav
 `largage_test.py` (largage : échelle du conteneur, rotations de la navette et de la caméra, traînée, cadrage du chargement) ;
 `titre_test.py` (séquence de titre : choix des systèmes, étoile, planètes, lune, fondu, continuité, démarrage du jeu) ;
 `saccades_test.py` (plans de suivi de navette à cadence irrégulière : tremblement à l'écran, distance, rotation, décor) ;
+`navette_baie_test.py` (navette de baie des porte-conteneurs : départ et rangement en baie, vitesses de manœuvre, contact, encombrement) ;
+`escale_baie_test.py` (escale d'un vaisseau à baie : fin navette rentrée, plan de suivi, rotations, éloignement) ;
+`ports_test.py` (ports orbitaux : postes L, altitudes, géantes, budget, absorption des stations — `ports_test.py page [ancienne]` pour la comparaison) ;
 `commerce_test.py` (commerce local : tableau de contrats, livraison sur cible quelconque, boucle, achat au chantier naval, bascule long-courrier).
 `carte_test.py` (carte 2D : ouverture, traduction, secteur et système, règles du ciblage, saut vers la cible, itinéraire recalculé, escale hors itinéraire).
 `couches_test.py` : supprimé en v2.17 (voir §4 ter).

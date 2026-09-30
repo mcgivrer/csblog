@@ -60,14 +60,14 @@ with sync_playwright() as pw:
     check("retour à la poursuite : plan relâché, focale rétablie, flou coupé", not back["shot"] and back["k"] == 0, back)
     pg.evaluate("() => { REAL.plan(REAL.leg); for(let i = 0; i < 900 && REAL.phase !== 'ORBIT'; i++) window.__step(1); }")
     seen, follow_ok, fshot = set(), 0, 0
-    for i in range(400):
+    for i in range(2400):   # lot N2 : la navette de baie rejoint la pile après ~70 s, part après ~100 s
         p = pg.evaluate("() => { window.__step(1); return (" + PROBE + ")(); }")
         if p and p["type"].startswith("shuttle"):
             seen.add(p["type"])
             if p["type"] == "shuttleFollow":
                 fshot += 1; follow_ok += 1 if p["onScreen"] and p["dist"] < 12*8*(1 + 0) * 10 else 0
                 if fshot == 12: u = pg.evaluate(SHOT); open(os.path.join(shots, f"gp_navette_{tag}.jpg"), "wb").write(base64.b64decode(u.split(",")[1]))
-        if pg.evaluate("() => !!orbitState.creditsPaid"): break
+        if pg.evaluate("() => flightPhase !== 'ARRIVAL_PAUSE'"): break   # fin de l'escale (navette rentrée)
     check("escale : plan du chargement puis suivi de la navette", {"shuttleLoad", "shuttleFollow"} <= seen, sorted(seen))
     check("la navette reste cadrée pendant son suivi", fshot > 0 and follow_ok == fshot, f"{follow_ok}/{fshot}")
     check("aucune erreur JavaScript", not errors, errors[:3])

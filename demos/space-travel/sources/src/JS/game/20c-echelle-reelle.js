@@ -393,6 +393,7 @@ function portDir(p, C){
 }
 /* plan de l'étape : orbite de livraison passant au-dessus du port, couloir d'approche, transfert */
 R.plan = function(leg, target, local){
+  if(typeof CARGO !== 'undefined') CARGO.restoreStack();   /* soute rechargée (conteneurs pris à l'escale précédente) */
   const p = target || leg.hab, C = p.position, Rp = p.radius;
   const ro = Rp*(1 + FLIGHT.ORBIT_ALT), vo = p.GM ? Math.sqrt(p.GM/ro) : FLIGHT.DOCK_SPEED;
   const u = portDir(p, C), A = shipRig.position.clone(), a = A.clone().sub(C).normalize();
@@ -481,6 +482,7 @@ function planDeparture(M){
 /* après une escale (L3) : long-courrier -> étoile suivante (comportement L2.3/L2.4 inchangé) ;
    sinon -> tableau de contrats (commerce local, cf. LOCAL, chargé après ce module) */
 R.afterEscale = function(M){
+  if(typeof MISSIONS !== 'undefined' && MISSIONS.enabled()){ MISSIONS.afterEscale(M, planDeparture); return; }   /* M1 : plus d'itinéraire */
   if(hasQuantumJump || SHIP_WARP){ planDeparture(M); return; }
   const boardUp = document.getElementById('contractBoardOverlay').classList.contains('visible');
   const yardUp = document.getElementById('shipyardOverlay').classList.contains('visible');

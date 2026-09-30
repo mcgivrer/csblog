@@ -7,7 +7,7 @@ l'échelle réelle, et ouvre la refonte de la navette de livraison demandée dan
 | | |
 |---|---|
 | Base | v2.17 : échelle réelle seule, greffons vaisseau de la démo (L5–L7), commerce local (L3), carte 2D (L4), gros plans (L10), séquence de titre ; L9 (trafic, concurrence, escorte, radar) **spécifié** |
-| Statut | **décisions prises le 28/09/2026** (voir « Décisions ») — lot N (navette) **implémenté** ; lots ports orbitaux à venir |
+| Statut | **décisions prises le 28/09/2026** — lots N et **N2 (navette de baie) implémentés et testés** ; lots ports orbitaux à venir |
 | Suite prévue | après décision : implémentation par lots (§B.10), puis mise à jour de la spécification générale, du `README.md` et du `TODO.md` |
 
 ---
@@ -34,6 +34,66 @@ l'échelle réelle, et ouvre la refonte de la navette de livraison demandée dan
 - Plan de chargement (gros plans) resserré sur la navette et le point de dépose (≈ 2 longueurs de navette).
 - Tests : `largage_test.py` (8/8, dont « conteneur ISO à l'échelle 1 : 6,06 m » et « chargement sans saut : 0,48 m par
   image au plus, mouvement du bras ») ; `saccades_test.py` 6/6 ; gros plans 9/9 ; fumée 8/8.
+
+## Lot N2 — navette de baie (décisions du 28/09/2026, implémenté)
+
+**Consignes** : plus de module d'amarrage ni de bras ; la navette part de la **baie intégrée** au vaisseau ; **les
+conteneurs ne voyagent que sur les porte-conteneurs** ; les approches se font à **vitesse de manœuvre**.
+**Constat** : aucun des quatre porte-conteneurs n'avait de baie (seuls les pousseurs, le paquebot et la Vagabonde en ont).
+**Décision** : baie ventrale ajoutée aux porte-conteneurs **et** prise directe sur la pile.
+
+| Étape (porte-conteneurs) | Mouvement | Vitesse de pointe (réglage du 29/09) |
+|---|---|---|
+| 1. Sortie de baie | descente à travers le champ de force, attitude du vaisseau | 2,5 m/s |
+| 2. Vers la pile | sous la coque puis le long de son flanc, roulis de 90° (dos vers la pile) | 8 m/s |
+| 3. Approche finale | 4 m de recul, contact **à l'arrêt** | 2 m/s → 0 |
+| 4. Prise | le conteneur extérieur glisse de son logement au berceau | 2,6 s |
+| 5. Écartement | 30 m depuis la pile, puis accélération | 8 m/s |
+| 6. Transfert, livraison | vers le port (crédits, radio inchangés) | transfert |
+| 7. Retour | vers un point d'approche **dans l'axe de la baie, juste hors de la zone de manœuvre** (encombrement + 45 m) | décélération jusqu'à l'arrêt |
+| 8. Entrée en baie | alignement, montée à travers le champ | 8 m/s puis 2,5 m/s |
+
+**Mesures** (Carrelet et Basalte) : aller-retour de la navette **97 s** (170 s avant le réglage) ; escale complète
+**111 s** (194 s) ; vitesse ≤ 8,00 m/s dans les 40 m autour de la coque (2 462 relevés) ; contact avec la pile à
+0,001 m/s ; aucune traversée de l'encombrement du vaisseau ; conteneur sans saut. Réduire le point d'approche à 40 m
+**dans la direction d'arrivée** faisait longer la coque à ~63 m/s : il est désormais placé dans l'axe de la baie.
+
+| Sortie de baie | Prise sur la pile | Écartement | Retour en baie |
+|---|---|---|---|
+| ![](img/ports/baie-1-sortie.jpg) | ![](img/ports/baie-2-prise.jpg) | ![](img/ports/baie-3-depart.jpg) | ![](img/ports/baie-4-retour.jpg) |
+
+**Escale** : une navette de baie par escale (les manœuvres lentes rendaient trois départs rapprochés impossibles) ;
+plafond de sécurité de l'escale prolongé pour les vaisseaux à baie (à 90 s, il clôturait l'escale navette encore
+dehors : le vaisseau repartait et la navette le poursuivait — rotations aberrantes, plus de plan de suivi).
+
+Le logement vidé reste visible vide pendant l'escale ; la pile est complétée au départ de l'étape suivante.
+
+**Baies ajoutées** (table `BELLY` de `shipglass.js`, seule modification de la copie de la démo) :
+
+| Modèle | Section au point d'amarrage | Ouverture × profondeur |
+|---|---|---|
+| Carrelet | 42,6 × 32,7 × 27 m | 19,6 × 9,6 m × 10 m |
+| Basalte | 90,7 × 90,7 × 28 m | 20,0 × 10,8 m × 10 m |
+| Hirondelle, Longue-Échine | 13,9 × 15,9 × 22 m | 19,6 × 8,2 m × 10 m |
+
+| Carrelet | Basalte | Hirondelle | Longue-Échine |
+|---|---|---|---|
+| ![](img/ports/baie-e18.jpg) | ![](img/ports/baie-e140.jpg) | ![](img/ports/baie-p10.jpg) | ![](img/ports/baie-p44.jpg) |
+
+**Autres vaisseaux** (décision : chacun livre sa cargaison avec les engins de ses baies, **jamais de conteneur**) :
+
+| Vaisseau | Engin | Baie |
+|---|---|---|
+| Paquebot | navette de transport (passagers) | latérale 12,4 × 7 m, 17,3 m de profondeur — nez vers l'intérieur, sortie en marche arrière ; la tuyère affleure au champ |
+| Vagabonde | drone-cargo | fentes latérales 10 × 2,3 m |
+| Pousseurs | drone-cargo | fente ventrale 11,2 × 3,2 m (même la navette de maintenance étroite n'y tient pas) |
+| Citernier | aucun (sans baie) | livraison payée sans navette, en attendant les ports orbitaux (lots P) |
+
+Plus aucun module d'amarrage ni bras, sur aucun vaisseau. Économie : prix par passager / par
+lot de fret léger / par tonne de glace, calés sur les recettes actuelles d'une escale (⚑ à valider).
+
+**Ensuite** (demandé) : évitement d'obstacles en vol — planètes, lunes, stations, vaisseaux (et, déjà visible sur la
+Longue-Échine, les anneaux de distorsion près de la baie).
 
 # Partie A — Refonte de la navette de livraison de conteneurs
 

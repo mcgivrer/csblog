@@ -487,6 +487,7 @@ function container(type, w, h, d, o){
   c.add(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), o.cargo[type]));
   [-1,1].forEach(function(k){ const f = new THREE.Mesh(new THREE.BoxGeometry(w*1.04, h*1.04, d*0.05), o.band); f.position.z = k*d*0.48; c.add(f); });
   S.containers++;
+  c.userData.cargo = type; c.userData.cdims = [w, h, d];   /* prise directe sur la pile (navette-cargo) */
   return c;
 }
 /* fenêtres éclairées (shader radial, cf. §6.3 de l'étude) */
@@ -1149,7 +1150,9 @@ function installShip(id, opts){
   const k = SHIP_K, f = SHIP_GAME_LEN/40, c = b.hullBox.getCenter(new THREE.Vector3());
   const dp = (b.group.userData.dockPt || new THREE.Vector3(0, b.hullBox.min.y, c.z)).clone().multiplyScalar(k);
   const nBefore = shipBody.children.length;
-  buildDockModule(shipBody, dp.x, dp.y - 1.15, dp.z);
+  const noDock = typeof CARGO !== 'undefined';   /* lot N2 : plus aucun module d'amarrage — les engins partent des baies intégrées */
+  if(noDock){ window.shipDockAnchor = null; window.shipArm = null; window.shipCargoStageAnchor = null; }
+  else buildDockModule(shipBody, dp.x, dp.y - 1.15, dp.z);
   if(typeof REAL !== 'undefined' && REAL.active){           /* L2.3 : dock dessiné pour un vaisseau de 40 u → mis à l'échelle du vaisseau réel */
     const fs = (typeof CARGO !== 'undefined') ? CARGO.DOCK_SCALE : gameLen40(), o = new THREE.Vector3(dp.x, dp.y, dp.z);   /* lot N : taillé pour le conteneur ISO 20' */
     shipBody.children.slice(nBefore).forEach(function(ch){ ch.position.sub(o).multiplyScalar(fs).add(o); ch.scale.multiplyScalar(fs); });

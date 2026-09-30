@@ -830,7 +830,8 @@ function ensureCarrier(leg, pc){
   c.traj = orbitTraj(hab.position, r, u, w, rr(0, 6.28), Math.sqrt(hab.GM/r)/r*(R() < .5 ? -1 : 1), 0); leg.npcs.push(c);
   const X = c.craft.extra; c.isCarrier = true; c.dock = X; c.rings = X.rings; c.field = X.ring.uField; c.phase = X.ring.uPhase;
   if(c.craft.wear && X.rings){ const L = X.rings.list; c.craft.wear.uRing.value.set(L[0].z, L[1].z, L[0].Rin, 2); c.ringU = c.craft.wear.uRingI; }
-  patchUniforms(c.craft.group, null, c.charge, X.ring.uField, X.ring.uPhase);    // halos des anneaux et géode : champ et charge propres au porteur
+  patchUniforms(c.craft.group, c.thr, c.charge, X.ring.uField, X.ring.uPhase);    // halos des anneaux et géode : champ et charge propres au porteur
+  c.drive = X.drive || null;                                                 // v7.6.2 : moteurs du jeu (chauffe, cardans)
   c.geode = findGeode(c.craft.group, c.charge); c.equip = { warp: !!X.rings, jump: !!c.geode }; c.ftl = true;   // v7.6.1 : saut quantique (raison d'être du porteur) et distorsion
   const m = pick(NOFTL), s = makeShip(m, leg, { noBays: true }), hb = s.hull.box, B = X.berths[1];   // vaisseau garé au poste 2
   const lp = new V3(B.C.x - ((hb.min.x + hb.max.x)/2 - s.com.x), B.C.y - (hb.min.y - s.com.y), B.C.z - ((hb.min.z + hb.max.z)/2 - s.com.z));
@@ -1548,6 +1549,23 @@ const SHOTS = {
     const s0 = subjectState(sh, vis.tJ), vm = velT(sh, vis.tJ + .5), f = frameOf(s0.q), L = sh.len, side = R()<.5?-1:1;
     const pos = s0.pos.clone().addScaledVector(f.right, side*rr(3.0,3.8)*L).addScaledVector(f.up, rr(1.7,2.3)*L).addScaledVector(f.fwd, rr(-1.8,.4)*L);
     return T => { const st = subjectState(sh, T); return { pos: pos.clone().addScaledVector(vm, T - vis.tJ), look: st.pos.clone().addScaledVector(f.up, -.75*L).addScaledVector(f.fwd, .3*L), fov: 52, up: f.up }; }; },
+  arriveFront(sh, t0, d, vis){ // v7.7 : contre-champ — la caméra attend devant le point d'arrivée, regard vers l'arrière : éclair au fond de l'image, le vaisseau vient vers nous
+    const s0 = subjectState(sh, vis.tArrive + .6), vm = velT(sh, vis.tArrive + 1), f = frameOf(s0.q), L = sh.len, side = R()<.5?-1:1, Tr = vis.tArrive + .6;
+    const fw = vm.lengthSq() > 1 ? vm.clone().normalize() : f.fwd.clone(), rt = new V3().crossVectors(fw, f.up).normalize();
+    const D0 = rr(16, 22)*L, D1 = rr(5, 7)*L, lat = side*rr(2.2, 3.4)*L, upo = rr(-.6, 1.4)*L, t1 = vis.tT0 + .3, fov = rr(34, 40);
+    return T => { const k = smoother(clamp((T - vis.tArrive)/Math.max(1, t1 - vis.tArrive), 0, 1)), base = s0.pos.clone().addScaledVector(vm, Math.min(T, vis.tT0) - Tr);
+      const st = subjectState(sh, Math.max(T, vis.tArrive));
+      return { pos: base.clone().addScaledVector(fw, lerp(D0, D1, k)).addScaledVector(rt, lat).addScaledVector(f.up, upo), look: st.pos.clone().addScaledVector(fw, -1.5*L*(1 - k)), fov, up: f.up }; }; },
+  planetDrift(sh, t0, d, vis){ // v7.7 : travelling lent — la planète en grand sous l'horizon, le vaisseau petit au premier tiers, dérive latérale co-mobile
+    const s0 = subjectState(sh, t0), pl = nearestPlanet(vis.leg, s0.pos);
+    if(!pl || s0.pos.distanceTo(pl.position) > pl.radius*6) return SHOTS.wide(sh, t0, d, vis);
+    const L = sh.len, side = R()<.5?-1:1, D0 = rr(14, 24)*L, D1 = D0*rr(.8, .92), lat0 = side*rr(4, 8)*L, lat1 = lat0*rr(1.4, 1.9), h = rr(1.5, 3.5)*L, fov = rr(52, 62);
+    return T => { const st = subjectState(sh, T), C = pl.position, r = st.pos.clone().sub(C), alt = r.length() - pl.radius; r.normalize();
+      let t = velT(sh, T); t.sub(r.clone().multiplyScalar(t.dot(r))); if(t.lengthSq() < 1e-9) t = perpTo(r, v(0, 1, 0)); t.normalize();
+      const sd = new V3().crossVectors(t, r).normalize(), k = smoother((T - t0)/d), dip = Math.acos(clamp(pl.radius/(pl.radius + Math.max(alt, 1)), -1, 1));
+      const pos = st.pos.clone().addScaledVector(t, -lerp(D0, D1, k)).addScaledVector(sd, lerp(lat0, lat1, k)).addScaledVector(r, h);
+      const fw = t.clone().multiplyScalar(Math.cos(dip*.55)).addScaledVector(r, -Math.sin(dip*.55));
+      return { pos, look: pos.clone().addScaledVector(fw, 1e5), fov, up: r }; }; },
   arrive(sh, t0, d, vis){ // plan fixe sur le point d'arrivée : l'espace se creuse, éclair, le vaisseau apparaît
     const s0 = subjectState(sh, vis.tArrive + .6), vm = velT(sh, vis.tArrive + 1), f = frameOf(s0.q), L = sh.len, side = R()<.5?-1:1, behind = R() < .6;
     const pos = behind ? s0.pos.clone().addScaledVector(f.fwd, -5.2*L).addScaledVector(f.right, side*3.2*L).addScaledVector(f.up, 2.4*L)
@@ -1675,9 +1693,10 @@ function chooseShot(T){
   const vis = visit;
   const dep = vis.departer;
   // 1) arrivée
-  if(!vis.userHero && T < vis.tArrive + (vis.arrMode === 'warp' ? 2.6 : 3.4)){
+  if(!vis.userHero && T < vis.tArrive + (vis.arrMode === 'warp' ? 2.6 : (vis.arrFront ? 2.9 : 3.4))){
     if(vis.arrMode === 'warp') return makeShot('warpArrive', vis.hero, T, vis.tArrive + rr(2.9, 3.4), vis);
-    return makeShot('arrive', vis.hero, Math.min(T, vis.tArrive - 1.8), vis.tArrive + rr(3.7, 4.3), vis);
+    if(vis.arrFront === undefined) vis.arrFront = R() < .35;                  // v7.7 : contre-champ d'arrivée une fois sur trois
+    return makeShot(vis.arrFront ? 'arriveFront' : 'arrive', vis.hero, Math.min(T, vis.tArrive - 1.8), vis.arrFront ? vis.tT0 + .3 : vis.tArrive + rr(3.7, 4.3), vis);   // contre-champ : coupé au début du transfert
   }
   // 2) départ imminent : saut quantique ou passage en distorsion, plans dédiés
   const jumpShotStart = vis.tJ - rr(1.6, 2.6);
@@ -1701,11 +1720,11 @@ function chooseShot(T){
   // travelling de découverte (sans vaisseau) : parfois juste après l'arrivée, parfois en cours de route
   const room = jumpShotStart - 2.4 - T;
   const lastV = shotLog.slice(-3).some(x => /^vista/.test(x));
-  if(room > 7 && !lastV && (shotLog[shotLog.length-1] === 'arrive' ? R() < .4 : R() < .26)){
+  if(vis.eclOK === undefined) vis.eclOK = ECL_P >= 1 || (ECL_P > 0 && !eclPrev && R() < ECL_P);   // v7.7 : ce système aura-t-il droit à une éclipse ?
+  if(room > 7 && !lastV && (/^arrive/.test(shotLog[shotLog.length-1]) ? R() < .45 : R() < .32)){      // v7.7 : un peu plus de travellings
     const vd = Math.min(rr(7.5, 11), room);
-    // une éclipse par système quand la géométrie le permet
-    if(!(vis.shown && vis.shown.has('eclipse')) && R() < .55){ const ve = makeVista(T, Math.max(vd, Math.min(11, room)), vis, 'eclipse'); if(ve){ vis.shown.add('eclipse'); return ve; } }
-    const vs = makeVista(T, vd, vis); if(vs) return vs;
+    if(vis.eclOK && !(vis.shown && vis.shown.has('eclipse')) && R() < .55){ const ve = makeVista(T, Math.max(vd, Math.min(11, room)), vis, 'eclipse'); if(ve){ vis.shown.add('eclipse'); vis.hadEcl = true; return ve; } }
+    const vs = makeVista(T, vd, vis, null, room); if(vs) return vs;
   }
   let subj = T >= vis.depStart - 1 ? dep : (vis.showcase || (vis.userHero ? dep : vis.hero));
   const seg = segAt(vis, subj, T + d*.5);
@@ -1756,10 +1775,11 @@ function chooseShot(T){
     const dayside = pl ? sp.clone().sub(pl.position).normalize().dot(pl.position.clone().negate().normalize()) : 1;
     const cities = pl && pl.mesh.material.uniforms.uCities && pl.mesh.material.uniforms.uCities.value > .5;
     const wl = dayside > -.05 ? 4 : (cities ? 1.5 : .3);
-    opts = [['limb',wl],['orbitcam',2],['tripod',calm ? 1.6 : 0],['wide',1.5],['lateral',1.2],['front',1]].concat(closeOpts(subj, 'orbit')); }
+    opts = [['limb',wl],['orbitcam',2],['tripod',calm ? 1.6 : 0],['wide',1.5],['lateral',1.2],['front',1],['planetDrift', 2.2]].concat(closeOpts(subj, 'orbit')); }   // v7.7 : dérive planétaire
   else if(seg === 'depart'){ opts = [['chase',3],['front',1.2],['wide',1.4],['lateral',1.5],['orbitcam',1]].concat(closeOpts(subj, 'depart')); }
   else { opts = [['wide',1],['lateral',1],['chase',1]]; }
   let type, n = 0; do { type = pickW(opts); n++; } while(n < 6 && type === shotLog[shotLog.length-1]);
+  if(type === 'planetDrift'){ const dd = Math.min(rr(12, 18), jumpShotStart - 2.4 - T); if(dd >= 8) d = dd; else type = 'wide'; }   // v7.7 : plan long
   return makeShot(type, subj, T, T + d, vis);
 }
 /* ---------- travellings de découverte, sans vaisseau ---------- */
@@ -1770,10 +1790,42 @@ const VISTAS = {
     const pl = (FOCUS.planet && FOCUS.planet.mesh ? FOCUS.planet : null) || pickW(pls.map(p => [p, 1 + (p.hasRings ? 1.5 : 0) + (p.fx && p.fx.clouds.length ? 1 : 0)])), C = pl.position, Rp = pl.radius;
     const Ls = C.clone().negate().normalize(), side = perpTo(Ls), a = rr(.9, 1.9);
     const dir0 = Ls.clone().multiplyScalar(Math.cos(a)).addScaledVector(side, Math.sin(a)).normalize(), axis = new V3().crossVectors(dir0, side).normalize();
-    const d0 = Rp*rr(2.3, 3.6), d1 = d0*rr(.78, .92), sweep = rr(.12, .22)*(R()<.5?-1:1), off = rr(.2, .45)*(R()<.5?-1:1), up = axis.clone();
+    const d0 = Rp*rr(2.3, 3.6), d1 = d0*rr(.8, .92), sweep = rr(.1, .18)*(R()<.5?-1:1),   /* v7.7 : 15–25 s */ off = rr(.2, .45)*(R()<.5?-1:1), up = axis.clone();
     return { place: pl.properName, focus: () => C, cam: T => { const k = smoother((T - t0)/d), dir = dir0.clone().applyAxisAngle(axis, sweep*k);
       const tan = new V3().crossVectors(axis, dir).normalize();
       return { pos: C.clone().addScaledVector(dir, lerp(d0, d1, k)), look: C.clone().addScaledVector(tan, Rp*off), fov: 46, up }; } };
+  },
+  planetrise(vis, t0, d){ // v7.7 : lever de planète — au-dessus d'une lune, la planète monte lentement au-dessus de son horizon
+    const cands = []; vis.leg.planets.forEach(p => p.mesh && (p.moonPivots || []).forEach(pv => { const m = pv.children[0]; if(m) cands.push({ p, m, name: pv.userData.moonName }); }));
+    if(!cands.length) return null;
+    const S = new V3(), lit = it => { const M = it.m.getWorldPosition(new V3()); return M.sub(it.p.position).normalize().dot(S.clone().sub(it.p.position).normalize()); };
+    const good = cands.filter(it => lit(it) > .15), it = pick(good.length ? good : cands), Rp = it.p.radius;
+    if(!it.m.geometry.boundingSphere) it.m.geometry.computeBoundingSphere();
+    const Rbs = it.m.geometry.boundingSphere.radius*it.m.scale.x, hA = rr(1.7, 2.6), dp = Rbs*hA, e0 = randUnit();
+    const geo = () => { const M = it.m.getWorldPosition(new V3()), B = it.p.position, u = M.clone().sub(B).normalize(), e = perpTo(u, e0); return { M, B, u, e }; };
+    const at = (g, b) => g.M.clone().addScaledVector(g.u, dp*Math.cos(b)).addScaledVector(g.e, dp*Math.sin(b));
+    const sepOf = (g, p) => Math.acos(clamp(g.B.clone().sub(p).normalize().dot(g.M.clone().sub(p).normalize()), -1, 1));
+    const solve = (g, target) => { let lo = 0, hi = 3.0; for(let i=0;i<30;i++){ const m = (lo + hi)/2; if(sepOf(g, at(g, m)) < target) lo = m; else hi = m; } return (lo + hi)/2; };
+    // lunes irrégulières : le limbe réel est mesuré (rayons) depuis la position de mi-plan, dans la direction de la planète
+    const g0 = geo(), th = Math.asin(clamp(Rp/g0.M.distanceTo(g0.B), 0, 1)), a0 = Math.asin(1/hA), pm = at(g0, solve(g0, a0));
+    it.m.updateWorldMatrix(true, false);
+    const dM = g0.M.clone().sub(pm).normalize(), dP = g0.B.clone().sub(pm).normalize(), ax = new V3().crossVectors(dM, dP).normalize(), rc = new THREE.Raycaster();
+    let lo = 0, hi = a0*1.2; for(let i=0;i<16;i++){ const m = (lo + hi)/2; rc.set(pm, dM.clone().applyAxisAngle(ax, m)); if(rc.intersectObject(it.m, false).length) lo = m; else hi = m; }
+    const edge = lo > .01 ? lo : a0, s0 = edge - 1.3*th, s1 = edge + 1.5*th, half = (s1 - edge)/2 + 1.7*th, fov = clamp(2*half*57.3*1.15, 16, 55), dl = (s1 - edge)/2;
+    return { place: 'Planetrise — ' + it.p.properName + (it.name ? ' over ' + it.name : ''), focus: () => it.p.position, cam: T => {
+      const g = geo(), k = smoother((T - t0)/d), pos = at(g, solve(g, lerp(s0, s1, k))), vv = g.B.clone().sub(pos).normalize(), w = g.M.clone().sub(pos).normalize();
+      const axis = new V3().crossVectors(vv, w).normalize(), dc = vv.clone().applyAxisAngle(axis, dl*.9);    // centre du cadre entre la planète et le limbe
+      let up = vv.clone().sub(w); up.sub(dc.clone().multiplyScalar(up.dot(dc))).normalize();
+      return { pos, look: pos.clone().addScaledVector(dc, 1e6), fov, up }; } };
+  },
+  terminator(vis, t0, d){ // v7.7 : du jour vers la nuit — long panoramique au-dessus du terminateur : lumières des villes, arc de l'atmosphère
+    const pls = vis.leg.planets.filter(p => p.mesh); if(!pls.length) return null;
+    const pl = pickW(pls.map(p => [p, (p.mesh.material.uniforms.uCities && p.mesh.material.uniforms.uCities.value > .5 ? 4 : 0) + (p.hasAtmosphere ? 2 : .5)])), C = pl.position, Rp = pl.radius;
+    const Ls = C.clone().negate().normalize(), n = perpTo(Ls), e = new V3().crossVectors(n, Ls).normalize();
+    const h = rr(1.35, 1.75), b0 = rr(1.05, 1.2), b1 = rr(1.95, 2.15), lead = rr(.28, .42), fov = rr(48, 56);
+    const g = b => Ls.clone().multiplyScalar(Math.cos(b)).addScaledVector(e, Math.sin(b));
+    return { place: pl.properName + ' — terminator', focus: () => C.clone().addScaledVector(g((b0 + b1)/2), Rp), cam: T => { const k = smoother((T - t0)/d), b = lerp(b0, b1, k), gr = g(b);
+      return { pos: C.clone().addScaledVector(gr, Rp*h), look: C.clone().addScaledVector(g(b + lead), Rp*.92), fov, up: gr }; } };
   },
   cloudscape(vis, t0, d){ // rase-nuages matinal à 60–95 km d'altitude : l'horizon défile, lever d'étoile sur la mer de nuages
     if(rateMax(t0, t0 + d) > 3) return null;
@@ -1895,16 +1947,18 @@ const VISTAS = {
       return { pos: N.clone().addScaledVector(dir, lerp(1500, 950, k)).addScaledVector(side, lerp(-180, 180, k)), look: N.clone().addScaledVector(side, lerp(60, -60, k)), fov: 55, up }; } };
   }
 };
-function makeVista(T, d, vis, prefer){
+const LONG_V = { planet: 1, planetrise: 1, terminator: 1 };                 // v7.7 : travellings planétaires longs (15–25 s)
+function makeVista(T, d, vis, prefer, room){
   const sunLike = vis.leg.star3 && __STARS.isSunLike(vis.leg.star);
-  const kinds = prefer ? [[prefer, 1]] : [['planet',3],['cloudscape',2.5],['aurora',3],['belt',2],['moon',1.5],['nebula',1.2],
-    ['star', sunLike ? 1.6 : 1],['flare', sunLike ? 3 : 1.5],['eclipse', sunLike ? 3.5 : 2],['sunrise', sunLike ? 2.5 : 1.5],['transit', 1.2]];
+  const kinds = prefer ? [[prefer, 1]] : [['planet',6],['planetrise',2.2],['terminator',2],['cloudscape',2.5],['aurora',3],['belt',2],['moon',1.5],['nebula',1.2],
+    ['star', sunLike ? 1.6 : 1],['flare', sunLike ? 3 : 1.5],['eclipse', vis.eclOK ? (sunLike ? 3.5 : 2) : 0],['sunrise', sunLike ? 2.5 : 1.5],['transit', 1.2]];
   vis.shown = vis.shown || new Set();
   for(let tries=0; tries<8; tries++){
     const k = pickW(kinds); if(!prefer && (shotLog[shotLog.length-1] === 'vista_' + k || vis.shown.has(k))) continue;   // pas deux fois le même travelling dans un système
-    const vs = VISTAS[k](vis, T, d); if(!vs) { if(prefer) return null; continue; }
-    shotLog.push('vista_' + k); if(shotLog.length > 10) shotLog.shift(); vis.shown.add(k);
-    return { type: 'vista_' + k, vista: true, gal: !!vs.gal, low: !!vs.low, subj: vistaSubject(vs.focus), t0: T, t1: T + d, cam: vs.cam, vis,
+    let dd = d; if(!prefer && LONG_V[k]){ dd = Math.min(rr(15, 25), room || d); if(dd < 11) continue; }        // plans longs : seulement s'il reste du temps
+    const vs = VISTAS[k](vis, T, dd); if(!vs) { if(prefer) return null; continue; }
+    shotLog.push('vista_' + k); if(shotLog.length > 10) shotLog.shift(); vis.shown.add(k); if(k === 'eclipse') vis.hadEcl = true;
+    return { type: 'vista_' + k, vista: true, gal: !!vs.gal, low: !!vs.low, subj: vistaSubject(vs.focus), t0: T, t1: T + dd, cam: vs.cam, vis,
       caption: { vista: true, star: vis.leg.name, cls: vis.leg.designation, place: vs.place } };
   }
   return null;
@@ -1933,12 +1987,15 @@ const heroHist = [];
 const routeLog = [];                                   // systèmes visités (carte : trajet parcouru)
 const FOCUS = {};                                      // cible imposée par la carte aux travellings (planète, lune, nébuleuse)
 const RELAY_P = (p => p !== null && p !== '' && !isNaN(+p) ? clamp(+p, 0, 1) : .6)(PARAMS.get('relay'));
+const ECL_P = (p => p !== null && p !== '' && !isNaN(+p) ? clamp(+p, 0, 1) : .15)(PARAMS.get('eclipse'));   // v7.7 : éclipses rares (≈ 1 système sur 6–7, jamais deux de suite ; ?eclipse=0|1|p)
+let eclPrev = false;
 C.followHero = false; C.pending = null;
 function startVisit(leg, hero, tArrive, arriveDir, arr){
   buildSystem(leg); leg.group.visible = true;
   hero.leg = leg; hero.heroVisits = (hero.heroVisits || 0) + 1; heroHist.push(hero.model); if(heroHist.length > 8) heroHist.shift();
   routeLog.push({ cell: leg.cell, name: leg.name, gal: leg.gal.clone() }); if(routeLog.length > 24) routeLog.shift();
   tlPrune(T);
+  eclPrev = !!(visit && visit.hadEcl);                                     // v7.7 : pas deux systèmes de suite avec une éclipse
   const vis = planVisit(leg, hero, tArrive, arriveDir, arr);
   if(!leg.populated){ leg.populated = true; populateSystem(leg).forEach(fn => fn()); }
   [vis.hero, vis.departer].forEach((sh, k) => { if(sh && sh.bays && (k === 0 || sh !== vis.hero)) sh.bays.forEach((op, i) => opSchedule(op, vis.tO0 + rr(.5, 3.5) + i*rr(4, 7))); });
@@ -2074,7 +2131,7 @@ C.step = function(dt, noRender){
   if(shot.gal){ galView = { pos: c.pos, fov: c.fov, q: new Q() }; const m = new THREE.Matrix4().lookAt(c.pos, c.look, c.up || v(0,1,0)); galView.q.setFromRotationMatrix(m); sysHidden = true; cam.fov = c.fov; }
   else {
     const subjPos = shot.subj.traj(T).pos;
-    const noMin = shot.vista || CLOSE[shot.type] || shot.type === 'bayOps' || shot.type === 'gunnery' || shot.type === 'formation' || shot.type === 'dockPass' || shot.type === 'dockInterior' || shot.type === 'dockBerth' || shot.type === 'arrive' || shot.type === 'jump' || shot.type === 'shipTransit' || shot.type === 'warpArrive';
+    const noMin = shot.vista || CLOSE[shot.type] || shot.type === 'bayOps' || shot.type === 'gunnery' || shot.type === 'formation' || shot.type === 'dockPass' || shot.type === 'dockInterior' || shot.type === 'dockBerth' || shot.type === 'arrive' || shot.type === 'arriveFront' || shot.type === 'jump' || shot.type === 'shipTransit' || shot.type === 'warpArrive';
     safeCam(c.pos, leg, noMin ? null : subjPos, shot.subj.len*1.4, !!shot.low);
     cam.position.copy(c.pos); if(c.up) cam.up.copy(c.up); else cam.up.set(0,1,0); cam.lookAt(c.look); cam.fov = c.fov;
     updateDof(dt, c); applyShake(T, dt, c.fov);

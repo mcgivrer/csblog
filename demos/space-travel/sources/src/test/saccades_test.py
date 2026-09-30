@@ -49,10 +49,10 @@ with sync_playwright() as pw:
     pg.wait_for_function("() => REAL.started === true", timeout=60000, polling=250)
     pg.evaluate("() => { LAYERS.skipRender = true; window.__step(3); for(let i = 0; i < 900 && REAL.phase !== 'ORBIT'; i++) window.__step(1); }")
     S = []
-    for i in range(1400):
+    for i in range(6000):   # navette de baie : le suivi commence après sortie, prise et écartement
         p = pg.evaluate("() => { window.__stepJ(1); return (" + PROBE + ")(); }")
         if p: S.append(p)
-        if len(S) > 360 or pg.evaluate("() => !!orbitState.creditsPaid && !GP.state.auto"): break
+        if len(S) > 300 or pg.evaluate("() => !!orbitState.creditsPaid && !GP.state.auto"): break
     br.close()
 jit, dd, rot, bg = [], [], [], []
 for a, b, c in zip(S, S[1:], S[2:]):

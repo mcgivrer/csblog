@@ -91,6 +91,9 @@ function geodeTpl(){
   try { const b = SHIPGEN.build('e140', { warp: false, jump: true, wear: false, ringFx: false, realGlass: false }); let core = null, halo = null, wire = null;
     b.group.traverse(o => { const m = o.material; if(o.isMesh && m && m.isShaderMaterial && m.uniforms && m.uniforms.uCharge === SHIPGEN.JUMP_U.uCharge){ if(m.transparent) halo = m; else core = m; } if(o.isLineSegments && o.geometry.type === 'EdgesGeometry') wire = o.material; });
     if(core && halo) t = { v: core.vertexShader, f: core.fragmentShader, hv: halo.vertexShader, hf: halo.fragmentShader, wire: wire ? wire.color.getHex() : 0xb8c2cc };
+    // v7.6.2 : jet de torche de fusion (dernière version des moteurs, shipdrive.js) — groupe jet + éclat, gardé hors du vaisseau modèle
+    let jet = null; b.group.traverse(o => { const m = o.material; if(!jet && o.isMesh && m && m.isShaderMaterial && m.uniforms && m.uniforms.uLength && m.uniforms.uRadius) jet = o; });
+    if(t && jet && jet.parent){ const pg = jet.parent; pg.parent && pg.parent.remove(pg); pg.position.set(0, 0, 0); t.plume = pg; t.plumeR = jet.material.uniforms.uRadius.value/3.4; t.plumeL = jet.material.uniforms.uLength.value/1.6; }
     SHIPGEN.dispose ? SHIPGEN.dispose(b.group) : null; } catch(e){ console.error(e); }
   return (CR._geodeTpl = t);
 }
@@ -106,6 +109,27 @@ function jumpCore(G, M, x, y, z, o){
   const halo = new THREE.Mesh(new THREE.SphereGeometry(1.7*o, 24, 16), new THREE.ShaderMaterial({ uniforms: U, vertexShader: t.hv, fragmentShader: t.hf, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
   halo.position.set(x, s, z); halo.userData.keep = true; halo.userData.noFrame = true; halo.renderOrder = 12; G.add(halo);
   return new V3(x, s, z);
+}
+/* moteurs principaux (v7.6.2) : même ensemble que les vaisseaux du jeu (shipdrive.js, v6.3 → v6.9) — cloche de profil Rao,
+   col incandescent, tubes de refroidissement, bobines magnétiques, vérins de cardan, jet de torche de fusion qui suit le cardan.
+   Les cloches sont posées dans un groupe à part, avec leur jet (copie du jet du jeu, uniformes partagés : la démo les remplace
+   par la poussée du porteur), puis __SHIPDRIVE.apply les remplace par les ensembles moteur. */
+function mainDrives(G, M, list){
+  const t = geodeTpl(), eng = new THREE.Group(); G.add(eng);
+  const DU = SHIPGEN.DRIVE_U;
+  list.forEach(([x, y, z, r, len], i) => {
+    H.bell(eng, r*.55, r, len, M.noz, x, y, z);
+    if(!(t && t.plume)) return;
+    const pg = t.plume.clone(true); pg.position.set(x, y, z + len); eng.add(pg);
+    const k = r/t.plumeR;
+    pg.traverse(o => { if(!o.isMesh || !o.material || !o.material.isShaderMaterial) return; const m0 = o.material, u = {};
+      Object.keys(m0.uniforms).forEach(key => { u[key] = DU[key] && m0.uniforms[key] === DU[key] ? DU[key] : { value: (m0.uniforms[key].value && m0.uniforms[key].value.clone) ? m0.uniforms[key].value.clone() : m0.uniforms[key].value }; });
+      if(u.uSeed) u.uSeed.value = 1.7 + i*2.3;
+      if(u.uLength){ u.uLength.value = t.plumeL*k/1.6*1.15; u.uRadius.value = 3.4*r; }        // ÷1,6 : __SHIPDRIVE.apply rallonge le jet
+      if(u.uSize) u.uSize.value *= k;
+      const m = m0.clone(); m.uniforms = u; o.material = m; });
+  });
+  return window.__SHIPDRIVE ? __SHIPDRIVE.apply(eng) : null;
 }
 /* anneau de distorsion : tore de structure + tore lumineux (reconnus par warpring.js : pivot, émetteurs, halo) */
 function ring(G, M, z, Rin, U){
@@ -152,7 +176,8 @@ function buildCarrier(G, M, o, R, mil){
     H.box(G, 30, 1.2, 52, M.dark, sx*(W/2 + 15), 0, zr, 0, 0, sx*.1);
     for(let k = 0; k < 9; k++) H.box(G, 28, 1.3, .6, M.heat, sx*(W/2 + 15), 0, zr - 22 + k*5.5, 0, 0, sx*.1);
     for(let r = 0; r < 2; r++) for(let k = 0; k < 6; k++) wins.push({ kind: 'port', fam, C: new V3(sx*(W/2 + .02), r ? -18 : 18, ZA - 30 + k*5.5), T: new V3(0, 0, -sx), N: new V3(sx, 0, 0), w: 2.4, D: 4.5, room: [-2.6, 2.6, -1.5, 1.4], lift: .04 }); });
-  const nz = []; [[-20, -20], [20, -20], [-20, 20], [20, 20]].forEach(c => { H.bell(G, 9, 15, 28, M.noz, c[0], c[1], ZB + 196); nz.push([c[0], c[1], ZB + 224]); });
+  const drive = mainDrives(G, M, [[-20, -20], [20, -20], [-20, 20], [20, 20]].map(c => [c[0], c[1], ZB + 196, 13.5, 30]));   // v7.6.2 : moteurs de la dernière version
+  const nz = drive ? [] : [[-20, -20], [20, -20], [-20, 20], [20, 20]].map(c => (H.bell(G, 9, 15, 28, M.noz, c[0], c[1], ZB + 196), [c[0], c[1], ZB + 224]));   // repli : tuyères simples
   const geode = jumpCore(G, M, 0, 47.5, ZB + 75, 13);                                                      // v7.6.1 : cœur de saut quantique
   const RU = { uField: { value: .12 }, uPhase: { value: 0 }, uTime: CR.TIME };
   ring(G, M, ZB + 31, 72, RU); ring(G, M, ZB + 119, 72, RU);
@@ -197,7 +222,7 @@ function buildCarrier(G, M, o, R, mil){
   const chase = chaseLights(G, mil ? 0xff3a22 : 0xffa22e), field = fieldCurtains(G);
   return { len: 640, plumeLen: 260, navSize: 7, rcsLen: 26, nozzles: nz, nozR: 15, windows: wins, lamps: [], navY: 0, navX: W/2 + 3, navZ: -214, style: 1, floods: 1, turrets: tur,
     extra: { carrier: true, civil: !mil, hold: { center: new V3(0, 0, ZC), half: new V3(W/2, HD/2, (ZB - ZA)/2) }, berths: BERTHS.map(z => ({ C: new V3(0, DECK, z), L: 140, W: 86 })),
-      gantry: { group: gantry, z0: ZA + 14, z1: ZB - 14 }, geode, field: field.uField, rip: field.uRip, chase, ring: RU, rings, dock: { W, HD, ZA, ZB, ZC } } };
+      gantry: { group: gantry, z0: ZA + 14, z1: ZB - 14 }, geode, drive, field: field.uField, rip: field.uRip, chase, ring: RU, rings, dock: { W, HD, ZA, ZB, ZC } } };
 }
 CR.register('carrier', (G, M, o, R) => buildCarrier(G, M, o, R, false), CIVIL, 'Ship carrier');
 CR.register('carrierMil', (G, M, o, R) => buildCarrier(G, M, o, R, true), MILP, 'Fleet carrier');

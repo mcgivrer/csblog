@@ -2834,6 +2834,7 @@ function container(type, w, h, d, o){
   c.add(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), o.cargo[type]));
   [-1,1].forEach(function(k){ const f = new THREE.Mesh(new THREE.BoxGeometry(w*1.04, h*1.04, d*0.05), o.band); f.position.z = k*d*0.48; c.add(f); });
   S.containers++;
+  c.userData.cargo = type; c.userData.cdims = [w, h, d];   /* prise directe sur la pile (navette-cargo) */
   return c;
 }
 /* fenêtres éclairées (shader radial, cf. §6.3 de l'étude) */
@@ -3496,7 +3497,9 @@ function installShip(id, opts){
   const k = SHIP_K, f = SHIP_GAME_LEN/40, c = b.hullBox.getCenter(new THREE.Vector3());
   const dp = (b.group.userData.dockPt || new THREE.Vector3(0, b.hullBox.min.y, c.z)).clone().multiplyScalar(k);
   const nBefore = shipBody.children.length;
-  buildDockModule(shipBody, dp.x, dp.y - 1.15, dp.z);
+  const noDock = typeof CARGO !== 'undefined';   /* lot N2 : plus aucun module d'amarrage — les engins partent des baies intégrées */
+  if(noDock){ window.shipDockAnchor = null; window.shipArm = null; window.shipCargoStageAnchor = null; }
+  else buildDockModule(shipBody, dp.x, dp.y - 1.15, dp.z);
   if(typeof REAL !== 'undefined' && REAL.active){           /* L2.3 : dock dessiné pour un vaisseau de 40 u → mis à l'échelle du vaisseau réel */
     const fs = (typeof CARGO !== 'undefined') ? CARGO.DOCK_SCALE : gameLen40(), o = new THREE.Vector3(dp.x, dp.y, dp.z);   /* lot N : taillé pour le conteneur ISO 20' */
     shipBody.children.slice(nBefore).forEach(function(ch){ ch.position.sub(o).multiplyScalar(fs).add(o); ch.scale.multiplyScalar(fs); });
@@ -3754,7 +3757,7 @@ SHIPGEN.build = function(model, opts){
 };
 })();
 
-/* Copie de la démo « Observation des étoiles » v7.2.2 (src/shipglass.js), inchangée : enveloppe SHIPGEN.build (auto-suffisante, détection des vitrages par géométrie/matériau — voir §L4). */
+/* Copie de la démo « Observation des étoiles » v7.2.2 (src/shipglass.js), une seule modification — table BELLY étendue aux 4 porte-conteneurs (lot N2, baie de la navette-cargo) ; enveloppe SHIPGEN.build (auto-suffisante, détection des vitrages par géométrie/matériau — voir §L4). */
 /* =====================================================================
    HUBLOTS, BAIES ET HANGARS RÉALISTES — option du générateur (sans modifier le moteur)
    Les vitrages plats du générateur (hublots lumineux, baies panoramiques, vitres de passerelle,
@@ -3784,7 +3787,13 @@ const BELLY = {
   tS:  { w: 10.2, h: 10.2, modL: 15.6, ch: .2929 },
   tM:  { w: 12.6, h: 12.6, modL: 16.8, ch: .2929 },
   tL:  { w: 16.8, h: 20.4, modL: 15.6, ch: .15 },
-  l20: { w: 20.4, h: 23.4, modL: 14.4, ch: .15 }
+  l20: { w: 20.4, h: 23.4, modL: 14.4, ch: .15 },
+  /* ajout du jeu (lot N2) — porte-conteneurs : baie ventrale de la navette-cargo (17,5 × 5,6 × 6,8 m) au point d'amarrage ;
+     modL fixé pour une ouverture de ~19,6 m (hx = 0,36 modL), w pour une demi-largeur ≥ 4 m, h pour 10 m de profondeur */
+  e18:  { w: 16.0, h: 16.0, modL: 27.2, ch: .15 },
+  e140: { w: 18.0, h: 18.0, modL: 27.8, ch: .15 },
+  p10:  { w: 13.9, h: 15.9, modL: 27.2, ch: .15 },
+  p44:  { w: 13.9, h: 15.8, modL: 27.2, ch: .15 }
 };
 
 /* formes d'ouverture (v7.2) — vS = (mode, cx, cy, décor) : mode 0 = rond ; 1 = polygone symétrique : rectangle (cx = cy = 0),
@@ -8283,6 +8292,7 @@ function portDir(p, C){
 }
 /* plan de l'étape : orbite de livraison passant au-dessus du port, couloir d'approche, transfert */
 R.plan = function(leg, target, local){
+  if(typeof CARGO !== 'undefined') CARGO.restoreStack();   /* soute rechargée (conteneurs pris à l'escale précédente) */
   const p = target || leg.hab, C = p.position, Rp = p.radius;
   const ro = Rp*(1 + FLIGHT.ORBIT_ALT), vo = p.GM ? Math.sqrt(p.GM/ro) : FLIGHT.DOCK_SPEED;
   const u = portDir(p, C), A = shipRig.position.clone(), a = A.clone().sub(C).normalize();
@@ -8371,6 +8381,7 @@ function planDeparture(M){
 /* après une escale (L3) : long-courrier -> étoile suivante (comportement L2.3/L2.4 inchangé) ;
    sinon -> tableau de contrats (commerce local, cf. LOCAL, chargé après ce module) */
 R.afterEscale = function(M){
+  if(typeof MISSIONS !== 'undefined' && MISSIONS.enabled()){ MISSIONS.afterEscale(M, planDeparture); return; }   /* M1 : plus d'itinéraire */
   if(hasQuantumJump || SHIP_WARP){ planDeparture(M); return; }
   const boardUp = document.getElementById('contractBoardOverlay').classList.contains('visible');
   const yardUp = document.getElementById('shipyardOverlay').classList.contains('visible');
@@ -8601,6 +8612,180 @@ return R;
 function galPosition(){ return (REAL.active && (REAL.started || REAL.titleActive)) ? REAL.galPos : shipRig.position; }
 
 /* =========================================================================
+   PORTS ORBITAUX — lot P1 : génération et rendu (spec-ports-orbitaux-navette.md, Partie B)
+   Décisions : archétypes + modules tirés par graine ; tous les vaisseaux accostent → chaque port offre au moins
+   un poste L (vaisseau ≤ 240 m) ; les stations du commerce local (L3) sont absorbées (mêmes planètes, angles, noms).
+   - A « anneau » (280–380 m) : anneau habité tournant, moyeu, rayons, un ponton L (+ parfois un ponton S/M) ;
+   - B « moyeu à pontons » (≈ 500–700 m) : noyau vertical, 3 à 5 pontons horizontaux (L, M, S), radiateurs, mât ;
+   - C « tour d'amarrage » (700–1 000 m) : épine, anneaux d'amarrage étagés, ponton L le long de l'épine —
+     réservée aux géantes gazeuses (orbite haute, au-delà des anneaux).
+   Tailles ABSOLUES (échelle réelle). Port stabilisé par gradient de gravité : son axe +Y pointe à l'opposé de la
+   planète ; seul l'anneau habité tourne, les postes restent fixes (amarrage, lot P2).
+   Chaque port décrit ses POSTES : { cls: 'S'|'M'|'L', max (m), pos, dir (axe du ponton), side (côté du navire) }.
+   Rendu : géométrie fusionnée par matériau (plaques projetées à taille réelle) + feux de balisage instanciés,
+   ≈ 10 appels de dessin par port.
+   ========================================================================= */
+const PORTS = (function(){
+const V3 = THREE.Vector3;
+const CLASS_MAX = { S: 100, M: 180, L: 240 };
+const PONTOON_LEN = { S: 140, M: 220, L: 300 };
+
+/* ---------- textures de plaques (générées une fois) ---------- */
+let MATS = null;
+function plateTex(base, seam, dirt){
+  const cv = document.createElement('canvas'); cv.width = cv.height = 256; const g = cv.getContext('2d');
+  g.fillStyle = base; g.fillRect(0, 0, 256, 256);
+  let s = 7; const r = () => { s = (s*16807) % 2147483647; return s/2147483647; };
+  for(let y = 0; y < 256; y += 32) for(let x = 0; x < 256; x += (r() < .5 ? 64 : 32)){
+    const k = .9 + .18*r(); g.fillStyle = 'rgba(' + [255, 255, 255].map(v => Math.round(v*(k - .9)*2)).join(',') + ',.35)'; g.fillRect(x + 1, y + 1, 30 + (r() < .3 ? 32 : 0), 30); }
+  g.strokeStyle = seam; g.lineWidth = 1.2; for(let i = 0; i <= 256; i += 32){ g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 256); g.stroke(); g.beginPath(); g.moveTo(0, i); g.lineTo(256, i); g.stroke(); }
+  for(let i = 0; i < 40; i++){ g.fillStyle = dirt + (.04 + .08*r()) + ')'; g.fillRect(r()*256, r()*256, 4 + 30*r(), 2 + 20*r()); }
+  const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; if(THREE.sRGBEncoding) t.encoding = THREE.sRGBEncoding; return t;
+}
+function mats(){
+  if(MATS) return MATS;
+  const std = (o) => new THREE.MeshStandardMaterial(o);
+  MATS = {
+    /* éclairage propre des coques (projecteurs de la station) : faible, mais la structure reste lisible côté nuit */
+    hull:   (() => { const t = plateTex('#c9ced6', 'rgba(60,66,78,.55)', 'rgba(60,50,40,'); return std({ map: t, emissiveMap: t, emissive: 0x2a3140, emissiveIntensity: .55, metalness: .45, roughness: .55 }); })(),
+    dark:   (() => { const t = plateTex('#4a505c', 'rgba(20,22,28,.7)', 'rgba(10,10,10,'); return std({ map: t, emissiveMap: t, emissive: 0x1a1f2a, emissiveIntensity: .45, metalness: .6, roughness: .5 }); })(),
+    accent: std({ color: 0xd9822b, metalness: .3, roughness: .6 }),
+    rad:    std({ map: plateTex('#232a36', 'rgba(90,110,140,.5)', 'rgba(0,0,0,'), metalness: .2, roughness: .8, emissive: 0x05080f }),
+    win:    std({ color: 0x2a2010, emissive: 0xffd28a, emissiveIntensity: 1.2, roughness: .4 }),
+    lampL:  std({ color: 0x221400, emissive: 0xffb454, emissiveIntensity: 1.6 }),
+    lampM:  std({ color: 0x021110, emissive: 0x5eead4, emissiveIntensity: 1.6 }),
+    lampS:  std({ color: 0x111111, emissive: 0xe8edf5, emissiveIntensity: 1.4 })
+  };
+  return MATS;
+}
+/* coordonnées de texture projetées selon la normale : une plaque = TILE mètres quelle que soit la pièce */
+const TILE = 9;
+function plated(geo){
+  const g = geo.index ? geo.toNonIndexed() : geo, p = g.attributes.position, n = g.attributes.normal, uv = new Float32Array(p.count*2);
+  for(let i = 0; i < p.count; i++){
+    const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i));
+    let u, v; if(ax >= ay && ax >= az){ u = p.getZ(i); v = p.getY(i); } else if(ay >= az){ u = p.getX(i); v = p.getZ(i); } else { u = p.getX(i); v = p.getY(i); }
+    uv[i*2] = u/TILE; uv[i*2 + 1] = v/TILE;
+  }
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); return g;
+}
+/* fusion par matériau (repris de smallcraft.js de la démo, avec coordonnées de texture) */
+function merge(G){
+  const groups = new Map();
+  G.children.slice().forEach(m => { if(!m.isMesh || m.userData.keep) return; const k = m.material; if(!groups.has(k)) groups.set(k, []); groups.get(k).push(m); });
+  groups.forEach((list, mat) => {
+    const pos = [], nor = [], uvs = [];
+    list.forEach(m => { m.updateMatrix(); const g = plated(m.geometry.clone()); g.applyMatrix4(m.matrix); const g2 = plated(g);
+      pos.push(g2.attributes.position.array); nor.push(g2.attributes.normal.array); uvs.push(g2.attributes.uv.array); G.remove(m); m.geometry.dispose(); });
+    const cat = (arrs) => { const n = arrs.reduce((a, p) => a + p.length, 0), out = new Float32Array(n); let o = 0; arrs.forEach(p => { out.set(p, o); o += p.length; }); return out; };
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(cat(pos), 3)); g.setAttribute('normal', new THREE.BufferAttribute(cat(nor), 3)); g.setAttribute('uv', new THREE.BufferAttribute(cat(uvs), 2));
+    g.computeBoundingSphere(); G.add(new THREE.Mesh(g, mat));
+  });
+}
+const box = (G, w, h, d, m, x, y, z, ry) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); if(ry) o.rotation.y = ry; G.add(o); return o; };
+const cyl = (G, r, h, m, x, y, z, seg) => { const o = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg || 28), m); o.position.set(x, y, z); G.add(o); return o; };
+const torus = (G, R, t, m, x, y, z, rx) => { const o = new THREE.Mesh(new THREE.TorusGeometry(R, t, 12, 64), m); o.position.set(x, y, z); o.rotation.x = rx === undefined ? Math.PI/2 : rx; G.add(o); return o; };
+
+/* ---------- pontons et postes ---------- */
+/* ponton horizontal partant de `root` (repère du port) selon l'angle a (autour de +Y), à la hauteur y */
+function pontoon(G, lamps, berths, cls, a, rootR, y, side2){
+  const M = mats(), len = PONTOON_LEN[cls], dir = new V3(Math.sin(a), 0, Math.cos(a)), nrm = new V3(Math.cos(a), 0, -Math.sin(a));
+  const c = dir.clone().multiplyScalar(rootR + len/2);
+  box(G, 12, 7, len, M.dark, c.x, y, c.z, a);                                 /* poutre du ponton */
+  box(G, 14, 1.2, len, M.hull, c.x, y + 4, c.z, a);                           /* tablier */
+  for(let k = 20; k < len; k += 40){ const p = dir.clone().multiplyScalar(rootR + k); box(G, 16, 2, 3, M.accent, p.x, y + 5, p.z, a); }   /* bittes et pinces */
+  /* feux de balisage des deux bords, couleur de la classe */
+  const lamp = cls === 'L' ? lamps.L : cls === 'M' ? lamps.M : lamps.S;
+  for(let k = 8; k < len; k += 18) [-1, 1].forEach(sg => lamp.push(dir.clone().multiplyScalar(rootR + k).addScaledVector(nrm, sg*7.5).setY(y + 5.5)));
+  /* postes : côté +nrm de la classe du ponton ; côté −nrm une classe en dessous (si demandé) */
+  const berthAt = (bcls, sg) => { const mid = dir.clone().multiplyScalar(rootR + len*.52);
+    berths.push({ cls: bcls, max: CLASS_MAX[bcls], pos: mid.clone().addScaledVector(nrm, sg*(8 + 12)).setY(y), dir: dir.clone(), side: nrm.clone().multiplyScalar(sg) }); };
+  berthAt(cls, 1);
+  if(side2) berthAt(side2, -1);
+}
+function radiators(G, n, r, y0, h, rnd){
+  const M = mats();
+  for(let i = 0; i < n; i++){ const a = (i + .5)/n*Math.PI*2 + rnd()*.2; box(G, 2, h, 40 + 30*rnd(), M.rad, Math.sin(a)*(r + 22), y0, Math.cos(a)*(r + 22), a + Math.PI/2); }
+}
+function lampMeshes(G, lamps){
+  const M = mats(), geo = new THREE.BoxGeometry(1.6, 1.6, 1.6);
+  [['L', M.lampL], ['M', M.lampM], ['S', M.lampS]].forEach(([k, m]) => { const list = lamps[k]; if(!list.length) return;
+    const im = new THREE.InstancedMesh(geo, m, list.length), mx = new THREE.Matrix4();
+    list.forEach((p, i) => { mx.makeTranslation(p.x, p.y, p.z); im.setMatrixAt(i, mx); }); im.userData.keep = true; G.add(im); });
+}
+function beacon(G, y){
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: typeof glowTex !== 'undefined' ? glowTex : null, color: 0xffb454, transparent: true, opacity: .95, depthWrite: false, blending: THREE.AdditiveBlending }));
+  s.scale.setScalar(40); s.position.set(0, y, 0); s.userData.keep = true; G.add(s); return s;
+}
+
+/* ---------- archétypes ---------- */
+function buildRing(rnd){
+  const G = new THREE.Group(), spin = new THREE.Group(), M = mats(), lamps = { L: [], M: [], S: [] }, berths = [];
+  const R = 140 + 50*rnd(), t = 12 + 4*rnd(), hubR = 26 + 8*rnd(), hubH = 60 + 30*rnd(), nSp = 3 + Math.floor(rnd()*4);
+  torus(spin, R, t, M.hull, 0, 0, 0); torus(spin, R + t*.98, 1.2, M.win, 0, 0, 0);
+  for(let i = 0; i < 16; i++){ const a = i/16*Math.PI*2; lamps.S.push(new V3(Math.sin(a)*(R + t + 1.5), 0, Math.cos(a)*(R + t + 1.5))); }   /* feux de gabarit de l'anneau (fixes) */
+  for(let i = 0; i < nSp; i++){ const a = i/nSp*Math.PI*2; box(spin, 5, 5, R - hubR, M.dark, Math.sin(a)*(hubR + (R - hubR)/2), 0, Math.cos(a)*(hubR + (R - hubR)/2), a); }
+  cyl(G, hubR, hubH, M.hull, 0, 0, 0); cyl(G, hubR*1.15, 8, M.accent, 0, hubH/2 - 6, 0); cyl(G, hubR*.5, 40, M.dark, 0, hubH/2 + 20, 0);
+  radiators(G, 2, hubR, -hubH/2 + 10, 18, rnd);
+  const a0 = rnd()*Math.PI*2;
+  pontoon(G, lamps, berths, 'L', a0, hubR, -hubH/2 - 8, rnd() < .5 ? 'M' : 'S');
+  if(rnd() < .6) pontoon(G, lamps, berths, rnd() < .5 ? 'M' : 'S', a0 + Math.PI, hubR, -hubH/2 - 8, 'S');
+  merge(spin); merge(G); lampMeshes(G, lamps); G.add(spin);
+  const bc = beacon(G, hubH/2 + 44);
+  return { group: G, spin: spin, berths: berths, beacon: bc };
+}
+function buildHub(rnd){
+  const G = new THREE.Group(), spin = new THREE.Group(), M = mats(), lamps = { L: [], M: [], S: [] }, berths = [];
+  const r = 40 + 10*rnd(), h = 220 + 40*rnd();
+  cyl(G, r, h, M.hull, 0, 0, 0);
+  for(let y = -h/2 + 20; y < h/2 - 10; y += 34) cyl(G, r*1.06, 5, M.dark, 0, y, 0);
+  cyl(G, r*1.3, 26, M.dark, 0, h/2 - 13, 0); cyl(G, r*1.3, 26, M.dark, 0, -h/2 + 13, 0);
+  for(let y = -h/2 + 40; y < h/2 - 30; y += 34) for(let i = 0; i < 10; i++){ const a = i/10*Math.PI*2; box(G, 6, 2.2, 1, M.win, Math.sin(a)*r*1.005, y, Math.cos(a)*r*1.005, a); }
+  cyl(G, 4, 80, M.dark, 0, h/2 + 40, 0); radiators(G, 3, r, 20, 60, rnd);
+  for(let i = 0; i < 12; i++){ const a = i/12*Math.PI*2; [h/2 + 1, -h/2 - 1].forEach(y => lamps.S.push(new V3(Math.sin(a)*r*1.3, y, Math.cos(a)*r*1.3))); }
+  if(rnd() < .5){ torus(spin, r + 60, 8, M.hull, 0, h/2 - 40, 0); for(let i = 0; i < 4; i++){ const a = i/4*Math.PI*2; box(spin, 4, 4, 60, M.dark, Math.sin(a)*(r + 30), h/2 - 40, Math.cos(a)*(r + 30), a); } }
+  const n = 3 + Math.floor(rnd()*3), a0 = rnd()*Math.PI*2, cls = ['L', 'M', 'S', rnd() < .5 ? 'M' : 'S', 'S'];
+  for(let i = 0; i < n; i++) pontoon(G, lamps, berths, cls[i], a0 + i/n*Math.PI*2, r, -h/2 + 40 + (i % 2)*30, cls[i] === 'L' ? 'M' : cls[i] === 'M' ? 'S' : null);
+  merge(spin); merge(G); lampMeshes(G, lamps); G.add(spin);
+  const bc = beacon(G, h/2 + 86);
+  return { group: G, spin: spin, berths: berths, beacon: bc };
+}
+function buildTower(rnd){
+  const G = new THREE.Group(), spin = new THREE.Group(), M = mats(), lamps = { L: [], M: [], S: [] }, berths = [];
+  const L = 700 + 300*rnd(), n = 4 + Math.floor(rnd()*4), step = L/(n + 1);
+  box(G, 24, L, 24, M.dark, 0, 0, 0);                                           /* épine verticale (axe +Y, loin de la planète) */
+  for(let i = 1; i <= n; i++){ const y = -L/2 + i*step; torus(G, 46, 6, M.hull, 0, y, 0); cyl(G, 18, 16, M.hull, 0, y, 0);
+    if(i % 2) box(G, 130, 2, 34, M.rad, 0, y + 12, 0); }
+  cyl(G, 30, 40, M.accent, 0, L/2 - 20, 0); cyl(G, 3, 120, M.dark, 0, L/2 + 60, 0);
+  for(let y = -L/2 + 20; y < L/2; y += 40) [[13, 0], [-13, 0], [0, 13], [0, -13]].forEach(([x, z]) => lamps.L.push(new V3(x, y, z)));   /* feux de l'épine */
+  for(let i = 1; i <= n; i++){ const y = -L/2 + i*step; torus(G, 46 + 5.9, .8, M.win, 0, y, 0); }   /* hublots des anneaux */
+  torus(spin, 90, 10, M.hull, 0, L/2 - 90, 0); torus(spin, 90 + 9.8, 1, M.win, 0, L/2 - 90, 0);
+  /* ponton L au pied de la tour, ponton M plus haut */
+  pontoon(G, lamps, berths, 'L', rnd()*Math.PI*2, 20, -L/2 + step*.5, 'M');
+  pontoon(G, lamps, berths, 'M', rnd()*Math.PI*2, 20, -L/2 + step*2.5, 'S');
+  merge(spin); merge(G); lampMeshes(G, lamps); G.add(spin);
+  const bc = beacon(G, L/2 + 130);
+  return { group: G, spin: spin, berths: berths, beacon: bc };
+}
+const BUILD = { ring: buildRing, hub: buildHub, tower: buildTower };
+function build(archetype, seedStr){
+  const rnd = rngFor(SEED + ':port:' + seedStr), P = BUILD[archetype](rnd);
+  P.group.updateMatrixWorld(true);
+  const b = new THREE.Box3().setFromObject(P.group), size = b.getSize(new V3());
+  P.radius = .5*size.length(); P.size = size; P.archetype = archetype; P.spinRate = .02 + .02*rnd();
+  if(!P.berths.some(x => x.cls === 'L')) throw new Error('port sans poste L');   /* garde-fou : tous les vaisseaux accostent */
+  return P;
+}
+/* archétype selon la planète : géante gazeuse → tour ; sinon anneau ou moyeu (graine) */
+function archetypeFor(planet, u){ return planet.kind && planet.kind.gas ? 'tower' : (u < .45 ? 'ring' : 'hub'); }
+/* altitude (spec §B.4) : tellurique 1,15–1,4 R ; géante 2,5–3 R (au-delà des anneaux) */
+function orbitRadius(planet, u){ return planet.radius*(planet.kind && planet.kind.gas ? 2.5 + .5*u : 1.15 + .25*u); }
+/* orientation : +Y du port à l'opposé de la planète (stabilisation par gradient de gravité) */
+function orient(group, pos, planetPos){ const up = pos.clone().sub(planetPos).normalize(); group.quaternion.setFromUnitVectors(new V3(0, 1, 0), up); }
+return { build, archetypeFor, orbitRadius, orient, CLASS_MAX, PONTOON_LEN, mats };
+})();
+
+/* =========================================================================
    L3 — COMMERCE LOCAL (lot 3, fusion de la démo v7.2.2)
    Pour les 6 modèles sans générateur de saut ni anneaux de distorsion :
    après l'arrivée sur la planète-port du système (comme avant, décomptée
@@ -8633,48 +8818,46 @@ const LOCAL = (function(){
   const STATION_NAMES = ['Relais', 'Comptoir', 'Plateforme', 'Dépôt', 'Poste'];
 
   /* ---------- stations orbitales ---------- */
-  function stationMesh(seedR){
-    const g = new THREE.Group();
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(38, 5, 8, 20),
-      new THREE.MeshStandardMaterial({ color: 0x8a94a6, roughness: .55, metalness: .6 }));
-    ring.rotation.x = Math.PI/2; g.add(ring);
-    const hub = new THREE.Mesh(new THREE.CylinderGeometry(11, 11, 30, 12),
-      new THREE.MeshStandardMaterial({ color: 0xb8bfcc, roughness: .5, metalness: .4 }));
-    g.add(hub);
-    const winMat = new THREE.MeshBasicMaterial({ color: 0xffd28a });
-    for(let i = 0; i < 8; i++){
-      const a = i/8*Math.PI*2, w = new THREE.Mesh(new THREE.BoxGeometry(6, 3, 3), winMat);
-      w.position.set(Math.cos(a)*38, Math.sin(a)*38, 0); w.rotation.x = Math.PI/2; g.add(w);
-    }
-    for(let i = 0; i < 3; i++){
-      const a = i/3*Math.PI*2, spoke = new THREE.Mesh(new THREE.BoxGeometry(2.4, 2.4, 30),
-        new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: .6 }));
-      spoke.position.set(Math.cos(a)*19, Math.sin(a)*19, 0); spoke.lookAt(0, 0, 0); g.add(spoke);
-    }
-    const beacon = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffb454, transparent: true, opacity: .95, depthWrite: false }));
-    beacon.scale.setScalar(9); beacon.position.set(0, 0, 22); g.add(beacon);
-    g.userData.beacon = beacon; g.userData.spin = .04 + seedR()*.03;
-    return g;
+  /* Lot P1 : les stations deviennent des PORTS ORBITAUX (20n-ports-orbitaux.js) — mêmes planètes, angles et noms
+     (même suite de tirages : le tirage de l'ancienne échelle choisit désormais l'archétype) ; altitude de la spec (§B.4) ;
+     une géante gazeuse destination de l'étape a toujours son port. Interface inchangée pour le commerce local. */
+  function addPort(leg, p, r, u, a, incl, archU, name, key){
+    const arch = PORTS.archetypeFor(p, archU), P = PORTS.build(arch, leg.cell + ':' + key), dist = PORTS.orbitRadius(p, u), g = P.group;
+    g.position.set(p.position.x + Math.cos(a)*dist, p.position.y + Math.sin(a)*dist*Math.sin(incl), p.position.z + Math.sin(a)*dist*Math.cos(incl));
+    PORTS.orient(g, g.position, p.position);
+    LAYERS.sysWorld.add(g);
+    leg.stations.push({ position: g.position, radius: P.radius, kind: { gas: false }, isStation: true, name: name,
+      beaconSprite: P.beacon, mesh: g, orbits: p, port: P });
   }
   function buildStations(leg){
     leg.stations = [];
     const r = rngFor(SEED + ':stations:' + leg.cell), notable = leg.planets.filter(p => p.isHabitable || p.kind.gas);
     notable.forEach(function(p, i){
-      if(r() > .55) return;                                        /* 0 à 2 stations par système, pas systématique */
-      const g = stationMesh(r), dist = p.radius*(9 + 5*r()), a = r()*Math.PI*2, incl = (r() - .5)*.6;
-      g.position.set(p.position.x + Math.cos(a)*dist, p.position.y + Math.sin(a)*dist*Math.sin(incl), p.position.z + Math.sin(a)*dist*Math.cos(incl));
-      g.scale.setScalar(1 + r()*.6);
-      LAYERS.sysWorld.add(g);
-      leg.stations.push({ position: g.position, radius: 45*g.scale.x, kind: { gas: false }, isStation: true,
-        name: STATION_NAMES[Math.floor(r()*STATION_NAMES.length)] + ' ' + String.fromCharCode(945 + i) + '-' + (1 + Math.floor(r()*9)),
-        beaconSprite: g.userData.beacon, mesh: g, orbits: p });
+      if(r() > .55) return;                                        /* 0 à 2 ports par système, pas systématique */
+      r();                                                         /* (ancien tirage de rotation, conservé pour la suite) */
+      const u = r(), a = r()*Math.PI*2, incl = (r() - .5)*.6, archU = r();
+      const name = STATION_NAMES[Math.floor(r()*STATION_NAMES.length)] + ' ' + String.fromCharCode(945 + i) + '-' + (1 + Math.floor(r()*9));
+      addPort(leg, p, r, u, a, incl, archU, name, i);
+    });
+    /* toute géante gazeuse reçoit un port (tour d'amarrage) : sans sol, son port orbital est le seul port possible —
+       et une géante peut être la destination d'un contrat local (la destination d'une étape, elle, est toujours
+       une planète habitable : la règle « géante destination de l'étape » ne s'appliquait jamais) */
+    leg.planets.forEach(function(p, i){
+      if(!(p.kind && p.kind.gas) || leg.stations.some(s => s.orbits === p)) return;
+      const r2 = rngFor(SEED + ':port-geante:' + leg.cell + ':' + i);
+      addPort(leg, p, r2, r2(), r2()*Math.PI*2, (r2() - .5)*.6, 0, STATION_NAMES[Math.floor(r2()*STATION_NAMES.length)] + ' Ω-' + (1 + Math.floor(r2()*9)), 'g' + i);
     });
   }
-  function updateStations(leg, dt){ (leg.stations || []).forEach(function(s){ s.mesh.rotation.z += s.mesh.userData.spin*dt; }); }
+  function updateStations(leg, dt){
+    const blink = (performance.now()/1000) % 1.6 < .18;             /* balise : éclat bref toutes les 1,6 s */
+    (leg.stations || []).forEach(function(s){ if(s.port && s.port.spin) s.port.spin.rotation.y += s.port.spinRate*dt;
+      if(s.beaconSprite) s.beaconSprite.material.opacity = blink ? 1 : .22; });
+  }
   function disposeStations(leg){
+    const shared = new Set(Object.values(PORTS.mats()));            /* matériaux partagés entre tous les ports : conservés */
     (leg.stations || []).forEach(function(s){
       LAYERS.detach(s.mesh);
-      s.mesh.traverse(function(o){ if(o.geometry) o.geometry.dispose(); if(o.material) o.material.dispose(); });
+      s.mesh.traverse(function(o){ if(o.geometry) o.geometry.dispose(); if(o.material && !shared.has(o.material)) o.material.dispose(); });
     });
   }
 
@@ -9376,7 +9559,10 @@ function hullLen(group){
 }
 function loadShot(L){
   const s = Math.random() < .5 ? -1 : 1, len = L.shuttle ? hullLen(L.shuttle.group) : shuttleLen();   /* longueur réelle de la navette */
-  return { type: 'shuttleLoad', dur: 3.4, t: 0, h: Math.random(), ship: true, eval: k => { const A = window.shipDockAnchor ? window.shipDockAnchor.getWorldPosition(new V3()) : shipRig.position.clone(), a = axes(), sl = len;
+  return { type: 'shuttleLoad', dur: 3.4, t: 0, h: Math.random(), ship: true, eval: k => {
+    if(L.pick){                                              /* prise sur la pile : du côté du conteneur, hors de la coque */
+      const Cp = L.container.getWorldPosition(new V3()), Sp = L.shuttle.group.getWorldPosition(new V3()), mid = Cp.clone().lerp(Sp, .5), a = axes();
+      return { pos: mid.clone().addScaledVector(a.rt, L.side*1.9*len).addScaledVector(a.up, -.7*len).addScaledVector(a.fw, -(1.2 + .3*k)*len), look: mid, up: a.up, fov: 44 }; } const A = window.shipDockAnchor ? window.shipDockAnchor.getWorldPosition(new V3()) : shipRig.position.clone(), a = axes(), sl = len;
     /* point visé pris sur les ancres DU VAISSEAU (à jour) : avant la saisie et après la pose, conteneur et navette sont
        replacés contre le dock plus tard dans l'image — leur position du moment a une image de retard, ≈ 330 m en orbite */
     let C = A;
@@ -9450,7 +9636,7 @@ function update(dt){
   /* plans automatiques des navettes pendant l'escale */
   if(flightPhase === 'ARRIVAL_PAUSE' && !arrivalSkip){
     const L = orbitState.loading;
-    if(L && L.container && S.loadShot !== L){ S.loadShot = L; S.auto = loadShot(L); }
+    if(L && L.container && (!L.pick || L.phase === 'pick') && S.loadShot !== L){ S.loadShot = L; S.auto = loadShot(L); }
     (orbitState.shuttles || []).forEach(sh => { if(sh.phase === 'outbound' && sh.group && !S.seen.has(sh) &&
       sh.group.getWorldPosition(new V3()).distanceTo(shipRig.position) > SHIP_GAME_LEN*.7){ S.seen.add(sh); S.auto = followShot(sh); } });   /* navette dégagée du vaisseau */
   }
@@ -9561,7 +9747,454 @@ function armPoints(){
   return { stage: pR.sub(shipRig.position).applyQuaternion(_q), place: pP.sub(shipRig.position).applyQuaternion(_q) };
 }
 function shipPoint(local){ return local.clone().applyQuaternion(shipRig.quaternion).add(shipRig.position); }
-return { ISO, DOCK_SCALE, buildIsoContainer, buildCargoShuttle, armPoints, shipPoint };
+/* ===================== navette de baie des porte-conteneurs (lot N2) =====================
+   Décision du 28/09 : la navette SORT DE LA BAIE ventrale du vaisseau, longe la coque jusqu'à la pile, prend
+   directement le conteneur extérieur, livre au port, puis REVIENT SE RANGER dans la baie. Tout le trajet proche du
+   vaisseau est calculé dans son repère (il file à ~8 km/s en orbite) et se fait à vitesse de manœuvre :
+   chaque mouvement part de l'arrêt et s'y arrête, avec une vitesse de pointe imposée (VP). Pas de module
+   d'amarrage ni de bras sur ces vaisseaux. Le logement vidé reste vide pendant l'escale ; la pile est complétée
+   au départ de l'étape suivante. */
+const CONTAINER_GROUPS = ['Fret en entrepôt', 'Fret en poutre'];
+function isContainerShip(id){ const m = SHIPGEN.MODELS.find(x => x.id === id); return !!m && CONTAINER_GROUPS.includes(m.group); }
+const VP = { exit: 2.5, side: 8, approach: 2, clear: 8, enter: 2.5 };        /* vitesses de pointe (m/s) — relevées pour raccourcir l'escale (29/09) */
+const T_PICK = 2.6, GAP = .6, CLEAR_D = 30;   /* écartement jusqu'à 30 m de la pile (60 m auparavant) : au-delà, la navette accélère */
+let taken = [];
+const smoother = x => { x = Math.max(0, Math.min(1, x)); return x*x*x*(x*(6*x - 15) + 10); };
+/* durée d'un mouvement de longueur L (profil lissé : vitesse de pointe = 1,875 L / T) */
+const durFor = (L, vp) => Math.max(3, 1.875*L/vp);
+function toLocal(w){ return shipRig.worldToLocal(w.clone()); }
+function dirToLocal(d){ return d.clone().applyQuaternion(shipRig.quaternion.clone().invert()); }
+/* baie ventrale (shipglass) et encombrement du vaisseau, dans le repère du vaisseau */
+function bayInfo(){
+  const b = SHIP_BUILD; if(!b || !b.docks) return null;
+  const d = arguments[0] || b.docks.find(x => x.ventral) || b.docks[0]; if(!d) return null;
+  shipRig.updateMatrixWorld(true);
+  const C = toLocal(b.group.localToWorld(d.C.clone()));
+  const N = dirToLocal(d.N.clone().transformDirection(b.group.matrixWorld)).normalize();
+  const box = new THREE.Box3(); b.group.traverse(o => { if(o.isMesh && !o.isSprite && o.geometry && !(o.userData && o.userData.glass)){ o.geometry.computeBoundingBox();
+    const bb = o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld); [bb.min, bb.max].forEach(p => box.expandByPoint(toLocal(p))); } });
+  return { C: C, N: N, D: d.D, hx: d.hx, hy: d.hy, box: box, ventral: !!d.ventral };
+}
+function stackSlots(){
+  const out = []; if(!SHIP_HULL) return out;
+  SHIP_HULL.updateMatrixWorld(true);
+  SHIP_HULL.traverse(o => { if(o.userData && o.userData.cargo && o.visible){ out.push({ obj: o, local: toLocal(o.getWorldPosition(new V3())), dims: o.userData.cdims }); } });
+  if(!out.length) return out;
+  const maxX = Math.max(...out.map(s => Math.abs(s.local.x)));
+  const outer = out.filter(s => Math.abs(s.local.x) >= maxX - .5*s.dims[0]);   /* couche extérieure, bâbord ou tribord */
+  const mis = outer.filter(s => s.obj.userData.mission);                         /* M1 : conteneurs de la mission en priorité */
+  return mis.length ? mis : outer;
+}
+function restoreStack(){ taken.forEach(o => { o.visible = true; }); taken = []; }
+/* chemin polyligne (repère du vaisseau) parcouru selon le profil lissé */
+function polyline(pts){
+  const seg = []; let L = 0;
+  for(let i = 1; i < pts.length; i++){ const l = pts[i].distanceTo(pts[i - 1]); seg.push(l); L += l; }
+  return { L: L, at: s => { let acc = 0; for(let i = 0; i < seg.length; i++){ if(s <= acc + seg[i] || i === seg.length - 1){ const k = seg[i] > 0 ? Math.min(1, (s - acc)/seg[i]) : 1; return pts[i].clone().lerp(pts[i + 1], k); } acc += seg[i]; } return pts[pts.length - 1].clone(); } };
+}
+/* ---- autres vaisseaux (décision : chacun livre sa cargaison avec les engins de ses baies, JAMAIS de conteneur) ----
+   paquebot : navette de transport (passagers) ; Vagabonde : drone-cargo ; pousseurs : navette de maintenance.
+   Baie choisie pour que l'engin y tienne : ventrale (engin à plat, axe long le long de la baie) ou latérale (engin nez
+   vers l'intérieur, sortie en marche arrière — comme les navettes de la démo). */
+function buildBayCraft(kind, variant, seed, slim){
+  const c = window.__CRAFT.build(kind, { variant: variant, age: typeof SHIP_WEAR !== 'undefined' ? SHIP_WEAR.age : .1, seed: seed || 1, slim: !!slim });
+  if(c.thr) c.thr.value = .08;
+  const g = new THREE.Group(); g.add(c.group); const b = c.box.clone();
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0x9fd4ff, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: 1 }));
+  glow.position.set(0, (b.min.y + b.max.y)/2, b.max.z + .5); glow.scale.setScalar(Math.max(1, (b.max.x - b.min.x)*.6)); g.add(glow);
+  const clampGroup = new THREE.Group(); g.add(clampGroup);
+  return { group: g, glow: glow, clampGroup: clampGroup, navLights: c.nav || [], hasCargo: false, trail: buildTrail(), craft: c, engineBack: b.max.z + .5, len: b.max.z - b.min.z, kind: kind };
+}
+function startBayOther(){
+  const b = SHIP_BUILD, m = SHIPGEN.MODELS.find(x => x.id === SHIP_ID); if(!b || !b.docks || !b.docks.length || !m) return false;
+  let kind = m.group === 'Passagers' ? 'crew' : m.group === 'Indépendants' ? 'drone' : 'maint';
+  const slim = m.group === 'Pousseurs';                         /* baies ventrales des pousseurs : fentes de 3,2 m — version étroite (2,5 m) */
+  let sh = buildBayCraft(kind, kind === 'drone' ? 'cargo' : undefined, _shuttleIdCounter + 11, slim);
+  const sz = sh.craft.box.getSize(new V3());
+  /* marges serrées : les engins de la démo passent par ces mêmes baies (la navette de transport du paquebot : 6,8 m de haut
+     pour 7,0 m d'ouverture ; les drones de la Vagabonde dans des fentes de 2,3 m) */
+  const fitsBelly = d => d.ventral && 2*d.hx >= sz.z + .6 && 2*d.hy >= sz.x + .3 && d.D >= sz.y + .3;
+  const fitsSide = d => !d.ventral && d.D >= sz.z - .5 && 2*d.hx >= sz.x + .3 && 2*d.hy >= sz.y + .05;   /* la tuyère peut affleurer au champ (paquebot : 17,3 m pour 17,5 m) */
+  let dk = b.docks.find(fitsBelly) || b.docks.find(fitsSide);
+  if(!dk && kind === 'crew'){ sh = buildBayCraft('maint', undefined, _shuttleIdCounter + 11, true); kind = 'maint'; const s2 = sh.craft.box.getSize(new V3()); sz.copy(s2); dk = b.docks.find(fitsBelly) || b.docks.find(fitsSide); }
+  if(!dk){                                                        /* dernier recours (fret léger) : le drone-cargo tient dans toutes les baies */
+    sh.craft.dispose && sh.craft.dispose(); sh = buildBayCraft('drone', 'cargo', _shuttleIdCounter + 11); kind = 'drone';
+    sz.copy(sh.craft.box.getSize(new V3())); dk = b.docks.find(fitsBelly) || b.docks.find(fitsSide); }
+  if(!dk) return false;
+  const bay = bayInfo(dk), ventral = bay.ventral;
+  /* attitude de rangement (repère du vaisseau) : à plat sous le vaisseau, ou nez vers l'intérieur d'une baie latérale */
+  const parkQ = ventral ? new THREE.Quaternion() : new THREE.Quaternion().setFromUnitVectors(new V3(0, 0, -1), bay.N.clone().negate());
+  const halfN = ventral ? sz.y/2 : sz.z/2;
+  const bayIn = bay.C.clone().addScaledVector(bay.N, -Math.max(halfN - .5, Math.min(bay.D - halfN - .3, halfN + .4))), bayOut = bay.C.clone().addScaledVector(bay.N, halfN + 2.5);
+  const clearDir = bay.N.clone().add(new V3(0, -.6, 0)).normalize(), clearTo = bayOut.clone().addScaledVector(clearDir, CLEAR_D);
+  const ORD = (window.__SHIPGLASS && __SHIPGLASS.RENDER_ORDER) ? __SHIPGLASS.RENDER_ORDER.craft : 7;
+  sh.group.traverse(o => { if(o.isMesh || o.isSprite) o.renderOrder = ORD; });
+  sh.group.position.copy(shipPoint(bayIn)); sh.group.quaternion.copy(shipRig.quaternion.clone().multiply(parkQ));
+  LAYERS.shipWorld.add(sh.group); LAYERS.shipWorld.add(sh.trail);
+  const plan = [
+    { ph: 'exit',  path: polyline([bayIn, bayOut]), T: durFor(bayOut.distanceTo(bayIn), VP.exit) },
+    { ph: 'clear', path: polyline([bayOut, clearTo]), T: durFor(CLEAR_D, VP.clear) }
+  ];
+  const camSeq = SHUTTLE_CAMERA_SEQUENCES[Math.floor(Math.random()*SHUTTLE_CAMERA_SEQUENCES.length)], id = ++_shuttleIdCounter;
+  sh.rest = clearTo; sh.pickQ = parkQ; sh.outLocal = clearDir.clone(); sh.bay = { bayIn: bayIn, bayOut: bayOut, N: bay.N.clone(), parkQ: parkQ, box: bay.box };
+  orbitState.loading = { id: id, pick: false, bayFlow: true, phase: 'exit', step: 0, st: 0, plan: plan, shuttle: sh, container: null, t: 0,
+    duration: plan.reduce((a, p) => a + p.T, 0), camSeq: camSeq, grabbed: true, released: true, kind: kind };
+  return true;
+}
+/* citernier (sans baie) : glace transférée sans navette — la livraison est comptée et payée comme les autres */
+function deliverDirect(){
+  const os = orbitState; os.deliveredCount = (os.deliveredCount || 0) + 1;
+  if(!os.creditsPaid && os.spawned.every(Boolean) && os.deliveredCount >= os.spawnFractions.length){
+    const total = os.cargoSplit.reduce((a, b) => a + b, 0); addCredits(total*os.unitPrice); os.creditsPaid = true; }
+}
+function startBay(){
+  if(!isContainerShip(SHIP_ID)) return startBayOther();
+  const bay = bayInfo(), slots = stackSlots(); if(!bay || !slots.length) return false;
+  const s = slots[Math.floor(Math.random()*slots.length)], side = Math.sign(s.local.x) || 1, w = s.dims[0];
+  const sh = buildCargoShuttle(_shuttleIdCounter + 11);
+  const ORD = (window.__SHIPGLASS && __SHIPGLASS.RENDER_ORDER) ? __SHIPGLASS.RENDER_ORDER.craft : 7;
+  sh.group.traverse(o => { if(o.isMesh || o.isSprite) o.renderOrder = ORD; });   /* dessinée après le portail de la baie */
+  const len = sh.len, halfH = 3.4;
+  /* garée dans la baie : le long de son axe, sa face dorsale vers le fond ; point de sortie sous l'ouverture */
+  const bayIn = bay.C.clone().addScaledVector(bay.N, -(Math.max(halfH + .4, bay.D - halfH - .6)));
+  const bayOut = bay.C.clone().addScaledVector(bay.N, halfH + 2.5);
+  /* pose de prise : navette roulée de 90° (dos vers la pile), berceau face au logement */
+  const pickQ = new THREE.Quaternion().setFromAxisAngle(new V3(0, 0, 1), side*Math.PI/2);
+  sh.clampGroup.position.y = sh.clampGroup.position.y - ISO.H/2 + w/2;
+  const out = s.local.clone().add(new V3(side*(w + GAP), 0, 0));
+  const rest = out.clone().sub(sh.clampGroup.position.clone().applyQuaternion(pickQ));
+  const hold = rest.clone().add(new V3(side*4, 0, 0));
+  /* le long de la coque, en dehors de son encombrement (anneaux compris) : sous la baie, puis sur le flanc */
+  const xOut = side*(Math.max(Math.abs(bay.box.min.x), Math.abs(bay.box.max.x)) + len*.5 + 4);
+  /* descente sous le point le plus bas du vaisseau avant de se décaler : jamais dans son encombrement */
+  const yLow = Math.min(bayOut.y, bay.box.min.y - halfH - 2);
+  const W0 = new V3(bayOut.x, yLow, bayOut.z), W1 = new V3(xOut, yLow, bayOut.z), W2 = new V3(xOut, hold.y, hold.z);
+  /* écartement en DIAGONALE (vers l'extérieur et vers le bas, côté planète et port) : quitte vite le voisinage du vaisseau */
+  const clearDir = new V3(side, -1.1, 0).normalize(), clearTo = rest.clone().addScaledVector(clearDir, CLEAR_D);
+  const cont = s.obj.clone(true); s.obj.updateMatrixWorld(true); s.obj.matrixWorld.decompose(cont.position, cont.quaternion, cont.scale);
+  s.obj.visible = false; taken.push(s.obj); LAYERS.shipWorld.add(cont);
+  sh.group.position.copy(shipPoint(bayIn)); sh.group.quaternion.copy(shipRig.quaternion);
+  LAYERS.shipWorld.add(sh.group); LAYERS.shipWorld.add(sh.trail);
+  if(sh.craft && sh.craft.thr) sh.craft.thr.value = .08;
+  const toSide = polyline([bayOut, W0, W1, W2, hold]);
+  const plan = [
+    { ph: 'exit',     path: polyline([bayIn, bayOut]), T: durFor(bayOut.distanceTo(bayIn), VP.exit) },
+    { ph: 'toStack',  path: toSide, T: durFor(toSide.L, VP.side) },
+    { ph: 'approach', path: polyline([hold, rest]), T: durFor(6, VP.approach) },
+    { ph: 'pick',     T: T_PICK },
+    { ph: 'clear',    path: polyline([rest, clearTo]), T: durFor(CLEAR_D, VP.clear) }
+  ];
+  const camSeq = SHUTTLE_CAMERA_SEQUENCES[Math.floor(Math.random()*SHUTTLE_CAMERA_SEQUENCES.length)], id = ++_shuttleIdCounter;
+  sh.rest = clearTo; sh.pickQ = pickQ; sh.outLocal = clearDir.clone();
+  sh.bay = { bayIn: bayIn, bayOut: bayOut, N: bay.N.clone(), box: bay.box };
+  orbitState.loading = { id: id, pick: true, bayFlow: true, phase: 'exit', step: 0, st: 0, plan: plan, shuttle: sh, container: cont, t: 0,
+    duration: plan.reduce((a, p) => a + p.T, 0), camSeq: camSeq, grabbed: false, released: false, side: side,
+    slotLocal: s.local.clone(), outLocal: out };
+  return true;
+}
+/* phases proches du vaisseau du chargement (sortie de baie → pile → prise → écartement) ; true quand terminé */
+function updateBay(L, dt){
+  const sh = L.shuttle, qShip = shipRig.quaternion, qPick = qShip.clone().multiply(sh.pickQ);
+  L.st += dt;
+  while(L.step < L.plan.length && L.st >= L.plan[L.step].T){ L.st -= L.plan[L.step].T; L.step++; }
+  if(L.step >= L.plan.length) return true;
+  const P = L.plan[L.step], k = L.st/P.T, e = smoother(k); L.phase = P.ph;
+  if(P.path) sh.group.position.copy(shipPoint(P.path.at(e*P.path.L)));
+  if(P.ph === 'exit'){ sh.group.quaternion.copy(L.pick ? qShip : qPick); if(sh.craft && sh.craft.thr) sh.craft.thr.value = .08 + .2*Math.sin(Math.PI*k); }
+  else if(P.ph === 'toStack'){ sh.group.quaternion.copy(qShip).slerp(qPick, smoother((k - .2)/.6)); if(sh.craft && sh.craft.thr) sh.craft.thr.value = .1 + .35*Math.sin(Math.PI*k); }
+  else if(P.ph === 'approach'){ sh.group.quaternion.copy(qPick); if(sh.craft && sh.craft.thr) sh.craft.thr.value = .06; }
+  else if(P.ph === 'pick'){
+    sh.group.quaternion.copy(qPick); sh.group.position.copy(shipPoint(L.plan[2].path.at(L.plan[2].path.L)));
+    if(!L.grabbed) L.grabbed = true;
+    if(!L.released){
+      L.container.position.copy(shipPoint(L.slotLocal.clone().lerp(L.outLocal, e))); L.container.quaternion.copy(qShip);
+      if(k >= .999){ L.released = true; sh.group.updateMatrixWorld(true); sh.clampGroup.attach(L.container); sh.hasCargo = true; }
+    }
+  } else if(P.ph === 'clear'){
+    if(!L.released && L.container){                                         /* image longue qui a sauté la fin de la prise : conteneur replacé à sa position
+                                                               finale DE CETTE IMAGE avant l'accrochage (sinon ~300 m de retard en orbite) */
+      sh.group.quaternion.copy(qPick); sh.group.position.copy(shipPoint(L.plan[2].path.at(L.plan[2].path.L)));
+      L.container.position.copy(shipPoint(L.outLocal)); L.container.quaternion.copy(qShip);
+      L.released = true; sh.group.updateMatrixWorld(true); sh.clampGroup.attach(L.container); sh.hasCargo = true;
+    }
+    sh.group.quaternion.copy(qPick); if(sh.craft && sh.craft.thr) sh.craft.thr.value = .1 + .4*k;
+  }
+  if(L.container && !L.grabbed){ L.container.position.copy(shipPoint(L.slotLocal)); L.container.quaternion.copy(qShip); }
+  return false;
+}
+/* retour (vol) : calculé dans le repère du vaisseau — la distance restante jusqu'au POINT D'APPROCHE (60 m sous la baie)
+   (90 m sous la baie) décroît en échelle logarithmique et s'annule avec une vitesse nulle. L'interpolation d'origine (du port vers le
+   vaisseau) arrivait encore à des centaines de m/s dans les derniers mètres : profil de l'ancien monde compressé. */
+const GATE = 40;
+/* point d'approche du retour : dans l'axe de sortie de la baie, au plus près MAIS hors de l'encombrement du vaisseau élargi de
+   45 m — la fin du vol (encore rapide) reste hors de la zone de manœuvre ; seule l'approche finale (≤ 8 m/s) s'en approche.
+   Placé dans la direction d'arrivée, à 40 m, il faisait longer la coque à ~60 m/s (test navette de baie, 29/09). */
+function gateOf(B){
+  const box = B.box ? B.box.clone().expandByScalar(45) : null, p = new V3();
+  for(let g = GATE*.5; g <= 400; g += 5){ p.copy(B.bayOut).addScaledVector(B.N, g); if(!box || !box.containsPoint(p)) break; }
+  return p.clone();
+}
+function toShipLocal(w){ return w.clone().sub(shipRig.position).applyQuaternion(shipRig.quaternion.clone().invert()); }
+function returnPose(s, f){
+  const B = s.bay;
+  if(!s.ret){
+    const start = toShipLocal(s.group.getWorldPosition(new V3()));
+    const gate = gateOf(B);   /* dans l'axe de sortie de la baie, juste hors de la zone des 40 m (et non dans la direction d'arrivée) */
+    const d0 = start.distanceTo(gate), dir = start.clone().sub(gate).normalize();
+    s.ret = { gate: gate, dir: dir, lnD: Math.log(d0 + 1) }; B.gate = gate;
+  }
+  const R = s.ret, e = f*f*(3 - 2*f), d = Math.exp(R.lnD*(1 - e)) - 1;
+  const local = R.gate.clone().addScaledVector(R.dir, d), pos = shipPoint(local);
+  const toward = R.dir.clone().negate().applyQuaternion(shipRig.quaternion);
+  return { pos: pos, look: toward, d: d };
+}
+/* départ (vol) depuis le point d'écartement : repère du vaisseau, distance parcourue croissant en échelle logarithmique —
+   la vitesse est proportionnelle à la distance déjà parcourue : lente près du vaisseau, rapide seulement loin de lui.
+   L'interpolation d'origine (du point de départ vers le port) partait à des centaines de m/s dès les premiers mètres. */
+function departPose(s, f, targetWorld){
+  if(!s.dep) s.dep = { start: toShipLocal(s.group.getWorldPosition(new V3())) };
+  const tgt = toShipLocal(targetWorld), D = tgt.distanceTo(s.dep.start), dir = tgt.clone().sub(s.dep.start).normalize();
+  const e = f*f*(3 - 2*f), d = Math.min(D, Math.exp(Math.log(D + 1)*e) - 1);
+  const local = s.dep.start.clone().addScaledVector(dir, d);
+  return { pos: shipPoint(local), look: dir.clone().applyQuaternion(shipRig.quaternion) };
+}
+/* approche (point d'approche → sous la baie, ≤ 5 m/s) puis entrée lente en baie ; true quand rangée */
+function updateEnter(s, dt){
+  const B = s.bay; if(!B) return true;
+  if(!s.enterPlan){ const g = B.gate || gateOf(B);
+    s.enterPlan = [{ path: polyline([g, B.bayOut]), T: durFor(g.distanceTo(B.bayOut), VP.side) }, { path: polyline([B.bayOut, B.bayIn]), T: durFor(B.bayOut.distanceTo(B.bayIn), VP.enter) }];
+    s.enterStep = 0; s.enterT = 0; }
+  s.enterT += dt;
+  while(s.enterStep < 2 && s.enterT >= s.enterPlan[s.enterStep].T){ s.enterT -= s.enterPlan[s.enterStep].T; s.enterStep++; }
+  const qPark = B.parkQ ? shipRig.quaternion.clone().multiply(B.parkQ) : shipRig.quaternion;
+  if(s.enterStep >= 2){ s.group.position.copy(shipPoint(B.bayIn)); s.group.quaternion.copy(qPark); return true; }
+  const P = s.enterPlan[s.enterStep], k = s.enterT/P.T;
+  s.group.position.copy(shipPoint(P.path.at(smoother(k)*P.path.L)));
+  s.group.quaternion.slerp(qPark, 1 - Math.exp(-dt*(s.enterStep ? 4 : 1.5)));
+  if(s.craft && s.craft.thr) s.craft.thr.value = s.enterStep ? .05 + .1*(1 - k) : .1 + .3*Math.sin(Math.PI*k);
+  if(s.trailHistory) s.trailHistory.length = 0;
+  return false;
+}
+function hasBay(){ return !!bayInfo(); }
+return { ISO, DOCK_SCALE, buildIsoContainer, buildCargoShuttle, armPoints, shipPoint, isContainerShip, startBay, updateBay, updateEnter, returnPose, departPose, restoreStack, hasBay, deliverDirect, VP };
+})();
+
+/* =========================================================================
+   MISSIONS — lot M1 (spec-missions.md) : système de missions AUTONOME
+   - plus d'itinéraire : la partie commence en orbite près d'une planète dotée d'un port ; le contrôle
+     appelle ; le TABLEAU DES MISSIONS s'ouvre ; après chaque livraison, celui du port d'arrivée prend le relais ;
+   - 5 natures de fret, couleur des conteneurs = nature (denrées orange, équipements vert, armes rouge,
+     minerais gris foncé, eau bleu ciel) ; le reste de la pile en gris neutre (fret d'autres affréteurs) ;
+   - capacités par vaisseau (conteneurs 1 à 5 selon la taille ; passagers et VIP ; eau en réservoirs ; lots) ;
+   - missions locales (tous vaisseaux) et entre systèmes (long-courriers : 24 étoiles les plus proches,
+     carburant suffisant — mêmes règles que la carte) ;
+   - prime et score de risque (§5 de la spec) ; livraison payée à la prime de la mission.
+   À venir : gabares du port (M2), escorte SMP et incidents (M3), négociation (M4), Gemini Nano (M5).
+   Le démarrage rapide des tests garde l'itinéraire, sauf option { missions: true }.
+   ========================================================================= */
+const MISSIONS = (function(){
+const V3 = THREE.Vector3;
+const NATURES = { denrees: 0xf0a030, equipements: 0x3f9a52, armes: 0xc8342c, minerais: 0x4a4d52, eau: 0x7cc8f0 };
+const NEUTRAL = 0x8c9199;
+const UNIT = { denrees: 220, eau: 180, equipements: 300, minerais: 260, armes: 600 };
+const NAT_PTS = { denrees: 0, eau: 0, equipements: 1, minerais: 1, armes: 3 };
+const CAP = { e18: [1, 3], p10: [1, 2], p44: [2, 4], e140: [3, 5] };
+const TXT = {
+  fr: { title: 'MISSIONS DISPONIBLES', sub: 'Couleur des conteneurs = nature du fret', accept: 'Accepter', negotiate: 'Négocier', negoSoon: 'Négociation : lot M4',
+        denrees: 'denrées', equipements: 'équipements', armes: 'armes', minerais: 'minerais', mineraisRares: 'minerais rares', eau: 'eau',
+        pax: 'passagers', vip: 'dont VIP', tanks: 'réservoirs d\u2019eau', lot: 'lot', local: 'local', jump: 'saut',
+        risk: ['RISQUE FAIBLE', 'RISQUE MOYEN', 'RISQUE ÉLEVÉ', 'RISQUE CRITIQUE'], mission: 'MISSION', empty: 'Aucune mission compatible ici.' },
+  en: { title: 'AVAILABLE MISSIONS', sub: 'Container colour = cargo type', accept: 'Accept', negotiate: 'Negotiate', negoSoon: 'Negotiation: lot M4',
+        denrees: 'foodstuffs', equipements: 'equipment', armes: 'weapons', minerais: 'ore', mineraisRares: 'rare ore', eau: 'water',
+        pax: 'passengers', vip: 'incl. VIP', tanks: 'water tanks', lot: 'lot', local: 'local', jump: 'jump',
+        risk: ['LOW RISK', 'MEDIUM RISK', 'HIGH RISK', 'CRITICAL RISK'], mission: 'MISSION', empty: 'No suitable mission here.' },
+  de: { title: 'VERFÜGBARE AUFTRÄGE', sub: 'Containerfarbe = Frachtart', accept: 'Annehmen', negotiate: 'Verhandeln', negoSoon: 'Verhandlung: Los M4',
+        denrees: 'Lebensmittel', equipements: 'Ausrüstung', armes: 'Waffen', minerais: 'Erze', mineraisRares: 'seltene Erze', eau: 'Wasser',
+        pax: 'Passagiere', vip: 'davon VIP', tanks: 'Wassertanks', lot: 'Los', local: 'lokal', jump: 'Sprung',
+        risk: ['GERINGES RISIKO', 'MITTLERES RISIKO', 'HOHES RISIKO', 'KRITISCHES RISIKO'], mission: 'AUFTRAG', empty: 'Hier kein passender Auftrag.' },
+  es: { title: 'MISIONES DISPONIBLES', sub: 'Color del contenedor = tipo de carga', accept: 'Aceptar', negotiate: 'Negociar', negoSoon: 'Negociación: lote M4',
+        denrees: 'víveres', equipements: 'equipos', armes: 'armas', minerais: 'minerales', mineraisRares: 'minerales raros', eau: 'agua',
+        pax: 'pasajeros', vip: 'con VIP', tanks: 'depósitos de agua', lot: 'lote', local: 'local', jump: 'salto',
+        risk: ['RIESGO BAJO', 'RIESGO MEDIO', 'RIESGO ALTO', 'RIESGO CRÍTICO'], mission: 'MISIÓN', empty: 'Ninguna misión adecuada aquí.' }
+};
+const tx = () => TXT[typeof LANG !== 'undefined' && TXT[LANG] ? LANG : 'fr'];
+const S = { enabled: false, active: null, offers: [], el: null, hud: null, pendingGo: false, done: [], shownKey: null, delivering: false, serial: 0 };
+const hex = c => '#' + c.toString(16).padStart(6, '0');
+
+/* ---------- vaisseau : ce qu'il transporte ---------- */
+function model(){ return SHIPGEN.MODELS.find(m => m.id === SHIP_ID) || {}; }
+function cargoSpec(){
+  const m = model();
+  if(CAP[SHIP_ID]) return { kind: 'containers', range: CAP[SHIP_ID], natures: Object.keys(NATURES) };
+  if(m.group === 'Passagers') return { kind: 'passengers', range: [10, 120] };
+  if(m.group === 'Fret en vrac') return { kind: 'tanks', range: [3, 15], natures: ['eau'] };
+  if(m.group === 'Indépendants') return { kind: 'lot', range: [1, 1], natures: ['armes', 'equipements'] };
+  return { kind: 'lot', range: [1, 1], natures: ['equipements'] };
+}
+const canTravel = () => !!(typeof hasQuantumJump !== 'undefined' && hasQuantumJump) || !!(typeof SHIP_WARP !== 'undefined' && SHIP_WARP);
+
+/* ---------- destinations ---------- */
+function localBodies(){
+  const leg = REAL.leg; if(!leg) return [];
+  const here = REAL.mission && REAL.mission.target, out = [];
+  leg.planets.forEach(p => { if(p !== here) out.push({ body: p, name: p.properName || p.name, kindKey: 'planet' }); });
+  leg.planets.forEach(p => (p.moonPivots || []).forEach(pv => { const m = pv.children[0]; if(!m) return;
+    out.push({ body: { position: m.getWorldPosition(new V3()), radius: m.scale.x, kind: { gas: false }, isMoon: true, name: pv.userData.moonName }, name: pv.userData.moonName, kindKey: 'moon' }); }));
+  (leg.stations || []).forEach(st => { if(st !== here) out.push({ body: st, name: st.name, kindKey: 'port' }); });
+  return out.filter(d => d.name);
+}
+function reachableStars(){
+  const p = REAL.galPos, cx = Math.round(p.x/STAR_CELL), cy = Math.round(p.y/STAR_CELL), cz = Math.round(p.z/STAR_CELL), list = [];
+  for(let dx = -STAR_MAP_RADIUS; dx <= STAR_MAP_RADIUS; dx++) for(let dy = -STAR_MAP_RADIUS; dy <= STAR_MAP_RADIUS; dy++) for(let dz = -STAR_MAP_RADIUS; dz <= STAR_MAP_RADIUS; dz++){
+    const d = starDataForCell(cx + dx, cy + dy, cz + dz); if(d && d.cell !== REAL.leg.cell) list.push([d.position.distanceTo(p), d]); }
+  list.sort((a, b) => a[0] - b[0]);
+  return list.slice(0, STAR_MAP_MAX_CANDIDATES).map(e => e[1]).filter(sd => typeof quantumJumpFuelCost !== 'function' || !hasQuantumJump || fuel >= quantumJumpFuelCost(sd.position.distanceTo(REAL.leg.gal)));
+}
+/* ---------- génération des offres ---------- */
+function zoneRisk(cell){ const r = rngFor(SEED + ':zone:' + cell); return Math.floor(r()*4); }
+function riskLevel(o){
+  const pts = (o.nature ? NAT_PTS[o.nature] + (o.rare ? 2 : 0) : 0) + (o.reward > 3000 ? 2 : o.reward > 1200 ? 1 : 0) + (o.vip ? 2 : 0) + o.zone + (o.inter ? 1 : 0);
+  return pts <= 2 ? 0 : pts <= 4 ? 1 : pts <= 6 ? 2 : 3;
+}
+function generate(){
+  const leg = REAL.leg, spec = cargoSpec(), r = rngFor(SEED + ':missions:' + leg.cell + ':' + (REAL.hops || 0) + ':' + S.serial++);
+  const pick = a => a[Math.floor(r()*a.length)];
+  const dests = localBodies().map(d => Object.assign({ inter: false, dist: d.body.position.distanceTo(shipRig.position) }, d));
+  if(canTravel()) reachableStars().slice(0, 6).forEach(sd => dests.push({ inter: true, sd: sd, name: sd.name, dist: sd.position.distanceTo(REAL.leg.gal), kindKey: 'star' }));
+  const shuffled = dests.map(d => [r(), d]).sort((a, b) => a[0] - b[0]).map(e => e[1]);
+  const inter = shuffled.filter(d => d.inter).slice(0, 2), local = shuffled.filter(d => !d.inter).slice(0, 5 - inter.length);
+  return local.concat(inter).map(d => {
+    const q = spec.range[0] + Math.floor(r()*(spec.range[1] - spec.range[0] + 1)), o = { dest: d, inter: d.inter, qty: q, kind: spec.kind, zone: zoneRisk(d.inter ? d.sd.cell : leg.cell) };
+    const au = d.inter ? 0 : d.dist/1.496e11, pc = d.inter ? d.dist : 0;
+    const distF = d.inter ? 2.5 + .12*pc : 1 + Math.min(au, 12)/4;
+    if(spec.kind === 'passengers'){ o.vip = r() < .25; o.reward = Math.round(q*(30 + 20*r())*(o.vip ? 3 : 1)*distF/10)*10; }
+    else { o.nature = pick(spec.natures); o.rare = o.nature === 'minerais' && r() < .2;
+      const unit = spec.kind === 'tanks' ? 150 : spec.kind === 'lot' ? (o.nature === 'armes' ? 1600 : 900) : UNIT[o.nature]*(o.rare ? 2 : 1);
+      o.reward = Math.round(q*unit*distF*(.9 + .2*r())/10)*10; }
+    o.risk = riskLevel(o);
+    if(d.inter) o.g = { name: d.sd.name, designation: d.sd.star.designation, starPosition: d.sd.position.clone(), cell: d.sd.cell, star: d.sd.star };
+    return o;
+  });
+}
+/* ---------- pile du vaisseau : couleurs ---------- */
+const matCache = new Map();
+function tinted(mat, color){ const k = mat.uuid + ':' + color; if(!matCache.has(k)){ const m = mat.clone(); m.color = new THREE.Color(color); matCache.set(k, m); } return matCache.get(k); }
+function stackContainers(){ const out = []; if(!SHIP_HULL) return out; SHIP_HULL.updateMatrixWorld(true);
+  SHIP_HULL.traverse(o => { if(o.userData && o.userData.cargo) out.push(o); }); return out; }
+function paint(o, color){ o.traverse(m => { if(!m.isMesh) return; if(!m.userData.baseMat) m.userData.baseMat = m.material; m.material = tinted(m.userData.baseMat, color); }); }
+function paintStack(mission){
+  const all = stackContainers(); if(!all.length) return 0;
+  all.forEach(c => { c.userData.mission = false; paint(c, NEUTRAL); });
+  if(!mission || mission.kind !== 'containers') return 0;
+  const loc = all.map(c => ({ c, x: Math.abs(shipRig.worldToLocal(c.getWorldPosition(new V3())).x) })), maxX = Math.max(...loc.map(e => e.x));
+  const outer = loc.filter(e => e.x >= maxX - .5*(e.c.userData.cdims ? e.c.userData.cdims[0] : 2)).map(e => e.c);
+  outer.slice(0, mission.qty).forEach(c => { c.userData.mission = true; c.visible = true; paint(c, NATURES[mission.nature]); });
+  return Math.min(mission.qty, outer.length);
+}
+/* ---------- interface ---------- */
+function cargoLabel(o){
+  const T = tx();
+  if(o.kind === 'passengers') return o.qty + ' ' + T.pax + (o.vip ? ' · ' + T.vip : '');
+  if(o.kind === 'tanks') return o.qty + ' ' + T.tanks;
+  const n = o.rare ? T.mineraisRares : T[o.nature];
+  return o.kind === 'lot' ? '1 ' + T.lot + ' · ' + n : o.qty + ' × ' + n;
+}
+function swatches(o){
+  if(!o.nature) return '';
+  return Array.from({ length: o.kind === 'containers' ? o.qty : 1 }, () => "<span style='display:inline-block;width:12px;height:12px;margin-right:3px;background:" + hex(o.rare ? 0x26282b : NATURES[o.nature]) + ";border:1px solid rgba(255,255,255,.25);vertical-align:middle'></span>").join('');
+}
+function distLabel(o){ const T = tx(); return o.inter ? (o.dest.dist.toFixed(1) + ' pc · ' + T.jump) : (REAL.fmt.dist(o.dest.dist) + ' · ' + T.local); }
+function ensureDom(){
+  if(S.el) return;
+  const el = document.createElement('div'); el.id = 'missionBoardOverlay'; el.className = 'mono';
+  el.style.cssText = 'position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:9;background:rgba(2,5,12,.45)';
+  el.innerHTML = "<div class='board-panel' style='max-width:760px;width:92vw'><div class='board-title' id='missionTitle'></div><div class='board-sub' id='missionSub'></div><div class='board-list' id='missionList'></div></div>";
+  document.body.appendChild(el); S.el = el;
+  el.querySelector('#missionList').addEventListener('click', e => { const b = e.target.closest('button[data-i]'); if(b && b.dataset.act === 'accept') accept(+b.dataset.i); });
+  const h = document.createElement('div'); h.id = 'missionHud'; h.className = 'mono';
+  h.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);top:10px;z-index:6;display:none;font-size:11px;letter-spacing:.06em;padding:6px 12px;border:1px solid #25375c;background:rgba(15,26,48,.88);color:#e8edf5;pointer-events:none';
+  document.body.appendChild(h); S.hud = h;
+}
+function riskTag(l){ const c = ['#5eead4', '#ffb454', '#ff6b57', '#ff2d55'][l]; return "<span style='font-size:9.5px;padding:2px 6px;border:1px solid " + c + ";color:" + c + "'>" + tx().risk[l] + '</span>'; }
+function openBoard(){
+  ensureDom(); const T = tx(), leg = REAL.leg;
+  S.offers = generate();
+  const here = (REAL.mission && REAL.mission.target && (REAL.mission.target.properName || REAL.mission.target.name)) || leg.name;
+  S.el.querySelector('#missionTitle').textContent = T.title + ' · ' + here;
+  S.el.querySelector('#missionSub').textContent = T.sub;
+  S.el.querySelector('#missionList').innerHTML = S.offers.length ? S.offers.map((o, i) =>
+    "<div class='board-row' data-mission='" + i + "'><div class='board-row-info'><div class='board-row-name'>" + o.dest.name + (o.inter ? ' (' + o.dest.name + ')' : '') + "</div>" +
+    "<div class='board-row-meta'>" + swatches(o) + ' ' + cargoLabel(o) + ' · ' + distLabel(o) + '</div></div>' +
+    "<div style='text-align:right;min-width:190px'><div style='color:#ffb454;font-size:12px'>" + o.reward.toLocaleString('fr-FR') + " CR</div><div style='margin:5px 0'>" + riskTag(o.risk) + '</div>' +
+    "<button class='board-row-btn' data-act='accept' data-i='" + i + "'>" + T.accept + "</button> <button class='board-row-btn' disabled title='" + T.negoSoon + "' style='opacity:.45'>" + T.negotiate + '</button></div></div>').join('')
+    : "<div class='board-empty'>" + T.empty + '</div>';
+  S.el.style.display = 'flex'; S.shownKey = keyNow();
+}
+function closeBoard(){ if(S.el) S.el.style.display = 'none'; }
+const boardOpen = () => !!(S.el && S.el.style.display === 'flex');
+function keyNow(){ return (REAL.leg ? REAL.leg.cell : '') + ':' + (REAL.hops || 0) + ':' + S.done.length; }
+function hud(){
+  ensureDom(); const o = S.active; if(!o){ S.hud.style.display = 'none'; return; }
+  S.hud.innerHTML = "<span style='color:#ffb454'>" + tx().mission + '</span> · ' + swatches(o) + ' ' + cargoLabel(o) + ' → ' + o.dest.name + ' · ' + o.reward.toLocaleString('fr-FR') + ' CR · ' + riskTag(o.risk);
+  S.hud.style.display = 'block';
+}
+/* ---------- déroulé ---------- */
+function accept(i){
+  const o = S.offers[i]; if(!o) return;
+  S.active = o; o.id = ++S.serial; closeBoard(); paintStack(o); hud();
+  if(flightPhase === 'ARRIVAL_PAUSE'){ S.pendingGo = true; if(!S.delivering) orbitState.missionGo = true; }   /* rien à livrer : l'escale s'achève */
+  else go();
+}
+let departFn = null;
+function go(){
+  const o = S.active; S.pendingGo = false; if(!o) return;
+  if(o.inter){ REAL.nextOverride = o.g; if(departFn) departFn(REAL.mission); }
+  else REAL.plan(REAL.leg, o.dest.body, true);
+}
+/* R.afterEscale, en mode missions : tableau (sans mission) ou départ vers la destination (mission acceptée) */
+function afterEscale(M, depart){
+  departFn = depart;
+  if(S.active){ if(S.pendingGo) go(); return; }
+  if(!boardOpen()) openBoard();
+}
+function atDestination(){
+  const o = S.active; if(!o || !REAL.mission) return false;
+  if(o.inter) return REAL.leg && REAL.leg.cell === o.g.cell;
+  return REAL.mission.target === o.dest.body || (o.dest.body.isMoon && REAL.mission.target && REAL.mission.target.name === o.dest.body.name);
+}
+/* escale (module 33) : cargaison = celle de la mission à destination ; aucune livraison sinon */
+function setupEscale(os){
+  if(!S.enabled) return;
+  if(S.active && atDestination()){
+    S.delivering = true;
+    const n = Math.max(1, os.spawnFractions.length), q = S.active.kind === 'containers' ? S.active.qty : 1;
+    os.cargoSplit = new Array(n).fill(0); for(let c = 0; c < q; c++) os.cargoSplit[c % n]++;
+    os.unitPrice = S.active.reward/q; os.creditsPaid = false;
+  } else { S.delivering = false; os.spawnFractions = []; os.spawned = []; os.cargoSplit = []; os.creditsPaid = true; }
+  os.missionGo = false;
+}
+function complete(){ S.done.push(S.active); S.active = null; S.delivering = false; paintStack(null); hud(); }
+function update(){
+  if(!S.enabled || !REAL.started) return;
+  if(S.delivering && S.active && orbitState.creditsPaid) complete();
+  /* tableau dès la mise en orbite (sans mission), pendant l'appel du contrôle */
+  if(!S.active && REAL.phase === 'ORBIT' && flightPhase === 'ARRIVAL_PAUSE' && !boardOpen() && S.shownKey !== keyNow()) openBoard();
+}
+/* ---------- démarrage : en orbite près de la planète de départ ---------- */
+function itineraryUi(hide){
+  if(!document.getElementById('missionModeCss')){ const st = document.createElement('style'); st.id = 'missionModeCss';
+    st.textContent = 'body.missions-mode #itineraryPanel, body.missions-mode #lagrangePanel, body.missions-mode .route-panel, body.missions-mode #routePanel{ display:none !important; }';
+    document.head.appendChild(st); }
+  document.body.classList.toggle('missions-mode', !!hide);
+  const fp = document.getElementById('lblFlightPlan'); const panel = fp && fp.closest('.panel'); if(panel) panel.style.display = hide ? 'none' : '';
+}
+function start(){
+  itineraryUi(true);
+  S.enabled = true; S.active = null; S.done = []; ensureDom(); paintStack(null); hud();
+  const M = REAL.mission; if(!M || !M.tr) return;
+  M.t = M.tr.prof.D; REAL.phase = 'APPROACH'; REAL.tau = 1; M.s = M.Lc;     /* transfert et approche sautés : mise en orbite immédiate */
+}
+return { start, update, afterEscale, setupEscale, enabled: () => S.enabled, setEnabled: v => { S.enabled = !!v; if(!v) itineraryUi(false); }, state: S, NATURES, cargoSpec, paintStack, openBoard, accept, generate };
 })();
 
 /* =========================================================================
@@ -12346,7 +12979,9 @@ function startOrbitDelivery(planet){
     if(s.trail){ LAYERS.detach(s.trail); s.trail.geometry.dispose(); s.trail.material.dispose(); }
   });
   orbitState.shuttles.length = 0;
-  orbitState.spawned = [false,false,false];
+  /* lot N2 : porte-conteneurs — une seule navette de baie (toute la cargaison de l'escale) ; ailleurs, trois navettes */
+  orbitState.spawnFractions = CARGO.hasBay() ? [0.04] : [0.08, 0.30, 0.52];   /* lot N2 : une navette de baie par escale (manœuvres lentes) ; sans baie : trois transferts directs */
+  orbitState.spawned = orbitState.spawnFractions.map(function(){ return false; });   /* taille réelle : sinon le paiement attend des navettes jamais lancées */
 
   const center = planet.position.clone();
   const toShip = shipRig.position.clone().sub(center);
@@ -12391,6 +13026,7 @@ function startOrbitDelivery(planet){
   orbitState.cargoSplit = split;
   orbitState.unitPrice = 180 + Math.floor(Math.random()*241);  /* 180 à 420 crédits */
   orbitState.creditsPaid = false;
+  if(typeof MISSIONS !== 'undefined') MISSIONS.setupEscale(orbitState);   /* M1 : cargaison et prime de la mission */
   orbitState.deliveredCount = 0;
   orbitState.loading = null;
 
@@ -12596,6 +13232,10 @@ const LOAD_T_RELEASE = 2.5;   /* dépose sur la pince de la navette */
    conteneur de stock, tous deux ancrés sur le dock/le point de stockage —
    qui suivent le vaisseau tant qu'il orbite, cf. updateShuttleLoading(). */
 function startShuttleLoading(withCutaway){
+  /* lot N2 : tous les vaisseaux lancent l'engin de leur baie (conteneur uniquement sur les porte-conteneurs) ;
+     sans baie (citernier) : livraison sans navette. Plus de module d'amarrage ni de bras. */
+  if(CARGO.startBay()) return;
+  CARGO.deliverDirect(); return;
   /* lot N : navette-cargo (P2) et conteneur ISO 20' réels, en mètres (plus de mise à l'échelle) */
   const sh = CARGO.buildCargoShuttle(_shuttleIdCounter + 11);
   const pts = CARGO.armPoints();
@@ -12694,6 +13334,7 @@ function updateShuttleLoading(dt){
   const L = orbitState.loading;
   if(!L) return;
   L.t += dt;
+  if(L.bayFlow){ if(CARGO.updateBay(L, dt)){ launchLoadedShuttle(L.shuttle, L.id, L.shuttle.group.position.clone(), L.camSeq); orbitState.loading = null; } return; }   /* lot N2 : baie → pile → écartement */
 
   /* le dock et le stock sont solidaires du vaisseau, qui continue
      d'orbiter pendant le chargement : on les réaligne à chaque image
@@ -12760,8 +13401,10 @@ function launchLoadedShuttle(sh, id, dockPos, camSeq){
   orbitState.shuttles.push({
     id:id, group:sh.group, glow:sh.glow, navLights:sh.navLights,
     trail:sh.trail, trailHistory:[],
-    startPos:dockPos.clone(), t:0, duration:11+Math.random()*3, arcOffset:arcOffset,
-    camSeq:camSeq, phase:'outbound', rest:sh.rest || null, engineBack:sh.engineBack || 1.95, craft:sh.craft || null
+    startPos:dockPos.clone(), t:0, duration:sh.bay ? 14 + Math.random()*2 : 11+Math.random()*3, arcOffset:arcOffset,
+    camSeq:camSeq, phase:'outbound', rest:sh.rest || null, engineBack:sh.engineBack || 1.95, craft:sh.craft || null,
+    pickQ:sh.pickQ || null, outLocal:sh.outLocal || null, noReturn:!!sh.noReturn,
+    bay:sh.bay || null, dropD:sh.bay ? 6 : null, clearD:sh.bay ? 20 : null   /* lot N2 : départ lent près du vaisseau */
   });
 }
 
@@ -12798,6 +13441,14 @@ function updateShuttles(dt, elapsed){
   if(_shipDelta.lengthSq() > 1e12) _shipDelta.set(0, 0, 0);   /* changement de système : pas de report */
   for(let i=orbitState.shuttles.length-1; i>=0; i--){
     const s = orbitState.shuttles[i];
+    if(s.phase === 'enter'){                                   /* lot N2 : montée lente dans la baie, puis rangée */
+      if(CARGO.updateEnter(s, dt)){
+        LAYERS.detach(s.group); disposePlanetGroup(s.group);
+        if(s.trail){ LAYERS.detach(s.trail); s.trail.geometry.dispose(); s.trail.material.dispose(); }
+        orbitState.shuttles.splice(i, 1);
+      }
+      continue;
+    }
     s.t += dt;
     const f = Math.min(1, s.t/s.duration);
     const ease = f*f*(3-2*f);
@@ -12823,27 +13474,32 @@ function updateShuttles(dt, elapsed){
          l'éloignement doivent rester solidaires de sa position/orientation
          RÉELLE au moment présent, pas d'un instantané figé au largage. */
       _shipDown.set(0,-1,0).applyQuaternion(shipRig.quaternion);
+      if(s.outLocal) _shipDown.copy(s.outLocal).applyQuaternion(shipRig.quaternion);   /* prise sur la pile : on s'écarte latéralement */
       if(s.rest) _dockPosNow.copy(CARGO.shipPoint(s.rest));                  /* lot N : point de repos sous la pince */
       else if(window.shipDockAnchor) window.shipDockAnchor.getWorldPosition(_dockPosNow);
       else _dockPosNow.copy(shipRig.position);
 
-      if(f < OUTBOUND_DROP_FRAC){
+      if(s.bay){                                                /* lot N2 : départ calculé dans le repère du vaisseau (écartement lent déjà fait) */
+        const dp = CARGO.departPose(s, f, _shuttleTarget); pos = dp.pos; lookDir = dp.look;
+        const qa = s.pickQ ? shipRig.quaternion.clone().multiply(s.pickQ) : shipRig.quaternion.clone();
+        targetQ = qa.slerp(shuttleAttitude(dp.look, pos), Math.min(1, f/.25));
+      } else if(f < OUTBOUND_DROP_FRAC){
         /* phase 1 : translation verticale pure, part du centre du dock */
         const t2 = f/OUTBOUND_DROP_FRAC, e2 = t2*t2*(3-2*t2);
-        pos = _dockPosNow.clone().addScaledVector(_shipDown, DROP_D*e2);
+        pos = _dockPosNow.clone().addScaledVector(_shipDown, (s.dropD || DROP_D)*e2);
         lookDir = _shipDown;
-        targetQ = shipRig.quaternion.clone(); snap = true;   /* sortie de soute : attitude du vaisseau */
+        targetQ = s.pickQ ? shipRig.quaternion.clone().multiply(s.pickQ) : shipRig.quaternion.clone(); snap = true;   /* sortie : attitude du vaisseau (roulée si prise sur la pile) */
       } else if(f < OUTBOUND_CLEAR_FRAC){
         /* phase 2 : poursuite du même axe, la navette s'éloigne encore du cargo */
         const t2 = (f-OUTBOUND_DROP_FRAC)/(OUTBOUND_CLEAR_FRAC-OUTBOUND_DROP_FRAC), e2 = t2*t2*(3-2*t2);
-        pos = _dockPosNow.clone().addScaledVector(_shipDown, DROP_D + CLEAR_D*e2);
+        pos = _dockPosNow.clone().addScaledVector(_shipDown, (s.dropD || DROP_D) + (s.clearD || CLEAR_D)*e2);
         lookDir = _shipDown;
-        targetQ = shipRig.quaternion.clone().slerp(shuttleAttitude(_shuttleTarget.clone().sub(pos), pos), e2);   /* pivote vers sa route */
+        targetQ = (s.pickQ ? shipRig.quaternion.clone().multiply(s.pickQ) : shipRig.quaternion.clone()).slerp(shuttleAttitude(_shuttleTarget.clone().sub(pos), pos), e2);   /* pivote vers sa route */
       } else {
         /* phase 3 : dégagée du cargo, la navette amorce enfin sa descente
            vers le port — même lerp+arc qu'avant, mais reparti du point de
            dégagement plutôt que du dock lui-même */
-        _clearPos.copy(_dockPosNow).addScaledVector(_shipDown, DROP_D + CLEAR_D);
+        _clearPos.copy(_dockPosNow).addScaledVector(_shipDown, (s.dropD || DROP_D) + (s.clearD || CLEAR_D));
         const t2 = (f-OUTBOUND_CLEAR_FRAC)/(1-OUTBOUND_CLEAR_FRAC), e2 = t2*t2*(3-2*t2);
         pos = _clearPos.clone().lerp(_shuttleTarget, e2);
         pos.addScaledVector(s.arcOffset, Math.sin(Math.PI*t2));
@@ -12853,9 +13509,12 @@ function updateShuttles(dt, elapsed){
     } else {
       /* retour au dock : trajet inchangé, un simple lerp+arc suffit —
          la chorégraphie de départ ne concerne que la SORTIE de la baie */
+      if(s.bay){ const rp = CARGO.returnPose(s, f); pos = rp.pos; lookDir = rp.look; }   /* lot N2 : repère du vaisseau, arrivée à l'arrêt */
+      else {
       pos = s.startPos.clone().lerp(_shuttleTarget, ease);
       pos.addScaledVector(s.arcOffset, Math.sin(Math.PI*f));
       lookDir = _shuttleTarget.clone().sub(pos);
+      }
       targetQ = shuttleAttitude(lookDir, pos);
       if(f > .8){ const b = (f - .8)/.2; targetQ.slerp(shipRig.quaternion, b*b*(3 - 2*b)); }   /* réalignement pour l'arrimage */
     }
@@ -12863,7 +13522,8 @@ function updateShuttles(dt, elapsed){
 
     if(targetQ){
       if(snap) s.group.quaternion.copy(targetQ);
-      else s.group.quaternion.slerp(targetQ, 1 - Math.exp(-dt*4));   /* rotations lissées */
+      else s.group.quaternion.rotateTowards(targetQ, 1.6*dt);   /* lot N2 : vitesse de rotation PLAFONNÉE (1,6 rad/s) — la poursuite exponentielle
+                                                            faisait tourner à ~12 rad/s face à un demi-tour (retour du port) */   /* rotations lissées */
     }
     /* rétrécissement + fondu en fin de trajectoire : simulation d'un
        atterrissage — à la livraison comme à l'amerrissage au dock */
@@ -12939,16 +13599,23 @@ function updateShuttles(dt, elapsed){
           addCredits(total * orbitState.unitPrice);
           orbitState.creditsPaid = true;
         }
+        if(s.noReturn){                                             /* navette du port : reste au port */
+          LAYERS.detach(s.group); disposePlanetGroup(s.group);
+          if(s.trail){ LAYERS.detach(s.trail); s.trail.geometry.dispose(); s.trail.material.dispose(); }
+          orbitState.shuttles.splice(i, 1); continue;
+        }
         s.phase = 'returning';
         s.t = 0;
+        if(s.bay){ s.rest = s.bay.bayOut.clone(); s.pickQ = null; s.ret = null; s.enterPlan = null; }   /* lot N2 : retour vers le point sous la baie */
         s.startPos = pos.clone();
         s.arcOffset = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5)
           .normalize().multiplyScalar((50 + Math.random()*70)*REAL.shipScale());   /* échelle du vaisseau */
-        s.duration = 9 + Math.random()*2;
+        s.duration = s.bay ? 11 : 9 + Math.random()*2;
         s.group.scale.setScalar(1);
         s.glow.material.opacity = 1;
       } else {
         /* retour terminé : amerrissage au dock */
+        if(s.bay && s.phase === 'returning'){ s.phase = 'enter'; s.enterT = 0; continue; }   /* lot N2 : entrée lente en baie */
         LAYERS.detach(s.group);
         disposePlanetGroup(s.group);
         if(s.trail){ LAYERS.detach(s.trail); s.trail.geometry.dispose(); s.trail.material.dispose(); }
@@ -13430,8 +14097,13 @@ function updateFlight(dt, elapsed){
     /* plafond défensif : si quelque chose empêchait radioDone/shuttlesDone
        de devenir vrais (cas non prévu), la manœuvre se termine quand même
        plutôt que de bloquer indéfiniment le vol. */
-    const hardCap = pauseTimer >= ARRIVAL_PAUSE_DURATION*2.5;
-    if((pauseTimer >= ARRIVAL_PAUSE_DURATION && radioDone && shuttlesDone) || hardCap){
+    /* lot N2 : la navette de baie manœuvre lentement près du vaisseau (≈ 100 s avant de partir, ≈ 170 s aller-retour) —
+       le plafond de 90 s terminait l'escale navette encore dehors : le vaisseau repartait et la navette le poursuivait
+       à des milliards de km (rotations aberrantes, plus de plan de suivi). Plafond prolongé pour les vaisseaux à baie. */
+    const hardCap = pauseTimer >= ARRIVAL_PAUSE_DURATION*2.5 + ((typeof CARGO !== 'undefined' && CARGO.hasBay()) ? 360 : 0);
+    /* M1 : escale sans livraison (départ, ou port sans mission à livrer) : terminée dès qu'une mission est acceptée */
+    const missionGo = !!os.missionGo && shuttlesDone;
+    if((pauseTimer >= ARRIVAL_PAUSE_DURATION && radioDone && shuttlesDone) || hardCap || missionGo){
       flightPhase = 'CRUISE';
       pauseTimer = 0;
       orbitState.active = false;
@@ -13800,7 +14472,8 @@ function animate(){
      toujours filmés à leur position de l'image précédente — à ~30 km/s, une image de retard fait des centaines de
      mètres, et la compensation par extrapolation ne tient qu'à cadence parfaitement régulière (saccades en jeu) */
   updateShuttles(dt*arrivalTimeScale, elapsed);
-  if(REAL.active && REAL.started) REAL.update(dt);   /* L2.2 : système en mètres, caméra galactique */
+  if(REAL.active && REAL.started) REAL.update(dt);
+  if(typeof MISSIONS !== 'undefined') MISSIONS.update();   /* M1 : fin de mission, tableau à la mise en orbite */   /* L2.2 : système en mètres, caméra galactique */
 
   chunkAccum += dt;
   if(chunkAccum > 0.5){
@@ -13958,6 +14631,7 @@ function animate(){
     applyLanguage(); refreshCreditsDisplay(false);
     titleEl.classList.add('hidden'); titleEl.style.display = 'none';
     installShip(id, opts || {});
+    window.__sttMissions = !!(opts && opts.missions);   /* M1 : tests existants sur l'itinéraire, sauf option */
     document.body.classList.remove('title-active');
     shipRig.visible = true;
     if(ROUTE.gates) ROUTE.gates.visible = true;
@@ -14070,6 +14744,7 @@ function animate(){
     gameStarted = true;
     if(typeof TITLE !== 'undefined') TITLE.stop();   /* fin de la séquence de titre (distorsion, système affiché) */
     if(REAL.active) REAL.enterSystem(ROUTE.legs[0]);   /* L2.2 : vaisseau posé au point d'arrivée de la première étape */
+    if(REAL.active && typeof MISSIONS !== 'undefined'){ MISSIONS.setEnabled(window.__sttMissions !== false); if(MISSIONS.enabled()) MISSIONS.start(); }   /* M1 : départ en orbite, tableau des missions */
     /* premier rafraîchissement de la barre d'icônes — différé jusqu'ici
        (cf. commentaires dans initHudIconBar/initTouchControls) car il
        dépend d'orbitState et ROUTE, tous deux déclarés après ces IIFE. */

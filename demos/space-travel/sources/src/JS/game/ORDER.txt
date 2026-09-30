@@ -28,12 +28,14 @@
 ../demo/asteroids.js
 ../demo/stars.js
 20c-echelle-reelle.js
+20n-ports-orbitaux.js
 20d-commerce-local.js
 20e-carte-2d.js
 20f-greffons-vaisseau.js
 20g-survol-systeme.js
 20h-gros-plans.js
 20p-navette.js
+20q-missions.js
 20i-sequence-titre.js
 ../demo/starmap.js
 21-effets-de-saut-et.js

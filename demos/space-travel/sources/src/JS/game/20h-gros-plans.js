@@ -76,7 +76,10 @@ function hullLen(group){
 }
 function loadShot(L){
   const s = Math.random() < .5 ? -1 : 1, len = L.shuttle ? hullLen(L.shuttle.group) : shuttleLen();   /* longueur réelle de la navette */
-  return { type: 'shuttleLoad', dur: 3.4, t: 0, h: Math.random(), ship: true, eval: k => { const A = window.shipDockAnchor ? window.shipDockAnchor.getWorldPosition(new V3()) : shipRig.position.clone(), a = axes(), sl = len;
+  return { type: 'shuttleLoad', dur: 3.4, t: 0, h: Math.random(), ship: true, eval: k => {
+    if(L.pick){                                              /* prise sur la pile : du côté du conteneur, hors de la coque */
+      const Cp = L.container.getWorldPosition(new V3()), Sp = L.shuttle.group.getWorldPosition(new V3()), mid = Cp.clone().lerp(Sp, .5), a = axes();
+      return { pos: mid.clone().addScaledVector(a.rt, L.side*1.9*len).addScaledVector(a.up, -.7*len).addScaledVector(a.fw, -(1.2 + .3*k)*len), look: mid, up: a.up, fov: 44 }; } const A = window.shipDockAnchor ? window.shipDockAnchor.getWorldPosition(new V3()) : shipRig.position.clone(), a = axes(), sl = len;
     /* point visé pris sur les ancres DU VAISSEAU (à jour) : avant la saisie et après la pose, conteneur et navette sont
        replacés contre le dock plus tard dans l'image — leur position du moment a une image de retard, ≈ 330 m en orbite */
     let C = A;
@@ -150,7 +153,7 @@ function update(dt){
   /* plans automatiques des navettes pendant l'escale */
   if(flightPhase === 'ARRIVAL_PAUSE' && !arrivalSkip){
     const L = orbitState.loading;
-    if(L && L.container && S.loadShot !== L){ S.loadShot = L; S.auto = loadShot(L); }
+    if(L && L.container && (!L.pick || L.phase === 'pick') && S.loadShot !== L){ S.loadShot = L; S.auto = loadShot(L); }
     (orbitState.shuttles || []).forEach(sh => { if(sh.phase === 'outbound' && sh.group && !S.seen.has(sh) &&
       sh.group.getWorldPosition(new V3()).distanceTo(shipRig.position) > SHIP_GAME_LEN*.7){ S.seen.add(sh); S.auto = followShot(sh); } });   /* navette dégagée du vaisseau */
   }

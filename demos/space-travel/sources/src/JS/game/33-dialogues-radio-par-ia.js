@@ -103,7 +103,9 @@ function startOrbitDelivery(planet){
     if(s.trail){ LAYERS.detach(s.trail); s.trail.geometry.dispose(); s.trail.material.dispose(); }
   });
   orbitState.shuttles.length = 0;
-  orbitState.spawned = [false,false,false];
+  /* lot N2 : porte-conteneurs — une seule navette de baie (toute la cargaison de l'escale) ; ailleurs, trois navettes */
+  orbitState.spawnFractions = CARGO.hasBay() ? [0.04] : [0.08, 0.30, 0.52];   /* lot N2 : une navette de baie par escale (manœuvres lentes) ; sans baie : trois transferts directs */
+  orbitState.spawned = orbitState.spawnFractions.map(function(){ return false; });   /* taille réelle : sinon le paiement attend des navettes jamais lancées */
 
   const center = planet.position.clone();
   const toShip = shipRig.position.clone().sub(center);
@@ -148,6 +150,7 @@ function startOrbitDelivery(planet){
   orbitState.cargoSplit = split;
   orbitState.unitPrice = 180 + Math.floor(Math.random()*241);  /* 180 à 420 crédits */
   orbitState.creditsPaid = false;
+  if(typeof MISSIONS !== 'undefined') MISSIONS.setupEscale(orbitState);   /* M1 : cargaison et prime de la mission */
   orbitState.deliveredCount = 0;
   orbitState.loading = null;
 

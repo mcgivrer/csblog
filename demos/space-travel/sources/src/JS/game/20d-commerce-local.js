@@ -31,48 +31,46 @@ const LOCAL = (function(){
   const STATION_NAMES = ['Relais', 'Comptoir', 'Plateforme', 'Dépôt', 'Poste'];
 
   /* ---------- stations orbitales ---------- */
-  function stationMesh(seedR){
-    const g = new THREE.Group();
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(38, 5, 8, 20),
-      new THREE.MeshStandardMaterial({ color: 0x8a94a6, roughness: .55, metalness: .6 }));
-    ring.rotation.x = Math.PI/2; g.add(ring);
-    const hub = new THREE.Mesh(new THREE.CylinderGeometry(11, 11, 30, 12),
-      new THREE.MeshStandardMaterial({ color: 0xb8bfcc, roughness: .5, metalness: .4 }));
-    g.add(hub);
-    const winMat = new THREE.MeshBasicMaterial({ color: 0xffd28a });
-    for(let i = 0; i < 8; i++){
-      const a = i/8*Math.PI*2, w = new THREE.Mesh(new THREE.BoxGeometry(6, 3, 3), winMat);
-      w.position.set(Math.cos(a)*38, Math.sin(a)*38, 0); w.rotation.x = Math.PI/2; g.add(w);
-    }
-    for(let i = 0; i < 3; i++){
-      const a = i/3*Math.PI*2, spoke = new THREE.Mesh(new THREE.BoxGeometry(2.4, 2.4, 30),
-        new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: .6 }));
-      spoke.position.set(Math.cos(a)*19, Math.sin(a)*19, 0); spoke.lookAt(0, 0, 0); g.add(spoke);
-    }
-    const beacon = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xffb454, transparent: true, opacity: .95, depthWrite: false }));
-    beacon.scale.setScalar(9); beacon.position.set(0, 0, 22); g.add(beacon);
-    g.userData.beacon = beacon; g.userData.spin = .04 + seedR()*.03;
-    return g;
+  /* Lot P1 : les stations deviennent des PORTS ORBITAUX (20n-ports-orbitaux.js) — mêmes planètes, angles et noms
+     (même suite de tirages : le tirage de l'ancienne échelle choisit désormais l'archétype) ; altitude de la spec (§B.4) ;
+     une géante gazeuse destination de l'étape a toujours son port. Interface inchangée pour le commerce local. */
+  function addPort(leg, p, r, u, a, incl, archU, name, key){
+    const arch = PORTS.archetypeFor(p, archU), P = PORTS.build(arch, leg.cell + ':' + key), dist = PORTS.orbitRadius(p, u), g = P.group;
+    g.position.set(p.position.x + Math.cos(a)*dist, p.position.y + Math.sin(a)*dist*Math.sin(incl), p.position.z + Math.sin(a)*dist*Math.cos(incl));
+    PORTS.orient(g, g.position, p.position);
+    LAYERS.sysWorld.add(g);
+    leg.stations.push({ position: g.position, radius: P.radius, kind: { gas: false }, isStation: true, name: name,
+      beaconSprite: P.beacon, mesh: g, orbits: p, port: P });
   }
   function buildStations(leg){
     leg.stations = [];
     const r = rngFor(SEED + ':stations:' + leg.cell), notable = leg.planets.filter(p => p.isHabitable || p.kind.gas);
     notable.forEach(function(p, i){
-      if(r() > .55) return;                                        /* 0 à 2 stations par système, pas systématique */
-      const g = stationMesh(r), dist = p.radius*(9 + 5*r()), a = r()*Math.PI*2, incl = (r() - .5)*.6;
-      g.position.set(p.position.x + Math.cos(a)*dist, p.position.y + Math.sin(a)*dist*Math.sin(incl), p.position.z + Math.sin(a)*dist*Math.cos(incl));
-      g.scale.setScalar(1 + r()*.6);
-      LAYERS.sysWorld.add(g);
-      leg.stations.push({ position: g.position, radius: 45*g.scale.x, kind: { gas: false }, isStation: true,
-        name: STATION_NAMES[Math.floor(r()*STATION_NAMES.length)] + ' ' + String.fromCharCode(945 + i) + '-' + (1 + Math.floor(r()*9)),
-        beaconSprite: g.userData.beacon, mesh: g, orbits: p });
+      if(r() > .55) return;                                        /* 0 à 2 ports par système, pas systématique */
+      r();                                                         /* (ancien tirage de rotation, conservé pour la suite) */
+      const u = r(), a = r()*Math.PI*2, incl = (r() - .5)*.6, archU = r();
+      const name = STATION_NAMES[Math.floor(r()*STATION_NAMES.length)] + ' ' + String.fromCharCode(945 + i) + '-' + (1 + Math.floor(r()*9));
+      addPort(leg, p, r, u, a, incl, archU, name, i);
+    });
+    /* toute géante gazeuse reçoit un port (tour d'amarrage) : sans sol, son port orbital est le seul port possible —
+       et une géante peut être la destination d'un contrat local (la destination d'une étape, elle, est toujours
+       une planète habitable : la règle « géante destination de l'étape » ne s'appliquait jamais) */
+    leg.planets.forEach(function(p, i){
+      if(!(p.kind && p.kind.gas) || leg.stations.some(s => s.orbits === p)) return;
+      const r2 = rngFor(SEED + ':port-geante:' + leg.cell + ':' + i);
+      addPort(leg, p, r2, r2(), r2()*Math.PI*2, (r2() - .5)*.6, 0, STATION_NAMES[Math.floor(r2()*STATION_NAMES.length)] + ' Ω-' + (1 + Math.floor(r2()*9)), 'g' + i);
     });
   }
-  function updateStations(leg, dt){ (leg.stations || []).forEach(function(s){ s.mesh.rotation.z += s.mesh.userData.spin*dt; }); }
+  function updateStations(leg, dt){
+    const blink = (performance.now()/1000) % 1.6 < .18;             /* balise : éclat bref toutes les 1,6 s */
+    (leg.stations || []).forEach(function(s){ if(s.port && s.port.spin) s.port.spin.rotation.y += s.port.spinRate*dt;
+      if(s.beaconSprite) s.beaconSprite.material.opacity = blink ? 1 : .22; });
+  }
   function disposeStations(leg){
+    const shared = new Set(Object.values(PORTS.mats()));            /* matériaux partagés entre tous les ports : conservés */
     (leg.stations || []).forEach(function(s){
       LAYERS.detach(s.mesh);
-      s.mesh.traverse(function(o){ if(o.geometry) o.geometry.dispose(); if(o.material) o.material.dispose(); });
+      s.mesh.traverse(function(o){ if(o.geometry) o.geometry.dispose(); if(o.material && !shared.has(o.material)) o.material.dispose(); });
     });
   }
 

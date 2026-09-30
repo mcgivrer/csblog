@@ -44,6 +44,7 @@
     applyLanguage(); refreshCreditsDisplay(false);
     titleEl.classList.add('hidden'); titleEl.style.display = 'none';
     installShip(id, opts || {});
+    window.__sttMissions = !!(opts && opts.missions);   /* M1 : tests existants sur l'itinéraire, sauf option */
     document.body.classList.remove('title-active');
     shipRig.visible = true;
     if(ROUTE.gates) ROUTE.gates.visible = true;
@@ -156,6 +157,7 @@
     gameStarted = true;
     if(typeof TITLE !== 'undefined') TITLE.stop();   /* fin de la séquence de titre (distorsion, système affiché) */
     if(REAL.active) REAL.enterSystem(ROUTE.legs[0]);   /* L2.2 : vaisseau posé au point d'arrivée de la première étape */
+    if(REAL.active && typeof MISSIONS !== 'undefined'){ MISSIONS.setEnabled(window.__sttMissions !== false); if(MISSIONS.enabled()) MISSIONS.start(); }   /* M1 : départ en orbite, tableau des missions */
     /* premier rafraîchissement de la barre d'icônes — différé jusqu'ici
        (cf. commentaires dans initHudIconBar/initTouchControls) car il
        dépend d'orbitState et ROUTE, tous deux déclarés après ces IIFE. */

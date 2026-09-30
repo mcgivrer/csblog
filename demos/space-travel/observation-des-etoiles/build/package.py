@@ -1,6 +1,10 @@
 # Construit le zip du projet « Observation des étoiles » (sources, build, tests, docs, dernière version)
 import os, shutil, json, sys, subprocess
 VER = sys.argv[1] if len(sys.argv) > 1 else '6.6'
+import re as _re
+_d = os.path.dirname(os.path.abspath(__file__)); _lv = [q for q in (os.path.join(_d, 'live2.js'), os.path.join(_d, '..', 'src', 'live2.js')) if os.path.exists(q)]
+_mv = _re.search(r"var VERSION = 'v([^']+)'", open(_lv[0]).read()) if _lv else None
+if _lv and (not _mv or _mv.group(1) != VER): print('ATTENTION : version affichée (live2.js) =', _mv and _mv.group(1), '≠', VER)   # v7.7.1 : ligne de crédits
 SRC = os.path.dirname(os.path.abspath(__file__)); OUT = sys.argv[2] if len(sys.argv) > 2 else os.path.join(SRC, 'pkg')
 D = os.path.join(OUT, 'observation-des-etoiles'); shutil.rmtree(OUT, ignore_errors=True)
 for d in ['engine', 'src', 'build', 'tests', 'docs', 'dist']: os.makedirs(os.path.join(D, d), exist_ok=True)
@@ -36,7 +40,7 @@ bm = bm.replace("fs.writeFileSync('observation-des-etoiles.min.html', s);", "fs.
 assert "P('src', f)" in bm and "P('dist'" in bm and 'smallcraft.js' in bm
 open(os.path.join(D, 'build', 'build_min.js'), 'w').write(bm)
 shutil.copy(__file__, os.path.join(D, 'build', 'package.py'))
-T = {'t11.js': 'smoke.js', 't19k.js': 'longrun.js', 't12.js': 'shots.js', 't31.js': 'hangar.js', 't30.js': 'geode.js', 't33.js': 'fleet.js', 't34.js': 'drawcalls.js', 't38.js': 'framecalls.js', 't39.js': 'orientation.js', 't41.js': 'heroes.js', 't40.js': 'selector.js', 't43.js': 'map-api.js', 't44.js': 'map.js', 't45.js': 'map-jumps.js', 't46.js': 'map-mobile.js', 't47.js': 'map-stress.js', 't49.js': 'loading-fx.js', 't50.js': 'dof.js', 't51.js': 'gimbal-shake.js', 't52.js': 'jump-dof.js', 't53.js': 'cabins.js', 't54.js': 'suite.js', 't55.js': 'textures-inventory.js', 't56.js': 'textures.js', 't57.js': 'liveries.js', 't58.js': 'warp-rings.js', 't59.js': 'cme.js', 't60.js': 'ftl-means.js', 't61.js': 'interiors.js', 't62.js': 'military.js', 't63.js': 'military-2.js', 't64.js': 'carrier-views.js', 't65.js': 'carrier-demo.js'}
+T = {'t11.js': 'smoke.js', 't19k.js': 'longrun.js', 't12.js': 'shots.js', 't31.js': 'hangar.js', 't30.js': 'geode.js', 't33.js': 'fleet.js', 't34.js': 'drawcalls.js', 't38.js': 'framecalls.js', 't39.js': 'orientation.js', 't41.js': 'heroes.js', 't40.js': 'selector.js', 't43.js': 'map-api.js', 't44.js': 'map.js', 't45.js': 'map-jumps.js', 't46.js': 'map-mobile.js', 't47.js': 'map-stress.js', 't49.js': 'loading-fx.js', 't50.js': 'dof.js', 't51.js': 'gimbal-shake.js', 't52.js': 'jump-dof.js', 't53.js': 'cabins.js', 't54.js': 'suite.js', 't55.js': 'textures-inventory.js', 't56.js': 'textures.js', 't57.js': 'liveries.js', 't58.js': 'warp-rings.js', 't59.js': 'cme.js', 't60.js': 'ftl-means.js', 't61.js': 'interiors.js', 't62.js': 'military.js', 't63.js': 'military-2.js', 't64.js': 'carrier-views.js', 't65.js': 'carrier-demo.js', 't66.js': 'directing.js'}
 for a, b in T.items():
     s = open(os.path.join(SRC, a)).read()
     s = s.replace("require('/home/claude/.npm-global/lib/node_modules/playwright')", "require('playwright')")

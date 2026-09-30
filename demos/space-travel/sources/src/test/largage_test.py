@@ -25,9 +25,10 @@ PROBE = """() => {
   const rel = cont ? shipRig.worldToLocal(cont.getWorldPosition(new THREE.Vector3())).toArray() : null;
   /* longueur dans le repère PROPRE du conteneur (une boîte alignée sur le monde grandit quand il est incliné) */
   const clen = cont ? (() => { let L = 0; cont.traverse(o => { if(o.isMesh){ o.geometry.computeBoundingBox(); const sz = o.geometry.boundingBox.getSize(new THREE.Vector3()), ws = o.getWorldScale(new THREE.Vector3()); L = Math.max(L, sz.x*ws.x, sz.y*ws.y, sz.z*ws.z); } }); return L; })() : null;
-  return { rel, clen, q: S.group.quaternion.toArray(), cq: camera.quaternion.toArray(), ph: out ? 'vol' : 'chargement',
+  const cd = cont && cont.userData && cont.userData.cdims ? Math.max(...cont.userData.cdims) : null;
+  return { rel, clen, cd, pick: !!(L && L.pick), q: S.group.quaternion.toArray(), cq: camera.quaternion.toArray(), ph: out ? 'vol' : 'chargement',
            f: SHIP_GAME_LEN/40, cs, cmax: cb ? Math.max(cb.x, cb.y, cb.z) : null, hmax: hull.isEmpty() ? null : Math.max(...hull.getSize(new THREE.Vector3()).toArray()),
-           load: GP.state.auto && GP.state.auto.type === 'shuttleLoad' ? (() => { const n = window.shipDockAnchor.getWorldPosition(new THREE.Vector3()).project(camera); return Math.max(Math.abs(n.x), Math.abs(n.y)); })() : null,   /* position RÉELLE du dock dans l'image rendue, pas le point visé */
+           load: GP.state.auto && GP.state.auto.type === 'shuttleLoad' ? (() => { const P = (L && L.pick && L.container) ? L.container.getWorldPosition(new THREE.Vector3()) : (window.shipDockAnchor ? window.shipDockAnchor.getWorldPosition(new THREE.Vector3()) : shipRig.position.clone()); const n = P.project(camera); return Math.max(Math.abs(n.x), Math.abs(n.y)); })() : null,   /* position RÉELLE du sujet (conteneur en prise directe, sinon dock) */   /* position RÉELLE du dock dans l'image rendue, pas le point visé */
            trail: tr, gp: GP.state.auto ? GP.state.auto.type : null, gt: GP.state.auto ? GP.state.auto.t : -1, sid: GP.state.auto ? (GP.state.auto.__id || (GP.state.auto.__id = Math.random())) : 0 };
 }"""
 def qang(a, b):
@@ -46,12 +47,14 @@ with sync_playwright() as pw:
     pg.wait_for_function("() => REAL.started === true", timeout=60000, polling=250)
     pg.evaluate("() => { LAYERS.skipRender = true; window.__step(3); for(let i = 0; i < 900 && REAL.phase !== 'ORBIT'; i++) window.__step(1); for(let i = 0; i < 400 && !orbitState.loading; i++) window.__step(1, 33.3); }")
     S = []; shot = None
-    for i in range(420):   # 14 s à 30 images/s : chargement + départ + trajet
+    for i in range(7000):   # navette de baie : sortie, trajet, prise, écartement, vol — jusqu'au retour (≈ 3 min simulées)   # 14 s à 30 images/s : chargement + départ + trajet
         p = pg.evaluate("() => { window.__step(1, 33.3); return (" + PROBE + ")(); }")
         if p: S.append(p)
+        elif S and pg.evaluate("() => !orbitState.loading && !orbitState.shuttles.length"): break
         if p and p["ph"] == "vol" and p["gp"] == "shuttleFollow" and shot is None and len([x for x in S if x["gp"] == "shuttleFollow"]) > 40:
             u = pg.evaluate("() => { LAYERS.skipRender = false; window.__step(1, 33.3); const u = renderer.domElement.toDataURL('image/jpeg', .9); LAYERS.skipRender = true; return u; }")
             open(os.path.join(shots, f"largage_{tag}.jpg"), "wb").write(base64.b64decode(u.split(",")[1])); shot = True
+    pg_dock = pg.evaluate("() => !!window.shipDockAnchor || !!window.shipArm")
     br.close()
 f = S[0]["f"]
 cs = [x["cs"] for x in S if x["cs"]]; ratio = [x["cmax"]/x["hmax"] for x in S if x["cmax"] and x["hmax"]]
@@ -61,7 +64,7 @@ wC = [qang(a["cq"], b["cq"])*30 for a, b in zip(S, S[1:]) if a["gp"] == b["gp"] 
 trail = max([x["trail"] for x in S if x["ph"] == "vol"] or [0])
 shots_ok = True
 jumps = [math.dist(a["rel"], b["rel"]) for a, b in zip(S, S[1:]) if a.get("rel") and b.get("rel")]
-res0 = { "saut_conteneur_max_m": round(max(jumps or [0]), 2), "conteneur_long_m": round(max([x["clen"] for x in S if x.get("clen")] or [0]), 2) }
+res0 = { "saut_conteneur_max_m": round(max(jumps or [0]), 2), "conteneur_long_m": round(max([x["clen"] for x in S if x.get("clen")] or [0]), 2), "conteneur_pile_m": round(max([x["cd"] for x in S if x.get("cd")] or [0]), 2), "prise_directe": any(x.get("pick") for x in S) }
 res = { **res0, "echelle_vaisseau": round(f, 2), "echelle_conteneur_max": round(max(cs), 2), "conteneur/navette_max": round(max(ratio), 2),
         "rotation_navette_max_rad_s": round(max(wS), 2), "rotation_camera_suivi_max_rad_s": round(max(wC or [0]), 2), "trainee_max_m": round(trail, 1),
         "erreurs": errors[:2] }
@@ -72,12 +75,13 @@ fails = []
 def check(name, ok, info=""):
     print(("    PASS " if ok else "    FAIL ") + name + (f"  — {info}" if info != "" else ""))
     if not ok: fails.append(name)
-check("conteneur ISO 20' à l'échelle 1 (6,06 m, jamais agrandi)", abs(res["echelle_conteneur_max"] - 1) < .05 and abs(res["conteneur_long_m"] - 6.06) < .3, f"échelle {res['echelle_conteneur_max']} · {res['conteneur_long_m']} m")
+check("porte-conteneurs : prise directe, conteneur de la pile à l'échelle 1 (ses dimensions d'origine)", res["prise_directe"] and abs(res["echelle_conteneur_max"] - 1) < .05 and abs(res["conteneur_long_m"] - res["conteneur_pile_m"]) < max(.05, .08*res["conteneur_pile_m"]), f"échelle {res['echelle_conteneur_max']} · {res['conteneur_long_m']} m pour {res['conteneur_pile_m']} m dans la pile")
+check("aucun module d'amarrage sur un porte-conteneurs", not pg_dock, pg_dock)
 check("conteneur plus petit que la navette", res["conteneur/navette_max"] < .8, res["conteneur/navette_max"])
 check("navette sans bascule (rotation < 3 rad/s)", res["rotation_navette_max_rad_s"] < 3, res["rotation_navette_max_rad_s"])
 check("caméra de suivi sans à-coups (rotation < 3 rad/s)", 0 < res["rotation_camera_suivi_max_rad_s"] < 3, res["rotation_camera_suivi_max_rad_s"])
 check("traînée courte (panache, pas trajectoire)", res["trainee_max_m"] < 150, f"{res['trainee_max_m']} m")
-check("plan de chargement : le dock reste dans l'image", ld and max(ld) < .9, res["plan_chargement_ecart_max"])
+check("plan de prise : le conteneur reste dans l'image", ld and max(ld) < .9, res["plan_chargement_ecart_max"])
 check("chargement sans saut du conteneur (repère du vaisseau, par image)", res["saut_conteneur_max_m"] < 1.5, f"{res['saut_conteneur_max_m']} m au plus")
 check("aucune erreur JavaScript", not errors, errors[:2])
 sys.exit(1 if fails else 0)

@@ -53,6 +53,7 @@ function updateShuttleLoading(dt){
   const L = orbitState.loading;
   if(!L) return;
   L.t += dt;
+  if(L.bayFlow){ if(CARGO.updateBay(L, dt)){ launchLoadedShuttle(L.shuttle, L.id, L.shuttle.group.position.clone(), L.camSeq); orbitState.loading = null; } return; }   /* lot N2 : baie → pile → écartement */
 
   /* le dock et le stock sont solidaires du vaisseau, qui continue
      d'orbiter pendant le chargement : on les réaligne à chaque image
@@ -119,8 +120,10 @@ function launchLoadedShuttle(sh, id, dockPos, camSeq){
   orbitState.shuttles.push({
     id:id, group:sh.group, glow:sh.glow, navLights:sh.navLights,
     trail:sh.trail, trailHistory:[],
-    startPos:dockPos.clone(), t:0, duration:11+Math.random()*3, arcOffset:arcOffset,
-    camSeq:camSeq, phase:'outbound', rest:sh.rest || null, engineBack:sh.engineBack || 1.95, craft:sh.craft || null
+    startPos:dockPos.clone(), t:0, duration:sh.bay ? 14 + Math.random()*2 : 11+Math.random()*3, arcOffset:arcOffset,
+    camSeq:camSeq, phase:'outbound', rest:sh.rest || null, engineBack:sh.engineBack || 1.95, craft:sh.craft || null,
+    pickQ:sh.pickQ || null, outLocal:sh.outLocal || null, noReturn:!!sh.noReturn,
+    bay:sh.bay || null, dropD:sh.bay ? 6 : null, clearD:sh.bay ? 20 : null   /* lot N2 : départ lent près du vaisseau */
   });
 }
 
@@ -157,6 +160,14 @@ function updateShuttles(dt, elapsed){
   if(_shipDelta.lengthSq() > 1e12) _shipDelta.set(0, 0, 0);   /* changement de système : pas de report */
   for(let i=orbitState.shuttles.length-1; i>=0; i--){
     const s = orbitState.shuttles[i];
+    if(s.phase === 'enter'){                                   /* lot N2 : montée lente dans la baie, puis rangée */
+      if(CARGO.updateEnter(s, dt)){
+        LAYERS.detach(s.group); disposePlanetGroup(s.group);
+        if(s.trail){ LAYERS.detach(s.trail); s.trail.geometry.dispose(); s.trail.material.dispose(); }
+        orbitState.shuttles.splice(i, 1);
+      }
+      continue;
+    }
     s.t += dt;
     const f = Math.min(1, s.t/s.duration);
     const ease = f*f*(3-2*f);
@@ -182,27 +193,32 @@ function updateShuttles(dt, elapsed){
          l'éloignement doivent rester solidaires de sa position/orientation
          RÉELLE au moment présent, pas d'un instantané figé au largage. */
       _shipDown.set(0,-1,0).applyQuaternion(shipRig.quaternion);
+      if(s.outLocal) _shipDown.copy(s.outLocal).applyQuaternion(shipRig.quaternion);   /* prise sur la pile : on s'écarte latéralement */
       if(s.rest) _dockPosNow.copy(CARGO.shipPoint(s.rest));                  /* lot N : point de repos sous la pince */
       else if(window.shipDockAnchor) window.shipDockAnchor.getWorldPosition(_dockPosNow);
       else _dockPosNow.copy(shipRig.position);
 
-      if(f < OUTBOUND_DROP_FRAC){
+      if(s.bay){                                                /* lot N2 : départ calculé dans le repère du vaisseau (écartement lent déjà fait) */
+        const dp = CARGO.departPose(s, f, _shuttleTarget); pos = dp.pos; lookDir = dp.look;
+        const qa = s.pickQ ? shipRig.quaternion.clone().multiply(s.pickQ) : shipRig.quaternion.clone();
+        targetQ = qa.slerp(shuttleAttitude(dp.look, pos), Math.min(1, f/.25));
+      } else if(f < OUTBOUND_DROP_FRAC){
         /* phase 1 : translation verticale pure, part du centre du dock */
         const t2 = f/OUTBOUND_DROP_FRAC, e2 = t2*t2*(3-2*t2);
-        pos = _dockPosNow.clone().addScaledVector(_shipDown, DROP_D*e2);
+        pos = _dockPosNow.clone().addScaledVector(_shipDown, (s.dropD || DROP_D)*e2);
         lookDir = _shipDown;
-        targetQ = shipRig.quaternion.clone(); snap = true;   /* sortie de soute : attitude du vaisseau */
+        targetQ = s.pickQ ? shipRig.quaternion.clone().multiply(s.pickQ) : shipRig.quaternion.clone(); snap = true;   /* sortie : attitude du vaisseau (roulée si prise sur la pile) */
       } else if(f < OUTBOUND_CLEAR_FRAC){
         /* phase 2 : poursuite du même axe, la navette s'éloigne encore du cargo */
         const t2 = (f-OUTBOUND_DROP_FRAC)/(OUTBOUND_CLEAR_FRAC-OUTBOUND_DROP_FRAC), e2 = t2*t2*(3-2*t2);
-        pos = _dockPosNow.clone().addScaledVector(_shipDown, DROP_D + CLEAR_D*e2);
+        pos = _dockPosNow.clone().addScaledVector(_shipDown, (s.dropD || DROP_D) + (s.clearD || CLEAR_D)*e2);
         lookDir = _shipDown;
-        targetQ = shipRig.quaternion.clone().slerp(shuttleAttitude(_shuttleTarget.clone().sub(pos), pos), e2);   /* pivote vers sa route */
+        targetQ = (s.pickQ ? shipRig.quaternion.clone().multiply(s.pickQ) : shipRig.quaternion.clone()).slerp(shuttleAttitude(_shuttleTarget.clone().sub(pos), pos), e2);   /* pivote vers sa route */
       } else {
         /* phase 3 : dégagée du cargo, la navette amorce enfin sa descente
            vers le port — même lerp+arc qu'avant, mais reparti du point de
            dégagement plutôt que du dock lui-même */
-        _clearPos.copy(_dockPosNow).addScaledVector(_shipDown, DROP_D + CLEAR_D);
+        _clearPos.copy(_dockPosNow).addScaledVector(_shipDown, (s.dropD || DROP_D) + (s.clearD || CLEAR_D));
         const t2 = (f-OUTBOUND_CLEAR_FRAC)/(1-OUTBOUND_CLEAR_FRAC), e2 = t2*t2*(3-2*t2);
         pos = _clearPos.clone().lerp(_shuttleTarget, e2);
         pos.addScaledVector(s.arcOffset, Math.sin(Math.PI*t2));
@@ -212,9 +228,12 @@ function updateShuttles(dt, elapsed){
     } else {
       /* retour au dock : trajet inchangé, un simple lerp+arc suffit —
          la chorégraphie de départ ne concerne que la SORTIE de la baie */
+      if(s.bay){ const rp = CARGO.returnPose(s, f); pos = rp.pos; lookDir = rp.look; }   /* lot N2 : repère du vaisseau, arrivée à l'arrêt */
+      else {
       pos = s.startPos.clone().lerp(_shuttleTarget, ease);
       pos.addScaledVector(s.arcOffset, Math.sin(Math.PI*f));
       lookDir = _shuttleTarget.clone().sub(pos);
+      }
       targetQ = shuttleAttitude(lookDir, pos);
       if(f > .8){ const b = (f - .8)/.2; targetQ.slerp(shipRig.quaternion, b*b*(3 - 2*b)); }   /* réalignement pour l'arrimage */
     }
@@ -222,7 +241,8 @@ function updateShuttles(dt, elapsed){
 
     if(targetQ){
       if(snap) s.group.quaternion.copy(targetQ);
-      else s.group.quaternion.slerp(targetQ, 1 - Math.exp(-dt*4));   /* rotations lissées */
+      else s.group.quaternion.rotateTowards(targetQ, 1.6*dt);   /* lot N2 : vitesse de rotation PLAFONNÉE (1,6 rad/s) — la poursuite exponentielle
+                                                            faisait tourner à ~12 rad/s face à un demi-tour (retour du port) */   /* rotations lissées */
     }
     /* rétrécissement + fondu en fin de trajectoire : simulation d'un
        atterrissage — à la livraison comme à l'amerrissage au dock */
@@ -298,16 +318,23 @@ function updateShuttles(dt, elapsed){
           addCredits(total * orbitState.unitPrice);
           orbitState.creditsPaid = true;
         }
+        if(s.noReturn){                                             /* navette du port : reste au port */
+          LAYERS.detach(s.group); disposePlanetGroup(s.group);
+          if(s.trail){ LAYERS.detach(s.trail); s.trail.geometry.dispose(); s.trail.material.dispose(); }
+          orbitState.shuttles.splice(i, 1); continue;
+        }
         s.phase = 'returning';
         s.t = 0;
+        if(s.bay){ s.rest = s.bay.bayOut.clone(); s.pickQ = null; s.ret = null; s.enterPlan = null; }   /* lot N2 : retour vers le point sous la baie */
         s.startPos = pos.clone();
         s.arcOffset = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5)
           .normalize().multiplyScalar((50 + Math.random()*70)*REAL.shipScale());   /* échelle du vaisseau */
-        s.duration = 9 + Math.random()*2;
+        s.duration = s.bay ? 11 : 9 + Math.random()*2;
         s.group.scale.setScalar(1);
         s.glow.material.opacity = 1;
       } else {
         /* retour terminé : amerrissage au dock */
+        if(s.bay && s.phase === 'returning'){ s.phase = 'enter'; s.enterT = 0; continue; }   /* lot N2 : entrée lente en baie */
         LAYERS.detach(s.group);
         disposePlanetGroup(s.group);
         if(s.trail){ LAYERS.detach(s.trail); s.trail.geometry.dispose(); s.trail.material.dispose(); }

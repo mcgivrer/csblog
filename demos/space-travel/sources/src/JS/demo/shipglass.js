@@ -1,4 +1,4 @@
-/* Copie de la démo « Observation des étoiles » v7.2.2 (src/shipglass.js), inchangée : enveloppe SHIPGEN.build (auto-suffisante, détection des vitrages par géométrie/matériau — voir §L4). */
+/* Copie de la démo « Observation des étoiles » v7.2.2 (src/shipglass.js), une seule modification — table BELLY étendue aux 4 porte-conteneurs (lot N2, baie de la navette-cargo) ; enveloppe SHIPGEN.build (auto-suffisante, détection des vitrages par géométrie/matériau — voir §L4). */
 /* =====================================================================
    HUBLOTS, BAIES ET HANGARS RÉALISTES — option du générateur (sans modifier le moteur)
    Les vitrages plats du générateur (hublots lumineux, baies panoramiques, vitres de passerelle,
@@ -28,7 +28,13 @@ const BELLY = {
   tS:  { w: 10.2, h: 10.2, modL: 15.6, ch: .2929 },
   tM:  { w: 12.6, h: 12.6, modL: 16.8, ch: .2929 },
   tL:  { w: 16.8, h: 20.4, modL: 15.6, ch: .15 },
-  l20: { w: 20.4, h: 23.4, modL: 14.4, ch: .15 }
+  l20: { w: 20.4, h: 23.4, modL: 14.4, ch: .15 },
+  /* ajout du jeu (lot N2) — porte-conteneurs : baie ventrale de la navette-cargo (17,5 × 5,6 × 6,8 m) au point d'amarrage ;
+     modL fixé pour une ouverture de ~19,6 m (hx = 0,36 modL), w pour une demi-largeur ≥ 4 m, h pour 10 m de profondeur */
+  e18:  { w: 16.0, h: 16.0, modL: 27.2, ch: .15 },
+  e140: { w: 18.0, h: 18.0, modL: 27.8, ch: .15 },
+  p10:  { w: 13.9, h: 15.9, modL: 27.2, ch: .15 },
+  p44:  { w: 13.9, h: 15.8, modL: 27.2, ch: .15 }
 };
 
 /* formes d'ouverture (v7.2) — vS = (mode, cx, cy, décor) : mode 0 = rond ; 1 = polygone symétrique : rectangle (cx = cy = 0),

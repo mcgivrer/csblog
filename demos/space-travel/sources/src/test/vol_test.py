@@ -53,7 +53,7 @@ with sync_playwright() as pw:
     fuel0 = pg.evaluate("() => fuel"); cell0 = pg.evaluate("() => REAL.leg.cell")
     seq, samples, since, shot_at = [], [], {}, {"TRANSFER": 16, "APPROACH": 12, "ORBIT": 14, "DEPART": 6}
     shots_done = set()
-    for sec in range(320):
+    for sec in range(520):   # lot N2 : escale d'un vaisseau à baie ≈ 3 min (manœuvres lentes de la navette de baie)
         s = pg.evaluate(SAMPLE, 10); s["t"] = sec + 1; samples.append(s)
         if not seq or seq[-1] != s["ph"]: seq.append(s["ph"]); since[s["ph"] + str(len(seq))] = sec
         k = s["ph"]

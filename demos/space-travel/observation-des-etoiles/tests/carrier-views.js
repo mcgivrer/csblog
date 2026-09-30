@@ -11,6 +11,7 @@ const { chromium } = require('playwright');
  await p.route(/fonts\.g/, r=>r.abort());
  await p.goto(ROOT + (process.env.HTML || 'dist/observation-des-etoiles.html') + '?seed=OBS-1');
  await p.waitForFunction(()=>document.querySelector('#sttStart.ready'), null, {timeout:180000, polling:250});
+ await p.evaluate((t)=>{ window.__THR = t; }, +(process.env.THR || 0));
  const info = await p.evaluate(([kind, parked, sun])=>{
    document.getElementById('sttStart').style.display='none'; document.querySelectorAll('#sttTitle,#sttCap,#sttCredit').forEach(e=>e.style.display='none');
    const c = __CRAFT.build(kind, { age: .15, seed: 77 }); c.nav.forEach(n => n.mat.opacity = n.peak);
@@ -28,7 +29,7 @@ const { chromium } = require('playwright');
  }, [kind, parked, sun]);
  console.log(JSON.stringify(info));
  for(let i = 0; i < views.length; i++){
-   const calls = await p.evaluate(([v, hold])=>{ const { c, sc, cam, sz } = window.__cv; __CRAFT.TIME.value = 14.2;
+   const calls = await p.evaluate(([v, hold])=>{ const { c, sc, cam, sz } = window.__cv; __CRAFT.TIME.value = 14.2; const th = +(window.__THR || 0); SHIPGEN.DRIVE_U.uThrottle.value = th; if(c.extra.drive){ c.extra.drive.uThr.value = th; c.extra.drive.uHeat.value = th; } SHIPGEN.tick && SHIPGEN.tick(14.2, 0, 1);
      cam.fov = v[6] || 40; cam.aspect = sz.x/sz.y; cam.updateProjectionMatrix(); cam.position.set(v[0], v[1], v[2]); cam.lookAt(v[3], v[4], v[5]); cam.updateMatrixWorld();
      __CRAFT.setHold(new THREE.Vector3(), new THREE.Quaternion(), hold ? c.extra.hold : null, cam.position, cam.quaternion);
      renderer.autoClear = true; renderer.setRenderTarget(null); renderer.info.reset(); renderer.info.autoReset = false; renderer.render(sc, cam); const n = renderer.info.render.calls; renderer.info.autoReset = true; return n; }, [views[i], hold]);

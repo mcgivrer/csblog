@@ -110,7 +110,8 @@ function animate(){
      toujours filmés à leur position de l'image précédente — à ~30 km/s, une image de retard fait des centaines de
      mètres, et la compensation par extrapolation ne tient qu'à cadence parfaitement régulière (saccades en jeu) */
   updateShuttles(dt*arrivalTimeScale, elapsed);
-  if(REAL.active && REAL.started) REAL.update(dt);   /* L2.2 : système en mètres, caméra galactique */
+  if(REAL.active && REAL.started) REAL.update(dt);
+  if(typeof MISSIONS !== 'undefined') MISSIONS.update();   /* M1 : fin de mission, tableau à la mise en orbite */   /* L2.2 : système en mètres, caméra galactique */
 
   chunkAccum += dt;
   if(chunkAccum > 0.5){

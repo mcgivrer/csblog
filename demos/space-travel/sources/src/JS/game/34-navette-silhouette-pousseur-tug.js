@@ -149,6 +149,10 @@ const LOAD_T_RELEASE = 2.5;   /* dépose sur la pince de la navette */
    conteneur de stock, tous deux ancrés sur le dock/le point de stockage —
    qui suivent le vaisseau tant qu'il orbite, cf. updateShuttleLoading(). */
 function startShuttleLoading(withCutaway){
+  /* lot N2 : tous les vaisseaux lancent l'engin de leur baie (conteneur uniquement sur les porte-conteneurs) ;
+     sans baie (citernier) : livraison sans navette. Plus de module d'amarrage ni de bras. */
+  if(CARGO.startBay()) return;
+  CARGO.deliverDirect(); return;
   /* lot N : navette-cargo (P2) et conteneur ISO 20' réels, en mètres (plus de mise à l'échelle) */
   const sh = CARGO.buildCargoShuttle(_shuttleIdCounter + 11);
   const pts = CARGO.armPoints();
