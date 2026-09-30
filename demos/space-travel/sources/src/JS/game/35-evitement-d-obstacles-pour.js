@@ -347,7 +347,7 @@ function updateShuttles(dt, elapsed){
 /* ---------- position/orientation du vaisseau sur le cercle d'orbite ---------- */
 function updateOrbitDelivery(dt){
   const os = orbitState;
-  const angularSpeed = REAL.active ? Math.sqrt(os.planet.GM/Math.pow(os.radius, 3)) : (Math.PI*2)/ARRIVAL_PAUSE_DURATION;   /* L2.3 : arc en temps réel */
+  const angularSpeed = REAL.active ? (os.planet.GM ? Math.sqrt(os.planet.GM/Math.pow(os.radius, 3)) : FLIGHT.DOCK_SPEED/os.radius) : (Math.PI*2)/ARRIVAL_PAUSE_DURATION;   /* L2.3 : arc en temps réel ; lune, station ou planète sans GM (cible de mission) : vitesse d'approche fixe, comme R.plan */
   const _prevShip = REAL.active ? shipRig.position.clone() : null;
   const angle = pauseTimer*angularSpeed;
   const cosA = Math.cos(angle), sinA = Math.sin(angle);

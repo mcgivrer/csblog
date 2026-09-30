@@ -12453,16 +12453,17 @@ function showWelcomeMessage(){
   appendRadioLine({ from:'ship', label:SHIP_REGISTRY, text:text });
 }
 function buildRadioScript(planet){
-  const rng = rngFor(SEED+':radio:'+planet.seedNoise);
+  const rng = rngFor(SEED+':radio:'+(planet.seedNoise !== undefined ? planet.seedNoise : planet.name));
+  const city = planet.cityName || planet.properName || planet.name || '';   /* cibles de mission : station, lune, planète sans port */
   function pick(arr){ return arr[Math.floor(rng()*arr.length)]; }
   const R = RADIO_TEMPLATES[LANG] || RADIO_TEMPLATES.fr;
-  const tower = R.towerName(planet.cityName);
+  const tower = R.towerName(city);
   const ship = SHIP_REGISTRY;
   const msgs = [];
 
   /* 1. demande d'autorisation d'approche */
   msgs.push({t:0.02, from:'ship', label:ship, text: pick(R.hail(tower,ship))});
-  msgs.push({t:0.08, from:'tower', label:tower, text: pick(R.hailReply(tower,ship,planet.cityName))});
+  msgs.push({t:0.08, from:'tower', label:tower, text: pick(R.hailReply(tower,ship,city))});
 
   /* 2. coordination des transferts de conteneurs, calée sur les navettes */
   orbitState.spawnFractions.forEach(function(f, i){
@@ -12943,7 +12944,7 @@ async function getLLMSession(persona){
 }
 function llmPromptFor(entry, planet){
   return 'Contexte : ' + entry.label + ' vient de dire, pendant l\u2019approche du port de '
-    + planet.cityName + ' : "' + entry.text + '". Reformule ce message dans ton propre style, '
+    + (planet.cityName || planet.properName || planet.name || '') + ' : "' + entry.text + '". Reformule ce message dans ton propre style, '
     + 'en gardant le même sens et les mêmes informations concrètes (nombres, noms).';
 }
 /* lance la réécriture de chaque réplique en arrière-plan, dès la
@@ -13628,7 +13629,7 @@ function updateShuttles(dt, elapsed){
 /* ---------- position/orientation du vaisseau sur le cercle d'orbite ---------- */
 function updateOrbitDelivery(dt){
   const os = orbitState;
-  const angularSpeed = REAL.active ? Math.sqrt(os.planet.GM/Math.pow(os.radius, 3)) : (Math.PI*2)/ARRIVAL_PAUSE_DURATION;   /* L2.3 : arc en temps réel */
+  const angularSpeed = REAL.active ? (os.planet.GM ? Math.sqrt(os.planet.GM/Math.pow(os.radius, 3)) : FLIGHT.DOCK_SPEED/os.radius) : (Math.PI*2)/ARRIVAL_PAUSE_DURATION;   /* L2.3 : arc en temps réel ; lune, station ou planète sans GM (cible de mission) : vitesse d'approche fixe, comme R.plan */
   const _prevShip = REAL.active ? shipRig.position.clone() : null;
   const angle = pauseTimer*angularSpeed;
   const cosA = Math.cos(angle), sinA = Math.sin(angle);

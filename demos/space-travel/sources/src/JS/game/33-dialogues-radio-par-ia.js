@@ -67,7 +67,7 @@ async function getLLMSession(persona){
 }
 function llmPromptFor(entry, planet){
   return 'Contexte : ' + entry.label + ' vient de dire, pendant l\u2019approche du port de '
-    + planet.cityName + ' : "' + entry.text + '". Reformule ce message dans ton propre style, '
+    + (planet.cityName || planet.properName || planet.name || '') + ' : "' + entry.text + '". Reformule ce message dans ton propre style, '
     + 'en gardant le même sens et les mêmes informations concrètes (nombres, noms).';
 }
 /* lance la réécriture de chaque réplique en arrière-plan, dès la

@@ -23,16 +23,17 @@ function showWelcomeMessage(){
   appendRadioLine({ from:'ship', label:SHIP_REGISTRY, text:text });
 }
 function buildRadioScript(planet){
-  const rng = rngFor(SEED+':radio:'+planet.seedNoise);
+  const rng = rngFor(SEED+':radio:'+(planet.seedNoise !== undefined ? planet.seedNoise : planet.name));
+  const city = planet.cityName || planet.properName || planet.name || '';   /* cibles de mission : station, lune, planète sans port */
   function pick(arr){ return arr[Math.floor(rng()*arr.length)]; }
   const R = RADIO_TEMPLATES[LANG] || RADIO_TEMPLATES.fr;
-  const tower = R.towerName(planet.cityName);
+  const tower = R.towerName(city);
   const ship = SHIP_REGISTRY;
   const msgs = [];
 
   /* 1. demande d'autorisation d'approche */
   msgs.push({t:0.02, from:'ship', label:ship, text: pick(R.hail(tower,ship))});
-  msgs.push({t:0.08, from:'tower', label:tower, text: pick(R.hailReply(tower,ship,planet.cityName))});
+  msgs.push({t:0.08, from:'tower', label:tower, text: pick(R.hailReply(tower,ship,city))});
 
   /* 2. coordination des transferts de conteneurs, calée sur les navettes */
   orbitState.spawnFractions.forEach(function(f, i){
