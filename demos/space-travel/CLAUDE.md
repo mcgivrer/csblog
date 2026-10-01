@@ -42,6 +42,15 @@ node tests/longrun.js LONG-10   # 20 simulated minutes: errors, memory, shot-typ
 - Versioned deliverables (`observation-des-etoiles-vX.Y.html` / `.min.html`) are committed snapshots, one per notable feature increment — check `README.md`'s file table before assuming the latest `vX.Y` is what to edit; always edit `src/` + `build/`, then rebuild.
 - `package.json` `name`/`version` describes this specific demo release, unrelated to the main game's version number.
 
+## Release tagging
+
+Every release of either project must be tagged on `main` (annotated tag, `git tag -a`), once the release commit is on `main`:
+
+- `stt_vX.Y.Z` for *Space Travel & Transport* (e.g. `stt_v2.17.0`).
+- `ode_vX.Y.Z` for *Observation des étoiles* (e.g. `ode_v7.19.0`; `X.Y` matches `VERSION` in `src/live2.js`, patch is `0` unless a hotfix).
+
+Push the tags to **both** remotes: `git push origin <tag>` and `git push nex <tag>`.
+
 ## Conventions specific to this directory
 
 - Both engines are **French-first**; UI strings and TTS/radio dialogue originate in French with in-file translation tables (see root `AGENTS.md`).
