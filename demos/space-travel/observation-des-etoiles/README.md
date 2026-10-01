@@ -140,7 +140,7 @@ En démo, bouger la souris fait apparaître sept boutons discrets en haut à dro
 | Paramètre | Valeurs | Effet |
 |---|---|---|
 | `seed` | texte libre | Graine de l'univers : même graine = même univers **et** même film. Sans graine, un univers neuf à chaque chargement. |
-| `quality` | `low` · `high` | `low` : résolution plafonnée à 60 % (portables, GPU intégrés) et textures de coque 2× au lieu de 4×. `high` : jusqu'à 2× sur écrans haute densité. Par défaut : jusqu'à 1,5×. |
+| `quality` | `low` · `high` | `low` : résolution plafonnée à 60 % (portables, GPU intégrés) et textures de coque 2× au lieu de 4×. `high` : résolution imposée à 2× sur écrans haute densité, **sans adaptation dynamique** (image toujours nette, mais la fluidité peut chuter sur les gros plans planétaires). Par défaut : jusqu'à 1,5×, abaissée automatiquement si le débit baisse. |
 | `music` | `0` | Coupe la musique. |
 | `traffic` | `0` | Supprime le trafic ambiant (navettes, remorqueurs, cargos) et les relais entre vaisseaux. |
 | `relay` | `0` à `1` | Probabilité de relais vers un autre vaisseau à chaque système (défaut 0,6 ; relais toujours imposé après 2 systèmes avec le même héros, sauf en mode Suivre). |

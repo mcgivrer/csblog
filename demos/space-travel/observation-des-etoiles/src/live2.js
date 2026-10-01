@@ -207,6 +207,7 @@
   var Q = new URLSearchParams(location.search).get('quality');
   var prMax = Math.min(window.devicePixelRatio || 1, Q === 'high' ? 2 : 1.5) * (Q === 'low' ? .6 : 1), pr = prMax, ema = 16.7, lastAdj = 0;
   function adaptResolution(now, frameMs){
+    if(Q === 'high') return;                                            // ?quality=high : résolution imposée, aucune adaptation
     ema = ema*0.92 + Math.min(frameMs, 100)*0.08;
     if(now - lastAdj < 700) return;
     var old = pr;
