@@ -45,6 +45,13 @@
     "#sttFleet button{display:block;width:100%;text-align:left;margin:0 0 8px;padding:10px 12px;background:#0f1a30;border:1px solid #25375c;color:#e8edf5;font:inherit;cursor:pointer}" +
     "#sttFleet button b{display:block;font-size:12px;letter-spacing:.1em;color:#ffb454}#sttFleet button span{font-size:11px;color:#8ea0c4}" +
     "#sttFleet button:hover,#sttFleet button:focus-visible{border-color:#ffb454;outline:none}#sttFleet button.x{text-align:center;color:#8ea0c4;margin:4px 0 0}" +
+    "#sttHelp{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:20;display:none;width:min(720px,94vw);max-height:92vh;overflow:auto;font-family:'JetBrains Mono',monospace;background:rgba(11,18,32,.97);border:1px solid #25375c;border-left:2px solid #5eead4;padding:16px 18px 14px}" +
+    "#sttHelp.on{display:block}#sttHelp .hd{display:flex;justify-content:space-between;align-items:center;font-size:11px;letter-spacing:.14em;color:#5eead4;margin-bottom:10px}" +
+    "#sttHelp .hd button{font:inherit;letter-spacing:inherit;background:#0f1a30;border:1px solid #25375c;color:#8ea0c4;padding:4px 10px;cursor:pointer}#sttHelp .hd button:hover,#sttHelp .hd button:focus-visible{border-color:#ffb454;color:#ffb454;outline:0}" +
+    "#sttHelp .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:4px 22px}#sttHelp h3{margin:10px 0 4px;font-size:10.5px;font-weight:400;letter-spacing:.14em;color:#ffb454}" +
+    "#sttHelp .r{display:flex;gap:10px;align-items:baseline;font-size:11px;line-height:1.55;color:#c9d4ea}#sttHelp .r .ky{flex:0 0 160px;text-align:right;white-space:nowrap}" +
+    "#sttHelp kbd{display:inline-block;min-width:18px;padding:0 5px;margin-left:3px;text-align:center;font:inherit;font-size:10.5px;color:#e8edf5;background:#0f1a30;border:1px solid #25375c;border-bottom-width:2px}" +
+    "#sttHelp .ft{margin-top:10px;font-size:10px;letter-spacing:.08em;color:#5d6f92}" +
     "@media (prefers-reduced-motion: reduce){#sttUi,#sttToast{transition:none}}";
   document.head.appendChild(css);
   function el(id, html){ var d = document.createElement('div'); d.id = id; d.innerHTML = html; return d; }
@@ -53,7 +60,7 @@
   var cap = el('sttCap', '<span class="ship"><span class="ty"></span> / <span class="nm"></span> <span class="sep">--</span> </span><span class="loc"></span><span class="tl"></span>');
   var credit = el('sttCredit', ''); credit.textContent = CREDIT;
   var pause = el('sttPause', 'PAUSE');
-  var ui = el('sttUi', '<button type="button" id="sttMapBtn">MAP<span class="k">M</span></button><button type="button" id="sttRadarBtn">RADAR<span class="k">R</span></button><button type="button" id="sttShipBtn">SHIP<span class="k">C</span></button><button type="button" id="sttFleetBtn">FLEET<span class="k">G</span></button><button type="button" id="sttDataBtn">DATA<span class="k">H</span></button><button type="button" id="sttLockBtn">AUTO<span class="k">L</span></button>'); ui.className = 'demo-ui';
+  var ui = el('sttUi', '<button type="button" id="sttMapBtn">MAP<span class="k">M</span></button><button type="button" id="sttRadarBtn">RADAR<span class="k">R</span></button><button type="button" id="sttShipBtn">SHIP<span class="k">C</span></button><button type="button" id="sttFleetBtn">FLEET<span class="k">G</span></button><button type="button" id="sttDataBtn">DATA<span class="k">D</span></button><button type="button" id="sttLockBtn">AUTO<span class="k">L</span></button><button type="button" id="sttHelpBtn">HELP<span class="k">H</span></button>'); ui.className = 'demo-ui';
   var toast = el('sttToast', ''); toast.className = 'demo-ui';
   /* v7.5 : panneau FLEET — suivre une formation militaire dans le système courant (ou au suivant si le départ est engagé) */
   var fleet = el('sttFleet', '<div class="hd">// MILITARY FLEET</div>' +
@@ -70,7 +77,50 @@
     '<button type="button" data-k="combat-assault"><b>CARRIER ASSAULT</b><span>Destroyer and fighters against a fleet carrier\'s defences</span></button>' +
     '<button type="button" data-k="close" class="x">CLOSE · Esc</button>');
   fleet.className = 'demo-ui'; fleet.setAttribute('role', 'dialog'); fleet.setAttribute('aria-label', 'Military fleet');
-  function mount(){ [start, title, cap, credit, pause, ui, toast, fleet].forEach(function(e){ document.body.appendChild(e); }); start.querySelector('.cr').textContent = CREDIT; }
+  /* aide (touche H, bouton HELP) : toutes les touches et actions de la démo */
+  function K(){ return Array.prototype.map.call(arguments, function(k){ return '<kbd>' + k + '</kbd>'; }).join(' '); }
+  function row(keys, what){ return '<div class="r"><span class="ky">' + keys + '</span><span>' + what + '</span></div>'; }
+  var help = el('sttHelp',
+    '<div class="hd"><span>// KEYS &amp; ACTIONS</span><button type="button" data-k="close" aria-label="Close help">CLOSE <kbd>Esc</kbd></button></div>' +
+    '<div class="cols"><div>' +
+    '<h3>DEMO</h3>' +
+    row(K('Space'), 'Pause / resume (music included)') +
+    row(K('F'), 'Fullscreen') +
+    row(K('L'), 'AUTO (relays between ships) / FOLLOW (the filmed ship stays the hero)') +
+    row(K('D'), 'DATA: ship labels and gauges on / off (remembered)') +
+    row(K('R'), 'Radar on / off') +
+    row(K('H'), 'This help (<kbd>H</kbd> or <kbd>Esc</kbd> closes it)') +
+    '<h3>PANELS</h3>' +
+    row(K('M'), 'Universe map (<kbd>M</kbd> or <kbd>Esc</kbd> closes)') +
+    row(K('G'), 'FLEET: military patrols, ship carrier, combat engagements') +
+    row(K('V'), 'Ship selector: choose the hero ship') +
+    row(K('C'), 'Shipyard: all ship types, 3D preview, age and wear sliders') +
+    '<h3>START SCREEN</h3>' +
+    row(K('Enter') + ' ' + K('Space'), 'Launch the demo') +
+    row(K('V') + ' ' + K('C'), 'Choose a ship / open the shipyard first') +
+    '</div><div>' +
+    '<h3>MAP</h3>' +
+    row('Wheel, ' + K('+') + ' ' + K('−'), 'Zoom') +
+    row('Drag, ' + K('←') + K('↑') + K('↓') + K('→'), 'Pan') +
+    row(K('Backspace'), 'Up one level (sector, system…)') +
+    row(K('C') + ' ' + K('Home'), 'Back to the current system') +
+    row(K('Enter'), 'Act on the selected target (follow, jump…)') +
+    row('Touch', 'Drag, pinch to zoom, double-tap to act') +
+    row(K('Space') + ' ' + K('F') + ' ' + K('R'), 'Still work while the map is open') +
+    '<h3>SHIP SELECTOR</h3>' +
+    row(K('←') + ' ' + K('→'), 'Previous / next ship') +
+    row(K('↑') + ' ' + K('↓'), 'Propulsion') +
+    row(K('Enter'), 'Board the ship') +
+    row(K('Esc'), 'Cancel') +
+    '<h3>SHIPYARD &amp; FLEET</h3>' +
+    row(K('←') + K('↑') + K('↓') + K('→'), 'Move through the shipyard list') +
+    row(K('Esc'), 'Close the shipyard or the fleet panel') +
+    '<h3>MOUSE</h3>' +
+    row('Move', 'Shows the buttons: MAP, RADAR, SHIP, FLEET, DATA, AUTO, HELP') +
+    '</div></div>' +
+    '<div class="ft">All other keys and mouse input are disabled: the demo runs on its own.</div>');
+  help.className = 'demo-ui'; help.setAttribute('role', 'dialog'); help.setAttribute('aria-label', 'Keys and actions');
+  function mount(){ [start, title, cap, credit, pause, ui, toast, fleet, help].forEach(function(e){ document.body.appendChild(e); }); start.querySelector('.cr').textContent = CREDIT; }
   if(document.body) mount(); else document.addEventListener('DOMContentLoaded', mount);
 
   var running = false, paused = false, last = 0, capKey = '', tlTxt = null, ready = false, selOpen = false, selCancel = false, uiTimer = 0, toastTimer = 0;
@@ -111,6 +161,10 @@
                             : '<span class="a">RELAY</span> · ' + nm + ' <span class="c">takes over at the next system</span>');
     });
   }
+  var helpOpen = false;
+  function openHelp(){ if(selOpen || yardOpen) return; helpOpen = true; help.classList.add('on'); var b = help.querySelector('button'); b && b.focus(); }
+  function closeHelp(){ helpOpen = false; help.classList.remove('on'); if(document.activeElement && document.activeElement.blur) document.activeElement.blur(); }
+  help.addEventListener('click', function(e){ if(e.target.closest('button')) closeHelp(); });
   var fleetOpen = false;
   function openFleet(){ if(!running || selOpen) return; if(window.__STARMAP && __STARMAP.isOpen()) __STARMAP.close(); fleetOpen = true; fleet.classList.add('on'); var b = fleet.querySelector('button'); b && b.focus(); }
   function closeFleet(){ fleetOpen = false; fleet.classList.remove('on'); }
@@ -135,7 +189,7 @@
   function pokeUi(){ if(!running) return; ui.classList.add('on'); clearTimeout(uiTimer); uiTimer = setTimeout(function(){ ui.classList.remove('on'); }, 2600); }
   window.addEventListener('mousemove', pokeUi, { passive: true });
   ui.addEventListener('click', function(e){ var b = e.target.closest('button'); if(!b) return; b.blur();
-    if(b.id === 'sttShipBtn') openYard(); else if(b.id === 'sttFleetBtn') openFleet(); else if(b.id === 'sttLockBtn') toggleFollow(); else if(b.id === 'sttMapBtn') openMap(); else if(b.id === 'sttRadarBtn') toggleRadar(); else if(b.id === 'sttDataBtn') toggleData(); pokeUi(); });
+    if(b.id === 'sttShipBtn') openYard(); else if(b.id === 'sttFleetBtn') openFleet(); else if(b.id === 'sttLockBtn') toggleFollow(); else if(b.id === 'sttMapBtn') openMap(); else if(b.id === 'sttRadarBtn') toggleRadar(); else if(b.id === 'sttDataBtn') toggleData(); else if(b.id === 'sttHelpBtn') openHelp(); pokeUi(); });
   ui.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
   /* facteur d'accélération du temps (⏱ ×N) : mis à jour en continu, sans refaire le fondu de la légende */
   function setTimeLapse(c){ var t = c && c.tl ? '\u23f1 ' + c.tl : ''; if(t !== tlTxt){ tlTxt = t; cap.querySelector('.tl').textContent = t; } }
@@ -187,6 +241,8 @@
   window.__onKey = function(e){
     if(selOpen){ if(e.key === 'Escape') cancelSelector(); return; }
     if(yardOpen){ if(e.key === 'Escape' && window.__YARD) __YARD.close(null); return; }
+    if(helpOpen){ if(e.key === 'Escape' || e.key === 'h' || e.key === 'H') closeHelp(); return; }
+    if(e.key === 'h' || e.key === 'H'){ openHelp(); return; }
     if(fleetOpen){ if(e.key === 'Escape' || e.key === 'g' || e.key === 'G') closeFleet(); return; }
     if(window.__STARMAP && __STARMAP.isOpen()){                         // carte ouverte : ses raccourcis, plus pause et plein écran
       if(e.key === ' '){ setPaused(!paused); return; }
@@ -201,7 +257,7 @@
     if(e.key === 'm' || e.key === 'M'){ openMap(); return; }
     if(e.key === 'g' || e.key === 'G'){ openFleet(); return; }
     if(e.key === 'r' || e.key === 'R'){ toggleRadar(); return; }
-    if(e.key === 'h' || e.key === 'H'){ toggleData(); return; }
+    if(e.key === 'd' || e.key === 'D'){ toggleData(); return; }
     if(e.key === 'l' || e.key === 'L'){ toggleFollow(); return; }
     if(e.key === ' '){ setPaused(!paused); }
     if(e.key === 'f' || e.key === 'F') fullscreen();

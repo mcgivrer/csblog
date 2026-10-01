@@ -96,7 +96,7 @@ observation-des-etoiles/
 │   ├── cine.js                            simulation, réalisateur, rendu en couches, combats, API carte et radar
 │   ├── starmap.js                         carte de l'univers (canevas 2D : secteur, système, orbite)
 │   ├── radar.js                           radar du vaisseau filmé
-│   ├── shiplabels.js                      étiquettes et jauges des vaisseaux (bouton DATA, touche H)
+│   ├── shiplabels.js                      étiquettes et jauges des vaisseaux (bouton DATA, touche D)
 │   ├── shipyard.js                        chantier : tous les vaisseaux, aperçu 3D, âge et usure (bouton SHIP, touche C)
 │   └── live2.js                           ④ écran d'accueil (barre de chargement), boucle temps réel, légende
 ├── build/build.py · build_min.js · package.py   assemblage → dist/, zip du projet
@@ -123,12 +123,13 @@ Reconstruire : `python3 build/build.py` (aucune dépendance) puis `npm install` 
 | `L` | Mode **Auto** (relais entre vaisseaux) / **Suivre** (le vaisseau filmé reste le héros) |
 | `M` | Carte de l'univers (ouvrir / fermer ; aussi `Échap`) — dans la carte : molette ou `+` `−` zoom, glisser ou flèches pour se déplacer, `Retour arrière` niveau supérieur, `C` système courant, `Entrée` action sur la cible |
 | `R` | Radar (affiché par défaut) |
-| `H` | **DATA** : étiquettes et jauges au-dessus des vaisseaux proches (affichées par défaut, choix mémorisé) |
+| `D` | **DATA** : étiquettes et jauges au-dessus des vaisseaux proches (affichées par défaut, choix mémorisé) |
+| `H` | **Aide** : dialogue listant toutes les touches et actions de la démo (`H` ou `Échap` ferme) |
 | `G` | Panneau **FLEET** : suivre une patrouille de chasseurs, un destroyer en station, une corvette d'escorte, le **porte-vaisseaux** ou un **engagement** (escarmouche, duel, convoi, pirates, assaut de porteur) (`Échap` ferme) |
 | `Espace` | Pause / reprise (musique comprise) |
 | `F` | Plein écran |
 
-En démo, bouger la souris fait apparaître six boutons discrets en haut à droite (**MAP**, **RADAR**, **SHIP**, **FLEET**, **DATA**, **AUTO/FOLLOW**). Sur écran tactile, la carte se manipule au doigt (glisser, pincer, double-tap). Toutes les autres entrées clavier / souris sont neutralisées : le jeu tourne « en arrière-plan » mais ne peut pas être démarré par erreur.
+En démo, bouger la souris fait apparaître sept boutons discrets en haut à droite (**MAP**, **RADAR**, **SHIP**, **FLEET**, **DATA**, **AUTO/FOLLOW**, **HELP**). Sur écran tactile, la carte se manipule au doigt (glisser, pincer, double-tap). Toutes les autres entrées clavier / souris sont neutralisées : le jeu tourne « en arrière-plan » mais ne peut pas être démarré par erreur.
 
 ---
 
@@ -579,7 +580,7 @@ Chaque vaisseau a une **énergie** (le réacteur, entamée par la poussée), un 
   - parfois un **jet de gaz** de 3 à 7 s.
 - **Coût** : tous ces effets tiennent en un seul nuage de points additif (1 appel de dessin, 900 particules au plus).
 
-**Étiquettes et jauges** (`shiplabels.js`, bouton **DATA**, touche `H`)
+**Étiquettes et jauges** (`shiplabels.js`, bouton **DATA**, touche `D`)
 
 - **Contenu** : au-dessus des vaisseaux proches à l'écran, le nom, la faction ou l'armateur, une jauge de **coque** (couleur selon l'état, bouclier en liseré bleu pour les militaires) et une jauge d'**énergie**. Mention *DISABLED* en rouge pour un vaisseau désemparé.
 - **Quels vaisseaux** : au plus 8, le vaisseau filmé en premier. Les étiquettes sont masquées en gros plan, dans les travellings et pour ce qui est à bord d'un porteur, et décalées quand elles se chevauchent.
@@ -1139,7 +1140,7 @@ Alternative écartée : le *logarithmic depth buffer* de three.js aurait imposé
 - Une ceinture réelle est invisible dans son ensemble : seul un amas local est montré de près.
 - RCS : seules les buses radiales des blocs sont animées (pas de roulis pur) ; les navettes du jeu n'ont pas de blocs RCS.
 - Porte-vaisseaux : le vaisseau du poste 2 reste garé (seul le poste 1 reçoit des escales) ; le visiteur revient avec le même nom et la même livrée d'une escale à l'autre ; pas de bras d'avitaillement (le portique vient au-dessus du poste) ; une première apparition au début de l'approche peut se voir de loin (≈ 1 km) ; en voyage, le passager n'a pas ses engins de baie, et un vaisseau choisi au sélecteur pendant l'orbite apparaît directement amarré (embarquement non filmé) ; un porteur choisi au sélecteur pendant un voyage arrête ce voyage (l'ancien porteur reste en orbite avec son passager) ; l'ombre de soute ne concerne que le volume du dock (la coque n'ombre pas un vaisseau à couple, un vaisseau garé n'ombre pas le pont) et un seul porteur à la fois (le plus proche de la caméra).
-- Combat (v7.13–v7.17) : le porte-vaisseaux ne lance pas ses propres chasseurs (il n'a pas de hangar) et l'assaut exige un porteur militaire ; les étiquettes ne sont pas masquées par les coques ou les planètes qui passent devant et se superposent dans les plans larges (touche `H`) ; les points chauds sont posés sur la boîte de la coque ; le drone-cible se répare par magie entre deux exercices ; les traçantes et les traînées ne sont pas occultées par les coques (effet additif) ; les effets et les dégâts utilisent un hasard non graine (même graine = même plan de combat, pas forcément la même issue) ; les chasseurs d'escorte suivent encore la trajectoire d'un assaillant désemparé ou détruit (en tirant sur un autre) ; les débris ne se heurtent pas et ne sont pas incandescents (les braises en tiennent lieu) ; les chasseurs ne se brisent pas (ils explosent) ; la cassure suit les triangles de la coque (dents larges là où la coque a de grandes faces) et son fond sombre est un disque plat ; les tronçons ne se heurtent pas.
+- Combat (v7.13–v7.17) : le porte-vaisseaux ne lance pas ses propres chasseurs (il n'a pas de hangar) et l'assaut exige un porteur militaire ; les étiquettes ne sont pas masquées par les coques ou les planètes qui passent devant et se superposent dans les plans larges (touche `D`) ; les points chauds sont posés sur la boîte de la coque ; le drone-cible se répare par magie entre deux exercices ; les traçantes et les traînées ne sont pas occultées par les coques (effet additif) ; les effets et les dégâts utilisent un hasard non graine (même graine = même plan de combat, pas forcément la même issue) ; les chasseurs d'escorte suivent encore la trajectoire d'un assaillant désemparé ou détruit (en tirant sur un autre) ; les débris ne se heurtent pas et ne sont pas incandescents (les braises en tiennent lieu) ; les chasseurs ne se brisent pas (ils explosent) ; la cassure suit les triangles de la coque (dents larges là où la coque a de grandes faces) et son fond sombre est un disque plat ; les tronçons ne se heurtent pas.
 - Mémoire (v7.19) : stable sur 2 h simulées en rendu logiciel ; des sessions de plusieurs heures sur GPU réel restent à observer (pilotes, caches du navigateur).
 - Chantier (v7.18) : l'aperçu est un studio (grille, deux lumières), pas la lumière du système visité ; les vignettes sont refaites à chaque rechargement de la page ; l'aspect choisi pour un porte-vaisseaux déjà en orbite remplace le sien ; l'aperçu d'un vaisseau du jeu montre la même coque et la même livrée que le vaisseau qui rejoint la scène, mais le nom et l'immatriculation sont tirés à ce moment-là.
 - Flotte militaire : exercices sans destruction ; le panneau FLEET remplace un onglet du sélecteur du jeu (celui-ci reste limité aux 10 modèles du catalogue) ; les traçantes ne sont pas occultées par les coques (effet additif) ; les formations sont rigides (décalages fixes dans le repère du chef) et la ronde des chasseurs autour du destroyer se fait en temps réel même en accéléré.
