@@ -336,6 +336,11 @@
       hit(X, Y, pr + 3, Object.assign({}, p, { kind: 'planet', pkind: p.kind, cell: info.cell, nShips: grp.length }), 3);
       label(g, placed, p.name, X + pr*.6, Y, F(10.5, p.hab ? 700 : 400), '#e8edf5', true, (KIND_EN[p.kind] || p.kind) + (grp.length ? ' · ' + grp.length + ' ship' + (grp.length > 1 ? 's' : '') : ''), grp.length ? '#5eead4' : '#5d6f92');
       if(hero) label(g, placed, '▲ ' + hero.name, X, Y - pr - 10, F(9.5), '#ffb454', false); });
+    // v7.12 : escale interplanétaire — trajet de la planète d'arrivée à la planète d'escale (tireté ambre, plein une fois parcouru)
+    if(cur && ms.stop && ms.stop.path && ms.stop.path.length > 1){ const pts = ms.stop.path.map(q => P(Math.hypot(q[0], q[1], q[2]), Math.atan2(dot(q, info.basis.l), dot(q, info.basis.s)))), n = pts.length - 1, fi = ms.stop.frac*n;
+      const seg = (i0, i1, dash, a) => { g.strokeStyle = 'rgba(255,180,84,' + a + ')'; g.lineWidth = 1.4; g.setLineDash(dash); g.beginPath(); for(let i = Math.floor(i0); i <= Math.ceil(i1); i++){ const p = pts[Math.min(n, i)]; if(i === Math.floor(i0)) g.moveTo(p[0], p[1]); else g.lineTo(p[0], p[1]); } g.stroke(); g.setLineDash([]); };
+      if(fi > 0) seg(0, fi, [], .6); if(fi < n) seg(fi, n, [5, 4], .9);                       // parcouru : plein ; reste : tireté
+      const mid = pts[Math.round(n/2)]; label(g, placed, 'STOPOVER → ' + ms.stop.toName, mid[0], mid[1], F(9), '#ffb454', false); }
     // vaisseaux en transit (hors des orbites planétaires)
     loose.forEach(s => { const r = Math.hypot(s.pos[0], s.pos[1], s.pos[2]), a = Math.atan2(dot(s.pos, info.basis.l), dot(s.pos, info.basis.s)), [X, Y] = P(r, a);
       const fa = Math.atan2(-dot(s.fwd, info.basis.l), dot(s.fwd, info.basis.s)); chevron(g, X, Y, fa, s.craft ? 3.5 : 5, s.hero ? '#ffb454' : (s.mil ? '#ff6b5e' : '#5eead4'));
@@ -444,7 +449,7 @@
     } else if(o.kind === 'ship'){
       const all = liveShips(), s = all.find(x => x.uid === o.uid) || o, hero = all.find(x => x.hero);
       h = '<div class="nm' + (s.hero ? ' a' : '') + '">' + esc(s.name) + '</div>' + (s.hero ? '<span class="tag a">HERO</span>' : '') + (s.subj ? '<span class="tag c">ON SCREEN</span>' : '') + (s.mil ? '<span class="tag" style="color:#ff6b5e;border-color:#ff6b5e">MILITARY</span>' : '') +
-        ln('Type', esc(s.type)) + ln('Registration', esc(s.reg)) + ln('Length', Math.round(s.len) + ' m') + (hero && !s.hero ? ln('From the hero', C.fmtU(dist3(hero.pos, s.pos))) : '') + ln('Phase', esc(s.seg));
+        ln('Type', esc(s.type)) + ln('Registration', esc(s.reg)) + ln('Length', Math.round(s.len) + ' m') + (s.carrying && s.carrying.length ? ln('Aboard', esc(s.carrying.join(', '))) : '') + (hero && !s.hero ? ln('From the hero', C.fmtU(dist3(hero.pos, s.pos))) : '') + ln('Phase', esc(s.seg));
       a = btn('▶ SEND CAMERA', 'go');
     }
     info.innerHTML = h; acts.innerHTML = a;
@@ -453,7 +458,7 @@
     if(b.dataset.a === 'go') act(S.sel);
     else if(b.dataset.a === 'sys'){ const s = S.sel; enterSystem(s.cell, S.W/2, S.H/2); }
     else if(b.dataset.a === 'orb'){ const s = S.sel, h = S.hits.find(x => x.o && okey(x.o) === okey(s)); enterPlanet(s.i, h ? h.x : S.W/2, h ? h.y : S.H/2); } });
-  const PH = { arrival: 'arrival', orbit: 'in orbit', departure: 'departing', jump: 'quantum jump', warp: 'superluminal' };
+  const PH = { arrival: 'arrival', orbit: 'in orbit', stopover: 'stopover transfer', departure: 'departing', jump: 'quantum jump', warp: 'superluminal' };
   function voyage(){ const ms = S.ms; if(!ms) return;
     const d = Math.hypot(ms.next.gal[0] - ms.cur.gal[0], ms.next.gal[1] - ms.cur.gal[1], ms.next.gal[2] - ms.cur.gal[2]);
     const h = ln('Hero', esc(ms.hero.name)) + ln('', esc(ms.hero.type) + ' · ' + esc(ms.hero.reg)) + ln('At', esc(ms.cur.name) + ' · ' + PH[ms.phase]) +

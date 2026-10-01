@@ -27,8 +27,20 @@ Pas de HUD imposé : l'univers est généré en continu, des vaisseaux y circule
 
 | Fichier | Contenu |
 |---|---|
-| `observation-des-etoiles-v7.7.1.html` | Version courante (**échelle réelle**, **RCS**, **vaisseaux vieillis**, **moteurs réalistes**, **gros plans**, **géode pulsante**, **hublots et hangars réalistes**, **baies à champ de force**, **petits engins**, **sélecteur de vaisseaux**, **carte de l'univers**, **radar**, **profondeur de champ**, **tuyères orientables**, **tremblement de caméra**, **barre de chargement**, **une pièce par cabine**, **géode en rotation**, **textures haute résolution**, **hublots hexagonaux**, **livrées sombres**, **anneaux de distorsion en rotation**, **départ en distorsion avec traînée et gerbe violettes**, **intérieurs à trois ambiances**, **flotte militaire**, **catapultage et exercices de tir**, **panneau FLEET**, **porte-vaisseaux à dock traversant**, **travellings planétaires lents et éclipses rares**), code de la démo lisible et commenté |
-| `observation-des-etoiles-v7.7.1.min.html` | Même version, scripts de la démo minifiés (terser) et CSS compacté |
+| `observation-des-etoiles-v7.19.html` | Version courante (**échelle réelle**, **RCS**, **vaisseaux vieillis**, **moteurs réalistes**, **gros plans**, **géode pulsante**, **hublots et hangars réalistes**, **baies à champ de force**, **petits engins**, **sélecteur de vaisseaux**, **carte de l'univers**, **radar**, **profondeur de champ**, **tuyères orientables**, **tremblement de caméra**, **barre de chargement**, **une pièce par cabine**, **géode en rotation**, **textures haute résolution**, **hublots hexagonaux**, **livrées sombres**, **anneaux de distorsion en rotation**, **départ en distorsion avec traînée et gerbe violettes**, **intérieurs à trois ambiances**, **flotte militaire**, **catapultage et exercices de tir**, **panneau FLEET**, **porte-vaisseaux à dock traversant**, **travellings planétaires lents et éclipses rares**, **propulsion hard SF du porte-vaisseaux**, **plans-séquences : révélation, anneaux, tour du système**, **escale au porte-vaisseaux : rangement et sortie à couple**, **voyage à bord d'un porte-vaisseaux**, **escale interplanétaire**, **factions, étiquettes et jauges, dégâts et impacts**, **engagements : escarmouche de chasseurs et duel de destroyers**, **attaque de convoi, raid de pirates, assaut de porte-vaisseaux**, **destruction : boule de feu, onde de choc, débris, ralenti**, **coques brisées en tronçons à la dérive**, **chantier : les 23 types de vaisseaux, âge et usure réglables**, **mémoire stable sur de longues sessions**), code de la démo lisible et commenté |
+| `observation-des-etoiles-v7.19.min.html` | Même version, scripts de la démo minifiés (terser) et CSS compacté |
+| `observation-des-etoiles-v7.18.html` / `.min.html` | Avec la fuite mémoire (≈ +120 Mo de tas par heure simulée, un système entier retenu par visite) |
+| `observation-des-etoiles-v7.17.html` / `.min.html` | Sans chantier (sélecteur du jeu seulement : 10 modèles) ; âge seul, sans usure distincte |
+| `observation-des-etoiles-v7.16.html` / `.min.html` | Destruction sans coque brisée (le vaisseau disparaît d'un bloc derrière l'éclair) |
+| `observation-des-etoiles-v7.15.html` / `.min.html` | Sans destruction (les vaisseaux vaincus restent désemparés) |
+| `observation-des-etoiles-v7.14.html` / `.min.html` | Escarmouche et duel seulement (ni convoi, ni pirates, ni assaut de porteur) |
+| `observation-des-etoiles-v7.13.html` / `.min.html` | Sans engagements (dégâts et étiquettes seulement sur les exercices de tir) |
+| `observation-des-etoiles-v7.12.html` / `.min.html` | Sans factions, étiquettes ni dégâts (exercices de tir sans effet sur la cible) |
+| `observation-des-etoiles-v7.11.html` / `.min.html` | Sans escale interplanétaire (une seule planète par système) |
+| `observation-des-etoiles-v7.10.html` / `.min.html` | Sans voyage à bord (le porteur ne quitte jamais son système) |
+| `observation-des-etoiles-v7.9.html` / `.min.html` | Sans escale au porte-vaisseaux (vaisseau garé immobile, pinces figées) |
+| `observation-des-etoiles-v7.8.html` / `.min.html` | Sans les plans-séquences de la v7.9 |
+| `observation-des-etoiles-v7.7.1.html` / `.min.html` | Porte-vaisseaux à 4 moteurs, destroyer et corvette à tuyères simples |
 | `observation-des-etoiles-v7.7.html` / `.min.html` | Sans numéro de version dans la ligne de crédits |
 | `observation-des-etoiles-v7.6.2.html` / `.min.html` | Réalisation précédente (une éclipse tentée dans chaque système, travellings de 7 à 11 s) |
 | `observation-des-etoiles-v7.6.1.html` / `.min.html` | Porte-vaisseaux à tuyères simples (petits engins) |
@@ -60,15 +72,15 @@ Chaque fichier est **autonome** (≈ 7 Mo) : moteur du jeu, three.js r128, musiq
 
 Seules les polices *JetBrains Mono* / *Inter* sont chargées depuis Google Fonts (police système en repli si hors ligne).
 
-La ligne de crédits (écran d'accueil et bas de l'écran) indique la version : `… Observation des étoiles v7.7.1`.
+La ligne de crédits (écran d'accueil et bas de l'écran) indique la version : `… Observation des étoiles v7.19`.
 
-### Package source (`observation-des-etoiles-v7.7.1-projet.zip`)
+### Package source (`observation-des-etoiles-v7.19-projet.zip`)
 
 ```
 observation-des-etoiles/
 ├── README.md                              ce document
-├── observation-des-etoiles-v7.7.1.html    version lisible (prête à ouvrir)
-├── observation-des-etoiles-v7.7.1.min.html version minifiée
+├── observation-des-etoiles-v7.19.html     version lisible (prête à ouvrir)
+├── observation-des-etoiles-v7.19.min.html version minifiée
 ├── package.json                           outils : terser, clean-css, playwright (tests)
 ├── engine/game.html                       build v2.15 du jeu (moteur, three.js r128, musique) — entrée du build, jamais modifiée
 ├── src/                                   code de la démo, dans l'ordre d'assemblage
@@ -81,16 +93,18 @@ observation-des-etoiles/
 │   ├── warships.js                        flotte militaire : chasseur, corvette, destroyer (tourelles, hangars), drone-cible
 │   ├── carrier.js                         porte-vaisseaux civil ou militaire : dock traversant, postes, ombre de soute
 │   ├── postfx.js                          profondeur de champ (passes plein écran)
-│   ├── cine.js                            simulation, réalisateur, rendu en couches, API carte et radar
+│   ├── cine.js                            simulation, réalisateur, rendu en couches, combats, API carte et radar
 │   ├── starmap.js                         carte de l'univers (canevas 2D : secteur, système, orbite)
 │   ├── radar.js                           radar du vaisseau filmé
+│   ├── shiplabels.js                      étiquettes et jauges des vaisseaux (bouton DATA, touche H)
+│   ├── shipyard.js                        chantier : tous les vaisseaux, aperçu 3D, âge et usure (bouton SHIP, touche C)
 │   └── live2.js                           ④ écran d'accueil (barre de chargement), boucle temps réel, légende
 ├── build/build.py · build_min.js · package.py   assemblage → dist/, zip du projet
 ├── tests/                                 harnais Playwright + SwiftShader (rendu logiciel)
-└── docs/                                  planches d'images des versions 6.1 à 7.7
+└── docs/                                  planches d'images des versions 6.1 à 7.19
 ```
 
-Reconstruire : `python3 build/build.py` (aucune dépendance) puis `npm install` et `node build/build_min.js` ; les fichiers sortent dans `dist/`. Tests : `node tests/smoke.js` (démarrage et 200 s de simulation sur la version minifiée), `node tests/longrun.js LONG-10` (20 min simulées : erreurs, mémoire, types de plans), `node tests/shots.js OBS-8 30:bay@1:1 34:keep` (plans forcés — ici une sortie de baie —, captures), `node tests/hangar.js l20 0.5 "…"` (vaisseau isolé sous plusieurs angles), `node tests/geode.js`, `node tests/fleet.js`, `node tests/drawcalls.js` (objets par modèle), `node tests/framecalls.js` (appels de dessin par image), `node tests/orientation.js OBS-2` (nez / vitesse par phase), `node tests/heroes.js LONG-10` (rotation des héros), `node tests/selector.js` (sélecteur, clavier et souris), `node tests/map-api.js` (API de la carte), `node tests/map.js` (carte à la souris : niveaux, sélection, double-clic, prochain saut ; radar), `node tests/map-jumps.js OBS-5` (changement de cible en distorsion, saut en attente, nébuleuse, lune), `node tests/map-mobile.js` (téléphone, tactile, paysage, version minifiée, mouvement réduit) `node tests/map-stress.js` (double-tap, pincement, 200 ouvertures, mémoire, coûts), `node tests/loading-fx.js` (barre de chargement, cardans, tremblement), `node tests/dof.js OBS-3 engineClose,hullDolly` (même image avec et sans profondeur de champ, coût), `node tests/gimbal-shake.js` (cardans pendant un retournement, allumage) `node tests/jump-dof.js` (saut filmé en gros plan : flou + lentille, erreurs GL), `node tests/cabins.js` (cabines reconstituées pour chaque modèle, rotation de la géode) `node tests/suite.js l20` (gros plans d'une suite et d'une cabine confort), `node tests/textures-inventory.js` (inventaire des textures : taille, répétition, densité en pixels par mètre) `node tests/textures.js 1 hd` / `0 sd` (mêmes gros plans avec et sans textures HD), `node tests/liveries.js tM "jeu,anthracite,nuit,noir"` (un modèle en plusieurs livrées, au soleil et côté ombre) `node tests/warp-rings.js OBS-1` (départ en distorsion filmé : pré-charge, charge, rotation, champ), `node tests/cme.js OBS-1` (éjection de masse coronale filmée) `node tests/ftl-means.js OBS-2` (départs selon l'équipement réel, sélecteur : vedette sans moyens de saut, bascule saut → distorsion, relais au système suivant) `node tests/military.js OBS-4` (système avec station, patrouille et escorte : plans de formation et de tourelle, carte et radar), `node tests/military-2.js OBS-4` (exercice de tir ouvert à la demande et filmé, tourelle en tir, catapultage d'un chasseur depuis le hangar du destroyer, panneau FLEET au clic), `node tests/carrier-views.js carrier e18 "x,y,z,lx,ly,lz,fov;…" cv ".7,.6,-.3" 1` (porte-vaisseaux isolé avec un vaisseau garé, soleil et ombre de soute au choix, appels de dessin) `node tests/carrier-demo.js OBS-4 c6 civil` (porte-vaisseaux dans la démo : plans `dockPass`, `dockInterior`, `dockBerth`, ombre de soute, entrée SHIP CARRIER du panneau FLEET) et `node tests/directing.js OBS-4 r7 20` (contre-champ d'arrivée, lever de planète, terminateur, travelling planétaire, dérive planétaire ; statistiques sur 20 min simulées : éclipses par système, durées moyennes des plans) et `node tests/interiors.js l20 0.2 int 0` (gros plans à travers un hublot, une passerelle, une baie panoramique et les hangars ; ambiance forcée en 4ᵉ argument, `DIST=0.75` pour coller à la vitre).
+Reconstruire : `python3 build/build.py` (aucune dépendance) puis `npm install` et `node build/build_min.js` ; les fichiers sortent dans `dist/`. Tests : `node tests/smoke.js` (démarrage et 200 s de simulation sur la version minifiée), `node tests/longrun.js LONG-10` (20 min simulées : erreurs, mémoire, types de plans), `node tests/shots.js OBS-8 30:bay@1:1 34:keep` (plans forcés — ici une sortie de baie —, captures), `node tests/hangar.js l20 0.5 "…"` (vaisseau isolé sous plusieurs angles), `node tests/geode.js`, `node tests/fleet.js`, `node tests/drawcalls.js` (objets par modèle), `node tests/framecalls.js` (appels de dessin par image), `node tests/orientation.js OBS-2` (nez / vitesse par phase), `node tests/heroes.js LONG-10` (rotation des héros), `node tests/selector.js` (sélecteur, clavier et souris), `node tests/map-api.js` (API de la carte), `node tests/map.js` (carte à la souris : niveaux, sélection, double-clic, prochain saut ; radar), `node tests/map-jumps.js OBS-5` (changement de cible en distorsion, saut en attente, nébuleuse, lune), `node tests/map-mobile.js` (téléphone, tactile, paysage, version minifiée, mouvement réduit) `node tests/map-stress.js` (double-tap, pincement, 200 ouvertures, mémoire, coûts), `node tests/loading-fx.js` (barre de chargement, cardans, tremblement), `node tests/dof.js OBS-3 engineClose,hullDolly` (même image avec et sans profondeur de champ, coût), `node tests/gimbal-shake.js` (cardans pendant un retournement, allumage) `node tests/jump-dof.js` (saut filmé en gros plan : flou + lentille, erreurs GL), `node tests/cabins.js` (cabines reconstituées pour chaque modèle, rotation de la géode) `node tests/suite.js l20` (gros plans d'une suite et d'une cabine confort), `node tests/textures-inventory.js` (inventaire des textures : taille, répétition, densité en pixels par mètre) `node tests/textures.js 1 hd` / `0 sd` (mêmes gros plans avec et sans textures HD), `node tests/liveries.js tM "jeu,anthracite,nuit,noir"` (un modèle en plusieurs livrées, au soleil et côté ombre) `node tests/warp-rings.js OBS-1` (départ en distorsion filmé : pré-charge, charge, rotation, champ), `node tests/cme.js OBS-1` (éjection de masse coronale filmée) `node tests/ftl-means.js OBS-2` (départs selon l'équipement réel, sélecteur : vedette sans moyens de saut, bascule saut → distorsion, relais au système suivant) `node tests/military.js OBS-4` (système avec station, patrouille et escorte : plans de formation et de tourelle, carte et radar), `node tests/military-2.js OBS-4` (exercice de tir ouvert à la demande et filmé, tourelle en tir, catapultage d'un chasseur depuis le hangar du destroyer, panneau FLEET au clic), `node tests/carrier-views.js carrier e18 "x,y,z,lx,ly,lz,fov;…" cv ".7,.6,-.3" 1` (porte-vaisseaux isolé avec un vaisseau garé, soleil et ombre de soute au choix, appels de dessin) `node tests/carrier-demo.js OBS-4 c6 civil` (porte-vaisseaux dans la démo : plans `dockPass`, `dockInterior`, `dockBerth`, ombre de soute, entrée SHIP CARRIER du panneau FLEET) `node tests/long-takes.js OBS-4 s9 20` (révélation, tour du système, survol des anneaux : captures en séquence ; statistiques de plans sur 20 min), `node tests/carrier-berth.js OBS-4 b10 civil 6` (escale au poste 1 : chaque phase imposée puis filmée — approche, glissement, pinces, amarré, sortie, allumage — avec l'état des pinces, des champs, de l'onde, du portique et les appels de dessin ; statistiques de plans), `node tests/carrier-berth-directing.js OBS-7 ba civil 10 8` (plans d'escale choisis par le réalisateur, captures), `node tests/carrier-trip.js OBS-4 tr 4` (voyage à bord : journal des visites — départ du porteur avec son passager, arrivée, débarquement, tour libre, réembarquement —, captures des phases, carte et radar « à bord de », saut avec les vaisseaux à bord, sélecteur en mode Suivre), `node tests/memory.js LONG-7 3600` (mémoire sur une longue session simulée, pas à pas par tâches : tas après ramasse-miettes, objets three.js vivants, vaisseaux libérés mais encore retenus, géométries et textures GPU ; verdict STABLE ou FUITE), `node tests/shipyard-ui.js OBS-4` (chantier : 23 types et leurs vignettes, aperçu à différents âges et usures, `Échap`, vaisseau choisi — modèle du jeu, engin, porte-vaisseaux — avec son aspect dans la scène ; `MOBILE=1` : téléphone), `node tests/hull-break.js duel OBS-4` (coque brisée imposée : découpe préparée pendant l'épave — triangles, durée —, tronçons, maillages par tronçon, plan `hulkPass` ; `CAP=1` : épave, rupture, feu, tronçons à 9 s et 30 s, appels de dessin), `node tests/destruction.js duel OBS-4` / `skirmish` (destruction imposée : explosions, débris, messages ; `CAP=1` : séquence filmée autour d'une explosion — épave, rupture, boule de feu, onde, débris — et ralenti), `node tests/combat-scenarios.js convoy OBS-4` / `raid` / `assault` (déroulé et issue — repli, fuite des pirates —, messages, plans choisis, appels de dessin ; `CAP=1` : captures des plans `strafeRun`, `convoyPass`, `patrolArrival`…), `node tests/combat.js skirmish OBS-4` / `duel` (engagement demandé au panneau FLEET puis filmé : camps, traçantes, missiles, interceptions, désemparés, fin d'engagement ; `CAP=1` pour les captures des plans d'engagement), `node tests/combat-damage.js OBS-4 k17` (exercice de tir : bouclier puis coque de la cible jusqu'au désemparé et au cessez-le-feu, chasseur désemparé, étiquettes, coût, touche H), `node tests/stopover.js OBS-1 st 3` (escale forcée : planètes A et B, distance et durée physique, continuité de la trajectoire aux raccords, captures des deux raccords filmés et de l'orbite B, phase et trajet sur la carte) et `node tests/directing.js OBS-4 r7 20` (contre-champ d'arrivée, lever de planète, terminateur, travelling planétaire, dérive planétaire ; statistiques sur 20 min simulées : éclipses par système, durées moyennes des plans) et `node tests/interiors.js l20 0.2 int 0` (gros plans à travers un hublot, une passerelle, une baie panoramique et les hangars ; ambiance forcée en 4ᵉ argument, `DIST=0.75` pour coller à la vitre).
 
 ---
 
@@ -104,15 +118,17 @@ Reconstruire : `python3 build/build.py` (aucune dépendance) puis `npm install` 
 | Touche | Action |
 |---|---|
 | `Entrée` / `Espace` (écran d'accueil) | Lancer |
-| `V` | Sélecteur de vaisseaux (accueil ou démo) : `←` `→` vaisseau, `↑` `↓` propulsion, `Entrée` embarquer, `Échap` annuler |
+| `C` | **Chantier** (v7.18, bouton **SHIP**) : les 23 types de vaisseaux, aperçu 3D, curseurs d'âge et d'usure ; `←` `→` `↑` `↓` dans la liste, `Échap` ferme |
+| `V` | Sélecteur du jeu (accueil ou démo, 10 modèles) : `←` `→` vaisseau, `↑` `↓` propulsion, `Entrée` embarquer, `Échap` annuler |
 | `L` | Mode **Auto** (relais entre vaisseaux) / **Suivre** (le vaisseau filmé reste le héros) |
 | `M` | Carte de l'univers (ouvrir / fermer ; aussi `Échap`) — dans la carte : molette ou `+` `−` zoom, glisser ou flèches pour se déplacer, `Retour arrière` niveau supérieur, `C` système courant, `Entrée` action sur la cible |
 | `R` | Radar (affiché par défaut) |
-| `G` | Panneau **FLEET** : suivre une patrouille de chasseurs, un destroyer en station, une corvette d'escorte ou le **porte-vaisseaux** (`Échap` ferme) |
+| `H` | **DATA** : étiquettes et jauges au-dessus des vaisseaux proches (affichées par défaut, choix mémorisé) |
+| `G` | Panneau **FLEET** : suivre une patrouille de chasseurs, un destroyer en station, une corvette d'escorte, le **porte-vaisseaux** ou un **engagement** (escarmouche, duel, convoi, pirates, assaut de porteur) (`Échap` ferme) |
 | `Espace` | Pause / reprise (musique comprise) |
 | `F` | Plein écran |
 
-En démo, bouger la souris fait apparaître cinq boutons discrets en haut à droite (**MAP**, **RADAR**, **SHIP**, **FLEET**, **AUTO/FOLLOW**). Sur écran tactile, la carte se manipule au doigt (glisser, pincer, double-tap). Toutes les autres entrées clavier / souris sont neutralisées : le jeu tourne « en arrière-plan » mais ne peut pas être démarré par erreur.
+En démo, bouger la souris fait apparaître six boutons discrets en haut à droite (**MAP**, **RADAR**, **SHIP**, **FLEET**, **DATA**, **AUTO/FOLLOW**). Sur écran tactile, la carte se manipule au doigt (glisser, pincer, double-tap). Toutes les autres entrées clavier / souris sont neutralisées : le jeu tourne « en arrière-plan » mais ne peut pas être démarré par erreur.
 
 ---
 
@@ -135,6 +151,12 @@ En démo, bouger la souris fait apparaître cinq boutons discrets en haut à dro
 | `military` | `0` · `1` · `all` · `station` · `patrol` · `escort` | Présence militaire : `0` aucune, `1` dans chaque système (scénario tiré au hasard), `all` les trois scénarios partout, ou un scénario précis. Par défaut : ≈ 6 systèmes sur 10. |
 | `eclipse` | `0` à `1` | Probabilité qu'un système ait droit à une éclipse (défaut 0,15, jamais deux systèmes de suite ; `1` = tentée dans chaque système, `0` = jamais). |
 | `carrier` | `0` · `1` · `civil` · `mil` | Porte-vaisseaux : `0` aucun, `1` dans chaque système, `civil` / `mil` dans chaque système avec cette identité. Par défaut : ≈ 1 système sur 3, civil ou militaire au hasard. |
+| `stopover` | `0` · `1` | Escale interplanétaire (v7.12) : `0` jamais, `1` dès que possible. Par défaut : ≈ 3 visites sur 10 parmi celles qui s'y prêtent (ni voyage à bord, ni choix en attente). |
+| `combat` | `0` · `1` · `skirmish` · `duel` · `convoy` · `raid` · `assault` | Engagement (v7.14, v7.15) : `0` jamais, `1` dans chaque système (scénario au hasard), ou un scénario imposé partout. Par défaut : ≈ 1 système sur 5 parmi ceux qui s'y prêtent (ni voyage à bord, ni escale interplanétaire, ni choix en attente) ; tirage : escarmouche 28 %, duel 22 %, convoi 20 %, pirates 18 %, assaut 12 %. |
+| `destroy` | `0` · `1` | Destruction (v7.16) : `0` jamais (les vaincus restent désemparés), `1` toute épave militaire explose. Par défaut : chasseur 60 %, corvette 50 %, destroyer 40 %. |
+| `slowmo` | `0` | Pas de ralenti sur les destructions filmées. |
+| `hullbreak` | `0` · `1` | Coques brisées (v7.17) : `0` jamais (explosion complète), `1` toute corvette ou tout destroyer détruit se brise. Par défaut : destroyer 70 %, corvette 55 % des destructions. |
+| `trip` | `0` · `1` | Voyage à bord d'un porte-vaisseaux (v7.11) : `0` jamais, `1` dès qu'un porteur est là et qu'un relais est prévu, et réembarquement systématique. Par défaut : en mode Auto, 1 relais sur 2 quand un porteur est là, réembarquement 1 fois sur 2. |
 | `livery` | `dark` · `light` · `anthracite` · `nuit` · `bouteille` · `bordeaux` · `noir` · `acier` · `jeu` | Impose la livrée : `dark` = palettes sombres tirées au hasard, `light` / `jeu` = couleurs du jeu, ou une palette précise. Par défaut : ≈ 30 % de vaisseaux sombres selon la famille. |
 | `age` | `0` à `1` | Impose l'âge de toute la flotte (0 = sortie de chantier, 0,5 = usée, 1 = épaves en fin de vie). Par défaut : mélange réaliste. |
 
@@ -220,6 +242,12 @@ Les travellings de découverte représentent environ un plan sur quatre (plus so
 - **Dérive planétaire** (nouveau, avec vaisseau) : en orbite, 12 à 18 s ; la planète en grand sous l'horizon, le vaisseau petit au premier tiers, caméra co-mobile qui dérive latéralement.
 - **Contre-champ d'arrivée** (nouveau, arrivées par saut, une fois sur trois) : la caméra attend devant le point d'arrivée et regarde vers l'arrière ; le quadrillage se creuse au fond de l'image, l'éclair, puis le vaisseau vient vers la caméra ; coupé au début du transfert.
 - Mesuré sur 2 × 20 min simulées : 3 éclipses pour 32 systèmes, jamais consécutives ; travellings planétaires 16 à 20 s en moyenne, levers de planète ≈ 18 s, terminateurs ≈ 21 s, dérives planétaires ≈ 11–13 s.
+
+#### Plans-séquences — v7.9
+
+- **Révélation** (avec le vaisseau, en orbite, côté jour) : 20 à 30 s d'un seul tenant — la caméra part au ras de la coque, s'en écarte, puis recule et monte en grue sur une courbe continue jusqu'à placer le vaisseau entre elle et la planète : la surface apparaît derrière lui, la focale se resserre (58° → 42°).
+- **Survol des anneaux** : à quelques centaines de km du plan des anneaux, côté éclairé, la caméra file vers l'intérieur ; le plan translucide s'étend jusqu'à l'horizon et les anneaux traversent le disque de la planète géante (planètes à anneaux seulement).
+- **Tour du système** (sans vaisseau) : vol documentaire accéléré — survol d'une planète à 2,2–2,8 rayons, traversée rapide, survol d'une autre ; légende « System tour — A → B ».
 
 #### Gros plans — v6.4
 
@@ -332,6 +360,8 @@ Les vitrages du générateur étaient des rectangles et des disques lumineux pla
 - **Une cabine, une pièce** (v7.0) : le générateur répartit les cabines d'un modèle par module habité et par pont (la cabine d'indice *i* va au module *e* et au pont *n* tels que *i* mod (modules × ponts) = *e* × ponts + *n*), chacune sur une tranche égale du module ; standard = 1 hublot, confort = 2, suite = 3, panoramique = une baie. `shipglass.js` rejoue cette répartition (table des modules, ponts et cabines de chaque modèle) et rattache chaque hublot à sa cabine : ses hublots partagent la même boîte de pièce, la même graine (éclairage, mobilier, occupant, store) ; cloison de 16 cm entre deux cabines voisines ; les suites, plus profondes, gagnent un canapé et une table basse. Vérifié sur les 10 modèles (comptes du catalogue du jeu : 2, 3, 4, 6, 9, 20 cabines) ; si les comptes ne correspondaient pas (autre version du jeu), repli automatique sur une pièce par hublot.
 
 ### Sélecteur de vaisseaux — v6.7
+
+*Depuis la v7.18, le bouton **SHIP** ouvre le chantier (touche `C`, voir plus haut) ; le sélecteur du jeu reste sur `V`.*
 
 - **Le sélecteur du jeu, réutilisé tel quel** (carrousel des 10 modèles, aperçu 3D, fiche technique, choix de propulsion) : sur l'écran d'accueil (**CHOOSE A SHIP**) ou à tout moment avec `V`.
 - **Relais immédiat** : le vaisseau choisi rejoint l'orbite de la planète visitée juste derrière le héros, la caméra le suit aussitôt et c'est lui qui part vers l'étoile suivante. Son départ reprend la durée physique déjà planifiée (poussée ajustée), si bien que le rythme du film n'est pas perturbé. Si le départ est déjà engagé, ou si le vaisseau choisi ne peut pas suivre une distorsion en cours, le relais a lieu au système suivant (un message l'indique).
@@ -489,7 +519,326 @@ Nouveau type pour faire voyager, à terme, les vaisseaux sans moyen supraluminiq
 - **Présence** dans ≈ 1 système sur 3 (`?carrier=`), en orbite haute : un vaisseau sans moyen de saut **garé au poste 2** (il suit le porteur), **deux drones d'inspection** qui tournent dans le poste libre (repères d'échelle).
 - **Plans** : `dockPass` (passage latéral dans l'axe du dock, on voit à travers), `dockInterior` (au ras du pont, dans le poste libre, le vaisseau garé derrière le treillis), `dockBerth` (juste devant une ouverture, le vaisseau garé encadré par les lèvres du dock) ; quand un porteur est là, les coupes sur le trafic le montrent souvent.
 - **Panneau FLEET** : entrée **SHIP CARRIER** (touche `G`) ; le porteur devient la vedette, premier plan `dockPass`. API : `__CINE.showCarrier()`.
-- Suite prévue : v7.7 rangement et sortie à couple (pinces, bras d'avitaillement, plans dédiés) ; v7.8 voyage complet (départ par saut quantique avec le passager, distorsion possible, arrivée, débarquement, carte, radar, mode Suivre pour tous les vaisseaux).
+- **Propulsion hard SF** (v7.8, design original dans un esprit industriel) : derrière le bloc moteur, un **bouclier anti-radiations** en disque nervuré, la **cuve du réacteur** et sa **pile de 6 bobines magnétiques** en cuivre, un **treillis de poussée** (4 longerons, croisillons, anneau de montage), **4 réservoirs d'ergols** et leurs conduites, des pompes et conduites le long du bloc moteur, **4 ailes de radiateurs en croix** dont les caloducs rougeoient avec la poussée (inertie thermique du moteur), et une **torche de fusion unique** : la cloche de 74 m est l'ensemble moteur du jeu à grande échelle (profil Rao, col incandescent, cardan, jet de torche), avec 16 raidisseurs extérieurs et 3 frettes lourdes qui suivent le cardan. Le porteur mesure ≈ 750 m. Plans `torchClose` (orbite lente autour de la cloche) et `radiatorPass` (travelling au ras d'une aile de radiateurs).
+- Même principe, à leur échelle, pour la **corvette** (un moteur du jeu) et le **destroyer** (trois) : cloches Rao, torches, chauffe ; leurs radiateurs rougeoient aussi avec la poussée.
+
+### Porte-vaisseaux II : escale au poste 1 — v7.10 (lot 14)
+
+Le poste 1 reçoit désormais des visiteurs : un vaisseau sans moyen supraluminique (e18, p10, x1, tS, tM, tL) vient s'y ranger **à couple**, puis repart **par l'ouverture opposée** (dock traversant). Toutes les positions sont tenues dans le repère du porteur (le visiteur suit son orbite).
+
+| Phase | Durée | Ce qu'on voit |
+|---|---|---|
+| Approche | 30 s | depuis ≈ 1 km à l'arrière et au-dessus du porteur, trajectoire courbe qui reste hors de la coque ; freinage aux **RCS** (bouffées de translation), feux d'approche plus vifs |
+| Alignement | 3 s | immobile face à l'ouverture, à ≈ 45 m de la lèvre |
+| Glissement | 16 s | translation latérale lente à travers le **champ de force** : le champ s'abaisse là où la coque le traverse, **onde** au contact puis à la sortie |
+| Pinces | 4 s | les 4 bras pivotent jusqu'au contact de la coque (angle calculé sur la demi-largeur du vaisseau) |
+| Amarré | 24–40 s | le **portique** vient au-dessus du poste (transition de 12 s) |
+| Pinces ouvertes → sortie | 3 + 16 s | glissement vers l'autre bord, nouvelle onde sur l'autre champ |
+| Dégagement | 24 s | poussée latérale aux RCS, puis **allumage de la torche** à ≈ 150 m du porteur, départ vers l'avant |
+| Hors champ | 25–50 s | puis nouvelle approche (bord tiré au hasard) |
+
+- **Calage sur l'orbite** : un système n'offre qu'une vingtaine de secondes d'orbite en temps réel ; à chaque visite, l'escale est donc recalée pour qu'une phase visible tombe dans cette fenêtre (≈ 55 % : glissement qui commence 1 à 12 s après le début de l'orbite ; sinon ouverture des pinces 1 à 5 s après). Entre deux visites, le cycle ne démarre qu'en temps réel.
+- **Plans dédiés** (le visiteur donne la légende) : `berthApproach` (sur l'échine du porteur, au-dessus de la lèvre : le vaisseau arrive de l'arrière et freine), `fieldCross` (hors du dock, devant la proue, au ras de l'ouverture : la coque traverse le champ), `controlRoom` (devant le vitrage de la salle de contrôle avant : tout le dock en enfilade), `deckLevel` (au ras du pont, côté que la coque ne balaie pas : contre-plongée sur la coque, les pinces et le plafond lumineux), `berthDepart` (même poste d'observation que l'approche, bord de sortie : dégagement et allumage). Le choix dépend de la phase ; une escale passe **avant les travellings** une fois par système (3 visites sur 4 environ), et un travelling commencé avant l'orbite s'arrête à son début pour ne pas la manger.
+- Les **drones d'inspection** quittent le poste 1 à l'approche d'un visiteur et se mettent en faction dans les coins avant, en hauteur ; le plan `dockInterior` (caméra dans ce poste) est remplacé par `deckLevel` quand le poste est occupé.
+- Le vaisseau garé au poste 2 a désormais ses **pinces fermées** sur la coque.
+- **Optimisation** : les vaisseaux à bord (garé, visiteur) ont leurs pièces statiques **fusionnées par matériau** (`mergeStatic`) : 90–210 appels de dessin → 37–49, rendu identique au pixel près (usure et livrée conservées ; cardans, jets, vitrages et intérieurs restent à part). Le portique du dock est lui aussi fusionné (une fusion était restée en commentaire).
+- API de test : `__CINE.forceBerth(phase, u)` (impose une phase et son avancement), `__CINE.berthDbg()` (phase, position, pinces, champs, onde, portique, bouffées RCS).
+
+### Combat I : factions, jauges, dégâts — v7.13 (lot 17)
+
+Première brique des combats (lots 17 à 20). La destruction arrive en v7.16. Les engagements eux-mêmes arrivent en v7.14 (ci-dessous).
+
+**Factions et livrées**
+
+| Faction | Livrée | Préfixe |
+|---|---|---|
+| **Coalition** | gris acier et bleu | `CNV` |
+| **League** | ocre et orange | `LWS` |
+| **Irregulars** | noir et rouge | aucun |
+
+- **Garnisons** : tirées par système, Coalition 6 fois sur 10 et League 4 fois sur 10 ; les Irregulars viendront avec les pirates (lot 19).
+- **Porte-vaisseaux militaire** : il prend la livrée de sa faction.
+- **Drone-cible** : il reste neutre, avec le préfixe `TGT`.
+- **Civils** : ils affichent un armateur fictif (Helion Freight, Kestrel Lines…).
+
+**État d'un vaisseau**
+
+Chaque vaisseau a une **énergie** (le réacteur, entamée par la poussée), un **bouclier** (militaires seulement) et une **coque**. Les vieilles coques partent un peu entamées.
+
+- **Ordre des dégâts** : un coup est d'abord absorbé par le bouclier, puis entame la coque.
+- **Recharge** : le bouclier se recharge sur l'énergie 1,5 s après le dernier coup ; tirer coûte aussi de l'énergie.
+- **Désemparé** : sous **22 % de coque**, la propulsion est coupée, les feux s'éteignent (avec des sursauts), le vaisseau dérive en rotation lente, et arcs électriques et fuites de gaz apparaissent.
+
+**Impacts visibles**
+
+- **Bouclier** : bulle ellipsoïdale à trame hexagonale, couleur de la faction, onde qui part du point d'impact. Elle est créée au premier coup et visible 1,4 s après chaque impact.
+- **Coque** :
+  - point d'entrée calculé sur la boîte de la coque ;
+  - gerbe d'étincelles ;
+  - **point chaud** qui refroidit en 7 à 10 s, au plus 8 par vaisseau ;
+  - parfois un **jet de gaz** de 3 à 7 s.
+- **Coût** : tous ces effets tiennent en un seul nuage de points additif (1 appel de dessin, 900 particules au plus).
+
+**Étiquettes et jauges** (`shiplabels.js`, bouton **DATA**, touche `H`)
+
+- **Contenu** : au-dessus des vaisseaux proches à l'écran, le nom, la faction ou l'armateur, une jauge de **coque** (couleur selon l'état, bouclier en liseré bleu pour les militaires) et une jauge d'**énergie**. Mention *DISABLED* en rouge pour un vaisseau désemparé.
+- **Quels vaisseaux** : au plus 8, le vaisseau filmé en premier. Les étiquettes sont masquées en gros plan, dans les travellings et pour ce qui est à bord d'un porteur, et décalées quand elles se chevauchent.
+- **Affichage** : actif par défaut, choix mémorisé dans le navigateur.
+
+**Validation sur les exercices de tir**
+
+- La cible perd son bouclier en 5 s environ, puis sa coque ; elle est désemparée vers 9 s, et le destroyer cesse le feu.
+- Elle redémarre 18 s après l'exercice et se répare lentement entre deux exercices.
+
+**API de test** : `__CINE.combatDbg()`, `__CINE.hitTest(modèle, n, dégâts)`, `__CINE.labelsState()`, `__LABELS.stats()`.
+
+### Mémoire : fuite corrigée — v7.19 (lot 23)
+
+La v7.17 avait révélé une croissance du tas JavaScript. La v7.19 en trouve la cause et la corrige : la mémoire est désormais **stable** sur 2 h simulées.
+
+**Cause**
+
+- Les effets réutilisent des **tampons circulaires** : étincelles d'impact, fumée, traçantes et missiles du combat, obus des exercices de tir. Chaque élément gardait une référence au vaisseau qu'il suivait ou visait, même après la libération du vaisseau.
+- Un vaisseau libéré retenait ainsi sa trajectoire, qui retenait la **visite**, qui retenait **tout le système** : planètes, nuages, lunes, trafic. Selon les effets joués, un ou plusieurs systèmes entiers restaient en mémoire à chaque saut.
+- Les **chasseurs des hangars** des destroyers n'étaient jamais libérés avec leur vaisseau porteur.
+- La fuite existait avant les combats : en v7.12, les obus des exercices et les chasseurs des hangars suffisaient.
+
+**Correction**
+
+- À la libération d'un vaisseau, `forgetShip` efface toute référence dans les tampons d'effets. L'élément concerné s'éteint s'il était encore actif.
+- Les chasseurs des hangars sont libérés avec leur porteur. Les taches de dégâts et la découpe de coque préparée sont abandonnées.
+- Des gardes empêchent un effet orphelin de lire un vaisseau absent.
+- Aucun changement visible : un vaisseau n'est libéré qu'à la fin d'une étape ou d'une visite, hors champ (un vaisseau détruit est seulement caché).
+
+**Mesure**
+
+Méthode : simulation découpée en tâches courtes (5 s simulées par appel), ramasse-miettes forcé (`HeapProfiler.collectGarbage`), puis comptage des objets three.js vivants (`queryObjects`, poignées libérées après chaque comptage).
+
+Deux pièges faussaient les mesures précédentes :
+
+- une longue boucle synchrone empêche la libération des objets suivis par `WeakRef` jusqu'à la fin de la tâche ;
+- les tableaux renvoyés par `queryObjects` restent retenus tant que leur groupe d'objets n'est pas libéré.
+
+**Tas après ramasse-miettes (Mo), graine OBS-4**
+
+| Version | 300 s | 1 200 s | 2 400 s | 3 600 s | Tendance |
+|---|---|---|---|---|---|
+| v7.12 | 206 | 212 | 306 | 320 | ≈ +115 Mo/h |
+| v7.16 | 249 | 298 | 324 | 380 | ≈ +130 Mo/h |
+| **v7.19** | **198** | **175** | **179** | **172** | stable |
+
+Autres graines en v7.19 (300 s → 3 600 s) : OBS-3 191 → 175 Mo, LONG-7 165 → 193 Mo, sans tendance.
+
+`tests/memory.js LONG-7 7200` (2 h simulées) donne :
+
+- tas 196 → 179 Mo, pente −13,5 Mo/h ;
+- 3 700 à 4 200 objets 3D et 2 300 à 2 700 géométries, sans dérive ;
+- aucun vaisseau libéré encore retenu ;
+- 58 géométries et 2 textures GPU constantes ;
+- verdict **STABLE**.
+
+### Chantier : tous les vaisseaux, âge et usure — v7.18
+
+Le bouton **SHIP** (touche `C`) ouvre un **chantier** qui présente **les 23 types de vaisseaux** de la démo. Le sélecteur du jeu reste disponible sur `V` et sur l'écran d'accueil.
+
+**Choix retenus (lot 22)**
+
+| Question | Retenu | Écarté |
+|---|---|---|
+| Quels vaisseaux | Catalogue complet (23 types) | Vaisseaux présents dans le système |
+| Aperçu | Aperçu 3D dédié, démo figée | Gros plan dans la démo, panneau latéral |
+| Âge / usure | Deux effets distincts | Âge + intensité globale |
+
+**Catalogue**
+
+| Famille | Types |
+|---|---|
+| Cargos, remorqueurs, paquebots | les 10 modèles du jeu (Carrelet, Basalte, Hirondelle, Longue-Échine, Banquise, Mistral, Sirocco, Tramontane, Belle-Étoile, Vagabonde) et la navette de fret du trafic |
+| Petits engins | navette de maintenance, navette d'équipage, drones d'inspection, de relais et de fret, gabare à conteneurs |
+| Militaires | chasseur, corvette, destroyer, drone-cible |
+| Porte-vaisseaux | civil et militaire |
+
+- **Vignettes** générées au fil de l'eau à la première ouverture (une toutes les deux images), puis gardées en mémoire ; chaque carte indique le type, la classe et la longueur.
+- **Aperçu 3D** : le vaisseau tourne lentement sur une grille à l'échelle (1 à 100 m selon la taille, indiquée en bas à gauche) ; glisser pour tourner, molette pour rapprocher. Type, classe, longueur et propulsion sont affichés sous l'aperçu.
+- **ÂGE** (le temps) : peinture passée et jaunie, farinage des livrées sombres, crasse, rouille née dans les joints, coulures vers la poupe.
+- **USURE** (le service) : éclats jusqu'au métal nu, rayures, bosses, suie autour des tuyères, tôles remplacées, tuyères bleuies par la chaleur.
+- **Préréglages** : *NEW*, *IN SERVICE*, *OLD, CARED FOR* (vieux mais entretenu), *HARD-WORKED* (récent mais malmené), *WRECK*.
+- **Options** : faction pour les militaires (Coalition, League, Irregulars) ; propulsion des modèles supraluminiques (saut + distorsion, saut seul, distorsion seule) ; *ANOTHER HULL / LIVERY* tire une autre coque et une autre livrée.
+- **À l'ouverture**, l'âge et l'usure du vaisseau filmé servent de point de départ.
+- **USE THIS SHIP** : le vaisseau rejoint l'orbite avec exactement cet aspect et la caméra le suit. Un modèle du jeu devient le héros (comme avec `V`) ; un engin, un militaire ou la navette devient la vedette et le voyage continue à bord d'un autre ; un porte-vaisseaux d'un autre type que celui déjà en orbite arrive au système suivant.
+
+**Technique**
+
+- **Deux uniformes** dans le shader d'usure (`uAge`, `uWear`) : les curseurs agissent en direct, sans reconstruire le vaisseau. Le reste de la flotte est inchangé (usure = âge par défaut). Options du générateur : `SHIPGEN.build(modèle, { age, wearAmt })`, `__SHIPWEAR.apply(groupe, âge, graine, unité, usure)`.
+- **Rendu de l'aperçu** par le moteur de rendu de la démo, dans un coin de son canevas, puis copié dans le canevas du dialogue. La scène d'aperçu a le même jeu de lumières que la scène de la démo (ambiante, directionnelle, ponctuelle) : les programmes GPU sont partagés, sans recompilation. Démo figée pendant l'ouverture ; la scène figée sert de fond flouté.
+- **Téléphone** : aperçu en haut, curseurs, puis la liste ; boutons d'action fixés en bas de l'écran.
+- **API** : `__YARD.open()`, `__YARD.pick(id)`, `__YARD.setLook(âge, usure)`, `__YARD.state()` ; `__CINE.catalog()`, `__CINE.previewBuild(id, aspect)`, `__CINE.useShip(id, aspect)`, `__CINE.lookOf(vaisseau)`.
+
+### Coques brisées : tronçons à la dérive — v7.17 (lot 21)
+
+Une corvette ou un destroyer détruit ne disparaît plus forcément d'un bloc : sa coque **se brise en tronçons** qui dérivent jusqu'au départ du système. Cela arrive pour 70 % des destroyers et 55 % des corvettes détruits (`?hullbreak=0|1`).
+
+**Découpe (options comparées au lot 21)**
+
+| Technique | Retenue | Pourquoi |
+|---|---|---|
+| **Découpe des triangles** | oui | Cassure irrégulière et déchirée, mêmes matériaux (pas de recompilation de shaders), préparée pendant la phase d'épave |
+| Plans de coupe (*clipping*) | non | Coupe nette « au laser », 2 copies complètes du vaisseau, recompilation de shaders au premier usage |
+
+- **Plans de cassure** : 1 plan (corvette, 55 % des destroyers) ou 2 (destroyer : 3 tronçons), vers le tiers ou le milieu de la coque, inclinés de ±20° et **bruités** : chaque triangle rejoint un tronçon selon son centre, d'où un bord déchiré qui suit les modules de la coque.
+- **Préparation étalée** : dès que l'épave est condamnée (4,5 à 8 s avant l'explosion), la découpe traite 2 500 triangles par image (destroyer : ≈ 48 000 triangles, ≈ 85 ms au total en rendu logiciel, soit ≈ 4 ms par image sur une vingtaine d'images) ; aucun à-coup au moment de la rupture.
+- **Fusion par tronçon et par matériau** : un destroyer brisé en 2 tronçons compte 55 à 60 maillages, autant que le vaisseau intact (≈ 70).
+
+**Rupture et dérive**
+
+- À chaque cassure : éclair, boule de feu, fumée, étincelles, une douzaine de débris ; onde de choc plus courte qu'une explosion complète. Message *DESTROYED — hull broken in two / three*.
+- Chaque tronçon garde la rotation de l'épave et tourne lentement autour de **son propre centre** ; les tronçons s'écartent l'un de l'autre à 5–11 m/s.
+- Cassure : fond sombre (l'intérieur de la coque n'est pas vide), halo incandescent qui passe de l'orange au rouge sombre en 20 s puis couve, avec fumée et étincelles pendant 9 s.
+- Les tronçons disparaissent au départ du système ou au début de l'engagement suivant (géométries libérées).
+
+**Plan `hulkPass`** : travelling latéral lent, perpendiculaire à l'axe de l'épave, à une distance qui suit l'écartement des tronçons. Pendant l'engagement, dès 2,5 s après la rupture (2 fois au plus), puis une fois après l'engagement, avant le départ (légende *Wreck of … · two sections adrift*). Le plan d'épave (`wreckDrift`) est désormais choisi même si le plan en cours ne filme pas l'engagement.
+
+**Corrections** : les effets d'explosion (feu, fumée) sont ancrés sur la trajectoire du vaisseau détruit et non plus sur sa racine figée (rayon des effets et tranches de rendu réduits) ; `wreckDrift` se rapproche des destroyers (2,3 à 3 longueurs).
+
+**API de test** : `__CINE.splitDbg()` (découpes en cours : triangles, durée, plans), `__CINE.hulkDbg()` (tronçons, âge, écartement, maillages), `__CINE.hulkSubj(nom)`, `__CINE.smk()`.
+
+### Combat IV : destruction — v7.16 (lot 20)
+
+Un vaisseau vaincu est d'abord **désemparé** (lot 17) : il dérive en tournant, feux éteints, avec des arcs et des fuites de gaz. Ensuite, son réacteur peut céder.
+
+**Qui explose**
+
+- Épaves militaires seulement : chasseur 60 %, corvette 50 %, destroyer 50 % (40 % en v7.16) (`?destroy=0|1`).
+- Jamais : les cargos civils, le porte-vaisseaux, le drone-cible des exercices, la vedette du film.
+- Délai après le désemparé : 2,5 à 5 s pour un chasseur, 4,5 à 8 s pour une corvette ou un destroyer.
+
+**Déroulé**
+
+1. **Explosions secondaires** (corvette, destroyer) : 2 à 4 boules de feu en des points de la coque, sur la dernière seconde et demie.
+2. **Rupture** : éclair, boule de feu (50 à 160 particules additives : blanc, orange puis rouge sombre), fumée sombre en mélange normal (visible sur une planète claire, là où un effet additif disparaît), braises.
+3. **Onde de choc** : anneau qui s'étend jusqu'à 2,8 longueurs de coque et s'éteint en 1,3 à 2,4 s.
+4. **Débris** : 22 (chasseur), 30 (corvette) ou 40 (destroyer) plaques et poutres, parties de toute la coque, à la teinte de la livrée ; ils dérivent en tournant et disparaissent au bout de 30 à 45 s.
+
+**Réalisation**
+
+- **Plan `wreckDrift`** : quand une épave va exploser, le réalisateur écourte le plan en cours et vient tourner lentement autour d'elle jusqu'à l'explosion.
+- **Ralenti** (`?slowmo=0` pour le couper) : si l'explosion est à l'image, le temps ralentit à 28 % pendant 1 à 1,5 s de film (≈ 2 à 3,5 s réelles, rampes comprises).
+- **Recadrage** : le plan reste sur l'explosion 2,2 à 3,2 s, puis la caméra change de sujet.
+- Message *DESTROYED* pour les corvettes et les destroyers.
+
+**Coût** : +1 appel de dessin pour tous les débris (maillage instancié, 200 au plus), +1 pour la fumée et +1 par onde visible, seulement pendant les explosions. Les particules de feu passent par le nuage d'impacts existant (1 400 au plus). Rien ne reste d'un engagement à l'autre.
+
+**API de test** : `__CINE.boomDbg()` (épaves condamnées et heure d'explosion), `__CINE.slow()`, `__CINE.debris()`.
+
+### Combat III : convoi, pirates, porte-vaisseaux — v7.15 (lot 19)
+
+Trois scénarios de plus pour le moteur d'engagement du lot 18. Les cargos civils ne sont jamais armés ni détruits : au pire désemparés (coque jamais sous 12 %).
+
+| Scénario | Camps | Déroulé |
+|---|---|---|
+| **Attaque de convoi** | 3 cargos en file (55–75 m/s), 1 corvette et 2 chasseurs d'escorte (faction du système) contre 4 chasseurs irréguliers | Les assaillants arrivent de 2,6–3,2 km et enchaînent les **passes de mitraillage** : piqué dans l'axe, passage au ras de la coque, ressource aux extrémités. Les chasseurs d'escorte quittent la formation pour les prendre en chasse, la corvette tire en barrage et lance des missiles. Repli des survivants en fin de fenêtre. |
+| **Raid de pirates** | 1 ou 2 cargos contre une corvette et 3 chasseurs irréguliers ; patrouille de la faction du système (destroyer et 3 chasseurs) | Les pirates harcèlent le cargo ; à un tiers de la fenêtre (≈ 14 s), la patrouille **surgit dans un éclair de saut** à 4 km, décélère et engage ; aux deux tiers, les pirates décrochent à pleine poussée, poursuivis. Messages *DISTRESS CALL*, *PATROL INBOUND*, *PIRATES WITHDRAWING*, *PIRATES DRIVEN OFF*. |
+| **Assaut de porte-vaisseaux** | Porte-vaisseaux militaire (défense rapprochée, pièce principale) et 2 chasseurs contre un destroyer et 4 chasseurs | Le destroyer se place à 2,6–3,2 km et tire, les chasseurs mitraillent le porteur sur toute sa longueur ; le bouclier du porteur encaisse (blindage : dégâts ÷ 5, jamais désemparé). Repli des assaillants en fin de fenêtre. Sans porteur militaire disponible (porteur civil dans le système, `?carrier=0`), le scénario devient une attaque de convoi. |
+
+**Moteur**
+
+- Cibles : chaque vaisseau a un adversaire désigné ; s'il est désemparé, il passe au plus proche (de préférence de la même catégorie, civil ou militaire).
+- Tir de barrage : sans missile à intercepter, les tourelles de défense rapprochée tirent sur l'ennemi le plus proche à moins de 1,1 km (chasseurs en priorité).
+- Missiles sur les grandes coques : l'impact est testé sur la boîte de la coque (plus d'explosion à 300 m d'un porteur de 760 m).
+- Dégâts sur les civils réduits (les pirates visent les moteurs : ×0,22 ; les pillards du convoi : ×0,3).
+- Porte-vaisseaux créé à la demande sur une orbite côté jour quand le système n'en a pas.
+
+**Plans**
+
+| Plan | Cadrage |
+|---|---|
+| `strafeRun` | En aval de la cible, à hauteur de coque : l'assaillant arrive en piqué, canons en action, la coque dans le bas du cadre, et passe tout près de la caméra |
+| `convoyPass` | Point fixe à 400–700 m du convoi : les cargos défilent, assaillants et escorte les traversent |
+| `patrolArrival` | Derrière le cargo attaqué, au téléobjectif (jusqu'à 9°) : l'éclair de saut, puis le destroyer qui approche en gardant sa taille à l'image |
+
+`battleWide` cadre désormais une paire d'adversaires quelle que soit sa taille (chasseur et cargo, porteur et destroyer) ; `dogfight` regarde devant quand l'adversaire passe derrière.
+
+**API de test** : `__CINE.startCombat('convoy' | 'raid' | 'assault')` (`__CINE.lastCombatKind` : scénario réellement lancé), `__CINE.camDbg()` (distance et angle du sujet), `__CINE.strafeIn(vaisseau)`.
+
+### Combat II : moteur d'engagement — v7.14 (lot 18)
+
+Des engagements rares entre deux factions, filmés pendant l'orbite. Le vaincu est **désemparé** et dérive (destruction : v7.16).
+
+**Quand**
+
+- ≈ 1 système sur 5, hors voyage à bord, escale interplanétaire et choix en attente : l'orbite passe à 46 s au moins, l'engagement commence 1,5 s après son début et dure 42 s.
+- À la demande : panneau **FLEET**, section **COMBAT** (*Fighter skirmish*, *Line duel*) — tout de suite s'il reste au moins 26 s d'orbite, sinon au système suivant ; paramètre `?combat=`.
+- Camps : la faction du système contre une autre (les Irregulars environ 1 fois sur 3).
+- Lieu : côté jour de la planète habitable, dans un repère qui suit son orbite — le combat est éclairé et la planète sert de décor.
+
+**Scénarios**
+
+| Scénario | Déroulé |
+|---|---|
+| Escarmouche de chasseurs | 3 duels sur des courbes de Lissajous : poursuite, dépassement, inversion des rôles. Entrée en 6 s depuis 2,5–3 km ; canons fixes dans l'axe (cône de ±20°) ; un missile par chasseur 6 fois sur 10 ; repli à pleine poussée en fin de fenêtre. |
+| Duel de ligne | 2 destroyers en station à 2,2–3 km. Tourelles principales avec anticipation, salves de 2 missiles toutes les 8 à 12 s, défense rapprochée sur les missiles entrants. Un camp un peu moins armé (coque −15 %, bouclier 75 %) : l'issue se lit dans les jauges. |
+
+**Armes**
+
+- Traçantes et obus : touche ou manque décidé au tir, dégâts appliqués à l'arrivée (bouclier puis coque, étincelles et points chauds du lot 17).
+- Missiles : guidage avec anticipation, impact testé sur tout le segment parcouru dans l'image (pas de traversée à grande vitesse), traînée de 1,4 s. Environ 1 missile sur 2 est intercepté quand deux tourelles de défense sont engagées.
+- Cessez-le-feu sur un vaisseau désemparé. Fin quand un camp est entièrement désemparé (message *ENGAGEMENT OVER*) ou au repli.
+
+**Plans**
+
+| Plan | Cadrage |
+|---|---|
+| `battleWide` | Plan large : une paire de chasseurs, ou les deux destroyers dans le champ |
+| `dogfight` | Poursuite derrière un chasseur, sa cible devant |
+| `missileCam` | Derrière un missile jusqu'à l'impact ou l'interception |
+| `duelSide` | Profil d'un destroyer, l'adversaire au loin |
+
+`turretClose` et `lateral` complètent le duel. Le réalisateur ne répète pas deux fois de suite le même type de plan d'engagement.
+
+**API de test** : `__CINE.startCombat('skirmish' | 'duel')` (réponse `now`, `next` ou `busy`), `__CINE.engDbg()`.
+
+### Escale interplanétaire — v7.12 (lot 16)
+
+De temps en temps, le vaisseau suivi s'arrête à une deuxième planète du système avant de partir.
+
+- **Déroulé** : arrivée → transfert → **orbite A** (13 à 17 s, écourtée) → **transfert *flip-and-burn* vers B** (accélération à 1 g, retournement, freinage, puis retournement final nez en avant) → **orbite B** (16 à 22 s, temps réel) → départ depuis B, saut ou distorsion. Le relais éventuel attend en formation autour de B.
+- **Choix de B** : une planète d'orbite voisine, prise parmi les 3 plus proches en demi-grand axe, avec une préférence pour les planètes rocheuses, habitables ou à anneaux. B doit rester à moins de 8 UA de A et du même côté de l'étoile (écart de moins de 100°) : le trajet ne rase pas l'étoile.
+- **Durées mesurées** : de 0,05 à 7,4 UA, soit de 17 h à 11 jours de temps physique, joués en 21 à 29 s à l'écran (accélération jusqu'à ×45 000).
+- **Temps accéléré** : le segment d'escale a des rampes plus longues aux deux bouts (3 s au départ, 4,5 s à l'arrivée, contre 1,8 s ailleurs). La planète quittée recule donc à l'écran, et la planète d'escale grossit pendant les dernières secondes au lieu d'apparaître d'un coup.
+- **Deux nouveaux plans, calés sur les raccords** (le plan en cours s'arrête pour les laisser passer, un travelling aussi) :
+  - `leaveOrbit` : caméra devant et de côté, la planète A recule derrière le vaisseau ;
+  - `planetApproach` : trois-quarts arrière, la planète B grossit devant jusqu'à la mise en orbite.
+- **Légende** : *Stopover → B* pendant le transfert.
+- **Carte** : phase « stopover transfer ». Dans la vue du système, le trajet réel est tracé en ambre : plein pour la partie parcourue, tireté pour le reste, avec l'étiquette *STOPOVER → B*.
+- **Fréquence** : environ 3 visites sur 10 parmi celles qui s'y prêtent. Mesuré sur 3 × 30 min : 11 à 17 % des visites selon le film. Une visite avec escale dure environ 25 s de plus. Paramètre `?stopover=0|1`.
+- **API de test** : `__CINE.timings().stop`.
+
+### Porte-vaisseaux III : voyage à bord — v7.11 (lot 15)
+
+Les vaisseaux sans moyen supraluminique voyagent désormais **à bord d'un porteur**, au poste 1.
+
+- **Départ** : le porteur devient le partant. Il quitte son orbite par la poussée habituelle, puis part par **saut quantique** (géode du porteur, charge, onde) ou en **distorsion** avec `?ftl=warp`. Il emporte son passager amarré, son vaisseau garé et ses drones. Pendant le saut, tout ce qui est à bord suit l'étirement du porteur et disparaît avec lui.
+- **Arrivée** : le porteur arrive, puis rejoint l'orbite basse (transfert *flip-and-burn*) avec tout ce qu'il transporte.
+- **Débarquement** dans la fenêtre d'orbite : pinces ouvertes, puis sortie par l'autre bord. Le passager fait ensuite un **tour libre** le long du porteur (≈ 250 m vers l'avant puis retour, nez parallèle au porteur, translations aux RCS) : il redevient le vaisseau suivi.
+- **Réembarquement** : alignement, glissement, pinces, puis le porteur repart avec lui. Sinon, relais habituel : un vaisseau capable prend le départ, et le porteur et son passager restent dans le système.
+- **Durée de la fenêtre d'orbite** : elle passe à 52 s avec réembarquement, 36 s sans (18 à 26 s d'ordinaire), car le passager doit tout faire en temps réel.
+
+**Quand un voyage a lieu**
+
+| Situation | Règle |
+|---|---|
+| Mode **Suivre**, vaisseau sans moyen de saut choisi au sélecteur | Il part toujours à bord d'un porteur : celui du système, ou un porteur qui arrive. Choisi pendant l'orbite, il est amarré aussitôt, et le porteur part avec lui ; choisi pendant un départ, il embarque pendant l'orbite du système suivant. Il réembarque toujours. |
+| Mode **Auto**, même choix | Une fois sur deux, voyage à bord ; sinon, vedette et départ par un autre vaisseau, comme avant. |
+| Mode **Auto**, sans intervention | Quand un porteur est dans le système et qu'un relais est prévu, 1 fois sur 2 le porteur part avec son visiteur, qui embarque pendant l'orbite. Au système suivant, le visiteur débarque et devient le vaisseau suivi ; il réembarque ensuite 1 fois sur 2 (au plus 4 systèmes de suite). Mesuré sur 3 × 30 min : ≈ 13 % des visites lancent un voyage, et les visites durent 78 s en moyenne (72 s avant). |
+| Panneau **FLEET**, porteur, en mode Suivre | Le porteur devient le partant, avec son visiteur s'il est amarré ; la caméra le suit de système en système. |
+
+**Réalisation, carte et radar**
+
+- **Réalisation** : la fenêtre d'orbite d'un voyage est réservée aux plans d'escale (`deckLevel`, `fieldCross`, `controlRoom`) et aux plans du passager libre (`lateral`, `orbitcam`, `tripod`, `chase`…), sans travelling.
+- **Porteur filmé** : il a ses propres plans (`dockPass`, `torchClose`, `radiatorPass`, `wide`…) à la place des gros plans des vaisseaux du jeu. Quand il porte un passager, la légende l'indique : « K · X aboard ».
+- **Carte et radar** : **« à bord de … »**. Le vaisseau suivi est affiché « X (aboard K) », et ce qui est à bord est rangé sous le porteur (ligne *Aboard* de sa fiche). Le radar d'un vaisseau à bord affiche « ABOARD » avec l'immatriculation du porteur.
+- **Messages** : *CARRIER · X travels on aboard K* au départ, *DISEMBARK · X leaves K* au débarquement, *CARRIER · X boards a ship carrier* au sélecteur.
+- **API de test** : `__CINE.tripDbg()` et `__CINE.forceShotOn(type, vaisseau)`. Paramètre `?trip=0|1`.
 
 ### Intérieurs — v7.3
 
@@ -738,6 +1087,13 @@ Alternative écartée : le *logarithmic depth buffer* de three.js aurait imposé
 | Départ en poussée continue | 12–15 à l'écran = 1 à 3 h réelles, puis 3,2 d'erre |
 | Éruption stellaire | flash 0,8 · arrachement et éjection 9–12 |
 | Éclipse totale (travelling) | 7,5–11, totalité au milieu du plan |
+| Coque brisée (v7.17) | découpe 0,3–0,6 s d'images après la condamnation · rupture à l'explosion · tronçons écartés de 5–11 m/s · halo incandescent 20 s puis couvant · fumée et étincelles 9 s · `hulkPass` dès 2,5 s |
+| Destruction (v7.16) | désemparé → explosion 2,5–5 (chasseur) ou 4,5–8 (corvette, destroyer) · explosions secondaires sur les 1,5 dernières · éclair 0,6 · boule de feu 1–2,6 · onde 1,3–2,4 · ralenti 1–1,5 de film à 28 % · recadrage 2,2–3,2 après · débris 30–45 |
+| Raid de pirates (v7.15) | pirates au contact dès le début · patrouille à 33 % de la fenêtre (≈ 14 s ; plan `patrolArrival` 2,6 s avant), décélération 6,5 s · fuite à 66 % (≈ 28 s) · fin 5 s plus tard |
+| Engagement (v7.14) | orbite ≥ 46 · entrée 6 (depuis 2,5–3 km) · premiers tirs à +2 · fenêtre 42 · repli des chasseurs au-delà ; salves de missiles toutes les 8–12 (duel) ; désemparé vers 55–65 s d'escarmouche, en fin de fenêtre pour le duel |
+| Escale interplanétaire (v7.12) | orbite A 13–17 · transfert A → B 21–27 (+2 pour une géante), rampes 3 et 4,5 · orbite B 16–22 ; `leaveOrbit` de −4 à +3,5–4,5 s autour de la fin d'orbite A, `planetApproach` des 6 dernières secondes à +2–3 s après la mise en orbite B |
+| Voyage à bord (v7.11) | débarquement 1 s après le début de l'orbite : pinces 3 · sortie 10 · tour libre 20 · (alignement 2 · glissement 10 · pinces 3) ; orbite de 52 s avec réembarquement, 36 s sans ; embarquement d'un visiteur : glissement 1 à 4 s après le début de l'orbite, orbite ≥ 23 s après |
+| Escale au porte-vaisseaux (v7.10) | approche 30 · alignement 3 · glissement 16 · pinces 4 · amarré 24–40 · pinces 3 · sortie 16 · dégagement 24 (torche à 8 s) · absence 25–50 ; glissement calé 1 à 12 s après le début de l'orbite (ou pinces ouvertes 1 à 5 s après) |
 
 ---
 
@@ -749,8 +1105,19 @@ Alternative écartée : le *logarithmic depth buffer* de three.js aurait imposé
 - Rendu en tranches : 2 à 5 passes système par image, mais chaque fragment n'est calculé qu'une fois (les tranches découpent la géométrie) ; seul le traitement des sommets est répété. Mesuré sur 24 plans : ≈ 780 appels de dessin et 1,1 M triangles par image (médiane), contre ≈ 820 et 1,5 M en v5.
 - v6.6, mesuré sur 40 images d'un système riche en baies (toutes passes confondues, compteur remis à zéro à chaque image) : médiane **≈ 280 appels de dessin**, 90ᵉ centile 375, maximum 465 ; baies-portails : +2 appels par vaisseau à baies, halo +1 ; petits engins : 4 à 8 appels chacun.
 - Sphères planétaires plus fines (256 × 192 pour la surface, 224 × 168 pour les nuages) pour des horizons lisses à basse altitude.
-- Mémoire stable sur de longues sessions (vérifié sur 20 min simulées : 11 à 15 vaisseaux, tas JavaScript constant, nœuds de temps élagués).
+- Mémoire (v7.19) : **stable**. Tas après ramasse-miettes entre 165 et 200 Mo sur 1 à 2 h simulées ; objets three.js, géométries et textures GPU sans dérive. Jusqu'à la v7.18, une fuite ajoutait environ 115 à 130 Mo par heure simulée (voir « Mémoire : fuite corrigée »). Coût de la correction : un parcours des tampons d'effets à chaque libération de vaisseau, négligeable.
 - Profondeur de champ (v6.9) : 4 passes plein écran (2 à demi-résolution), uniquement pendant les gros plans ; mesuré en rendu logiciel à 960 × 540 : +4 à +9 ms par image (processeur), soit de l'ordre de 1 à 2 ms sur un GPU intégré en 1080p. Coupée automatiquement si la résolution dynamique descend sous 0,7. Cardans et tremblement : coût négligeable.
+- v7.18 : chantier fermé : aucun coût ; ouvert : démo figée, un rendu d'aperçu par image (≈ 1–3 ms sur GPU ; 75 à 170 ms en rendu logiciel dans les tests), construction d'un aperçu 1 à 120 ms, vignettes des 23 types en ≈ 2 s sur GPU (20 à 35 s en rendu logiciel) ; usure distincte : un uniforme de plus, aucun programme GPU supplémentaire.
+- v7.17 : découpe étalée (≈ 4 ms par image pendant une vingtaine d'images, rendu logiciel) ; destroyer brisé : 55–60 maillages (intact : ≈ 70) + 1 fond et 1 halo par cassure.
+- v7.16 : débris en un seul maillage instancié (200 au plus), fumée en un nuage de points (320), ondes : 4 anneaux réutilisés ; +1 à +3 appels de dessin pendant une explosion.
+- v7.15 : aucun effet nouveau ; 3 cargos fusionnés (≈ 40 appels chacun) pendant une attaque de convoi ; mesuré en rendu logiciel : **85 à 190 appels par image** pendant les engagements ; le choix d'un plan `strafeRun` évalue 16 positions par chasseur (une fois par plan).
+- v7.14 : un groupe d'effets d'engagement en 4 appels de dessin (traçantes, têtes, traînées de missiles, têtes de missiles) + 1 par éclair visible ; tampons fixes (560 traçantes, 40 missiles × 14 points), aucune allocation par image ; 2 à 6 vaisseaux militaires de plus pendant l'engagement seulement.
+- v7.13 : effets d'impact en 1 appel de dessin (nuage de points), +1 appel par bulle de bouclier visible ; étiquettes : 0,1 ms par mise à jour (15/s, DOM réutilisé, rendu logiciel) ; rien par image hors combat en dehors d'un parcours de 900 particules inactives.
+- v7.12 : aucun objet nouveau ; le trajet de la carte est échantillonné une fois (25 points) par escale.
+- v7.11 : aucun objet nouveau (le passager est le visiteur du poste 1, déjà fusionné quand il vient du trafic ; un passager choisi au sélecteur garde sa géométrie d'origine). Les visites avec voyage durent plus longtemps en temps réel (fenêtre d'orbite de 36 à 52 s). Mémoire stable sur 20 min simulées.
+- v7.10 : visiteur au poste 1 = un vaisseau du jeu de plus, mais fusionné (37 à 49 appels) comme le vaisseau garé ; en plan de dock, **260 à 450 appels par image** au total avec les deux vaisseaux (340 à 450 en v7.9 avec le seul vaisseau garé non fusionné). Escale : quelques évaluations de trajectoire par image. Tas JavaScript stable sur 20 min simulées.
+- v7.9 : aucun coût nouveau par image (caméras seules).
+- v7.8 : porte-vaisseaux ≈ 44 appels de dessin (au lieu de 64 avec 4 moteurs) ; destroyer ≈ 67, corvette ≈ 30 avec les moteurs du jeu ; radiateurs : une valeur par matériau et par image.
 - v7.7 : aucun coût nouveau par image ; les plans lourds (planète plein écran) durent plus longtemps. Lever de planète : une vingtaine de lancers de rayons une seule fois au début du plan.
 - v7.6 : porte-vaisseaux ≈ 64 appels de dessin (civil, géode et 4 moteurs du jeu compris : ≈ 7 par moteur) à ≈ 75 (militaire, tourelles), émetteurs des anneaux fusionnés ; le vaisseau garé coûte comme un cargo du trafic (120 à 200 appels quand il est à l'écran) : en plan de dock, 340 à 450 appels par image au total (rendu logiciel, toutes tranches). Ombre de soute : quelques opérations par pixel de coque, sautées hors du volume du dock. Porte-vaisseaux et flotte militaire compilés pendant l'étape « COMPILING SHADERS » (≈ 0,8 s de plus en rendu logiciel) : plus d'à-coup à leur première apparition. Mémoire stable sur 20 min simulées.
 - v7.5 : exercices de tir en un seul lot de traçantes (1 appel), un lot de têtes lumineuses (1 appel) et 24 éclats réutilisés, groupe caché hors exercice ; hangars du destroyer : +2 appels (masques des baies). Tas JavaScript stable sur 20 min simulées.
@@ -771,8 +1138,11 @@ Alternative écartée : le *logarithmic depth buffer* de three.js aurait imposé
 - Les étoiles du champ galactique gardent le rendu du jeu (points lumineux, taille angulaire bornée) ; seules les étoiles visitées ont le rendu « cinéma ».
 - Une ceinture réelle est invisible dans son ensemble : seul un amas local est montré de près.
 - RCS : seules les buses radiales des blocs sont animées (pas de roulis pur) ; les navettes du jeu n'ont pas de blocs RCS.
-- Porte-vaisseaux (v7.6) : décor et plans seulement — le vaisseau garé ne bouge pas (rangement, sortie et voyage en v7.7 et v7.8), pinces figées ouvertes ; l'ombre de soute ne concerne que le volume du dock (la coque n'ombre pas un vaisseau à couple, un vaisseau garé n'ombre pas le pont) et un seul porteur à la fois (le plus proche de la caméra).
-- Flotte militaire : pas de combat réel (exercices sans destruction, pas d'ennemis) ; le panneau FLEET remplace un onglet du sélecteur du jeu (celui-ci reste limité aux 10 modèles du catalogue) ; les traçantes ne sont pas occultées par les coques (effet additif) ; les formations sont rigides (décalages fixes dans le repère du chef) et la ronde des chasseurs autour du destroyer se fait en temps réel même en accéléré.
+- Porte-vaisseaux : le vaisseau du poste 2 reste garé (seul le poste 1 reçoit des escales) ; le visiteur revient avec le même nom et la même livrée d'une escale à l'autre ; pas de bras d'avitaillement (le portique vient au-dessus du poste) ; une première apparition au début de l'approche peut se voir de loin (≈ 1 km) ; en voyage, le passager n'a pas ses engins de baie, et un vaisseau choisi au sélecteur pendant l'orbite apparaît directement amarré (embarquement non filmé) ; un porteur choisi au sélecteur pendant un voyage arrête ce voyage (l'ancien porteur reste en orbite avec son passager) ; l'ombre de soute ne concerne que le volume du dock (la coque n'ombre pas un vaisseau à couple, un vaisseau garé n'ombre pas le pont) et un seul porteur à la fois (le plus proche de la caméra).
+- Combat (v7.13–v7.17) : le porte-vaisseaux ne lance pas ses propres chasseurs (il n'a pas de hangar) et l'assaut exige un porteur militaire ; les étiquettes ne sont pas masquées par les coques ou les planètes qui passent devant et se superposent dans les plans larges (touche `H`) ; les points chauds sont posés sur la boîte de la coque ; le drone-cible se répare par magie entre deux exercices ; les traçantes et les traînées ne sont pas occultées par les coques (effet additif) ; les effets et les dégâts utilisent un hasard non graine (même graine = même plan de combat, pas forcément la même issue) ; les chasseurs d'escorte suivent encore la trajectoire d'un assaillant désemparé ou détruit (en tirant sur un autre) ; les débris ne se heurtent pas et ne sont pas incandescents (les braises en tiennent lieu) ; les chasseurs ne se brisent pas (ils explosent) ; la cassure suit les triangles de la coque (dents larges là où la coque a de grandes faces) et son fond sombre est un disque plat ; les tronçons ne se heurtent pas.
+- Mémoire (v7.19) : stable sur 2 h simulées en rendu logiciel ; des sessions de plusieurs heures sur GPU réel restent à observer (pilotes, caches du navigateur).
+- Chantier (v7.18) : l'aperçu est un studio (grille, deux lumières), pas la lumière du système visité ; les vignettes sont refaites à chaque rechargement de la page ; l'aspect choisi pour un porte-vaisseaux déjà en orbite remplace le sien ; l'aperçu d'un vaisseau du jeu montre la même coque et la même livrée que le vaisseau qui rejoint la scène, mais le nom et l'immatriculation sont tirés à ce moment-là.
+- Flotte militaire : exercices sans destruction ; le panneau FLEET remplace un onglet du sélecteur du jeu (celui-ci reste limité aux 10 modèles du catalogue) ; les traçantes ne sont pas occultées par les coques (effet additif) ; les formations sont rigides (décalages fixes dans le repère du chef) et la ronde des chasseurs autour du destroyer se fait en temps réel même en accéléré.
 - Seuls les 4 modèles supraluminiques passent d'un système à l'autre : les autres n'apparaissent qu'en trafic local ou comme vedette choisie au sélecteur.
 - Livrées et projecteurs : les projecteurs sont des cônes sans appareil visible ni ombre portée ; les petits engins gardent leurs couleurs. Anneaux : la pré-charge est un effet visuel (le calendrier des départs n'a pas changé) ; le halo additif prend le flou de ce qui est derrière lui en profondeur de champ.
 - Textures HD : seules les 4 textures partagées du générateur sont refaites (reconnues par leur taille : une autre version du jeu qui en changerait les dimensions retomberait sur les textures d'origine) ; au-delà de ~1 m de distance, la finesse reste bornée par le texel 4× (≈ 95 à 330 px par mètre), relayée par le détail procédural.
@@ -785,6 +1155,7 @@ Alternative écartée : le *logarithmic depth buffer* de three.js aurait imposé
 - Profondeur de champ : les effets additifs (jets, bouffées RCS, lueurs) n'écrivent pas la profondeur et prennent le flou de ce qui est derrière eux ; le flou de premier plan reste dans la silhouette de l'objet (pas de débordement sur un sujet net) ; dans les gros plans, l'anticrénelage matériel est remplacé par un FXAA.
 - Carte : vue de dessus d'une tranche de ±41 al (les étoiles hors tranche n'apparaissent pas, sauf le prochain saut) ; dans un système, le plan orbital est vu de face et les distances sont logarithmiques ; les vaisseaux ne sont suivis que dans le système courant ; les nébuleuses lointaines ne sont pas filmables (le double-clic mène à l'étoile la plus proche) ; noms de types en anglais comme le reste de la démo.
 - Radar : les contacts très proches par rapport à la portée sont posés sur un petit cercle intérieur (jamais sous le vaisseau central) ; la liste donne la vraie distance.
+- Escale : les planètes restent fixes sur leur orbite pendant le transfert, qui dure pourtant jusqu'à 11 jours ; une vedette (sélecteur, FLEET) choisie pendant l'orbite A rejoint la planète B.
 - Lever de planète : seulement dans les systèmes avec lunes ; contre-champ : seulement pour les arrivées par saut (la sortie de distorsion garde son plan fixe). L'éclipse totale n'est possible que si le système possède une lune ; sinon le réalisateur choisit un lever d'étoile, une éruption ou un transit du vaisseau.
 
 ---
@@ -799,6 +1170,18 @@ Alternative écartée : le *logarithmic depth buffer* de three.js aurait imposé
 | v3 | Astéroïdes et lunes texturés, travellings de découverte sans vaisseau, vol supraluminique, version minifiée |
 | v4 | Aurores polaires et travellings en rase-mottes sous les aurores |
 | v5 | Soleils « cinéma » (granulation, taches, chromosphère, couronne, protubérances, éruptions), éclipses totales, levers d'étoile, transits |
+| v7.19 | **Fuite mémoire corrigée** (lot 23) : les tampons d'effets (étincelles, fumée, traçantes, obus) ne retiennent plus les vaisseaux libérés, ni donc les systèmes visités ; chasseurs des hangars libérés avec leur porteur ; tas stable sur 2 h simulées (≈ 165–200 Mo, contre +115 à +130 Mo par heure avant) ; test `tests/memory.js` |
+| v7.18 | **Chantier** (lot 22) : bouton SHIP / touche `C` — les **23 types** de vaisseaux avec vignettes, aperçu 3D tournant sur grille à l'échelle, curseurs **ÂGE** (temps) et **USURE** (service) distincts dans le shader, préréglages, faction, propulsion, autre coque ; le vaisseau rejoint la scène avec cet aspect ; mise en page téléphone |
+| v7.17 | **Coques brisées** (lot 21) : corvettes et destroyers détruits brisés en 2 ou 3 **tronçons** (découpe des triangles préparée pendant l'épave, bord déchiré, fusion par matériau) qui dérivent et tournent jusqu'au départ du système ; cassures incandescentes, fumée, étincelles ; plan `hulkPass` ; `?hullbreak=` ; effets ancrés sur la trajectoire du vaisseau détruit |
+| v7.16 | **Combat IV** (lot 20) : **destruction** des épaves militaires — explosions secondaires, éclair, boule de feu, fumée, braises, onde de choc, 22 à 40 débris ; plan `wreckDrift`, **ralenti** et recadrage ; `?destroy=`, `?slowmo=` ; civils, porteur et vedette jamais détruits |
+| v7.15 | **Combat III** (lot 19) : **attaque de convoi** (passes de mitraillage, escorte), **raid de pirates** (patrouille surgie d'un saut, fuite des pirates) et **assaut de porte-vaisseaux** (bouclier et défense rapprochée du porteur) ; tir de barrage, changement de cible, impacts de missiles sur la coque ; plans `strafeRun`, `convoyPass`, `patrolArrival` ; entrées CONVOY ATTACK, PIRATE RAID, CARRIER ASSAULT du panneau FLEET |
+| v7.14 | **Combat II** (lot 18) : **moteur d'engagement** — escarmouche de chasseurs (3 duels, poursuites et dépassements) et duel de destroyers (tourelles, salves de missiles, défense rapprochée) ; missiles guidés et interceptables ; côté jour de la planète ; plans `battleWide`, `dogfight`, `missileCam`, `duelSide` ; section COMBAT du panneau FLEET ; `?combat=` |
+| v7.13 | **Combat I** (lot 17) : factions (Coalition, League, Irregulars) et livrées ; état des vaisseaux (énergie → bouclier → coque), désemparé sous 22 % ; impacts (bulle de bouclier, étincelles, points chauds, jets de gaz) ; étiquettes et jauges (bouton DATA, touche `H`) ; exercices de tir avec dégâts et cessez-le-feu |
+| v7.12 | **Escale interplanétaire** (lot 16) : orbite A écourtée, transfert *flip-and-burn* vers une planète voisine, orbite B, départ depuis B ; plans `leaveOrbit` et `planetApproach` calés sur les raccords ; trajet sur la carte ; `?stopover=` |
+| v7.11 | **Porte-vaisseaux III** (lot 15) : **voyage à bord** — le porteur part (saut quantique, distorsion avec `?ftl=warp`) avec son passager, son vaisseau garé et ses drones ; arrivée, débarquement, tour libre, réembarquement ; mode Suivre pour tous les vaisseaux (sélecteur : un vaisseau sans moyen de saut part à bord d'un porteur) ; Auto : 1 fois sur 2 ; carte et radar « à bord de » ; `?trip=` |
+| v7.10 | **Porte-vaisseaux II** (lot 14) : **escale au poste 1** — approche aux RCS, glissement à couple à travers le champ de force (onde, champ abaissé), pinces animées, portique au-dessus du poste, sortie par l'autre bord et allumage à distance ; calage sur la fenêtre d'orbite ; plans `berthApproach`, `fieldCross`, `controlRoom`, `deckLevel`, `berthDepart` ; vaisseaux à bord fusionnés (÷3 à ÷5 appels de dessin) |
+| v7.9 | **Réalisation II** (lot 13) : plans-séquences **révélation** (20–30 s, de la coque à la planète), **survol des anneaux**, **tour du système** de planète en planète |
+| v7.8 | **Propulsion hard SF du porte-vaisseaux** (lot 12) : torche de fusion unique de 74 m, bouclier anti-radiations, bobines, treillis, réservoirs, radiateurs en croix qui rougeoient avec la poussée ; plans `torchClose` et `radiatorPass` ; moteurs du jeu sur la corvette et le destroyer |
 | v7.7.1 | Numéro de version dans la ligne de crédits (écran d'accueil et bas de l'écran) : constante `VERSION` de `live2.js`, vérifiée par `package.py` |
 | v7.7 | **Réalisation I** : éclipses rares (≈ 15 % des systèmes, jamais deux de suite, `?eclipse=`), travellings planétaires de 15 à 25 s plus lents et plus fréquents ; nouveaux plans : **lever de planète** au-dessus d'une lune, **terminateur** jour → nuit, **dérive planétaire** avec le vaisseau, **contre-champ d'arrivée** |
 | v7.6.2 | Porte-vaisseaux : **moteurs de la dernière version** (ensembles de shipdrive.js : cloches Rao, col incandescent, bobines, cardans, jets de torche de fusion qui suivent le cardan) à la place des tuyères de petits engins |

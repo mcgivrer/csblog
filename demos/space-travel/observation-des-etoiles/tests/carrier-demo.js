@@ -14,7 +14,7 @@ const fs = require('fs');
  const snap = async (name) => { const img = await p.evaluate(()=>{ __CINE.step(1/30, false); return renderer.domElement.toDataURL('image/jpeg', .88); }); fs.writeFileSync(`${pre}_${name}.jpg`, Buffer.from(img.split(',')[1], 'base64')); };
  const r0 = await p.evaluate(()=>{ const t = __CINE.timings(); while(__CINE.time() < t.tO0 + 2) __CINE.step(.25, true); for(let i = 0; i < 40 && !__CINE.carrierDbg(); i++) __CINE.step(.25, true); return __CINE.carrierDbg(); });
  console.log('present', JSON.stringify(r0));
- for(const t of ['dockPass', 'dockInterior', 'dockBerth', 'lateral']){
+ for(const t of ['dockPass', 'dockInterior', 'dockBerth', 'torchClose', 'radiatorPass', 'lateral']){
    const r = await p.evaluate(([t, k])=>{ window.__P0 = window.__P0 || renderer.info.programs.map(q => q.name + '|' + q.cacheKey.slice(0, 60)); __CINE.forceShot(t, k); for(let i = 0; i < 45; i++) __CINE.step(1/30, true);
      renderer.info.autoReset = false; renderer.info.reset(); const t0 = performance.now(); __CINE.step(1/60, false); const ms = performance.now() - t0; const calls = renderer.info.render.calls; renderer.info.autoReset = true;
      return Object.assign({ calls, ms: Math.round(ms), progs: renderer.info.programs.length, pw: __CINE.prewarmMs }, __CINE.carrierDbg()); }, [t, r0 && r0.kind]);

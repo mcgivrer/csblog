@@ -295,7 +295,7 @@ CR.build = function(kind, opts){
   let docks = [];
   if(spec.bays && window.__SHIPGLASS && __SHIPGLASS.addBays) docks = __SHIPGLASS.addBays(G, spec.bays, opts.age || 0, s, 1).docks;   // v7.5 : hangars à champ de force (destroyer)
   let wearU = null;
-  if(window.__SHIPWEAR) wearU = __SHIPWEAR.apply(G, opts.age || 0, s, 1);             // v7.1 : aussi neuf (micro-relief des gros plans)
+  if(window.__SHIPWEAR) wearU = __SHIPWEAR.apply(G, opts.age || 0, s, 1, opts.wearAmt);             // v7.1 : aussi neuf (micro-relief des gros plans)
   G.traverse(m => { if(m.isMesh && m.renderOrder < ORDER && !m.userData.portal) m.renderOrder = ORDER; });
   if(docks.length) G.children.forEach(m => { if(m.isMesh && !m.userData.portal && !m.userData.noFrame && !m.userData.glass) m.renderOrder = 0; });   // coque avant les portails (comme les vaisseaux du jeu)
   const box3 = new THREE.Box3(); G.updateMatrixWorld(true); G.traverse(m => { if(m.isMesh && !m.userData.noFrame){ m.geometry.computeBoundingBox(); box3.union(m.geometry.boundingBox.clone().applyMatrix4(m.matrixWorld)); } });

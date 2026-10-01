@@ -1,6 +1,6 @@
 /* Lancement de la démo « Observation des étoiles » : attente du monde, prise de contrôle du moteur, boucle infinie */
 (function(){
-  var VERSION = 'v7.7.1';                                              // version affichée dans la ligne de crédits (mise à jour à chaque livraison)
+  var VERSION = 'v7.19';                                              // version affichée dans la ligne de crédits (mise à jour à chaque livraison)
   var CREDIT = '(c) 2026 Frédéric Delorme & claude.ai - Music by ScoreStudio - Observation des étoiles ' + VERSION;
   var css = document.createElement('style');
   css.textContent =
@@ -40,20 +40,20 @@
     "#sttUi button.lock{color:#ffb454;border-color:#a97a3d}#sttUi button.off{color:#5d6f92}" +
     "#sttToast{position:fixed;left:50%;bottom:14vh;transform:translateX(-50%);z-index:13;font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.08em;color:#e8edf5;background:rgba(11,18,32,.9);border:1px solid #25375c;border-left:2px solid #ffb454;padding:10px 16px;opacity:0;transition:opacity .4s;pointer-events:none;max-width:80vw;text-align:center}" +
     "#sttToast.on{opacity:1}#sttToast .a{color:#ffb454}#sttToast .c{color:#5eead4}" +
-    "#sttFleet{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:14;display:none;width:min(440px,92vw);font-family:'JetBrains Mono',monospace;background:rgba(11,18,32,.96);border:1px solid #25375c;border-left:2px solid #ff6b5e;padding:16px 16px 12px}" +
-    "#sttFleet.on{display:block}#sttFleet .hd{font-size:11px;letter-spacing:.14em;color:#ff6b5e;margin-bottom:10px}#sttFleet .hd2{color:#5eead4;margin-top:6px}" +
+    "#sttFleet{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:14;display:none;width:min(440px,92vw);max-height:92vh;overflow:auto;font-family:'JetBrains Mono',monospace;background:rgba(11,18,32,.96);border:1px solid #25375c;border-left:2px solid #ff6b5e;padding:16px 16px 12px}" +
+    "#sttFleet.on{display:block}#sttFleet .hd{font-size:11px;letter-spacing:.14em;color:#ff6b5e;margin-bottom:10px}#sttFleet .hd2{color:#5eead4;margin-top:6px}#sttFleet .hd3{color:#ff9a3c;margin-top:6px}" +
     "#sttFleet button{display:block;width:100%;text-align:left;margin:0 0 8px;padding:10px 12px;background:#0f1a30;border:1px solid #25375c;color:#e8edf5;font:inherit;cursor:pointer}" +
     "#sttFleet button b{display:block;font-size:12px;letter-spacing:.1em;color:#ffb454}#sttFleet button span{font-size:11px;color:#8ea0c4}" +
     "#sttFleet button:hover,#sttFleet button:focus-visible{border-color:#ffb454;outline:none}#sttFleet button.x{text-align:center;color:#8ea0c4;margin:4px 0 0}" +
     "@media (prefers-reduced-motion: reduce){#sttUi,#sttToast{transition:none}}";
   document.head.appendChild(css);
   function el(id, html){ var d = document.createElement('div'); d.id = id; d.innerHTML = html; return d; }
-  var start = el('sttStart', '<div class="eb">// PROCEDURAL SPACE SIMULATION</div><div class="mn">SPACE TRAVEL <span class="amber">&amp;</span> TRANSPORT</div><div class="sub">Observation des étoiles — endless cinematic mode</div><div class="go" id="sttGo">GENERATING UNIVERSE…</div><div class="pb" id="sttPb" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Universe generation"><i></i></div><div class="pl" id="sttPl">BOOTING ENGINE<b>0 %</b></div><div id="sttPick" role="button" tabindex="0">CHOOSE A SHIP <span class="ch">· RANDOM</span></div><div class="keys">SPACE pause · F fullscreen · V ship · L follow · M map · R radar</div><div class="cr"></div>');
+  var start = el('sttStart', '<div class="eb">// PROCEDURAL SPACE SIMULATION</div><div class="mn">SPACE TRAVEL <span class="amber">&amp;</span> TRANSPORT</div><div class="sub">Observation des étoiles — endless cinematic mode</div><div class="go" id="sttGo">GENERATING UNIVERSE…</div><div class="pb" id="sttPb" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Universe generation"><i></i></div><div class="pl" id="sttPl">BOOTING ENGINE<b>0 %</b></div><div id="sttPick" role="button" tabindex="0">CHOOSE A SHIP <span class="ch">· RANDOM</span></div><div class="keys">SPACE pause · F fullscreen · V ship · L follow · M map · R radar · H data</div><div class="cr"></div>');
   var title = el('sttTitle', '<div class="eb">// PROCEDURAL SPACE SIMULATION</div><div class="mn">SPACE TRAVEL <span class="amber">&amp;</span> TRANSPORT</div>');
   var cap = el('sttCap', '<span class="ship"><span class="ty"></span> / <span class="nm"></span> <span class="sep">--</span> </span><span class="loc"></span><span class="tl"></span>');
   var credit = el('sttCredit', ''); credit.textContent = CREDIT;
   var pause = el('sttPause', 'PAUSE');
-  var ui = el('sttUi', '<button type="button" id="sttMapBtn">MAP<span class="k">M</span></button><button type="button" id="sttRadarBtn">RADAR<span class="k">R</span></button><button type="button" id="sttShipBtn">SHIP<span class="k">V</span></button><button type="button" id="sttFleetBtn">FLEET<span class="k">G</span></button><button type="button" id="sttLockBtn">AUTO<span class="k">L</span></button>'); ui.className = 'demo-ui';
+  var ui = el('sttUi', '<button type="button" id="sttMapBtn">MAP<span class="k">M</span></button><button type="button" id="sttRadarBtn">RADAR<span class="k">R</span></button><button type="button" id="sttShipBtn">SHIP<span class="k">C</span></button><button type="button" id="sttFleetBtn">FLEET<span class="k">G</span></button><button type="button" id="sttDataBtn">DATA<span class="k">H</span></button><button type="button" id="sttLockBtn">AUTO<span class="k">L</span></button>'); ui.className = 'demo-ui';
   var toast = el('sttToast', ''); toast.className = 'demo-ui';
   /* v7.5 : panneau FLEET — suivre une formation militaire dans le système courant (ou au suivant si le départ est engagé) */
   var fleet = el('sttFleet', '<div class="hd">// MILITARY FLEET</div>' +
@@ -62,6 +62,12 @@
     '<button type="button" data-k="escort"><b>CORVETTE ESCORT</b><span>Corvette flying alongside a freighter</span></button>' +
     '<div class="hd hd2">// SHIP CARRIER</div>' +
     '<button type="button" data-k="carrier"><b>SHIP CARRIER</b><span>640 m through-dock carrier, a freighter berthed aboard</span></button>' +
+    '<div class="hd hd3">// COMBAT</div>' +
+    '<button type="button" data-k="combat-skirmish"><b>FIGHTER SKIRMISH</b><span>Two patrols of 3 fighters, dogfights and missiles</span></button>' +
+    '<button type="button" data-k="combat-duel"><b>LINE DUEL</b><span>Two destroyers exchanging railgun fire and missile salvos</span></button>' +
+    '<button type="button" data-k="combat-convoy"><b>CONVOY ATTACK</b><span>Raiders strafe three freighters, corvette and fighters escort</span></button>' +
+    '<button type="button" data-k="combat-raid"><b>PIRATE RAID</b><span>Pirates on a lone freighter until a patrol jumps in</span></button>' +
+    '<button type="button" data-k="combat-assault"><b>CARRIER ASSAULT</b><span>Destroyer and fighters against a fleet carrier\'s defences</span></button>' +
     '<button type="button" data-k="close" class="x">CLOSE · Esc</button>');
   fleet.className = 'demo-ui'; fleet.setAttribute('role', 'dialog'); fleet.setAttribute('aria-label', 'Military fleet');
   function mount(){ [start, title, cap, credit, pause, ui, toast, fleet].forEach(function(e){ document.body.appendChild(e); }); start.querySelector('.cr').textContent = CREDIT; }
@@ -74,7 +80,19 @@
   function modelName(id){ var m = SHIPGEN.MODELS.filter(function(x){ return x.id === id; })[0]; return m ? m.name : id; }
   function refreshLock(){ var b = document.getElementById('sttLockBtn'); if(!b || !window.__CINE) return; var f = __CINE.followHero; b.firstChild.textContent = f ? 'FOLLOW' : 'AUTO'; b.classList.toggle('lock', f); }
   function setPaused(p, silent){ paused = p; pause.style.display = p && !silent ? 'flex' : 'none'; try { p ? musicAudio.pause() : (running && __CINE.OPT.music && musicAudio.play()); } catch(_){} }
-  var wasPaused = false;
+  var wasPaused = false, yardOpen = false;
+  function openYard(){                                                          // v7.18 : chantier — tous les vaisseaux, âge et usure
+    if(!running || selOpen || yardOpen || !window.__YARD) return;
+    if(window.__STARMAP && __STARMAP.isOpen()) __STARMAP.close(); if(fleetOpen) closeFleet();
+    yardOpen = __YARD.open(function(res){
+      yardOpen = false; last = performance.now(); if(!res) return;
+      var r = __CINE.useShip(res.id, res.look), nm = esc(res.name), aw = ' <span class="c">age ' + Math.round(res.look.age*100) + ' % · wear ' + Math.round(res.look.wear*100) + ' %</span>';
+      if(r === 'invalid') return;
+      showToast(r === 'trip' ? '<span class="a">CARRIER</span> · ' + nm + ' <span class="c">boards a ship carrier — the journey continues aboard</span>'
+              : r === 'now' ? '<span class="a">SHIPYARD</span> · ' + nm + ' <span class="c">joins the orbit — camera follows it now</span> ·' + aw
+                            : '<span class="a">SHIPYARD</span> · ' + nm + ' <span class="c">at the next system</span> ·' + aw);
+    });
+  }
   function openSelector(){
     if(selOpen || !ready || typeof openShipSelect !== 'function') return;
     if(window.__STARMAP && __STARMAP.isOpen()) __STARMAP.close();
@@ -88,7 +106,8 @@
       var r = __CINE.setHero(id, opts);
       var nm = esc(modelName(id));
       if(!running){ document.querySelector('#sttPick .ch').textContent = '· ' + modelName(id).toUpperCase(); return; }
-      showToast(r === 'now' ? '<span class="a">RELAY</span> · ' + nm + ' <span class="c">joins the orbit — camera follows it now</span>'
+      showToast(r === 'trip' ? '<span class="a">CARRIER</span> · ' + nm + ' <span class="c">boards a ship carrier — the journey continues aboard</span>'   // v7.11
+              : r === 'now' ? '<span class="a">RELAY</span> · ' + nm + ' <span class="c">joins the orbit — camera follows it now</span>'
                             : '<span class="a">RELAY</span> · ' + nm + ' <span class="c">takes over at the next system</span>');
     });
   }
@@ -97,6 +116,9 @@
   function closeFleet(){ fleetOpen = false; fleet.classList.remove('on'); }
   var FLEET_NAMES = { patrol: 'Fighter patrol', station: 'Destroyer on station', escort: 'Corvette escort', carrier: 'Ship carrier' };
   fleet.addEventListener('click', function(e){ var b = e.target.closest('button'); if(!b) return; var k = b.getAttribute('data-k'); closeFleet(); if(k === 'close' || !window.__CINE) return;
+    if(k.indexOf('combat-') === 0){ var ck = k.slice(7), cr = __CINE.startCombat ? __CINE.startCombat(ck) : 'invalid'; if(cr === 'invalid') return;   // v7.14 : engagement
+      var CKN = { skirmish: 'Fighter skirmish', duel: 'Line duel', convoy: 'Convoy attack', raid: 'Pirate raid', assault: 'Carrier assault' }; ck = (cr === 'now' && __CINE.lastCombatKind) || ck;
+      showToast('<span class="a">COMBAT</span> · ' + (CKN[ck] || 'Engagement') + ' <span class="c">' + (cr === 'now' ? '— starting now' : cr === 'busy' ? '— an engagement is already under way' : '— at the next system') + '</span>'); return; }
     var r = k === 'carrier' ? (__CINE.showCarrier ? __CINE.showCarrier() : 'invalid') : __CINE.showMilitary(k); if(r === 'invalid') return;   // v7.6 : porte-vaisseaux
     var nm = FLEET_NAMES[k]; if(k === 'carrier' && __CINE.carrierDbg){ var cd = __CINE.carrierDbg(); if(cd && cd.type) nm = cd.type; }
     showToast('<span class="a">FLEET</span> · ' + nm + ' <span class="c">' + (r === 'now' ? '— camera follows it now' : '— at the next system') + '</span>'); });
@@ -106,12 +128,14 @@
   /* carte (starmap.js) et radar (radar.js) */
   function openMap(){ if(!running || selOpen || !window.__STARMAP) return; __STARMAP.open(); }
   function refreshRadar(){ var b = document.getElementById('sttRadarBtn'); if(b && window.__RADAR) b.classList.toggle('off', !__RADAR.isOn()); }
+  function refreshData(){ var b = document.getElementById('sttDataBtn'); if(b && window.__LABELS) b.classList.toggle('off', !__LABELS.isOn()); }   // v7.13 : étiquettes et jauges
+  function toggleData(){ if(!window.__LABELS) return; var on = __LABELS.toggle(); refreshData(); showToast('<span class="a">DATA</span> <span class="c">· ship labels and gauges ' + (on ? 'on' : 'off') + '</span>'); }
   function toggleRadar(){ if(!window.__RADAR) return; var on = __RADAR.toggle(); refreshRadar(); showToast('<span class="a">RADAR</span> <span class="c">· ' + (on ? 'on' : 'off') + '</span>'); }
-  window.__DEMO = { toast: function(h){ showToast(h); }, running: function(){ return running; } };
+  window.__DEMO = { toast: function(h){ showToast(h); }, running: function(){ return running; }, openYard: function(){ openYard(); return yardOpen; }, yardOpen: function(){ return yardOpen; } };
   function pokeUi(){ if(!running) return; ui.classList.add('on'); clearTimeout(uiTimer); uiTimer = setTimeout(function(){ ui.classList.remove('on'); }, 2600); }
   window.addEventListener('mousemove', pokeUi, { passive: true });
   ui.addEventListener('click', function(e){ var b = e.target.closest('button'); if(!b) return; b.blur();
-    if(b.id === 'sttShipBtn') openSelector(); else if(b.id === 'sttFleetBtn') openFleet(); else if(b.id === 'sttLockBtn') toggleFollow(); else if(b.id === 'sttMapBtn') openMap(); else if(b.id === 'sttRadarBtn') toggleRadar(); pokeUi(); });
+    if(b.id === 'sttShipBtn') openYard(); else if(b.id === 'sttFleetBtn') openFleet(); else if(b.id === 'sttLockBtn') toggleFollow(); else if(b.id === 'sttMapBtn') openMap(); else if(b.id === 'sttRadarBtn') toggleRadar(); else if(b.id === 'sttDataBtn') toggleData(); pokeUi(); });
   ui.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
   /* facteur d'accélération du temps (⏱ ×N) : mis à jour en continu, sans refaire le fondu de la légende */
   function setTimeLapse(c){ var t = c && c.tl ? '\u23f1 ' + c.tl : ''; if(t !== tlTxt){ tlTxt = t; cap.querySelector('.tl').textContent = t; } }
@@ -140,14 +164,16 @@
     var frameMs = now - last;
     var dt = Math.min(.05, Math.max(0, frameMs/1000)); last = now;
     if(running && !paused) adaptResolution(now, frameMs);
-    if(!selOpen && !window.__DEMO_NOLOOP) try {          // sélecteur ouvert : la démo se fige (un seul rendu WebGL actif) ; __DEMO_NOLOOP : tests pas à pas
+    if(yardOpen && window.__YARD) try { __YARD.frame(now); } catch(e){ console.error(e); }   // v7.18 : chantier ouvert — démo figée, aperçu seul
+    if(!selOpen && !yardOpen && !window.__DEMO_NOLOOP) try {          // sélecteur ouvert : la démo se fige (un seul rendu WebGL actif) ; __DEMO_NOLOOP : tests pas à pas
       __CINE.step(paused ? 0 : dt);
       setCaption(__CINE.caption()); setTimeLapse(__CINE.caption());
     } catch(e){ console.error(e); }
     try {
       var mapOpen = !!(window.__STARMAP && __STARMAP.isOpen());
       if(mapOpen) __STARMAP.frame(now);
-      if(window.__RADAR) __RADAR.frame(now, running && !selOpen && !mapOpen);
+      if(window.__RADAR) __RADAR.frame(now, running && !selOpen && !yardOpen && !mapOpen);
+      if(window.__LABELS) __LABELS.frame(now, running && !selOpen && !yardOpen && !mapOpen && !fleetOpen);
     } catch(e){ console.error(e); }
     window.__raf(loop);
   }
@@ -160,6 +186,7 @@
   function fullscreen(){ var d = document.documentElement; document.fullscreenElement ? document.exitFullscreen() : (d.requestFullscreen && d.requestFullscreen()); }
   window.__onKey = function(e){
     if(selOpen){ if(e.key === 'Escape') cancelSelector(); return; }
+    if(yardOpen){ if(e.key === 'Escape' && window.__YARD) __YARD.close(null); return; }
     if(fleetOpen){ if(e.key === 'Escape' || e.key === 'g' || e.key === 'G') closeFleet(); return; }
     if(window.__STARMAP && __STARMAP.isOpen()){                         // carte ouverte : ses raccourcis, plus pause et plein écran
       if(e.key === ' '){ setPaused(!paused); return; }
@@ -169,10 +196,12 @@
       return;
     }
     if(e.key === 'v' || e.key === 'V'){ openSelector(); return; }
+    if(e.key === 'c' || e.key === 'C'){ openYard(); return; }
     if(!running){ if(e.key === 'Enter' || e.key === ' ') go(); return; }
     if(e.key === 'm' || e.key === 'M'){ openMap(); return; }
     if(e.key === 'g' || e.key === 'G'){ openFleet(); return; }
     if(e.key === 'r' || e.key === 'R'){ toggleRadar(); return; }
+    if(e.key === 'h' || e.key === 'H'){ toggleData(); return; }
     if(e.key === 'l' || e.key === 'L'){ toggleFollow(); return; }
     if(e.key === ' '){ setPaused(!paused); }
     if(e.key === 'f' || e.key === 'F') fullscreen();
@@ -220,7 +249,7 @@
           mark('shaders');
           setProgress(1, 'UNIVERSE READY');
           document.getElementById('sttGo').textContent = '▶  CLICK TO LAUNCH';
-          ready = true; refreshLock(); refreshRadar();
+          ready = true; refreshLock(); refreshRadar(); refreshData();
           var pick = document.getElementById('sttPick');
           pick.addEventListener('click', function(e){ e.stopPropagation(); openSelector(); });
           pick.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); e.stopPropagation(); openSelector(); } });

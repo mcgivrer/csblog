@@ -35,7 +35,7 @@ float holdSun(vec3 pv, vec3 Lv){
 }
 `;
 const PARS_F = `
-uniform float uAge; uniform float uWSeed; uniform vec2 uZr; uniform float uWLen; uniform float uWKind; uniform float uDark; uniform float uFlood; uniform vec4 uSpotP[4]; uniform vec4 uSpotD[4]; uniform vec4 uRing; uniform float uRingI;
+uniform float uAge; uniform float uWear; uniform float uWSeed; uniform vec2 uZr; uniform float uWLen; uniform float uWKind; uniform float uDark; uniform float uFlood; uniform vec4 uSpotP[4]; uniform vec4 uSpotD[4]; uniform vec4 uRing; uniform float uRingI;
 varying vec3 vShip;
 float wRust = 0.0, wSoot = 0.0, wChip = 0.0, wGrime = 0.0, wH = 0.0, wScr = 0.0, wGrain = 0.0;
 float wh(vec3 p){ p = fract(p*0.3183099 + 0.1); p *= 17.0; return fract(p.x*p.y*p.z*(p.x + p.y + p.z)); }
@@ -56,7 +56,7 @@ float wDetail(inout vec3 col){
   float h = (wn(p*7.0) - 0.5)*0.024*f2;                               /* martelage */
   if(f1 > 0.0){ wGrain = (wn(vec3(p.x*55.0, p.y*55.0, p.z*6.0)) - 0.5)*f1; h += wGrain*0.01; }
   float sc = abs(wn(vec3(p.x*2.2, p.y*2.2, p.z*0.35) + 31.0) - 0.5);
-  wScr = (1.0 - smoothstep(0.0, 0.012 + fw*3.0, sc))*step(0.55, wn(p*0.9 + 7.0))*f2*(uWKind > 1.5 && uWKind < 2.5 ? 0.5 : 1.0);
+  wScr = (1.0 - smoothstep(0.0, 0.012 + fw*3.0, sc))*step(0.55, wn(p*0.9 + 7.0))*f2*(uWKind > 1.5 && uWKind < 2.5 ? 0.5 : 1.0)*clamp(1.0 + 1.2*(uWear - uAge), 0.15, 2.2);   /* v7.18 : rayures selon l'usure (identiques quand usure = âge) */
   h -= wScr*0.012;
   col *= 1.0 + 0.09*wScr + 0.08*wGrain;
   col += (0.028*wScr + 0.004*wGrain)*uDark*vec3(1.0, 1.0, 1.02);      /* rayures : métal clair sous une peinture sombre */
@@ -64,8 +64,8 @@ float wDetail(inout vec3 col){
 }
 /* kinds : 0 coque peinte (tôles), 1 tuyères, 2 structure métallique, 4 pièces peintes / conteneurs */
 void wearColor(inout vec3 col, float seam){
-  float A = uAge;
-  if(A < 0.004) return;
+  float A = uAge, Wr = uWear;                                       /* v7.18 : âge = temps (patine, crasse, rouille, coulures) ; usure = service (éclats, bosses, suie, tôles remplacées, revenu des tuyères) */
+  if(max(A, Wr) < 0.004) return;
   vec3 p = vShip + vec3(uWSeed*7.31, uWSeed*3.17, uWSeed*5.53);
   float fw = length(fwidth(vShip));                                   /* taille d'un pixel sur la coque (m) */
   float fine = 1.0 - smoothstep(0.08, 0.35, fw);                      /* le détail fin s'efface au loin (pas de scintillement) */
@@ -81,7 +81,7 @@ void wearColor(inout vec3 col, float seam){
   /* tôles remplacées (coque) : apprêt rouge, gris neutre ou blanc neuf */
   if(hull){
     vec3 cell = floor(p/vec3(4.2, 4.2, 5.6));
-    if(wh(cell + 3.7) < 0.14*A){
+    if(wh(cell + 3.7) < 0.14*Wr){
       float t = wh(cell + 11.1);
       vec3 pc = t < 0.35 ? wLin(vec3(0.47, 0.29, 0.23)) : (t < 0.7 ? wLin(vec3(0.5, 0.52, 0.54)) : wLin(vec3(0.9, 0.9, 0.87)));
       col = mix(col, pc*(0.85 + 0.3*wh(cell + 5.0)), 0.88);
@@ -102,7 +102,7 @@ void wearColor(inout vec3 col, float seam){
   col = mix(col, rustC, wRust);
   /* suie autour des tuyères (poupe) et crasse */
   float soot = engine ? 0.6 + 0.4*g : smoothstep(uZr.y - 0.2*uWLen, uZr.y, vShip.z)*(0.5 + 0.5*g);
-  wSoot = A*soot;
+  wSoot = Wr*soot;
   vec3 cg = col*(1.0 - 0.55*wGrime);
   cg = mix(cg, cg*vec3(0.9, 0.8, 0.66), wGrime*0.7);
   vec3 dust = wLin(vec3(0.43, 0.41, 0.38));                            /* peinture sombre : la poussière éclaircit au lieu d'assombrir */
@@ -110,12 +110,12 @@ void wearColor(inout vec3 col, float seam){
   /* éclats de peinture : métal nu */
   float ch = wn(p*2.7)*wn(p*9.0 + 3.0);
   float chw = max(0.05, 1.5*fwidth(ch));                              /* éclats : bord adouci à l'échelle du pixel (v7.1) */
-  wChip = smoothstep(0.55 - 0.18*A, 0.55 - 0.18*A + chw, ch)*A*(1.0 - wRust)*(frame ? 0.3 : 1.0)*fine*(0.05/chw);
+  wChip = smoothstep(0.55 - 0.18*Wr, 0.55 - 0.18*Wr + chw, ch)*Wr*(1.0 - wRust)*(frame ? 0.3 : 1.0)*fine*(0.05/chw);
   col = mix(col, mix(wLin(vec3(0.22, 0.23, 0.25)), wLin(vec3(0.62, 0.63, 0.65)), wn(p*5.0)), wChip*0.8);   /* apprêt sombre ou métal nu */
   /* tuyères : bleuissement et bronze de revenu thermique */
-  if(engine){ float band = sin(vShip.z*1.7 + wn(p*0.8)*3.0)*0.5 + 0.5; col = mix(col, mix(wLin(vec3(0.45, 0.30, 0.18)), wLin(vec3(0.25, 0.22, 0.42)), band), 0.55*A); }
+  if(engine){ float band = sin(vShip.z*1.7 + wn(p*0.8)*3.0)*0.5 + 0.5; col = mix(col, mix(wLin(vec3(0.45, 0.30, 0.18)), wLin(vec3(0.25, 0.22, 0.42)), band), 0.55*Wr); }
   /* relief : cloques de rouille, éclats, bosses */
-  wH = wRust*(0.6 + 0.4*rf) - wChip*0.4 + A*0.3*wfbm(p*0.5);
+  wH = wRust*(0.6 + 0.4*rf) - wChip*0.4 + Wr*0.3*wfbm(p*0.5);
 }`;
 /* projecteurs de coque (v7.2) : cônes analytiques en coordonnées vaisseau, lumière chaude ajoutée à l'émission ;
    normale de face tirée des dérivées (coques à facettes) ; portée limitée : pas d'ombres portées à calculer */
@@ -247,11 +247,11 @@ function placeSpots(U, box, pal, model){
 
 W.floods = function(U, box, k){ placeSpots(U, box, { dark: 1 }, ''); U.uFlood.value = k === undefined ? 1 : k; };   // v7.4 : projecteurs pour d'autres générateurs
 /* applique l'usure à un vaisseau construit ; unit = mètres par unité locale du groupe */
-W.apply = function(group, age, seed, unit){
-  unit = unit || 1; age = clamp(+age || 0, 0, 1);
+W.apply = function(group, age, seed, unit, wearAmt){                     // v7.18 : wearAmt = usure (par défaut = âge)
+  unit = unit || 1; age = clamp(+age || 0, 0, 1); const wr = wearAmt == null || isNaN(+wearAmt) ? age : clamp(+wearAmt, 0, 1);
   group.updateMatrixWorld(true);
   const inv = new THREE.Matrix4().copy(group.matrixWorld).invert();
-  const U = { uAge:{ value: age }, uWSeed:{ value: ((seed >>> 0) % 997)*.113 + .37 }, uZr:{ value: new THREE.Vector2() }, uWLen:{ value: 1 },
+  const U = { uAge:{ value: age }, uWear:{ value: wr }, uWSeed:{ value: ((seed >>> 0) % 997)*.113 + .37 }, uZr:{ value: new THREE.Vector2() }, uWLen:{ value: 1 },
     uDark:{ value: 0 }, uFlood:{ value: 0 }, uRing:{ value: new THREE.Vector4() }, uRingI:{ value: 0 }, uSpotP:{ value: [0, 1, 2, 3].map(() => new THREE.Vector4(0, 0, 0, 1)) }, uSpotD:{ value: [0, 1, 2, 3].map(() => new THREE.Vector4(0, 0, 1, 2)) } };
   Object.assign(U, W.HOLD);                                               // v7.6 : soute (uniformes partagés)
   const pal = W.livery;                                                   // livrée choisie par l'enveloppe (v7.2), sinon couleurs du jeu
@@ -295,7 +295,7 @@ SHIPGEN.build = function(model, opts){
   b.age = age;
   b.livery = W.pickLivery(model, seed, opts && opts.livery);                 // v7.2 : livrée (palette) tirée par graine et par famille
   if(!(opts && opts.wear === false)){
-    W.livery = PAL[b.livery]; W.liveryModel = model; b.wear = W.apply(b.group, age, seed, 1); W.livery = null;   // v7.1 : aussi à l'âge 0 (micro-relief des gros plans)
+    W.livery = PAL[b.livery]; W.liveryModel = model; b.wear = W.apply(b.group, age, seed, 1, opts && opts.wearAmt); W.livery = null;   // v7.1 : aussi à l'âge 0 (micro-relief des gros plans)
     placeSpots(b.wear, b.hullBox, PAL[b.livery], model);
     if(b.rings){ const L = b.rings.list; b.wear.uRing.value.set(L[0].z, (L[1] || L[0]).z, L[0].Rin, Math.min(2, L.length)); b.wear.uRingI.value = .15; }
   }

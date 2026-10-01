@@ -7,7 +7,7 @@ l'échelle réelle, et ouvre la refonte de la navette de livraison demandée dan
 | | |
 |---|---|
 | Base | v2.17 : échelle réelle seule, greffons vaisseau de la démo (L5–L7), commerce local (L3), carte 2D (L4), gros plans (L10), séquence de titre ; L9 (trafic, concurrence, escorte, radar) **spécifié** |
-| Statut | **décisions prises le 28/09/2026** — lots N et **N2 (navette de baie) implémentés et testés** ; lots ports orbitaux à venir |
+| Statut | **décisions prises le 28/09/2026** — lots N, N2 (navette de baie) et **P1 (ports : génération et rendu) implémentés et testés** ; P2 à P4 à venir |
 | Suite prévue | après décision : implémentation par lots (§B.10), puis mise à jour de la spécification générale, du `README.md` et du `TODO.md` |
 
 ---
@@ -173,11 +173,41 @@ Concepts de principe à taille réelle (primitives simples, vaisseaux du jeu ama
 | ![Anneau](img/ports/port-A.jpg) | ![Moyeu à pontons](img/ports/port-B.jpg) | ![Tour d'amarrage](img/ports/port-C.jpg) |
 | ≈ 370 m · 1 ponton S/M · petites escales ; **reprend les stations L3** | ≈ 490 m · 3 pontons L, M, S · ports principaux | ≈ 900 m · anneaux étagés · géantes gazeuses, orbite haute |
 
+## B.3 bis — Lot P1 implémenté (29/09/2026)
+
+`20n-ports-orbitaux.js` (`PORTS`) : trois archétypes tirés par graine, à taille réelle, **au moins un poste L par port**
+(tous les vaisseaux accostent) ; chaque poste est décrit (classe S/M/L, longueur maximale, position, axe du ponton, côté
+du navire) pour l'amarrage du lot P2. Port stabilisé par gradient de gravité (axe +Y à l'opposé de la planète) ; seul
+l'anneau habité tourne, les postes restent fixes. Géométrie fusionnée par matériau (plaques projetées à 9 m), feux de
+balisage instanciés par classe (ambre L, cyan M, blanc S), éclairage propre faible des coques (projecteurs de station :
+la structure reste lisible côté nuit) ; **9 à 11 appels de dessin par port**.
+
+| Anneau | Moyeu à pontons | Tour d'amarrage |
+|---|---|---|
+| ![](img/ports/port-ring.jpg) | ![](img/ports/port-hub.jpg) | ![](img/ports/port-tower.jpg) |
+| ≈ 400 × 530 m · postes L, M | ≈ 450 × 530 m · 3 à 5 pontons, jusqu'à 6 postes | 700 à 1 060 m · postes L, M, M, S |
+
+*Rendus studio : Basalte (120 m) au poste L, Carrelet (96 m) aux postes M, placés d'après les données des postes.*
+
+**Placement retenu** : les stations du commerce local (L3) sont **absorbées** — mêmes planètes, mêmes angles, mêmes noms
+(même suite de tirages ; vérifié contre la version précédente) ; altitude de la spec ; **toute géante gazeuse reçoit une
+tour d'amarrage** (sans sol, c'est son seul port possible ; destination possible d'un contrat local). La règle d'abord
+écrite (« géante destination de l'étape ») ne pouvait jamais s'appliquer : la destination d'une étape est toujours une
+planète habitable. Interface inchangée pour le commerce local (`leg.stations`, avec le port en plus).
+
+![Tour d'amarrage en jeu, en orbite haute d'une géante gazeuse](img/ports/jeu-port-orbital.jpg)
+
+Test : `ports_test.py` (10/10) — des ports dans les systèmes visités ; poste L partout ; altitudes (1,22–1,29 R
+telluriques, 2,77–2,91 R géantes) ; tour autour des géantes, anneau ou moyeu sinon ; chaque géante dotée ; budget ≤ 14
+appels ; couche du système ; **mêmes planètes et noms que la version précédente** (4 ports sur 6 systèmes) ; aucune
+erreur. Sur 30 graines : génération déterministe, aucun port sans poste L.
+**En attendant P2** : une escale à un port en fait encore le tour comme d'un astre (orbite juste hors de la structure).
+
 ## B.4 Option 2 — Placement
 
 | Règle | Proposition | ⚑ |
 |---|---|---|
-| Fréquence | un tiers des systèmes (graine) ; **systématique** si la planète cible est une géante gazeuse | à valider |
+| Fréquence | stations du commerce local absorbées (0 à 2 par système, graine) ; **toute géante gazeuse** reçoit une tour (retenu le 29/09) | — |
 | Planète | habitable ou géante gazeuse | — |
 | Orbite | tellurique : 1,15–1,4 R ; géante : au-delà des anneaux, 2,5–3 R | à valider |
 | Taille | **absolue**, par archétype (tableau B.3), plus la taille des vaisseaux à accueillir | — |

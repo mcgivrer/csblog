@@ -78,7 +78,10 @@ void main(){
   float k = uField*((0.035 + 0.10*cell*wave)*(0.45 + 0.9*view) + 0.55*e) + rip;
   gl_FragColor = vec4(vec3(0.28, 0.55, 1.0)*k, 1.0);
 }` });
-  [-1, 1].forEach(sx => { const m = new THREE.Mesh(new THREE.PlaneGeometry(ZB - ZA, HD, 1, 1), mat); m.rotation.y = sx*Math.PI/2; m.position.set(sx*(W/2 + .35), 0, ZC);
+  U.sides = {};
+  [-1, 1].forEach(sx => { const mt = mat.clone(); mt.uniforms = { uField: sx > 0 ? U.uField : { value: U.uField.value }, uTime: CR.TIME, uRip: sx > 0 ? U.uRip : { value: new THREE.Vector4(0, 0, 0, -99) } };   // v7.10 : un champ par bord
+    U.sides[sx] = { uField: mt.uniforms.uField, uRip: mt.uniforms.uRip, zSign: -sx };                       // coordonnée du plan : x = zSign·(z − ZC)
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(ZB - ZA, HD, 1, 1), mt); m.rotation.y = sx*Math.PI/2; m.position.set(sx*(W/2 + .35), 0, ZC);
     m.userData.keep = true; m.userData.noFrame = true; m.renderOrder = H.ORDER + 3; G.add(m); });
   return U;
 }
@@ -117,7 +120,7 @@ function jumpCore(G, M, x, y, z, o){
 function mainDrives(G, M, list){
   const t = geodeTpl(), eng = new THREE.Group(); G.add(eng);
   const DU = SHIPGEN.DRIVE_U;
-  list.forEach(([x, y, z, r, len], i) => {
+  list.forEach(([x, y, z, r, len, pk], i) => {
     H.bell(eng, r*.55, r, len, M.noz, x, y, z);
     if(!(t && t.plume)) return;
     const pg = t.plume.clone(true); pg.position.set(x, y, z + len); eng.add(pg);
@@ -125,11 +128,49 @@ function mainDrives(G, M, list){
     pg.traverse(o => { if(!o.isMesh || !o.material || !o.material.isShaderMaterial) return; const m0 = o.material, u = {};
       Object.keys(m0.uniforms).forEach(key => { u[key] = DU[key] && m0.uniforms[key] === DU[key] ? DU[key] : { value: (m0.uniforms[key].value && m0.uniforms[key].value.clone) ? m0.uniforms[key].value.clone() : m0.uniforms[key].value }; });
       if(u.uSeed) u.uSeed.value = 1.7 + i*2.3;
-      if(u.uLength){ u.uLength.value = t.plumeL*k/1.6*1.15; u.uRadius.value = 3.4*r; }        // ÷1,6 : __SHIPDRIVE.apply rallonge le jet
+      if(u.uLength){ u.uLength.value = t.plumeL*k/1.6*(pk || 1.15); u.uRadius.value = 3.4*r; }        // ÷1,6 : __SHIPDRIVE.apply rallonge le jet
       if(u.uSize) u.uSize.value *= k;
       const m = m0.clone(); m.uniforms = u; o.material = m; });
   });
-  return window.__SHIPDRIVE ? __SHIPDRIVE.apply(eng) : null;
+  const dr = window.__SHIPDRIVE ? __SHIPDRIVE.apply(eng) : null;
+  if(dr && list.length === 1 && list[0][3] > 20){                                                     // v7.8 : grande tuyère — raidisseurs extérieurs et frettes lourdes (repère du cardan)
+    const u = dr.units[0], [, , , r, len] = list[0], rAt = f => r*(.36 + .64*Math.pow(f, .8)) + r*.06;
+    for(let k = 0; k < 16; k++){ const a = k*Math.PI/8, A = new V3(Math.cos(a)*rAt(.25), Math.sin(a)*rAt(.25), len*.25), B = new V3(Math.cos(a)*rAt(.97), Math.sin(a)*rAt(.97), len*.97);
+      H.rod(u.G, A, B, .55, M.dark); }
+    [.4, .62, .84].forEach(f => H.part(u.G, new THREE.TorusGeometry(rAt(f) + .5, 1.1, 8, 64), M.mid, 0, 0, len*f));
+    H.merge(u.G); }
+  return dr;
+}
+/* section de propulsion « hard SF » (v7.8, lot 12 — design original, esprit industriel) : derrière le bloc moteur,
+   bouclier anti-radiations en disque nervuré, cuve du réacteur et pile de bobines magnétiques, treillis de poussée (4 longerons,
+   croisillons, anneau de montage), 4 réservoirs d'ergols et leurs conduites, deux ailes de radiateurs à caloducs rougeoyants,
+   et une torche de fusion unique (ensemble moteur du jeu à grande échelle : cloche Rao, col incandescent, vérins de cardan). */
+function torchSection(G, M, z0){
+  const copper = M.std(0x8a5a36, { metalness: .85, roughness: .36 }), Zs = z0 + 6;
+  H.cyl(G, 46, 46, 4, 48, M.dark, 0, 0, Zs, Math.PI/2);                                              // bouclier
+  H.part(G, new THREE.TorusGeometry(46, 1.7, 8, 72), M.hazard, 0, 0, Zs);
+  for(let k = 0; k < 12; k++){ const a = k*Math.PI/6; H.box(G, 1.6, 40, 3.2, M.mid, Math.cos(a)*23, Math.sin(a)*23, Zs - 3.2, 0, 0, a - Math.PI/2); }
+  H.cyl(G, 17, 21, 34, 32, M.mid, 0, 0, Zs + 20, Math.PI/2);                                      // cuve du réacteur
+  for(let i = 0; i < 6; i++){ H.part(G, new THREE.TorusGeometry(24, 2.6, 10, 56), copper, 0, 0, Zs + 6 + i*5.4); H.part(G, new THREE.TorusGeometry(22, 1.0, 6, 48), M.dark, 0, 0, Zs + 8.7 + i*5.4); }
+  const Zm = Zs + 70, Rm = 36, V = THREE.Vector3;                                                   // treillis de poussée
+  H.part(G, new THREE.TorusGeometry(Rm, 2.2, 10, 64), M.mid, 0, 0, Zm);
+  const A = k => new V(Math.cos(k*Math.PI/2)*43, Math.sin(k*Math.PI/2)*43, Zs + 2), B = k => new V(Math.cos(k*Math.PI/2)*Rm, Math.sin(k*Math.PI/2)*Rm, Zm);
+  for(let k = 0; k < 4; k++){ H.rod(G, A(k), B(k), 2.2, M.mid); H.rod(G, A(k), B(k + 1), .9, M.dark); H.rod(G, B(k), A(k + 1), .9, M.dark); }
+  for(let k = 0; k < 4; k++){ const a = Math.PI/4 + k*Math.PI/2, x = Math.cos(a)*40, y = Math.sin(a)*40;   // réservoirs d'ergols
+    H.cyl(G, 9, 9, 26, 20, M.paint, x, y, Zs + 22, Math.PI/2); H.part(G, new THREE.SphereGeometry(9, 16, 10), M.paint, x, y, Zs + 9); H.part(G, new THREE.SphereGeometry(9, 16, 10), M.paint, x, y, Zs + 35);
+    H.cyl(G, 9.3, 9.3, 2.2, 20, M.hazard, x, y, Zs + 22, Math.PI/2); H.rod(G, new V(x, y, Zs + 1), new V(x, y, Zs + 7), 1.4, M.dark);
+    H.rod(G, new V(x*.8, y*.8, Zs + 22), new V(Math.cos(a)*20, Math.sin(a)*20, Zs + 26), .9, copper); }
+  for(let w = 0; w < 4; w++){                                                                       // radiateurs : 4 ailes en croix (silhouette lisible sous tous les angles)
+    const a = w*Math.PI/2, grp = new THREE.Group(); grp.rotation.z = a; G.add(grp);
+    H.box(grp, 68, 3, 3.4, M.mid, 74, 0, Zs + 30); H.box(grp, 3, 3, 104, M.mid, 110, 0, Zs + 42);
+    for(let p = 0; p < 3; p++){ const xc = 56 + p*37;
+      H.box(grp, 34, .9, 100, M.dark, xc, 0, Zs + 42); H.box(grp, 34.4, 1.4, 1.6, M.mid, xc, 0, Zs - 8); H.box(grp, 34.4, 1.4, 1.6, M.mid, xc, 0, Zs + 92);
+      for(let c = 0; c < 9; c++) H.box(grp, 31, 1.3, .9, M.heat, xc, 0, Zs + 42 - 44 + c*11); }
+    grp.updateMatrix(); grp.children.slice().forEach(m => { m.applyMatrix4(grp.matrix); G.add(m); }); G.remove(grp); }   // remis à plat : fusion par matériau
+  for(let k = 0; k < 10; k++){ const a = (k + .5)*Math.PI/5, r = 30;                               // conduites et pompes le long du bloc moteur
+    H.cyl(G, 1.5, 1.5, 44, 8, k % 2 ? copper : M.dark, Math.cos(a)*r, Math.sin(a)*r, z0 - 22, Math.PI/2);
+    if(k % 2 === 0) H.box(G, 6, 6, 8, M.mid, Math.cos(a)*(r + 3), Math.sin(a)*(r + 3), z0 - 10, 0, 0, a); }
+  return Zs;
 }
 /* anneau de distorsion : tore de structure + tore lumineux (reconnus par warpring.js : pivot, émetteurs, halo) */
 function ring(G, M, z, Rin, U){
@@ -148,6 +189,7 @@ function bigGreeble(G, M, R, n, x0, x1, y, dir, z0, z1){
 }
 
 function buildCarrier(G, M, o, R, mil){
+  M.heat.userData.radiator = true;                                                                 // v7.8 : lueur des radiateurs selon la poussée (démo)
   if(!mil){ M.accent.emissive.setHex(0x2f86ff).convertSRGBToLinear(); }
   const wins = [], fam = mil ? 'slit' : 'hexH';
   // ---- proue : effilée, puis collier à la section du dock ; passerelle sur le dessus
@@ -176,7 +218,8 @@ function buildCarrier(G, M, o, R, mil){
     H.box(G, 30, 1.2, 52, M.dark, sx*(W/2 + 15), 0, zr, 0, 0, sx*.1);
     for(let k = 0; k < 9; k++) H.box(G, 28, 1.3, .6, M.heat, sx*(W/2 + 15), 0, zr - 22 + k*5.5, 0, 0, sx*.1);
     for(let r = 0; r < 2; r++) for(let k = 0; k < 6; k++) wins.push({ kind: 'port', fam, C: new V3(sx*(W/2 + .02), r ? -18 : 18, ZA - 30 + k*5.5), T: new V3(0, 0, -sx), N: new V3(sx, 0, 0), w: 2.4, D: 4.5, room: [-2.6, 2.6, -1.5, 1.4], lift: .04 }); });
-  const drive = mainDrives(G, M, [[-20, -20], [20, -20], [-20, 20], [20, 20]].map(c => [c[0], c[1], ZB + 196, 13.5, 30]));   // v7.6.2 : moteurs de la dernière version
+  const Zs = torchSection(G, M, ZB + 196);                                                             // v7.8 : section de propulsion hard SF
+  const drive = mainDrives(G, M, [[0, 0, Zs + 34, 37, 95, .8]]);                                       // torche de fusion unique (cloche de 74 m)
   const nz = drive ? [] : [[-20, -20], [20, -20], [-20, 20], [20, 20]].map(c => (H.bell(G, 9, 15, 28, M.noz, c[0], c[1], ZB + 196), [c[0], c[1], ZB + 224]));   // repli : tuyères simples
   const geode = jumpCore(G, M, 0, 47.5, ZB + 75, 13);                                                      // v7.6.1 : cœur de saut quantique
   const RU = { uField: { value: .12 }, uPhase: { value: 0 }, uTime: CR.TIME };
@@ -187,13 +230,16 @@ function buildCarrier(G, M, o, R, mil){
   [-1, 1].forEach(sx => H.box(G, 6, HD, 9, M.mid, sx*(W/2 - 3.5), 0, ZC));
   H.rod(G, new V3(-44, YF + 1, ZC), new V3(44, YC - 1, ZC), 1.3, M.dark); H.rod(G, new V3(-44, YC - 1, ZC), new V3(44, YF + 1, ZC), 1.3, M.dark);
   H.box(G, W - 8, 2.2, 3, M.mid, 0, 0, ZC);
+  const CL = [];
   BERTHS.forEach(zb => {
     H.box(G, 86, .4, 132, M.mid, 0, YF + .2, zb);
     [-1, 1].forEach(s => { H.box(G, 1.4, .5, 132, M.hazard, s*43, YF + .25, zb); H.box(G, 86, .5, 1.4, M.hazard, 0, YF + .25, zb + s*66); });
     [-44, 0, 44].forEach(dz => { H.box(G, 44, 3.8, 7, M.dark, 0, YF + 2.3, zb + dz); H.box(G, 38, .6, 5, M.mid, 0, DECK - .3, zb + dz); });
-    [-1, 1].forEach(sx => [-1, 1].forEach(sz => {                                                           // pinces (ouvertes)
-      const x = sx*33, z = zb + sz*30; H.box(G, 4, 4, 4, M.dark, x, YF + 2, z);
-      H.box(G, 2.4, 16, 2.4, M.mid, x + sx*3.4, YF + 9, z, 0, 0, -sx*.42); H.box(G, 2.6, 2.4, 2.6, M.hazard, x + sx*6.6, YF + 16.3, z, 0, 0, -sx*.42); }));
+    const cl = []; [-1, 1].forEach(sx => {                                                                   // pinces : un groupe par bord (pivot parallèle à Z), animé par la démo
+      const g = new THREE.Group(); g.position.set(sx*33, YF + 4, zb); G.add(g);
+      [-1, 1].forEach(sz => { H.box(G, 4, 4, 4, M.dark, sx*33, YF + 2, zb + sz*30); H.box(g, 2.4, 16, 2.4, M.mid, 0, 8, sz*30); H.box(g, 2.6, 2.4, 2.6, M.hazard, 0, 15.6, sz*30); H.box(g, 5, 1.4, 3.2, M.dark, -sx*1.8, 16.4, sz*30); });
+      H.merge(g); g.rotation.z = -sx*.42; cl.push({ g, sx, open: -sx*.42, closed: sx*.62 }); });
+    CL.push(cl);
   });
   for(let z = ZA + 9; z < ZB - 5; z += 14){ if(Math.abs(z - ZC) < 8) continue; [-30, 0, 30].forEach(x => H.box(G, 18, .5, 2.6, M.lamp, x, YC - .3, z)); }
   [-1, 1].forEach(sx => H.box(G, 2.2, 1.6, ZB - ZA, M.dark, sx*44, YC - .8, ZC));
@@ -211,7 +257,8 @@ function buildCarrier(G, M, o, R, mil){
   // portique roulant : groupe à part, déplacé par la démo le long des rails
   const gantry = new THREE.Group(); gantry.position.set(0, YC - 4.2, ZC - 60); G.add(gantry);
   H.box(gantry, W - 6, 3, 4, M.hazard, 0, 0, 0); H.box(gantry, 3.5, 3.2, 5, M.dark, -44, 1.5, 0); H.box(gantry, 3.5, 3.2, 5, M.dark, 44, 1.5, 0);
-  H.box(gantry, 8, 4, 9, M.mid, 12, -3, 0); H.cyl(gantry, .3, .3, 2.5, 6, M.dark, 12, -6.2, 0); H.box(gantry, 3, 2.2, 3, M.dark, 12, -8.3, 0);   // palan relevé (au-dessus des plus hauts vaisseaux) H.merge(gantry);
+  H.box(gantry, 8, 4, 9, M.mid, 12, -3, 0); H.cyl(gantry, .3, .3, 2.5, 6, M.dark, 12, -6.2, 0); H.box(gantry, 3, 2.2, 3, M.dark, 12, -8.3, 0);   // palan relevé (au-dessus des plus hauts vaisseaux)
+  H.merge(gantry);                                                                                          // v7.10 : 1 appel par matériau (le commentaire avalait la fusion)
   // ---- propulseurs d'attitude, armement (militaire)
   [[-1, 1], [1, 1], [-1, -1], [1, -1]].forEach(c => { H.rcsPod(G, M, o.rcs, c[0]*(W/2 + 2), c[1]*42, -228, c[0], 0, 5); H.rcsPod(G, M, o.rcs, c[0]*(W/2 + 2), c[1]*42, ZB + 130, c[0], 0, 5); });
   H.rcsPod(G, M, o.rcs, 0, 52, -290, 0, 1, 5); H.rcsPod(G, M, o.rcs, 0, -52, ZB + 150, 0, -1, 5);
@@ -220,14 +267,15 @@ function buildCarrier(G, M, o, R, mil){
     [[-26, -60], [26, -60]].forEach(([x, z]) => tur.push(CR.turret(G, M, x, -YC - TH, z, 2.4, true, false)));
     tur.push(CR.turret(G, M, 0, YC + TH + 7, -120, 3.0, false, true)); }
   const chase = chaseLights(G, mil ? 0xff3a22 : 0xffa22e), field = fieldCurtains(G);
-  return { len: 640, plumeLen: 260, navSize: 7, rcsLen: 26, nozzles: nz, nozR: 15, windows: wins, lamps: [], navY: 0, navX: W/2 + 3, navZ: -214, style: 1, floods: 1, turrets: tur,
+  return { len: 760, plumeLen: 260, navSize: 7, rcsLen: 26, nozzles: nz, nozR: 15, windows: wins, lamps: [], navY: 0, navX: W/2 + 3, navZ: -214, style: 1, floods: 1, turrets: tur,
     extra: { carrier: true, civil: !mil, hold: { center: new V3(0, 0, ZC), half: new V3(W/2, HD/2, (ZB - ZA)/2) }, berths: BERTHS.map(z => ({ C: new V3(0, DECK, z), L: 140, W: 86 })),
-      gantry: { group: gantry, z0: ZA + 14, z1: ZB - 14 }, geode, drive, field: field.uField, rip: field.uRip, chase, ring: RU, rings, dock: { W, HD, ZA, ZB, ZC } } };
+      gantry: { group: gantry, z0: ZA + 14, z1: ZB - 14 }, clamps: CL, fields: field.sides, geode, drive, torch: { Zs, z0: Zs + 34, len: 95, r: 37 }, wings: { z0: Zs - 8, z1: Zs + 92, r0: 40, r1: 130 }, field: field.uField, rip: field.uRip, chase, ring: RU, rings, dock: { W, HD, ZA, ZB, ZC } } };
 }
 CR.register('carrier', (G, M, o, R) => buildCarrier(G, M, o, R, false), CIVIL, 'Ship carrier');
 CR.register('carrierMil', (G, M, o, R) => buildCarrier(G, M, o, R, true), MILP, 'Fleet carrier');
 CR.MIL = CR.MIL || {}; CR.MIL.carrierMil = { mid: 0x30353b, accent: 0xff2a1a };
 CR.CARRIER = { W, HD, ZA, ZB, ZC, BERTHS, DECK };
+CR.mainDrives = mainDrives;                                                                          // v7.8 : moteurs du jeu pour d'autres générateurs (destroyer, corvette)
 /* ombre de soute : met à jour les uniformes partagés du shader d'usure pour le dock donné (position / attitude absolues du porteur),
    vus depuis la caméra (position / attitude absolues) — rendu en tranches : vue = caméra au repère absolu décalé */
 const _m1 = new THREE.Matrix4(), _m2 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _v = new V3(), ONE = new V3(1, 1, 1);

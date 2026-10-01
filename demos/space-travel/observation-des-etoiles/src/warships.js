@@ -67,7 +67,9 @@ function buildCorvette(G, M, o, R){   // corvette : proue blindée, coque à fac
   H.box(G, w*.9, .3, 3, M.hazard, 0, h/2 + .05, z0 + 33);
   H.greeble(G, M, R, 40, -w*.32, w*.32, h/2, z0 + 24, z0 + 60);
   const tur = [turret(G, M, 0, h/2, z0 + 28, 1.3, false, false), turret(G, M, 0, -h/2, z0 + 50, 1.3, true, false)];
-  const nz = []; H.bell(G, 2.0, 4.0, 7.5, M.noz, 0, 0, z0 + 62); nz.push([0, 0, z0 + 69.5]);
+  M.heat.userData.radiator = true;
+  const drive = CR.mainDrives ? CR.mainDrives(G, M, [[0, 0, z0 + 62, 4, 9, 1]]) : null;                // v7.8 : moteur du jeu (cloche Rao, torche)
+  const nz = []; if(!drive){ H.bell(G, 2.0, 4.0, 7.5, M.noz, 0, 0, z0 + 62); nz.push([0, 0, z0 + 69.5]); }
   [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(c => H.bell(G, .6, 1.1, 2.5, M.noz, c[0]*w*.36, c[1]*h*.34, z0 + 62));
   [[-1, 1], [1, 1], [-1, -1], [1, -1]].forEach((c, i) => H.rcsPod(G, M, o.rcs, c[0]*(w/2 + .3), c[1]*h*.18, i < 2 ? z0 + 12 : z0 + 58, c[0], 0, .9));
   H.rcsPod(G, M, o.rcs, 0, h/2 + .4, z0 + 12, 0, 1, .9); H.rcsPod(G, M, o.rcs, 0, -h/2 - .4, z0 + 60, 0, -1, .9);
@@ -75,7 +77,7 @@ function buildCorvette(G, M, o, R){   // corvette : proue blindée, coque à fac
   const win = [{ kind: 'bridge', C: new V3(0, h/2 + .02, z0 + 17.5), T: new V3(-1, 0, 0), N: new V3(0, 1, -.1).normalize(), w: 5.2, h: .85, D: 3.6, floor: .9 }];
   [-1, 1].forEach(s => { for(let r = 0; r < 2; r++) for(let k = 0; k < 5; k++){ const z = z0 + 21 + k*5 + r*2.2;
     win.push({ kind: 'port', fam: 'slit', C: new V3(s*(half(z) + .02), r ? -1.1 : 1.1, z), T: new V3(0, 0, -s), N: new V3(s, 0, 0), w: 1.4, D: 2.6, room: [-1.5, 1.5, -1.25, 1.1], lift: .03 }); } });
-  return { len: L + 8, nozzles: nz, nozR: 4.0, windows: win, lamps: [[0, -h*.3, z0 + 3, new V3(0, -.25, -1)]], navY: h*.3, navX: w/2 + 1.2, navZ: z0 + 22, style: 1, floods: 1, turrets: tur };
+  return { len: L + 8, nozzles: nz, nozR: 4.0, windows: win, lamps: [[0, -h*.3, z0 + 3, new V3(0, -.25, -1)]], navY: h*.3, navX: w/2 + 1.2, navZ: z0 + 22, style: 1, floods: 1, turrets: tur, extra: drive ? { drive } : null };
 }
 
 function buildDestroyer(G, M, o, R){   // destroyer : proue en marteau et canon axial, épine, 3 modules blindés, grands radiateurs, 6 tourelles (≈ 250 m)
@@ -99,7 +101,9 @@ function buildDestroyer(G, M, o, R){   // destroyer : proue en marteau et canon 
     for(let k = 0; k < 9; k++) H.box(G, 28, 1.1, .5, M.heat, s*(w*.5 + 16), 0, zr - 20 + k*5, 0, 0, s*.12);
     H.box(G, 4, 4, 40, M.mid, s*(w*.25 + 2), 0, zr); });
   H.prism(G, w*.8, h*.8, w*.7, h*.7, 36, .26, M.mid, 0, 0, z0 + 190);
-  const nz = []; [[0, 5], [-8, -4], [8, -4]].forEach(c => { H.bell(G, 4.5, 8.0, 15, M.noz, c[0], c[1], z0 + 208); nz.push([c[0], c[1], z0 + 223]); });
+  M.heat.userData.radiator = true;
+  const drive = CR.mainDrives ? CR.mainDrives(G, M, [[0, 5, z0 + 208, 7.5, 17, 1], [-8, -4, z0 + 208, 7.5, 17, 1], [8, -4, z0 + 208, 7.5, 17, 1]]) : null;   // v7.8 : moteurs du jeu
+  const nz = []; if(!drive) [[0, 5], [-8, -4], [8, -4]].forEach(c => { H.bell(G, 4.5, 8.0, 15, M.noz, c[0], c[1], z0 + 208); nz.push([c[0], c[1], z0 + 223]); });
   H.cyl(G, .8, 1.0, 12, 8, M.dark, 0, h*.38 + 6, z0 + 64);
   const dish = new THREE.SphereGeometry(4.5, 18, 6, 0, Math.PI*2, 0, .6); dish.rotateX(-Math.PI/2); H.part(G, dish, M.mid, 0, h*.38 + 12, z0 + 62);
   H.box(G, w*.8, .5, 6, M.hazard, 0, h*.45 + .1, z0 + 112);
@@ -112,7 +116,7 @@ function buildDestroyer(G, M, o, R){   // destroyer : proue en marteau et canon 
   // v7.5 : deux hangars latéraux à champ de force (module central), un chasseur dans chacun
   const bays = [-1, 1].map(s => ({ C: new V3(s*(w/2 + .03), -1.0, z0 + 92), T: new V3(0, 0, -s), N: new V3(s, 0, 0), w: 16, h: 7, D: 24, fw: .6 }));
   [-1, 1].forEach(s => { H.box(G, .3, .5, 18, M.hazard, s*(w/2 + .1), 3.2, z0 + 92); H.box(G, .3, .5, 18, M.hazard, s*(w/2 + .1), -5.2, z0 + 92); });
-  return { len: L + 18, nozzles: nz, nozR: 8.0, windows: win, bays, lamps: [[0, -h*.3, z0 + 2, new V3(0, -.2, -1)]], navY: 0, navX: w*.5 + 31, navZ: z0 + 156, style: 1, floods: 1, turrets: tur };
+  return { len: L + 18, nozzles: nz, nozR: 8.0, windows: win, bays, lamps: [[0, -h*.3, z0 + 2, new V3(0, -.2, -1)]], navY: 0, navX: w*.5 + 31, navZ: z0 + 156, style: 1, floods: 1, turrets: tur, extra: drive ? { drive } : null };
 }
 
 function buildTarget(G, M, o, R){   // drone-cible d'exercice : noyau à bandes de danger, bouclier d'entraînement (les impacts l'illuminent), feu rouge (≈ 5 m)
