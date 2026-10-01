@@ -47,7 +47,7 @@ node tests/longrun.js LONG-10   # 20 simulated minutes: errors, memory, shot-typ
 Every release of either project must be tagged on `main` (annotated tag, `git tag -a`), once the release commit is on `main`:
 
 - `stt_vX.Y.Z` for *Space Travel & Transport* (e.g. `stt_v2.17.0`).
-- `ode_vX.Y.Z` for *Observation des étoiles* (e.g. `ode_v7.19.0`; `X.Y` matches `VERSION` in `src/live2.js`, patch is `0` unless a hotfix).
+- `ode_vX.Y.Z` for *Observation des étoiles* (e.g. `ode_v7.19.0`; `X.Y.Z` matches `VERSION` in `src/live2.js` and `package.json`; patch is `0` unless a hotfix, e.g. `ode_v7.19.1`).
 
 Push the tags to **both** remotes: `git push origin <tag>` and `git push nex <tag>`.
 

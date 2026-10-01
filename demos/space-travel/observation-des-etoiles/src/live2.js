@@ -1,6 +1,6 @@
 /* Lancement de la démo « Observation des étoiles » : attente du monde, prise de contrôle du moteur, boucle infinie */
 (function(){
-  var VERSION = 'v7.19';                                              // version affichée dans la ligne de crédits (mise à jour à chaque livraison)
+  var VERSION = 'v7.19.1';                                              // version affichée dans la ligne de crédits (mise à jour à chaque livraison)
   var CREDIT = '(c) 2026 Frédéric Delorme & claude.ai - Music by ScoreStudio - Observation des étoiles ' + VERSION;
   var css = document.createElement('style');
   css.textContent =
@@ -207,6 +207,7 @@
   var Q = new URLSearchParams(location.search).get('quality');
   var prMax = Math.min(window.devicePixelRatio || 1, Q === 'high' ? 2 : 1.5) * (Q === 'low' ? .6 : 1), pr = prMax, ema = 16.7, lastAdj = 0;
   function adaptResolution(now, frameMs){
+    if(Q === 'high') return;                                            // ?quality=high : résolution imposée, aucune adaptation
     ema = ema*0.92 + Math.min(frameMs, 100)*0.08;
     if(now - lastAdj < 700) return;
     var old = pr;
