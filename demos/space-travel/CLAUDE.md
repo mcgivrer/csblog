@@ -21,7 +21,7 @@ python3 build.py package    # needs `npm ci` first (node_modules is not tracked)
 python3 build.py test       # run src/test/*_test.py (Playwright) against target/*.html
 ```
 
-- `compile` concatenates `src/JS/game/*.js` in the exact order listed in `src/JS/game/ORDER.txt`, interleaved with the demo-only modules under `src/JS/demo/` at the points `ORDER.txt` specifies. These are classic scripts sharing one global scope — **concatenation order is part of the program**; don't reorder `ORDER.txt` casually.
+- `compile` concatenates `src/JS/game/*.js` in the exact order listed in `src/JS/game/ORDER.txt`, with the shared modules (`shared/x.js` lines, read from `../shared/`, see "Shared modules" below) at the points `ORDER.txt` specifies. These are classic scripts sharing one global scope — **concatenation order is part of the program**; don't reorder `ORDER.txt` casually.
 - The result is spliced into `src/html/index.template.html` at the `/*@CSS@*/`, `/*@VENDOR@*/`, `/*@JS@*/` markers (CSS from `src/css/main.css`, vendored Three.js r128 from `src/JS/vendor/`).
 - Tests (`src/test/*_test.py`) drive headless Chromium via Playwright directly against the built HTML file (passed as argv), asserting on page globals (e.g. `ROUTE.legs`, `shipRig.position`, `gameStarted`) — not a conventional test runner, no test IDs, just scripts that exit non-zero on failure.
 - `docs/spec217/` contains the tooling that assembles the versioned spec doc/PDF (`build_spec.py`, `spec_pdf.py`) — separate from the game build.
@@ -37,10 +37,18 @@ node tests/smoke.js         # boot + 200s simulated run on the minified build
 node tests/longrun.js LONG-10   # 20 simulated minutes: errors, memory, shot-type stats
 ```
 
-- `build/build.py` takes `engine/game.html` (a fixed v2.15 build of the main game — **never modify this file**; it's the frozen foundation) and string-splices in: `src/head_guard2.js` (input/loop guard) right after the first `<script>`, then the demo modules (`planets.js`, `asteroids.js`, `stars.js`, `shipdrive.js`, `shipglass.js`, `warpring.js`, `shipwear.js`, `hitex.js`, `smallcraft.js`, `warships.js`, `carrier.js`, `postfx.js`, `cine.js`, `starmap.js`, `radar.js`, in that literal order) plus `src/live2.js` (boot screen / main loop) before `</body>`.
+- `build/build.py` takes `engine/game.html` (a fixed v2.15 build of the main game — **never modify this file**; it's the frozen foundation) and string-splices in: `src/head_guard2.js` (input/loop guard) right after the first `<script>`, then the demo modules (`planets.js`, `asteroids.js`, `stars.js`, `shipdrive.js`, `shipglass.js`, `warpring.js`, `shipwear.js`, `hitex.js`, `smallcraft.js`, `warships.js`, `carrier.js`, `postfx.js`, `cine.js`, `starmap.js`, `radar.js`, in that literal order; the eleven listed under "Shared modules" below come from `../../shared/`) plus `src/live2.js` (boot screen / main loop) before `</body>`.
 - `tests/` is a large suite of standalone Node/Playwright scripts (not a single runner) — each targets one subsystem and takes its own positional args (seed, ship id, shot list, etc.). Run `node tests/<name>.js` directly; see the "Reconstruire" section of `observation-des-etoiles/README.md` for the full list and argument meaning of each script (carrier views, map, textures, liveries, FTL, military encounters, director stats, etc.).
 - Versioned deliverables (`observation-des-etoiles-vX.Y.html` / `.min.html`) are committed snapshots, one per notable feature increment — check `README.md`'s file table before assuming the latest `vX.Y` is what to edit; always edit `src/` + `build/`, then rebuild.
 - `package.json` `name`/`version` describes this specific demo release, unrelated to the main game's version number.
+
+## Shared modules (`shared/`)
+
+Eleven modules are **single-source** in `demos/space-travel/shared/` and consumed by both builds: `asteroids`, `hitex`, `planets`, `postfx`, `shipdrive`, `shipglass`, `shipwear`, `smallcraft`, `starmap`, `stars`, `warpring`. Never copy one into `sources/` or `observation-des-etoiles/src/`: edit it in `shared/` (it affects both products).
+
+- The game reads them through `shared/x.js` lines in `ORDER.txt`; the demo through `../../shared/x.js` in `build/build.py` and `build/build_min.js`.
+- Game-specific behaviour does **not** go into a shared module. The game extends it from its own files loaded around it: `09b-baies-ventrales.js` extends `__SHIPGLASS.BELLY`; `20e2-carte-hote.js` sets `window.__STARMAP_HOST` (translation, no camera buttons, jump refusal messages) before `shared/starmap.js`. A new shared module that needs per-product behaviour should take a host object the same way, with the demo's behaviour as default.
+- A change in `shared/` changes the demo's output: rebuild it, and release it (version bump, tag `ode_`) when its behaviour changes. Until then the committed demo HTML lags the source.
 
 ## Dependencies and tracked build output
 

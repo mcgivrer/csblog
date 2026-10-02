@@ -1,9 +1,3 @@
-/* Copie de la démo « Observation des étoiles » v7.2.2 (src/starmap.js), adaptée au jeu (lot L4) :
-   - traduction fr / de / es par trm() (textes du canevas et des panneaux ; l'anglais d'origine reste inchangé) ;
-   - types de planètes : libellés du jeu (planetKind_*) ;
-   - pas d'action « caméra » (le jeu n'a pas le réalisateur de la démo) : les objets du système courant sont consultables seulement ;
-   - refus du ciblage selon les règles du jeu (§23) : générateur requis, portée, carburant ;
-   - le reste (niveaux secteur / système / orbite, gestes, rendu) est celui de la démo. Données : window.__CINE fourni par 20e-carte-2d.js. */
 /* =====================================================================
    CARTE DE L'UNIVERS (lot 2, v6.8) — touche M
    Vue de dessus en 2D (canevas), trois niveaux enchaînés par le zoom :
@@ -22,26 +16,20 @@
   const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
   const reduced = () => !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
   const KIND_EN = { ocean:'Ocean world', continental:'Continental world', desert:'Desert world', ice:'Ice world', volcanic:'Volcanic world', gas:'Gas giant' };
+  /* ---------- hôte : réglages facultatifs, définis avant le chargement par window.__STARMAP_HOST ----------
+     Source unique de la carte pour le jeu et pour la démo ; sans hôte, comportement de la démo.
+       camera        faux : pas de réalisateur, les objets du système courant sont consultables seulement
+       arrivalPlanet faux : pas de choix de la planète d'arrivée
+       tr(texte)     traduction des textes du canevas et des panneaux (identité par défaut)
+       kindLabel(type, anglais)  libellé d'un type de planète
+       messages      messages de refus par code de retour (en plus de ceux de la démo) */
+  const HOST = window.__STARMAP_HOST || {};
+  const CAM = HOST.camera !== false, ARRIVAL = HOST.arrivalPlanet !== false;
+  const trm = HOST.tr || (s => s);
+  const KIND_T = k => HOST.kindLabel ? HOST.kindLabel(k, KIND_EN[k] || k) : (KIND_EN[k] || k);
+  const MSG = Object.assign({ 'none': 'Not available right now.', 'next:invalid': 'Not available right now.' }, HOST.messages || {});
   const NEB_EN = { emission:'Emission nebula', hii:'H II region', dark:'Dark nebula', planetary:'Planetary nebula', supernova:'Supernova remnant', nursery:'Stellar nursery', reflection:'Reflection nebula', molecular:'Molecular cloud', oiii:'O III emission nebula' };
   const KCOL = (typeof PLANET_KIND_COLORS !== 'undefined' && PLANET_KIND_COLORS) || { ocean:['#123a63','#5eb8e0'], continental:['#2e4a26','#c9a86a'], desert:['#7a4f22','#e8c088'], ice:['#7fa8c0','#f0fbff'], volcanic:['#3a0f0a','#ff7a3d'], gas:['#8a5a28','#e8c896'] };
-
-  /* ---------- traduction (jeu : fr / en / de / es) — ajout L4 pour le jeu Space Travel & Transport ----------
-     Tous les textes de la carte passent par trm() : canevas (fillText/measureText enveloppés), panneaux
-     HTML, bandeaux. Remplacement par expressions entières, les plus longues d'abord ; anglais inchangé. */
-  const TR_DICT = [["ASTEROID BELT", "CEINTURE D’ASTÉROÏDES", "ASTEROIDENGÜRTEL", "CINTURÓN DE ASTEROIDES"], ["wheel / pinch zoom · drag pan · double-click go · M close", "molette / pincer : zoom · glisser : déplacer · double-clic : aller · M : fermer", "Mausrad / Zwei-Finger: Zoom · Ziehen: verschieben · Doppelklick: los · M: schließen", "rueda / pellizco: zoom · arrastrar: mover · doble clic: ir · M: cerrar"], ["UNIVERSE MAP", "CARTE DE L’UNIVERS", "UNIVERSUMSKARTE", "MAPA DEL UNIVERSO"], ["Universe map", "Carte de l’univers", "Universumskarte", "Mapa del universo"], ["Map level", "Niveau de carte", "Kartenebene", "Nivel del mapa"], ["Center on current system", "Centrer sur le système actuel", "Auf aktuelles System zentrieren", "Centrar en el sistema actual"], ["Current system", "Système actuel", "Aktuelles System", "Sistema actual"], ["current system", "système actuel", "aktuelles System", "sistema actual"], ["Zoom in", "Zoom avant", "Vergrößern", "Acercar"], ["Zoom out", "Zoom arrière", "Verkleinern", "Alejar"], ["Double-click a target = same action", "Double-clic sur une cible = même action", "Doppelklick auf ein Ziel = gleiche Aktion", "Doble clic en un objetivo = misma acción"], ["TARGET", "CIBLE", "ZIEL", "OBJETIVO"], ["VOYAGE", "VOYAGE", "REISE", "VIAJE"], ["SECTOR", "SECTEUR", "SEKTOR", "SECTOR"], ["No target — click a star, planet, ship or nebula.", "Aucune cible — cliquez une étoile, une planète, un vaisseau ou une nébuleuse.", "Kein Ziel — klicken Sie auf einen Stern, einen Planeten, ein Schiff oder einen Nebel.", "Sin objetivo — haga clic en una estrella, un planeta, una nave o una nebulosa."], ["Zoom in on a star to open its system.", "Zoomez sur une étoile pour ouvrir son système.", "Zoomen Sie auf einen Stern, um sein System zu öffnen.", "Acérquese a una estrella para abrir su sistema."], ["Ships are only tracked in the current system.", "Vaisseaux suivis uniquement dans le système actuel.", "Schiffe werden nur im aktuellen System verfolgt.", "Las naves solo se siguen en el sistema actual."], ["Objects of the current system have no action.", "Les objets du système actuel n’ont pas d’action.", "Objekte des aktuellen Systems haben keine Aktion.", "Los objetos del sistema actual no tienen acción."], ["Quantum jump module required (port services).", "Générateur de saut quantique requis (services du port).", "Quantensprungmodul erforderlich (Hafendienste).", "Se requiere el módulo de salto cuántico (servicios del puerto)."], ["Out of jump range: the 24 nearest stars only.", "Hors de portée de saut : les 24 étoiles les plus proches seulement.", "Außerhalb der Sprungreichweite: nur die 24 nächsten Sterne.", "Fuera del alcance de salto: solo las 24 estrellas más cercanas."], ["Not enough fuel for this jump.", "Carburant insuffisant pour ce saut.", "Nicht genug Treibstoff für diesen Sprung.", "Combustible insuficiente para este salto."], ["Not available right now.", "Indisponible pour le moment.", "Derzeit nicht verfügbar.", "No disponible por ahora."], ["▶ SET AS NEXT JUMP", "▶ DÉFINIR COMME PROCHAIN SAUT", "▶ ALS NÄCHSTEN SPRUNG SETZEN", "▶ FIJAR COMO PRÓXIMO SALTO"], ["ALREADY THE NEXT JUMP", "DÉJÀ LE PROCHAIN SAUT", "BEREITS NÄCHSTER SPRUNG", "YA ES EL PRÓXIMO SALTO"], ["▶ JUMP TO THE NEAREST STAR", "▶ SAUTER VERS L’ÉTOILE LA PLUS PROCHE", "▶ ZUM NÄCHSTEN STERN SPRINGEN", "▶ SALTAR A LA ESTRELLA MÁS CERCANA"], ["▶ JUMP TO THIS SYSTEM", "▶ SAUTER VERS CE SYSTÈME", "▶ ZU DIESEM SYSTEM SPRINGEN", "▶ SALTAR A ESTE SISTEMA"], ["▶ JUMP HERE", "▶ SAUTER ICI", "▶ HIERHER SPRINGEN", "▶ SALTAR AQUÍ"], ["departure re-planned", "départ replanifié", "Abflug neu geplant", "salida replanificada"], ["after the current jump", "après le saut en cours", "nach dem laufenden Sprung", "tras el salto en curso"], ["already planned", "déjà prévu", "bereits geplant", "ya previsto"], ["is the current system", "est le système actuel", "ist das aktuelle System", "es el sistema actual"], ["after the jump", "après le saut", "nach dem Sprung", "tras el salto"], ["arrival at", "arrivée à", "Ankunft bei", "llegada a"], ["(near", "(près de", "(nahe", "(cerca de"], ["NEXT JUMP", "PROCHAIN SAUT", "NÄCHSTER SPRUNG", "PRÓXIMO SALTO"], ["next jump", "prochain saut", "nächster Sprung", "próximo salto"], ["QUEUED", "EN ATTENTE", "VORGEMERKT", "EN COLA"], ["Queued", "En attente", "Vorgemerkt", "En cola"], ["CURRENT", "ACTUEL", "AKTUELL", "ACTUAL"], ["HABITABLE ZONE", "ZONE HABITABLE", "HABITABLE ZONE", "ZONA HABITABLE"], ["HABITABLE", "HABITABLE", "BEWOHNBAR", "HABITABLE"], ["Habitable", "Habitable", "Bewohnbar", "Habitable"], ["TOP VIEW", "VUE DE DESSUS", "DRAUFSICHT", "VISTA SUPERIOR"], ["SLICE", "TRANCHE", "SCHICHT", "CORTE"], ["LOADING…", "CHARGEMENT…", "LADEN…", "CARGANDO…"], ["LOG SCALE", "ÉCHELLE LOG", "LOG-SKALA", "ESCALA LOG"], ["OUTER ORBIT", "ORBITE EXTÉRIEURE", "ÄUSSERE BAHN", "ÓRBITA EXTERIOR"], ["SHIPS IN ORBIT", "VAISSEAUX EN ORBITE", "SCHIFFE IM ORBIT", "NAVES EN ÓRBITA"], ["Ships in orbit", "Vaisseaux en orbite", "Schiffe im Orbit", "Naves en órbita"], ["NOT VISITED", "NON VISITÉ", "NICHT BESUCHT", "NO VISITADO"], ["ALTITUDE", "ALTITUDE", "HÖHE", "ALTITUD"], ["Asteroid belt", "Ceinture d’astéroïdes", "Asteroidengürtel", "Cinturón de asteroides"], ["Inner edge", "Bord intérieur", "Innenrand", "Borde interior"], ["Outer edge", "Bord extérieur", "Außenrand", "Borde exterior"], ["MOON OF", "LUNE DE", "MOND VON", "LUNA DE"], ["RINGS", "ANNEAUX", "RINGE", "ANILLOS"], ["ON SCREEN", "À L’ÉCRAN", "IM BILD", "EN PANTALLA"], ["HERO", "VOTRE VAISSEAU", "IHR SCHIFF", "SU NAVE"], ["From the hero", "Depuis votre vaisseau", "Von Ihrem Schiff", "Desde su nave"], ["Registration", "Immatriculation", "Kennung", "Matrícula"], ["Length", "Longueur", "Länge", "Longitud"], ["Class", "Classe", "Klasse", "Clase"], ["Luminosity", "Luminosité", "Leuchtkraft", "Luminosidad"], ["Temperature", "Température", "Temperatur", "Temperatura"], ["Distance", "Distance", "Entfernung", "Distancia"], ["Planets", "Planètes", "Planeten", "Planetas"], ["Diameter", "Diamètre", "Durchmesser", "Diámetro"], ["Radius", "Rayon", "Radius", "Radio"], ["Orbit", "Orbite", "Umlaufbahn", "Órbita"], ["Moons", "Lunes", "Monde", "Lunas"], ["Phase", "Phase", "Phase", "Fase"], ["Type", "Type", "Typ", "Tipo"], ["Hero", "Vaisseau", "Schiff", "Nave"], ["Next", "Prochain", "Nächster", "Próximo"], ["At", "Position", "Position", "Posición"], ["in orbit", "en orbite", "im Orbit", "en órbita"], ["departing", "départ", "Abflug", "partida"], ["quantum jump", "saut quantique", "Quantensprung", "salto cuántico"], ["superluminal", "supraluminique", "überlichtschnell", "superlumínico"], ["warp drive", "distorsion", "Warpantrieb", "distorsión"], ["local trade", "commerce local", "lokaler Handel", "comercio local"], ["arrival", "arrivée", "Ankunft", "llegada"], [" Nebula", " (nébuleuse)", " (Nebel)", " (nebulosa)"], ["nebula", "nébuleuse", "Nebel", "nebulosa"], ["Emission nebula", "Nébuleuse en émission", "Emissionsnebel", "Nebulosa de emisión"], ["H II region", "Région H II", "H-II-Region", "Región H II"], ["Dark nebula", "Nébuleuse obscure", "Dunkelnebel", "Nebulosa oscura"], ["Planetary nebula", "Nébuleuse planétaire", "Planetarischer Nebel", "Nebulosa planetaria"], ["Supernova remnant", "Rémanent de supernova", "Supernovaüberrest", "Remanente de supernova"], ["Stellar nursery", "Pépinière d’étoiles", "Sternentstehungsgebiet", "Guardería estelar"], ["Reflection nebula", "Nébuleuse par réflexion", "Reflexionsnebel", "Nebulosa de reflexión"], ["O III emission nebula", "Nébuleuse en émission O III", "O-III-Emissionsnebel", "Nebulosa de emisión O III"], ["Molecular cloud", "Nuage moléculaire", "Molekülwolke", "Nube molecular"], ["ships", "vaisseaux", "Schiffe", "naves"], ["ship", "vaisseau", "Schiff", "nave"], ["route", "itinéraire", "Route", "ruta"], ["hero", "votre vaisseau", "Ihr Schiff", "su nave"], ["belt", "ceinture", "Gürtel", "cinturón"], ["up", "d’altitude", "Höhe", "de altitud"], ["ly", "al", "Lj", "al"], ["AU", "ua", "AE", "ua"]];
-  const TR_COL = { fr: 1, de: 2, es: 3 };
-  const TR_RE = TR_DICT.slice().sort((a, b) => b[0].length - a[0].length).map(r => {
-    const e = r[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), w0 = /^[A-Za-z]/.test(r[0]) ? '(?<![A-Za-z\u00c0-\u00ff])' : '', w1 = /[A-Za-z.]$/.test(r[0]) ? '(?![A-Za-z\u00c0-\u00ff])' : '';
-    return [new RegExp(w0 + e + w1, 'g'), r]; });
-  const TR_MEMO = new Map();
-  function trm(s){
-    if(s == null) return s;
-    const lang = (typeof LANG !== 'undefined') ? LANG : 'en', col = TR_COL[lang]; if(!col) return s;
-    const k = lang + '\u0001' + s; let o = TR_MEMO.get(k); if(o !== undefined) return o;
-    o = String(s); for(const [re, row] of TR_RE) o = o.replace(re, row[col]);
-    if(TR_MEMO.size > 4000) TR_MEMO.clear(); TR_MEMO.set(k, o); return o;
-  }
-  const KIND_T = k => { const s = (typeof t === 'function') ? t('planetKind_' + k) : null; return (s && s !== 'planetKind_' + k) ? s.charAt(0).toUpperCase() + s.slice(1) : trm(KIND_EN[k] || k); };
   const F = (px, w) => (w || '') + ' ' + px + "px 'JetBrains Mono', ui-monospace, monospace";
   const lyOf = u => u*C.UNIT_GAL/LY;
   const num = x => Math.abs(x) >= 99.95 ? x.toFixed(0) : Math.abs(x) >= 9.995 ? x.toFixed(1) : x.toFixed(2);
@@ -110,8 +98,8 @@
   // la carte garde ses entrées : rien ne remonte jusqu'aux écouteurs du jeu
   ['pointerdown','pointerup','pointermove','mousedown','mouseup','click','dblclick','wheel','touchstart','touchend','touchmove','contextmenu','keydown'].forEach(ev => root.addEventListener(ev, e => { if(ev !== 'keydown' || e.key === 'Enter' || e.key === ' ') e.stopPropagation(); if(ev === 'contextmenu') e.preventDefault(); }));
   const cv = root.querySelector('canvas'), ctx = cv.getContext('2d'), view = root.querySelector('.view');
-  { const f0 = ctx.fillText.bind(ctx), m0 = ctx.measureText.bind(ctx); ctx.fillText = (s, x, y, w) => w === undefined ? f0(trm(s), x, y) : f0(trm(s), x, y, w); ctx.measureText = s => m0(trm(s)); }
   const $ = s => root.querySelector(s);
+  if(HOST.tr){ const f0 = ctx.fillText.bind(ctx), m0 = ctx.measureText.bind(ctx); ctx.fillText = (s, x, y, w) => w === undefined ? f0(trm(s), x, y) : f0(trm(s), x, y, w); ctx.measureText = s => m0(trm(s)); }
 
   /* ---------- état ---------- */
   const S = { open: false, level: 'sector', cell: null, pi: null, v: { x: 0, y: 0, k: 1 }, W: 1, H: 1, dpr: 1, sel: null, hov: null, hits: [], dirty: true,
@@ -361,9 +349,14 @@
       hit(X, Y, pr + 3, Object.assign({}, p, { kind: 'planet', pkind: p.kind, cell: info.cell, nShips: grp.length }), 3);
       label(g, placed, p.name, X + pr*.6, Y, F(10.5, p.hab ? 700 : 400), '#e8edf5', true, (KIND_T(p.kind)) + (grp.length ? ' · ' + grp.length + ' ship' + (grp.length > 1 ? 's' : '') : ''), grp.length ? '#5eead4' : '#5d6f92');
       if(hero) label(g, placed, '▲ ' + hero.name, X, Y - pr - 10, F(9.5), '#ffb454', false); });
+    // v7.12 : escale interplanétaire — trajet de la planète d'arrivée à la planète d'escale (tireté ambre, plein une fois parcouru)
+    if(cur && ms.stop && ms.stop.path && ms.stop.path.length > 1){ const pts = ms.stop.path.map(q => P(Math.hypot(q[0], q[1], q[2]), Math.atan2(dot(q, info.basis.l), dot(q, info.basis.s)))), n = pts.length - 1, fi = ms.stop.frac*n;
+      const seg = (i0, i1, dash, a) => { g.strokeStyle = 'rgba(255,180,84,' + a + ')'; g.lineWidth = 1.4; g.setLineDash(dash); g.beginPath(); for(let i = Math.floor(i0); i <= Math.ceil(i1); i++){ const p = pts[Math.min(n, i)]; if(i === Math.floor(i0)) g.moveTo(p[0], p[1]); else g.lineTo(p[0], p[1]); } g.stroke(); g.setLineDash([]); };
+      if(fi > 0) seg(0, fi, [], .6); if(fi < n) seg(fi, n, [5, 4], .9);                       // parcouru : plein ; reste : tireté
+      const mid = pts[Math.round(n/2)]; label(g, placed, 'STOPOVER → ' + ms.stop.toName, mid[0], mid[1], F(9), '#ffb454', false); }
     // vaisseaux en transit (hors des orbites planétaires)
     loose.forEach(s => { const r = Math.hypot(s.pos[0], s.pos[1], s.pos[2]), a = Math.atan2(dot(s.pos, info.basis.l), dot(s.pos, info.basis.s)), [X, Y] = P(r, a);
-      const fa = Math.atan2(-dot(s.fwd, info.basis.l), dot(s.fwd, info.basis.s)); chevron(g, X, Y, fa, s.craft ? 3.5 : 5, s.hero ? '#ffb454' : '#5eead4');
+      const fa = Math.atan2(-dot(s.fwd, info.basis.l), dot(s.fwd, info.basis.s)); chevron(g, X, Y, fa, s.craft ? 3.5 : 5, s.hero ? '#ffb454' : (s.mil ? '#ff6b5e' : '#5eead4'));
       hit(X, Y, 7, Object.assign({ kind: 'ship' }, s), 5); label(g, placed, s.name, X, Y, F(9.5), s.hero ? '#ffb454' : '#b9c4dc', s.hero, s.hero ? s.type : null); });
     // étiquettes d'anneaux (zone habitable, ceinture) : premier emplacement libre sur le cercle
     const ringLabel = (t, r, col) => { if(r < 30) return; g.font = F(9); const w = g.measureText(t).width;
@@ -408,7 +401,7 @@
     // vaisseaux : trace d'orbite discrète, chevron orienté, étiquette nom + immatriculation + altitude
     g.lineWidth = 1; ships.forEach(s => { if(s.craft) return; g.strokeStyle = s.hero ? 'rgba(255,180,84,.28)' : 'rgba(94,234,212,.12)'; g.beginPath(); g.arc(Ox, Oy, gm(s.d)*k, 0, TAU); g.stroke(); });
     ships.sort((a, b) => (b.hero - a.hero) || (a.d - b.d)).forEach(s => { const [X, Y] = at(s.rel, s.d), fa = Math.atan2(-dot(s.fwd, B.l), dot(s.fwd, B.s));
-      chevron(g, X, Y, fa, s.craft ? 3.6 : 5.2, s.hero ? '#ffb454' : (s.craft ? '#8ea0c4' : '#5eead4'));
+      chevron(g, X, Y, fa, s.craft ? 3.6 : 5.2, s.hero ? '#ffb454' : (s.mil ? '#ff6b5e' : (s.craft ? '#8ea0c4' : '#5eead4')));
       hit(X, Y, 7, Object.assign({ kind: 'ship' }, s), 5);
       label(g, placed, s.name, X, Y, F(9.5, s.hero ? 700 : 400), s.hero ? '#ffb454' : '#d5dcea', s.hero, s.reg + ' · ' + C.fmtU(s.d - R) + ' up', '#5d6f92'); });
     if(!cur) { g.font = F(10); g.fillStyle = '#5d6f92'; g.fillText('Ships are only tracked in the current system.', 14, H - 20); }
@@ -446,31 +439,31 @@
       h = '<div class="nm' + (isNext ? ' a' : '') + '">' + esc(o.name) + '</div>' + (isCur ? '<span class="tag c">CURRENT</span>' : '') + (isNext ? '<span class="tag a">NEXT JUMP</span>' : '') + (isPend ? '<span class="tag a">QUEUED</span>' : '') + (vis && !isCur ? '<span class="tag m">VISITED</span>' : '') +
         ln('Class', esc(o.des)) + ln('Luminosity', (o.lum < .01 ? o.lum.toPrecision(2) : num(o.lum)) + ' L☉') + ln('Temperature', Math.round(o.temp) + ' K') + (isCur ? '' : ln('Distance', fmtLy(Math.hypot(o.x - ms.cur.gal[0], o.y - ms.cur.gal[1], o.z - ms.cur.gal[2])))) +
         (si ? ln('Planets', si.planets.length + (si.belt ? ' + belt' : '')) + ln('Habitable', esc(si.planets.filter(p => p.hab).map(p => p.name).join(', ') || '—')) : '');
-      a = isCur ? '' : btn(isNext ? 'ALREADY THE NEXT JUMP' : '▶ SET AS NEXT JUMP', 'go', '', isNext);
+      a = isCur ? (CAM ? btn('▶ VIEW THE STAR', 'go') : '') : btn(isNext ? 'ALREADY THE NEXT JUMP' : '▶ SET AS NEXT JUMP', 'go', '', isNext);
       a += btn('OPEN SYSTEM ›', 'sys', 'g2');
       if(!isCur && !isNext && !ms.canRetarget) h += '<div class="msg" style="display:block">Departure under way: applies to the jump after.</div>';
     } else if(o.kind === 'nebula'){
       const loaded = C.nebulaLoaded(o.key);
       h = '<div class="nm">' + esc(o.name) + ' Nebula</div><span class="tag m">' + esc((NEB_EN[o.type] || o.type).toUpperCase()) + '</span>' + ln('Diameter', fmtLy(o.R*2)) + ln('Distance', fmtLy(Math.max(0, Math.hypot(o.x - ms.cur.gal[0], o.y - ms.cur.gal[1], o.z - ms.cur.gal[2]) - o.R)));
-      a = btn('▶ JUMP TO THE NEAREST STAR', 'go');
+      a = btn(loaded && CAM ? '▶ SEND CAMERA' : '▶ JUMP TO THE NEAREST STAR', 'go');
     } else if(o.kind === 'planet'){
       const isCur = o.cell === ms.cur.cell, isNext = o.cell === ms.next.cell;
       h = '<div class="nm">' + esc(o.name) + '</div>' + (o.hab ? '<span class="tag c">HABITABLE</span>' : '') + (o.rings ? '<span class="tag m">RINGS</span>' : '') +
         ln('Type', KIND_T(o.pkind)) + ln('Radius', fmtKm(o.R)) + ln('Orbit', fmtAU(o.a) + ' · ' + C.fmtU(o.a)) + ln('Moons', o.moons) + (isCur ? ln('Ships in orbit', o.nShips || 0) : '');
-      a = isCur ? '' : (isNext ? btn('ALREADY THE NEXT JUMP', 'go', '', true) : btn('▶ JUMP HERE', 'go'));
+      a = isCur ? (CAM ? btn('▶ SEND CAMERA', 'go') : '') : (isNext ? (ARRIVAL ? btn('▶ SET AS ARRIVAL PLANET', 'go') : btn('ALREADY THE NEXT JUMP', 'go', '', true)) : btn('▶ JUMP HERE', 'go'));
       if(S.level === 'system') a += btn('ORBIT VIEW ›', 'orb', 'g2');
     } else if(o.kind === 'moon'){
       h = '<div class="nm">' + esc(o.name) + '</div><span class="tag m">MOON OF ' + esc(o.parent.toUpperCase()) + '</span>' + ln('Radius', fmtKm(o.R)) + ln('Distance', C.fmtU(o.d));
-      a = o.real ? '' : btn('▶ JUMP TO THIS SYSTEM', 'go');
+      a = o.real ? (CAM ? btn('▶ SEND CAMERA', 'go') : '') : btn('▶ JUMP TO THIS SYSTEM', 'go');
     } else if(o.kind === 'belt'){
       const isCur = o.cell === ms.cur.cell;
       h = '<div class="nm">Asteroid belt</div>' + ln('Inner edge', fmtAU(o.a0)) + ln('Outer edge', fmtAU(o.a1));
-      a = isCur ? '' : btn('▶ JUMP TO THIS SYSTEM', 'go');
+      a = isCur ? (CAM ? btn('▶ SEND CAMERA', 'go') : '') : btn('▶ JUMP TO THIS SYSTEM', 'go');
     } else if(o.kind === 'ship'){
       const all = liveShips(), s = all.find(x => x.uid === o.uid) || o, hero = all.find(x => x.hero);
-      h = '<div class="nm' + (s.hero ? ' a' : '') + '">' + esc(s.name) + '</div>' + (s.hero ? '<span class="tag a">HERO</span>' : '') + (s.subj ? '<span class="tag c">ON SCREEN</span>' : '') +
-        ln('Type', esc(s.type)) + ln('Registration', esc(s.reg)) + ln('Length', Math.round(s.len) + ' m') + (hero && !s.hero ? ln('From the hero', C.fmtU(dist3(hero.pos, s.pos))) : '') + ln('Phase', esc(s.seg));
-      a = '';
+      h = '<div class="nm' + (s.hero ? ' a' : '') + '">' + esc(s.name) + '</div>' + (s.hero ? '<span class="tag a">HERO</span>' : '') + (s.subj ? '<span class="tag c">ON SCREEN</span>' : '') + (s.mil ? '<span class="tag" style="color:#ff6b5e;border-color:#ff6b5e">MILITARY</span>' : '') +
+        ln('Type', esc(s.type)) + ln('Registration', esc(s.reg)) + ln('Length', Math.round(s.len) + ' m') + (s.carrying && s.carrying.length ? ln('Aboard', esc(s.carrying.join(', '))) : '') + (hero && !s.hero ? ln('From the hero', C.fmtU(dist3(hero.pos, s.pos))) : '') + ln('Phase', esc(s.seg));
+      a = CAM ? btn('▶ SEND CAMERA', 'go') : '';
     }
     info.innerHTML = trm(h); acts.innerHTML = trm(a);
   }
@@ -478,7 +471,7 @@
     if(b.dataset.a === 'go') act(S.sel);
     else if(b.dataset.a === 'sys'){ const s = S.sel; enterSystem(s.cell, S.W/2, S.H/2); }
     else if(b.dataset.a === 'orb'){ const s = S.sel, h = S.hits.find(x => x.o && okey(x.o) === okey(s)); enterPlanet(s.i, h ? h.x : S.W/2, h ? h.y : S.H/2); } });
-  const PH = { arrival: 'arrival', orbit: 'in orbit', departure: 'departing', jump: 'quantum jump', warp: 'superluminal' };
+  const PH = { arrival: 'arrival', orbit: 'in orbit', stopover: 'stopover transfer', departure: 'departing', jump: 'quantum jump', warp: 'superluminal' };
   function voyage(){ const ms = S.ms; if(!ms) return;
     const d = Math.hypot(ms.next.gal[0] - ms.cur.gal[0], ms.next.gal[1] - ms.cur.gal[1], ms.next.gal[2] - ms.cur.gal[2]);
     const h = ln('Hero', esc(ms.hero.name)) + ln('', esc(ms.hero.type) + ' · ' + esc(ms.hero.reg)) + ln('At', esc(ms.cur.name) + ' · ' + PH[ms.phase]) +
@@ -496,11 +489,7 @@
     const r = C.focus(toTarget(o)), nm = esc(o.kind === 'nebula' ? o.name + ' Nebula' : o.name || '');
     const msg = t => { $('.msg').textContent = trm(t); };
     if(r === 'busy') return msg('Jump sequence under way — the camera stays on the ship. Try again after the jump.');
-    if(r === 'next:locked') return msg('Quantum jump module required (port services).');
-    if(r === 'next:range') return msg('Out of jump range: the 24 nearest stars only.');
-    if(r === 'next:fuel') return msg('Not enough fuel for this jump.');
-    if(r === 'none') return msg('Objects of the current system have no action.');
-    if(r === 'next:invalid') return msg('Not available right now.');
+    if(Object.prototype.hasOwnProperty.call(MSG, r)) return msg(MSG[r]);
     const star = o.kind === 'star' ? o.name : (C.systemInfo(o.cell) || {}).name;
     let html;
     if(r === 'vista' || r === 'shot') html = '<span class="a">CAMERA</span> · ' + nm;

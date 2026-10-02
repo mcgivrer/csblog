@@ -1,4 +1,3 @@
-/* Copie de la démo « Observation des étoiles » v7.2.2 (src/shipglass.js), une seule modification — table BELLY étendue aux 4 porte-conteneurs (lot N2, baie de la navette-cargo) ; enveloppe SHIPGEN.build (auto-suffisante, détection des vitrages par géométrie/matériau — voir §L4). */
 /* =====================================================================
    HUBLOTS, BAIES ET HANGARS RÉALISTES — option du générateur (sans modifier le moteur)
    Les vitrages plats du générateur (hublots lumineux, baies panoramiques, vitres de passerelle,
@@ -28,14 +27,9 @@ const BELLY = {
   tS:  { w: 10.2, h: 10.2, modL: 15.6, ch: .2929 },
   tM:  { w: 12.6, h: 12.6, modL: 16.8, ch: .2929 },
   tL:  { w: 16.8, h: 20.4, modL: 15.6, ch: .15 },
-  l20: { w: 20.4, h: 23.4, modL: 14.4, ch: .15 },
-  /* ajout du jeu (lot N2) — porte-conteneurs : baie ventrale de la navette-cargo (17,5 × 5,6 × 6,8 m) au point d'amarrage ;
-     modL fixé pour une ouverture de ~19,6 m (hx = 0,36 modL), w pour une demi-largeur ≥ 4 m, h pour 10 m de profondeur */
-  e18:  { w: 16.0, h: 16.0, modL: 27.2, ch: .15 },
-  e140: { w: 18.0, h: 18.0, modL: 27.8, ch: .15 },
-  p10:  { w: 13.9, h: 15.9, modL: 27.2, ch: .15 },
-  p44:  { w: 13.9, h: 15.8, modL: 27.2, ch: .15 }
+  l20: { w: 20.4, h: 23.4, modL: 14.4, ch: .15 }
 };
+GL.BELLY = BELLY;   /* extensible : le jeu y ajoute les baies ventrales de ses porte-conteneurs (sources/src/JS/game/09b-baies-ventrales.js) */
 
 /* formes d'ouverture (v7.2) — vS = (mode, cx, cy, décor) : mode 0 = rond ; 1 = polygone symétrique : rectangle (cx = cy = 0),
    coins à pans coupés de cx le long de x et cy le long de y, hexagone à pointes latérales (cy = h.y) */
@@ -78,7 +72,7 @@ void main(){
 
 const FRAG = `
 precision highp float;
-uniform vec3 uSunCol; uniform float uSunI; uniform float uTime; uniform float uAge;
+uniform vec3 uSunCol; uniform float uSunI; uniform float uTime; uniform float uAge; uniform float uStyle;
 varying vec3 vV; varying vec3 vSun; varying vec4 vP; varying vec4 vA; varying vec4 vR; varying vec2 vR2; varying vec4 vS;
 #ifdef PORTAL
 uniform mat4 projectionMatrix; uniform vec4 uRip[3]; uniform float uField;
@@ -103,6 +97,17 @@ float tunnelPoly(vec2 p, vec2 h, out vec2 nxy){
     }
   }
   return t;
+}
+/* pièce (v7.3) : boîte + pans coupés le long des arêtes du plafond ; sid : 0 paroi latérale, 1 sol, 2 plafond, 3 fond, 4 pan coupé */
+void roomHit(vec3 o, float x0, float x1, float y0, float y1, float D, float c, out float t, out vec3 n, out float sid){
+  float tx = ((gD.x > 0.0 ? x1 : x0) - o.x)/gD.x, ty = ((gD.y > 0.0 ? y1 : y0) - o.y)/gD.y, tz = (-D - o.z)/gD.z;
+  if(tz <= tx && tz <= ty){ t = tz; n = vec3(0.0, 0.0, 1.0); sid = 3.0; }
+  else if(tx <= ty){ t = tx; n = vec3(-sign(gD.x), 0.0, 0.0); sid = 0.0; }
+  else { t = ty; n = vec3(0.0, -sign(gD.y), 0.0); sid = gD.y < 0.0 ? 1.0 : 2.0; }
+  if(c > 0.0){
+    float dl = gD.x - gD.y;  if(dl < -1e-5){ float tl = (c - (o.x - x0) - (y1 - o.y))/dl; if(tl > 0.0 && tl < t){ t = tl; n = vec3(0.70710678, -0.70710678, 0.0); sid = 4.0; } }
+    float dr = -gD.x - gD.y; if(dr < -1e-5){ float tr = (c - (x1 - o.x) - (y1 - o.y))/dr; if(tr > 0.0 && tr < t){ t = tr; n = vec3(-0.70710678, -0.70710678, 0.0); sid = 4.0; } }
+  }
 }
 
 /* rayon / boîte alignée : garde l'intersection la plus proche */
@@ -143,10 +148,14 @@ void main(){
   /* éclairage intérieur : état propre à chaque pièce, qui change lentement */
   float st = h1(seed*1.37 + floor(uTime/80.0 + seed*0.093)*3.1);
   vec3 lc = vec3(1.0, 0.72, 0.42); float li = 1.0;
-  if(type < 0.5){ lc = st < 0.45 ? vec3(1.0, 0.72, 0.42) : (st < 0.62 ? vec3(0.8, 0.88, 1.0) : vec3(1.0, 0.5, 0.22)); li = st < 0.62 ? 1.0 : (st < 0.8 ? 0.3 : 0.03); }
-  else if(type < 1.5){ lc = vec3(0.55, 0.72, 1.0); li = 0.7; }
-  else if(type < 2.5){ lc = vec3(1.0, 0.76, 0.48); li = st < 0.85 ? 1.15 : 0.3; }
-  else { lc = vec3(0.26, 0.56, 1.0); li = 1.9; }                 /* hangar : lumière bleutée (champ de force) */
+  float S_ = uStyle;                                          /* v7.3 : 0 hospitalité, 1 industriel, 2 rétro-futur */
+  if(type < 0.5){
+    if(S_ < 0.5){ lc = st < 0.45 ? vec3(1.0, 0.72, 0.42) : (st < 0.62 ? vec3(0.8, 0.88, 1.0) : vec3(1.0, 0.5, 0.22)); li = st < 0.62 ? 1.0 : (st < 0.8 ? 0.3 : 0.03); }
+    else if(S_ < 1.5){ lc = st < 0.5 ? vec3(0.78, 0.88, 1.0) : (st < 0.7 ? vec3(1.0, 0.78, 0.5) : vec3(1.0, 0.3, 0.15)); li = st < 0.7 ? 0.95 : (st < 0.85 ? 0.35 : 0.04); }
+    else { lc = vec3(0.95, 0.97, 1.0); li = st < 0.8 ? 1.25 : 0.25; } }
+  else if(type < 1.5){ lc = S_ < 0.5 ? vec3(0.9, 0.84, 0.76) : (S_ < 1.5 ? vec3(0.55, 0.72, 1.0) : vec3(0.95, 0.97, 1.0)); li = S_ > 1.5 ? 1.1 : 0.75; }
+  else if(type < 2.5){ lc = S_ < 0.5 ? vec3(1.0, 0.76, 0.48) : (S_ < 1.5 ? vec3(0.85, 0.92, 1.0) : vec3(0.95, 0.97, 1.0)); li = st < 0.85 ? 1.15 : 0.3; }
+  else { lc = S_ < 0.5 ? vec3(0.5, 0.7, 1.0) : vec3(0.26, 0.56, 1.0); li = 1.9; }                 /* hangar : lumière bleutée (champ de force) */
   vec3 avg = lc*li*0.3;
 
   vec3 col; vec3 hitL = vec3(p, 0.0);
@@ -207,62 +216,96 @@ void main(){
       float dk = clamp(-q.z/g, 0.0, 1.0);
       col = alb*(sunC*max(dot(n, L), 0.0)*sl + amb*(1.0 - 0.5*dk)) + alb*avg*1.4*dk*dk;
     } else {
-      /* ---- vitrage puis pièce ---- */
+      /* ---- vitrage puis pièce (v7.3 : pans coupés au plafond, trois ambiances) ---- */
       vec3 o = vec3(pg, -g);
       float x0 = vR.x, x1 = vR.y, y0 = vR.z, y1 = vR.w, D = vR2.x, xc = 0.5*(x0 + x1);
-      float tx = ((gD.x > 0.0 ? x1 : x0) - o.x)/gD.x, ty = ((gD.y > 0.0 ? y1 : y0) - o.y)/gD.y, tz = (-D - o.z)/gD.z;
+      float sty = uStyle;
       float t; vec3 n; float sid;
-      if(tz <= tx && tz <= ty){ t = tz; n = vec3(0.0, 0.0, 1.0); sid = 3.0; }
-      else if(tx <= ty){ t = tx; n = vec3(-sign(gD.x), 0.0, 0.0); sid = 0.0; }
-      else { t = ty; n = vec3(0.0, -sign(gD.y), 0.0); sid = gD.y < 0.0 ? 1.0 : 2.0; }
+      roomHit(o, x0, x1, y0, y1, D, hangar > 0.5 ? (type > 3.5 ? 0.0 : 1.3) : (sty > 1.5 ? 0.75 : 0.42), t, n, sid);
       float oid = 0.0;
       vec3 bn = n;
       float r1 = h1(seed*3.1), r2 = h1(seed*5.3), r3 = h1(seed*8.1);
-      if(type < 0.5){                                   /* cabine : lit, meuble, occupant */
-        float bw = min(2.0, (x1 - x0)*0.6);
-        vec3 b0 = r1 < 0.5 ? vec3(x0 + 0.06, y0, -D) : vec3(x1 - 0.06 - bw, y0, -D);
-        if(boxHit(o, b0, b0 + vec3(bw, 0.5, 0.95), t, bn)) oid = 1.0;
-        vec3 c0 = r1 < 0.5 ? vec3(x1 - 0.65, y0, -D) : vec3(x0 + 0.05, y0, -D);
-        if(boxHit(o, c0, c0 + vec3(0.6, 0.85, 0.5), t, bn)) oid = 2.0;
-        if(x1 - x0 > 4.5 && D > 2.3){                  /* suite : coin salon (canapé, table basse) entre le lit et l'armoire */
+      if(type < 0.5){                                   /* cabine */
+        float bw = min(2.0, (x1 - x0)*0.6), bx = r1 < 0.5 ? x0 + 0.06 : x1 - 0.06 - bw;
+        if(sty < 0.5){                                  /* hospitalité : lit bas, tête de lit à filet lumineux, chevet, banquette sous la fenêtre */
+          if(boxHit(o, vec3(bx, y0, -D), vec3(bx + bw, y0 + 0.45, -D + 1.0), t, bn)) oid = 1.0;
+          if(boxHit(o, vec3(bx, y0, -D), vec3(bx + bw, y0 + 1.1, -D + 0.1), t, bn)) oid = 17.0;
+          float nx = r1 < 0.5 ? bx + bw + 0.05 : bx - 0.5;
+          if(boxHit(o, vec3(nx, y0, -D), vec3(nx + 0.45, y0 + 0.5, -D + 0.45), t, bn)) oid = 18.0;
+          if(boxHit(o, vec3(xc - 0.95, y0, -0.6), vec3(xc + 0.95, y0 + 0.42, -0.04), t, bn)) oid = 19.0;
+        } else if(sty < 1.5){                           /* industriel : couchette anti-g (assise + dossier), conduits au plafond */
+          float cw = min(bw, 0.95);
+          if(boxHit(o, vec3(bx, y0, -D + 0.2), vec3(bx + cw, y0 + 0.55, min(-D + 2.1, -0.3)), t, bn)) oid = 20.0;
+          if(boxHit(o, vec3(bx, y0 + 0.55, -D + 0.2), vec3(bx + cw, y0 + 1.1, -D + 0.5), t, bn)) oid = 20.0;
+          if(boxHit(o, vec3(x0 + 0.35, y1 - 0.2, -D), vec3(x0 + 0.52, y1 - 0.03, 0.0), t, bn)) oid = 21.0;
+          if(boxHit(o, vec3(x1 - 0.55, y1 - 0.18, -D), vec3(x1 - 0.4, y1 - 0.03, 0.0), t, bn)) oid = 21.0;
+        } else {                                        /* rétro-futur : couchette blanche moulée, fauteuil orange */
+          if(boxHit(o, vec3(bx, y0, -D), vec3(bx + bw, y0 + 0.5, -D + 1.0), t, bn)) oid = 22.0;
+          float cx = r1 < 0.5 ? x1 - 0.95 : x0 + 0.25;
+          if(boxHit(o, vec3(cx, y0, -D + 1.25), vec3(cx + 0.7, y0 + 0.4, -D + 1.95), t, bn)) oid = 23.0;
+          if(boxHit(o, vec3(cx, y0, -D + 1.25), vec3(cx + 0.7, y0 + 0.85, -D + 1.4), t, bn)) oid = 23.0;
+        }
+        if(x1 - x0 > 4.5 && D > 2.3){                  /* suite : coin salon (canapé, table basse) */
           float sx = r1 < 0.5 ? x1 - 2.35 : x0 + 0.75;
           if(boxHit(o, vec3(sx, y0, -D), vec3(sx + 1.6, y0 + 0.42, -D + 0.8), t, bn)) oid = 5.0;
           if(boxHit(o, vec3(sx, y0, -D), vec3(sx + 1.6, y0 + 0.9, -D + 0.22), t, bn)) oid = 5.0;
           if(boxHit(o, vec3(sx + 0.35, y0, -D + 1.15), vec3(sx + 1.25, y0 + 0.38, -D + 1.7), t, bn)) oid = 6.0;
         }
         if(li > 0.5 && r3 > 0.55 && person(o, -D*0.55, mix(x0 + 0.5, x1 - 0.5, r2), y0, 1e9, t)) oid = 9.0;
-      } else if(type < 1.5){                            /* passerelle : pupitres, sièges */
+      } else if(type < 1.5){                            /* passerelle : pupitres, sièges et opérateurs assis, table tactique */
         if(boxHit(o, vec3(x0, y0, -1.35), vec3(x1, y0 + 0.95, -0.45), t, bn)) oid = 3.0;
-        for(int k = 0; k < 6; k++){ float xs = x0 + 1.1 + float(k)*2.3; if(xs < x1 - 0.5){ if(boxHit(o, vec3(xs - 0.3, y0, -2.35), vec3(xs + 0.3, y0 + 1.2, -1.85), t, bn)) oid = 4.0; } }
-        if(r3 > 0.4 && person(o, -2.9, mix(x0 + 0.8, x1 - 0.8, r2), y0, 1e9, t)) oid = 9.0;
-      } else if(type < 2.5){                            /* salon panoramique : canapé, table, plante, passagers */
-        if(boxHit(o, vec3(x0 + 0.4, y0, -D), vec3(x1 - 0.4, y0 + 0.45, -D + 0.85), t, bn)) oid = 5.0;
-        if(boxHit(o, vec3(x0 + 0.4, y0, -D), vec3(x1 - 0.4, y0 + 0.95, -D + 0.25), t, bn)) oid = 5.0;
-        if(boxHit(o, vec3(xc - 0.6, y0, -D + 1.4), vec3(xc + 0.6, y0 + 0.4, -D + 2.0), t, bn)) oid = 6.0;
-        if(boxHit(o, vec3(x0 + 0.25, y0, -D + 0.3), vec3(x0 + 0.7, y0 + 0.5, -D + 0.75), t, bn)) oid = 2.0;
-        float tp = (-D + 0.52 - o.z)/gD.z;
-        if(tp > 0.0 && tp < t){ vec2 q = o.xy + gD.xy*tp - vec2(x0 + 0.47, y0 + 1.05);
+        for(int k = 0; k < 6; k++){ float xs = x0 + 1.1 + float(k)*2.3; if(xs < x1 - 0.5){
+          if(boxHit(o, vec3(xs - 0.3, y0, -2.35), vec3(xs + 0.3, y0 + 0.5, -1.85), t, bn)) oid = 4.0;
+          if(boxHit(o, vec3(xs - 0.3, y0 + 0.5, -2.45), vec3(xs + 0.3, y0 + 1.3, -2.3), t, bn)) oid = 4.0;
+          if(h1(seed + float(k)*7.7) > 0.3 && person(o, -2.12, xs, y0 - 0.45, 1e9, t)) oid = 9.0; } }
+        if(D > 3.3 && boxHit(o, vec3(xc - 0.7, y0, -D*0.74 - 0.5), vec3(xc + 0.7, y0 + 0.9, -D*0.74 + 0.5), t, bn)) oid = 24.0;
+        if(r3 > 0.5 && person(o, -D*0.74 - 0.75, xc + 0.9, y0, 1e9, t)) oid = 9.0;
+      } else if(type < 2.5){                            /* salon / mess derrière la baie panoramique */
+        if(sty < 0.5){                                  /* hospitalité : bar rétroéclairé, canapé face à la baie, table, plante, passagers */
+          if(boxHit(o, vec3(x0 + 0.5, y0, -D), vec3(x1 - 0.5, y0 + 1.05, -D + 0.6), t, bn)) oid = 25.0;
+          if(boxHit(o, vec3(xc - 1.6, y0, -D*0.62), vec3(xc + 1.6, y0 + 0.42, -D*0.62 + 0.8), t, bn)) oid = 5.0;
+          if(boxHit(o, vec3(xc - 1.6, y0, -D*0.62), vec3(xc + 1.6, y0 + 0.9, -D*0.62 + 0.22), t, bn)) oid = 5.0;
+          if(boxHit(o, vec3(xc - 0.55, y0, -D*0.62 + 1.2), vec3(xc + 0.55, y0 + 0.4, -D*0.62 + 1.8), t, bn)) oid = 6.0;
+        } else if(sty < 1.5){                           /* industriel : table du mess et bancs, comptoir de la cambuse */
+          if(boxHit(o, vec3(x0 + 0.5, y0, -D), vec3(x1 - 0.5, y0 + 0.95, -D + 0.65), t, bn)) oid = 25.0;
+          if(boxHit(o, vec3(xc - 1.3, y0 + 0.7, -D*0.5 - 0.4), vec3(xc + 1.3, y0 + 0.76, -D*0.5 + 0.4), t, bn)) oid = 26.0;
+          if(boxHit(o, vec3(xc - 0.1, y0, -D*0.5 - 0.3), vec3(xc + 0.1, y0 + 0.7, -D*0.5 + 0.3), t, bn)) oid = 26.0;
+          if(boxHit(o, vec3(xc - 1.3, y0, -D*0.5 - 0.95), vec3(xc + 1.3, y0 + 0.45, -D*0.5 - 0.65), t, bn)) oid = 27.0;
+          if(boxHit(o, vec3(xc - 1.3, y0, -D*0.5 + 0.65), vec3(xc + 1.3, y0 + 0.45, -D*0.5 + 0.95), t, bn)) oid = 27.0;
+        } else {                                        /* rétro-futur : banquette blanche, fauteuils orange */
+          if(boxHit(o, vec3(x0 + 0.4, y0, -D), vec3(x1 - 0.4, y0 + 0.45, -D + 0.85), t, bn)) oid = 22.0;
+          if(boxHit(o, vec3(x0 + 0.4, y0, -D), vec3(x1 - 0.4, y0 + 0.95, -D + 0.25), t, bn)) oid = 22.0;
+          for(int k = 0; k < 2; k++){ float cx = xc + (float(k) - 0.5)*2.2;
+            if(boxHit(o, vec3(cx - 0.35, y0, -D*0.45 - 0.35), vec3(cx + 0.35, y0 + 0.4, -D*0.45 + 0.35), t, bn)) oid = 23.0; }
+        }
+        if(sty < 1.5 && boxHit(o, vec3(x0 + 0.25, y0, -D*0.35), vec3(x0 + 0.7, y0 + 0.5, -D*0.35 + 0.45), t, bn)) oid = 2.0;
+        float tp = (-D*0.35 + 0.22 - o.z)/gD.z;
+        if(sty < 1.5 && tp > 0.0 && tp < t){ vec2 q = o.xy + gD.xy*tp - vec2(x0 + 0.47, y0 + 1.05);
           float lf = min(min(length(q) - 0.33, length(q - vec2(0.2, 0.25)) - 0.22), length(q - vec2(-0.18, 0.28)) - 0.2);
           if(lf < 0.0){ t = tp; oid = 7.0; bn = vec3(0.0, 0.0, 1.0); } }
-        if(li > 0.5 && r3 > 0.3 && person(o, -D + 1.6, mix(x0 + 1.2, x1 - 1.2, r2), y0, 1e9, t)) oid = 9.0;
-        if(li > 0.5 && r1 > 0.6 && person(o, -D + 2.4, mix(x0 + 1.0, x1 - 1.0, fract(r2 + 0.45)), y0, 1e9, t)) oid = 9.0;
-      } else if(type < 3.5){                            /* hangar latéral : nacelle, caisses, portique */
+        if(li > 0.5 && r3 > 0.3 && person(o, -D + 0.9, mix(x0 + 1.2, x1 - 1.2, r2), y0, 1e9, t)) oid = 9.0;
+        if(li > 0.5 && r1 > 0.45 && person(o, -D*0.62 + 0.45, mix(xc - 1.2, xc + 1.2, fract(r2 + 0.45)), y0 - 0.42, 1e9, t)) oid = 9.0;
+      } else if(type < 3.5){                            /* hangar latéral : nacelle, caisses, portique roulant, coursive */
         float cx = r1 < 0.5 ? x1 - 2.9 : x0 + 0.3;
         if(boxHit(o, vec3(cx, y0, -D + 0.3), vec3(cx + 1.2, y0 + 1.2, -D + 1.5), t, bn)) oid = 12.0;
         if(boxHit(o, vec3(cx + 1.3, y0, -D + 0.3), vec3(cx + 2.5, y0 + 1.2, -D + 1.5), t, bn)) oid = 13.0;
         if(boxHit(o, vec3(cx + 0.1, y0 + 1.2, -D + 0.3), vec3(cx + 1.3, y0 + 2.4, -D + 1.5), t, bn)) oid = 14.0;
-        if(boxHit(o, vec3(x0, y1 - 0.55, -D*0.8 - 0.22), vec3(x1, y1 - 0.25, -D*0.8 + 0.22), t, bn)) oid = 4.0;   /* portique au fond */
-        if(boxHit(o, vec3(x0, y0 + 2.6, -D + 0.1), vec3(x1, y0 + 2.75, -D + 1.3), t, bn)) oid = 16.0;               /* coursive au fond */
+        float xg = mix(x0 + 2.0, x1 - 2.0, 0.5 + 0.5*sin(uTime*0.06 + seed));                                          /* portique roulant (v7.3) */
+        if(boxHit(o, vec3(xg - 0.3, y1 - 0.7, -D), vec3(xg + 0.3, y1 - 0.35, -0.8), t, bn)) oid = 28.0;
+        float zh = -D*(0.45 + 0.2*sin(uTime*0.09 + seed*1.7));
+        if(boxHit(o, vec3(xg - 0.45, y1 - 1.9 + 0.3*sin(uTime*0.13), zh - 0.45), vec3(xg + 0.45, y1 - 0.7, zh + 0.45), t, bn)) oid = 28.0;
+        if(boxHit(o, vec3(x0, y1 - 0.55, -D*0.8 - 0.22), vec3(x1, y1 - 0.25, -D*0.8 + 0.22), t, bn)) oid = 4.0;
+        if(boxHit(o, vec3(x0, y0 + 2.6, -D + 0.1), vec3(x1, y0 + 2.75, -D + 1.3), t, bn)) oid = 16.0;
         if(li > 0.5 && r3 > 0.35 && person(o, -D + 0.9, mix(x0 + 1.0, x1 - 1.0, r2), y0 + 2.75, 1e9, t)) oid = 9.0;
-      } else {                                          /* baie ventrale : nacelle arrimée au plafond, caisses */
+      } else {                                          /* baie ventrale : pince d'amarrage, caisses, coursive, portique */
         float pc = 0.5*(x0 + x1);
-        if(boxHit(o, vec3(pc - 0.6, -0.6, -D), vec3(pc + 0.6, 0.6, -D + 0.5), t, bn)) oid = 4.0;                       /* pince d'amarrage */
+        if(boxHit(o, vec3(pc - 0.6, -0.6, -D), vec3(pc + 0.6, 0.6, -D + 0.5), t, bn)) oid = 4.0;
         float cx = r1 < 0.5 ? x1 - 2.9 : x0 + 0.3;
         if(boxHit(o, vec3(cx, y0, -D + 0.3), vec3(cx + 1.2, y0 + 1.1, -D + 1.5), t, bn)) oid = 12.0;
         if(boxHit(o, vec3(cx + 1.3, y0, -D + 0.3), vec3(cx + 2.5, y0 + 1.1, -D + 1.5), t, bn)) oid = 13.0;
         if(boxHit(o, vec3(cx, y1 - 1.1, -D + 0.3), vec3(cx + 1.2, y1, -D + 1.5), t, bn)) oid = 14.0;
-        if(boxHit(o, vec3(x0, y0, -D*0.52), vec3(x1, y0 + 0.9, -D*0.47), t, bn)) oid = 16.0;                          /* coursive latérale */
-        if(boxHit(o, vec3(x1 - 1.2, y0, -D*0.3 - 0.2), vec3(x1 - 0.8, y1, -D*0.3 + 0.2), t, bn)) oid = 4.0;             /* portique */
+        if(boxHit(o, vec3(x0, y0, -D*0.52), vec3(x1, y0 + 0.9, -D*0.47), t, bn)) oid = 16.0;
+        if(boxHit(o, vec3(x1 - 1.2, y0, -D*0.3 - 0.2), vec3(x1 - 0.8, y1, -D*0.3 + 0.2), t, bn)) oid = 4.0;
         if(li > 0.5 && r3 > 0.3 && person(o, -D*0.47, mix(x0 + 1.5, x1 - 1.5, r2), y0 + 0.9, 1e9, t)) oid = 9.0;
       }
       if(oid > 0.0) n = bn;
@@ -274,52 +317,106 @@ void main(){
       else if(oid > 10.5 && oid < 11.5){ alb = vec3(0.04); em = vec3(0.3, 0.6, 1.0)*0.5*step(0.3, fract(hp.x*3.0 + hp.y*2.0)); }
       else if(oid > 14.5 && oid < 15.5) alb = vec3(0.06);
       else if(oid > 15.5 && oid < 16.5){ alb = vec3(0.09); if(n.z > 0.5 && fract(hp.x*2.5) < 0.2) alb = vec3(0.5, 0.34, 0.03); em = lc*li*0.6*step(0.93, fract(hp.x/1.4))*step(0.5, -n.z); }
+      else if(oid > 16.5){                              /* mobilier v7.3 */
+        if(oid < 17.5){ alb = vec3(0.3, 0.25, 0.2); if(n.z > 0.5 && abs(hp.y - y0 - 0.85) < 0.035) em = lc*li*2.2; }
+        else if(oid < 18.5){ alb = vec3(0.24, 0.19, 0.15); if(n.y > 0.5 && length(hp.xz - vec2(hp.x, -D + 0.22)) < 0.2) em = vec3(1.0, 0.72, 0.42)*li*2.0; }
+        else if(oid < 19.5) alb = vec3(0.42, 0.17, 0.13)*(0.85 + 0.15*step(0.5, fract((hp.x - xc)*1.6)));
+        else if(oid < 20.5){ alb = n.y > 0.5 || n.z > 0.5 ? vec3(0.13, 0.17, 0.24) : vec3(0.1, 0.1, 0.11); if(n.x != 0.0 && fract(hp.z*3.0) < 0.12) alb = vec3(0.5, 0.36, 0.05); }
+        else if(oid < 21.5){ alb = vec3(0.34, 0.33, 0.3); if(fract(hp.z*1.4) < 0.08) alb = vec3(0.62, 0.46, 0.05); }
+        else if(oid < 22.5) alb = vec3(0.8, 0.8, 0.79);
+        else if(oid < 23.5) alb = vec3(0.78, 0.27, 0.05);
+        else if(oid < 24.5){ alb = vec3(0.05, 0.06, 0.08); if(n.y > 0.5) em = vec3(0.2, 0.55, 1.0)*(0.3 + 0.35*step(0.55, fract(length(hp.xz - vec2(xc, -D*0.74))*5.0 - uTime*0.7))); }
+        else if(oid < 25.5){ alb = sty < 0.5 ? vec3(0.2, 0.12, 0.07) : vec3(0.28, 0.29, 0.3); if(n.y > 0.5) alb = sty < 0.5 ? vec3(0.08) : vec3(0.45);
+          if(sty > 0.5 && n.z > 0.5 && hp.y > y0 + 0.55 && fract((hp.x - x0)/1.1) < 0.5) em = screenCol(h1(floor((hp.x - x0)/1.1) + seed))*0.45; }
+        else if(oid < 26.5) alb = vec3(0.42, 0.44, 0.46);
+        else if(oid < 27.5) alb = vec3(0.16, 0.18, 0.21);
+        else { alb = vec3(0.55, 0.42, 0.05); if(fract((hp.x + hp.z + hp.y)*1.4) < 0.5) alb = vec3(0.07); }
+      }
       else if(oid > 11.5){ float kc = h1(oid + seed); alb = kc < 0.3 ? vec3(0.45, 0.18, 0.05) : (kc < 0.6 ? vec3(0.08, 0.2, 0.38) : vec3(0.3, 0.3, 0.1)); alb *= 0.8 + 0.2*step(0.5, fract((hp.x + hp.y + hp.z)*3.0)); }
-      else if(type < 0.5){
-        if(oid > 0.5 && oid < 1.5) alb = n.y > 0.5 ? vec3(0.6, 0.58, 0.55) : vec3(0.25, 0.2, 0.18);
-        else if(oid > 4.5 && oid < 5.5) alb = vec3(0.32, 0.12, 0.08);
+      else if(type < 2.5 && oid > 0.5){                 /* mobilier conservé : lit, armoire, canapé, table, plante */
+        if(oid < 1.5) alb = n.y > 0.5 ? (sty < 0.5 ? vec3(0.62, 0.6, 0.57) : vec3(0.5, 0.52, 0.55)) : vec3(0.25, 0.2, 0.18);
+        else if(oid > 4.5 && oid < 5.5) alb = sty < 0.5 ? vec3(0.34, 0.13, 0.09) : vec3(0.2, 0.24, 0.3);
         else if(oid > 5.5 && oid < 6.5) alb = vec3(0.28, 0.19, 0.11);
-        else if(oid > 1.5) alb = vec3(0.3, 0.22, 0.15);
-        else if(sid == 1.0) alb = vec3(0.16, 0.11, 0.09);
-        else if(sid == 2.0){ alb = vec3(0.55); if(abs(hp.z + D*0.5) < 0.25 && abs(hp.x - xc) < 0.5) em = lc*li*2.5; }
-        else { alb = vec3(0.5, 0.44, 0.36)*(0.9 + 0.1*step(0.5, fract((sid == 0.0 ? hp.z : hp.x)*0.8))); if(sid == 3.0 && r2 > 0.5 && abs(hp.x - xc) < 0.35 && abs(hp.y - y0 - 1.5) < 0.25) alb = vec3(0.2, 0.35, 0.5); }
-      } else if(type < 1.5){
-        alb = sid == 1.0 ? vec3(0.05) : vec3(0.1, 0.12, 0.15);
-        if(oid > 2.5 && oid < 3.5){ alb = vec3(0.08, 0.09, 0.1);
-          if(n.y > 0.5){ float cx = fract((hp.x - x0)/0.8); if(cx > 0.12 && cx < 0.88 && hp.z < -0.6 && hp.z > -1.2) em = screenCol(h1(floor((hp.x - x0)/0.8) + seed))*(0.55 + 0.25*step(0.5, fract(hp.z*9.0 + uTime*0.3))); } }
-        if(oid > 3.5 && oid < 4.5) alb = vec3(0.05, 0.05, 0.06);
-        if(oid < 0.5 && sid == 3.0){ float cx = fract((hp.x - x0)/1.6); if(cx > 0.08 && cx < 0.86 && hp.y > y0 + 1.05 && hp.y < y0 + 2.05){ float kc = h1(floor((hp.x - x0)/1.6) + seed*2.0);
-          em = screenCol(kc)*(0.35 + 0.35*step(0.45, fract(hp.y*7.0 + kc*3.0 - uTime*0.05*kc))); } }
-        if(oid < 0.5 && sid == 2.0 && abs(hp.z + D*0.55) < 0.12) em = lc*li*2.0;
-      } else if(type < 2.5){
-        if(oid > 4.5 && oid < 5.5) alb = vec3(0.35, 0.12, 0.08);
-        else if(oid > 5.5 && oid < 6.5) alb = vec3(0.3, 0.2, 0.12);
         else if(oid > 6.5 && oid < 7.5){ alb = vec3(0.08, 0.28, 0.06); n = vec3(0.0, 0.0, 1.0); }
-        else if(oid > 1.5 && oid < 2.5) alb = vec3(0.35, 0.3, 0.25);
-        else if(sid == 1.0) alb = vec3(0.32, 0.18, 0.09)*(0.82 + 0.18*step(0.5, fract(hp.x*3.0)));
-        else if(sid == 2.0){ alb = vec3(0.6); vec2 lq = vec2(fract((hp.x - x0)/1.6) - 0.5, hp.z + D*0.5); if(length(lq*vec2(1.6, 1.0)) < 0.18) em = lc*li*3.0; }
-        else alb = vec3(0.55, 0.47, 0.37);
-      } else {
+        else if(oid > 2.5 && oid < 3.5){ alb = sty > 1.5 ? vec3(0.75) : vec3(0.08, 0.09, 0.1);
+          if(n.y > 0.5){ float cx = fract((hp.x - x0)/0.8); if(cx > 0.12 && cx < 0.88 && hp.z < -0.6 && hp.z > -1.2) em = screenCol(h1(floor((hp.x - x0)/0.8) + seed))*(0.55 + 0.25*step(0.5, fract(hp.z*9.0 + uTime*0.3))); } }
+        else if(oid > 3.5 && oid < 4.5) alb = sty > 1.5 ? vec3(0.78, 0.3, 0.06) : (sty < 0.5 ? vec3(0.44, 0.39, 0.34) : vec3(0.2, 0.24, 0.3));   /* sièges : l'opérateur (sombre) s'en détache */
+        else alb = vec3(0.3, 0.22, 0.15);
+      }
+      else if(type < 2.5){                              /* parois selon l'ambiance */
+        float along = sid == 0.0 ? hp.z : hp.x;
+        if(sty < 0.5){                                  /* hospitalité : moquette, parois chaudes, corniche lumineuse, écran mural */
+          if(sid == 1.0) alb = mix(vec3(0.09, 0.11, 0.2), vec3(0.22, 0.08, 0.09), step(0.5, r2))*(0.9 + 0.1*vn(hp.xz*7.0));
+          else if(sid == 2.0){ alb = vec3(0.6); if(abs(hp.z + D*0.5) < 0.25 && abs(hp.x - xc) < 0.5) em = lc*li*2.2; }
+          else if(sid == 4.0){ alb = vec3(0.62, 0.56, 0.48); em = lc*li*(0.9 + 1.4*smoothstep(0.25, 0.05, y1 - hp.y - 0.1)); }
+          else { alb = vec3(0.56, 0.47, 0.37)*(0.93 + 0.07*step(0.5, fract(along*0.8)));
+            if(sid == 3.0){ float ex = xc + (r1 < 0.5 ? 0.55 : -0.55)*min(1.0, (x1 - x0)*0.25);
+              if(abs(hp.x - ex) < 0.5 && abs(hp.y - y0 - 1.45) < 0.28){ vec2 sq = vec2(hp.x - ex, hp.y - y0 - 1.45);
+                em = mix(vec3(0.02, 0.04, 0.12), vec3(0.12, 0.25, 0.5), 0.5 + 0.5*sq.y/0.28)*li*1.4 + vec3(0.9)*step(0.985, h2(floor(sq*40.0) + seed))*li; alb = vec3(0.02); } } }
+        } else if(sty < 1.5){                           /* industriel : caillebotis, nervures, casiers, bandeaux LED froids, écran ambre */
+          if(sid == 1.0){ alb = vec3(0.12, 0.13, 0.13); if(min(fract(hp.x*4.0), fract(hp.z*4.0)) < 0.12) alb = vec3(0.05); }
+          else if(sid == 2.0){ alb = vec3(0.2, 0.21, 0.22); if(abs(hp.x - xc) < 0.06) em = vec3(0.75, 0.88, 1.0)*li*2.4; }
+          else if(sid == 4.0){ alb = vec3(0.3, 0.32, 0.31); if(abs(y1 - hp.y - 0.2) < 0.04) em = vec3(0.75, 0.88, 1.0)*li*2.2; }
+          else { alb = vec3(0.27, 0.3, 0.29);
+            float rb = fract(along/0.62); if(sid == 0.0 && rb < 0.1){ alb = vec3(0.17, 0.19, 0.19); n = normalize(n + vec3(0.0, 0.0, (rb - 0.05)*8.0)); }
+            if(sid == 3.0){ vec2 lk = vec2(fract((hp.x - x0)/0.5), fract((hp.y - y0)/0.95));
+              if(hp.y < y0 + 1.9 && (lk.x < 0.04 || lk.y < 0.03)) alb = vec3(0.12);
+              if(hp.y < y0 + 1.9 && abs(lk.x - 0.85) < 0.04 && abs(lk.y - 0.5) < 0.08) alb = vec3(0.6);
+              float ex = r1 < 0.5 ? x1 - 0.9 : x0 + 0.9;
+              if(abs(hp.x - ex) < 0.4 && abs(hp.y - y0 - 1.4) < 0.22){ float ln = floor((hp.y - y0 - 1.18)*22.0); alb = vec3(0.01);
+                em = vec3(1.0, 0.62, 0.15)*li*0.9*step(0.5, fract(hp.y*22.0))*step(hp.x - ex + 0.35, 0.7*h1(ln + floor(uTime*0.7) + seed)); } }
+            if(sid == 0.0 && abs(hp.y - y0 - 1.9) < 0.05 && abs(hp.z + 0.4) < 0.05) em = vec3(1.0, 0.1, 0.05)*(0.3 + 2.0*step(0.5, fract(uTime*0.7 + seed)));
+          }
+        } else {                                        /* rétro-futur : parois capitonnées blanches, lumière crue */
+          if(sid == 1.0) alb = vec3(0.55, 0.56, 0.58);
+          else if(sid == 4.0 || sid == 2.0){ alb = vec3(0.85); em = lc*li*(sid == 4.0 ? 1.1 : 0.5); }
+          else { vec2 qq = sid == 0.0 ? vec2(hp.z, hp.y) : vec2(hp.x, hp.y);
+            float q1 = fract((qq.x + qq.y)*1.8), q2 = fract((qq.x - qq.y)*1.8), tuft = min(sin(q1*3.14159), sin(q2*3.14159));
+            alb = vec3(0.84, 0.84, 0.82)*(0.8 + 0.2*tuft); }
+          if(type > 0.5 && type < 1.5 && sid == 3.0){ float cx = fract((hp.x - x0)/1.6); if(cx > 0.08 && cx < 0.86 && hp.y > y0 + 1.05 && hp.y < y0 + 2.05) em = vec3(0.9, 0.25, 0.1)*0.25*step(0.5, fract(hp.y*5.0 - uTime*0.2)); }
+        }
+        if(type > 0.5 && type < 1.5 && sid == 3.0 && sty < 1.5){ float cx = fract((hp.x - x0)/1.6); if(cx > 0.08 && cx < 0.86 && hp.y > y0 + 1.05 && hp.y < y0 + 2.05){ float kc = h1(floor((hp.x - x0)/1.6) + seed*2.0);
+          alb = vec3(0.02); em = screenCol(kc)*(0.35 + 0.35*step(0.45, fract(hp.y*7.0 + kc*3.0 - uTime*0.05*kc))); } }
+        if(type > 1.5 && sid == 3.0 && sty < 0.5 && hp.y > y0 + 1.25 && hp.y < y0 + 2.2){        /* bar : étagères rétroéclairées */
+          alb = vec3(0.05); em = vec3(1.0, 0.7, 0.4)*li*(0.5 + 0.9*step(0.82, fract((hp.y - y0)*3.2)))*(0.8 + 0.2*step(0.5, fract(hp.x*2.3))); }
+      } else {                                          /* hangars */
         float along = sid == 0.0 ? -hp.z : hp.x - x0;          /* coordonnée le long de la paroi (x est constant sur les parois latérales) */
-        alb = vec3(0.14, 0.15, 0.16);
+        vec3 wallC = sty < 0.5 ? vec3(0.27, 0.29, 0.32) : (sty > 1.5 ? vec3(0.5) : vec3(0.14, 0.15, 0.16));
+        vec3 markC = sty < 0.5 ? vec3(0.15, 0.4, 0.75) : vec3(0.55, 0.38, 0.04);
+        alb = wallC;
         if(oid < 0.5){
           vec2 pw2 = sid == 3.0 ? hp.xy : (sid == 0.0 ? hp.yz : hp.xz);
-          if(min(fract(pw2.x/2.0), fract(pw2.y/2.0)) < 0.025) alb = vec3(0.07);                   /* joints de panneaux */
-          if(fract(along/1.4) < 0.12 && !(type < 3.5 && sid == 1.0) && sid != 3.0) alb = vec3(0.05);  /* nervures */
-          if(type < 3.5 && sid == 1.0){ alb = vec3(0.07);                                       /* sol balisé */
-            float lx = abs(abs(hp.x - mix(x0 + 3.2, x1 - 3.2, r1) + 0.3) - 2.6), lz = abs(abs(hp.z + D*0.52) - D*0.3);
-            if(min(lx, lz) < 0.07) alb = vec3(0.55, 0.38, 0.04);
-            if(hp.z > -1.0 && fract((hp.x + hp.z)*0.9) < 0.5) alb = vec3(0.5, 0.34, 0.03); }
+          if(min(fract(pw2.x/2.0), fract(pw2.y/2.0)) < 0.025) alb = wallC*0.5;                  /* joints de panneaux */
+          if(fract(along/1.4) < 0.12 && !(type < 3.5 && sid == 1.0) && sid != 3.0) alb = wallC*0.35;  /* nervures */
+          if(type < 3.5 && sid == 1.0){ alb = sty < 0.5 ? vec3(0.13, 0.15, 0.19) : vec3(0.07);        /* sol balisé : plot d'appontage hexagonal */
+            vec2 pq = vec2(hp.x - mix(x0 + 3.2, x1 - 3.2, r1) - 0.3, hp.z + D*0.52);
+            vec2 aq = abs(pq); float hx = max(dot(aq, vec2(0.5, 0.8660254)), aq.x);
+            if(abs(hx - 2.6) < 0.08 || abs(hx - 2.2) < 0.03) alb = markC;
+            if(hp.z > -1.0 && fract((hp.x + hp.z)*0.9) < 0.5) alb = sty < 0.5 ? vec3(0.6) : vec3(0.5, 0.34, 0.03);
+            float lane = min(abs(hp.x - x0 - 0.45), abs(x1 - 0.45 - hp.x));                      /* feux chenillards vers la sortie */
+            if(lane < 0.09 && fract(hp.z*0.55 + uTime*1.2) < 0.18) em = (sty < 0.5 ? vec3(0.3, 0.6, 1.0) : vec3(1.0, 0.6, 0.15))*2.2; }
+          if(type > 3.5 && sid == 3.0){ vec2 aq = abs(hp.xy - vec2(0.5*(x0 + x1), 0.0)); float hx = max(dot(aq, vec2(0.5, 0.8660254)), aq.x);   /* plot autour de la pince */
+            if(abs(hx - 2.2) < 0.07) alb = markC; }
+          if(type > 3.5 && sid == 0.0){ float lane = abs(hp.y); if(lane < 0.08 && fract(-hp.z*0.6 - uTime*1.2) < 0.18) em = vec3(1.0, 0.6, 0.15)*2.0; }
           float sd = type < 3.5 ? (sid == 2.0 ? 1.0 : 0.0) : (sid == 3.0 ? 1.0 : 0.0);          /* rampes lumineuses */
           float cross_ = type < 3.5 ? abs(hp.z + D*0.5) : abs(hp.y);
-          if(type < 3.5){ if(sd > 0.5 && fract(along/2.8) < 0.1 && cross_ < D*0.38) em = lc*li*2.4; }
+          if(type < 3.5){ if(sd > 0.5 && fract(along/2.8) < 0.1 && cross_ < D*0.38) em = lc*li*2.4; if(sid == 4.0 && abs(fract(-hp.z/2.4) - 0.5) < 0.08) em = lc*li*2.0; }
           else if(sd > 0.5 && abs(abs(hp.y) - (y1 - y0)*0.34) < 0.09) em = lc*li*2.6;             /* deux rampes continues au plafond */
           else if(sid == 3.0 && length(vec2(fract(along/3.0) - 0.5, (abs(hp.y) - (y1 - y0)*0.18)*0.35)) < 0.07) em = lc*li*3.0;
-          if(sid == 3.0 && type < 3.5 && hp.y < y0 + 0.5 && fract((hp.x + hp.y)*1.1) < 0.5) alb = vec3(0.5, 0.34, 0.03);
-          vec3 bc = vec3(x1 - 0.45, type < 3.5 ? y1 - 0.45 : y1 - 0.45, -D);                       /* gyrophare */
+          if(sid == 3.0 && type < 3.5 && hp.y < y0 + 0.5 && fract((hp.x + hp.y)*1.1) < 0.5) alb = sty < 0.5 ? vec3(0.6) : vec3(0.5, 0.34, 0.03);
+          vec3 bc = vec3(x1 - 0.45, y1 - 0.45, -D);                                                 /* gyrophare */
           if(sid == 3.0 && length(hp.xy - bc.xy) < 0.16) em = vec3(1.0, 0.45, 0.05)*(0.4 + 3.0*pow(0.5 + 0.5*sin(uTime*5.0 + seed), 6.0));
+          /* salle de contrôle vitrée : opérateurs devant leurs écrans (fond du hangar latéral, paroi de la baie ventrale) */
+          vec2 cw = type < 3.5 ? vec2(hp.x - xc, hp.y - (y1 - 1.55)) : vec2(-hp.z - D*0.72, hp.y);
+          bool wall = type < 3.5 ? sid == 3.0 : (sid == 0.0 && hp.x > xc);
+          if(wall && abs(cw.x) < min(2.4, (x1 - x0)*0.25) && abs(cw.y) < 0.55){
+            vec3 ins = mix(vec3(0.35, 0.3, 0.22), vec3(0.12, 0.14, 0.18), 0.5 + 0.5*cw.y/0.55)*li*0.9;
+            for(int k = 0; k < 3; k++){ float px = (float(k) - 1.0)*1.3 + 0.25*sin(float(k)*5.0 + seed); vec2 q = cw - vec2(px, -0.25);
+              if(length(q - vec2(0.0, 0.33)) < 0.13 || length(vec2(q.x*0.75, q.y)) < 0.24) ins = vec3(0.02); 
+              if(abs(q.x - 0.45) < 0.22 && abs(q.y - 0.05) < 0.14) ins = screenCol(h1(float(k) + seed))*0.8; }
+            alb = vec3(0.0); em = ins + vec3(0.04, 0.06, 0.09); }
         }
-        if(oid > 3.5 && oid < 4.5) alb = vec3(0.1);
+        if(oid > 3.5 && oid < 4.5) alb = sty > 1.5 ? vec3(0.8) : vec3(0.1);
       }
       /* ---- éclairage : plafonnier, occlusion des angles, tache de soleil ---- */
       vec3 lp = type > 3.5 ? vec3(xc, 0.0, -D + 0.5) : vec3(xc, y1 - 0.15, -D*0.5);
@@ -332,6 +429,10 @@ void main(){
       float sp = 0.0;
       if(L.z > 0.01){ vec2 qs = hp.xy + L.xy*((-g - hp.z)/L.z); sp = apm(qs, h) < 1.0 ? 1.0 : 0.0; }
       vec3 inside = alb*(irr*ao + sunC*max(dot(n, L), 0.0)*sp*(1.0 - 0.4*age)) + em;
+      if(type > 0.5 && type < 1.5 && D > 3.3){                 /* passerelle : hologramme au-dessus de la table tactique (v7.3) */
+        vec2 hc = vec2(xc, -D*0.74); float sx = dot(hc - o.xz, gD.xz)/max(dot(gD.xz, gD.xz), 1e-6);
+        if(sx > 0.0 && sx < t){ vec3 pp = o + gD*sx; float dx = length(pp.xz - hc), hy_ = pp.y - y0 - 0.9;
+          if(hy_ > 0.0 && hy_ < 0.9) inside += vec3(0.2, 0.55, 1.0)*exp(-dx*dx/0.08)*(0.55 + 0.45*sin(pp.y*40.0 - uTime*3.0))*(1.0 - hy_/0.9)*0.9; } }
       if(type < 0.5 && r2 < 0.28 && li > 0.1){          /* store à demi baissé */
         float yb = mix(-0.3*h.y, 0.8*h.y, r1);
         if(pg.y > yb) inside = lc*li*0.22*vec3(0.95, 0.88, 0.78) + vec3(0.02)*sunC*max(L.z, 0.0);
@@ -384,8 +485,8 @@ void main(){
   #include <encodings_fragment>
 }`;
 
-GL.material = function(age, portal){
-  const uni = { uSunDir: U.uSunDir, uSunCol: U.uSunCol, uSunI: U.uSunI, uTime: U.uTime, uAge: { value: age || 0 } };
+GL.material = function(age, portal, style){
+  const uni = { uSunDir: U.uSunDir, uSunCol: U.uSunCol, uSunI: U.uSunI, uTime: U.uTime, uAge: { value: age || 0 }, uStyle: { value: style || 0 } };
   if(portal){ uni.uRip = { value: [new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4()] }; uni.uField = { value: 1 }; }
   const m = new THREE.ShaderMaterial({ uniforms: uni, vertexShader: VERT, fragmentShader: FRAG, defines: portal ? { PORTAL: 1 } : {} });
   m.extensions = { derivatives: true, fragDepth: !!portal };
@@ -494,6 +595,12 @@ const bridgeShape = (hx, hy, age) => age > OLD ? [1, 0, 0, 0] : [1, Math.min(.7*
 const panoShape = (hx, hy, age) => { const c = .28*Math.min(hx, hy); return age > OLD ? [1, 0, 0, 0] : [1, c, c, 1]; };
 const bayShape = (hx, hy, age) => { const c = .2*Math.min(hx, hy); return age > OLD ? [1, 0, 0, 0] : [1, c, c, 0]; };
 GL.portShape = portShape;
+/* ambiances intérieures (v7.3) : 0 hospitalité (paquebots, coureurs, navettes de passagers), 1 industriel (cargos, pousseurs,
+   engins de service), 2 rétro-futur (très vieux vaisseaux : ancienne génération, capitonnage blanc) */
+const STYLE = { l20: 0, x1: 0 };
+GL.STYLE = STYLE;
+const styleOf = (model, age, def) => age > OLD ? 2 : (STYLE[model] !== undefined ? STYLE[model] : (def !== undefined ? def : 1));
+GL.styleOf = styleOf;
 
 /* ---------- construction d'un maillage d'ouvertures (partagée avec les petits engins) ---------- */
 function seedOf(i, s0){ return 1 + Math.floor(((Math.sin((i + 1)*12.9898 + s0*78.233)*43758.5453 % 1) + 1)%1*97); }
@@ -517,7 +624,7 @@ function glassGeometry(wins, s0){
   return g;
 }
 /* hublots / vitres pour d'autres coques (petits engins) : specs = [{ C, T, N, w, h, kind: 'bridge'|'port'|'pano', D, room? }] */
-GL.addWindows = function(group, specs, age, seed0){
+GL.addWindows = function(group, specs, age, seed0, style){
   const s0 = (seed0 || 0)%9973 + 1;
   const wins = specs.map(sp => {
     const it = { C: sp.C, T: sp.T, N: sp.N };
@@ -525,7 +632,7 @@ GL.addWindows = function(group, specs, age, seed0){
     const hx = sp.w/2, hy = sp.h/2, y0 = -hy - (sp.floor !== undefined ? sp.floor : .7), pano = sp.kind === 'pano';
     return { it, type: pano ? TYPE.pano : TYPE.bridge, hx, hy, shp: pano ? panoShape(hx, hy, age || 0) : bridgeShape(hx, hy, age || 0), fw: sp.fw || .06, g: sp.g || .06, room: sp.room || [-hx - .4, hx + .4, y0, Math.max(y0 + 2.1, hy + .4)], D: sp.D || 1.8, lift: sp.lift };
   });
-  const mesh = new THREE.Mesh(glassGeometry(wins, s0), GL.material(age));
+  const mesh = new THREE.Mesh(glassGeometry(wins, s0), GL.material(age, false, (age || 0) > OLD ? 2 : (style !== undefined ? style : 1)));
   mesh.userData.glass = true; mesh.userData.noFrame = true; group.add(mesh);
   return mesh;
 };
@@ -537,8 +644,8 @@ const SIDE = {
 };
 
 /* ---------- vitrages et baies d'un vaisseau du générateur ---------- */
-GL.apply = function(group, model, age, seed0, withBays, fam){
-  const items = survey(group); age = age || 0; fam = fam || FAM[model] || 'hexS';
+GL.apply = function(group, model, age, seed0, withBays, fam, style){
+  const items = survey(group); age = age || 0; fam = fam || FAM[model] || 'hexS'; const sty = style !== undefined ? style : styleOf(model, age);
   const wins = [], bays = [];
   const s0 = (seed0 || 0)%9973 + 1;
   // baie latérale ajoutée : zone réservée (les hublots qui s'y trouvaient disparaissent)
@@ -599,13 +706,18 @@ GL.apply = function(group, model, age, seed0, withBays, fam){
   items.forEach(it => { if(it.mesh && it.mesh.parent){ it.mesh.parent.remove(it.mesh); it.mesh.geometry.dispose(); } });
   const out = { count: wins.length + bays.length, docks: [], cabins: cabs ? new Set(cabs.values()).size : 0, cabinPorts: cabs ? cabs.size : 0, panos: items.filter(it => it.kind === 'pano').length };
   if(wins.length){
-    const mesh = new THREE.Mesh(glassGeometry(wins, s0), GL.material(age));
+    const mesh = new THREE.Mesh(glassGeometry(wins, s0), GL.material(age, false, sty));
     mesh.userData.glass = true; mesh.userData.noFrame = true; group.add(mesh);
-    out.mesh = mesh; out.uAge = mesh.material.uniforms.uAge;
+    out.mesh = mesh; out.style = sty; out.uAge = mesh.material.uniforms.uAge;
   }
-  if(bays.length){
+  if(bays.length) buildBays(group, bays, age, s0, sty, out);
+  return out;
+};
+
+/* hangars à champ de force (portails) : masque, intérieur, halo — partagé avec les vaisseaux d'autres générateurs (v7.5) */
+function buildBays(group, bays, age, s0, sty, out){
     bays.forEach((w, i) => { w.bi = i; w.seed = seedOf(100 + i, s0); });
-    const g = glassGeometry(bays, s0), mat = GL.material(age, true);
+    const g = glassGeometry(bays, s0), mat = GL.material(age, true, sty);
     const mask = new THREE.Mesh(g, maskMaterial()), draw = new THREE.Mesh(g, mat);
     mask.renderOrder = GL.RENDER_ORDER.mask; draw.renderOrder = GL.RENDER_ORDER.portal;
     [mask, draw].forEach(m => { m.userData.glass = true; m.userData.noFrame = true; m.userData.portal = true; group.add(m); });
@@ -620,6 +732,12 @@ GL.apply = function(group, model, age, seed0, withBays, fam){
     bays.forEach(w => { const it = w.it, B = new V3().crossVectors(it.N, it.T);
       out.docks.push({ bi: w.bi, C: it.C.clone(), N: it.N.clone(), T: it.T.clone(), B, hx: w.hx, hy: w.hy, D: w.D, room: w.room.slice(), mode: w.mode, ventral: w.mode === 'belly', rip: mat.uniforms.uRip.value[w.bi] }); });
   }
+/* hangars pour un autre générateur : specs = [{ C, T, N, w, h, D, mode: 'side' }] → { docks, bays } */
+GL.addBays = function(group, specs, age, seed0, style){
+  const s0 = (seed0 || 0)%9973 + 1, sty = style !== undefined ? style : 1, out = { docks: [] };
+  const bays = specs.map(sp => { const hx = sp.w/2, hy = sp.h/2; return { it: { kind: 'side', C: sp.C, T: sp.T, N: sp.N }, type: TYPE.dock, hx, hy, shp: bayShape(hx, hy, age || 0), fw: sp.fw || .5, g: .05,
+    room: sp.room || [-hx - 1.5, hx + 1.5, -hy - .05, hy + 2.4], D: sp.D, mode: 'side' }; });
+  buildBays(group, bays, age || 0, s0, sty, out);
   return out;
 };
 
@@ -628,7 +746,7 @@ const build0 = SHIPGEN.build;
 SHIPGEN.build = function(model, opts){
   const b = build0.call(SHIPGEN, model, opts);
   if(!(opts && opts.realGlass === false)){
-    const r = GL.apply(b.group, model, opts && opts.age ? +opts.age : 0, opts && opts.ageSeed, !(opts && opts.dockBay === false), opts && opts.portFam);
+    const r = GL.apply(b.group, model, opts && opts.age ? +opts.age : 0, opts && opts.ageSeed, !(opts && opts.dockBay === false), opts && opts.portFam, opts && opts.interior);
     if(r){ b.glass = r; b.docks = r.docks; }
   }
   return b;
