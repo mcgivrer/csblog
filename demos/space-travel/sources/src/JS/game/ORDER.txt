@@ -10,10 +10,11 @@
 08-le-vaisseau-support-commun.js
 09-les-vaisseaux-generateur-v2.js
 shared/shipdrive.js
-../demo/shipglass.js
-../demo/smallcraft.js
+shared/shipglass.js
+09b-baies-ventrales.js
+shared/smallcraft.js
 shared/warpring.js
-../demo/shipwear.js
+shared/shipwear.js
 shared/hitex.js
 shared/postfx.js
 10-panneau-de-jauges-moteur.js
