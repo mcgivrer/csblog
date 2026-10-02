@@ -15,8 +15,8 @@ Aujourd'hui, « dans quel état est le jeu ? » n'a pas de réponse unique. Le c
 | Drapeau ou état | Utilisations | Rôle réel |
 |---|---|---|
 | `jumpState` | 27 | saut quantique en cours |
-| `gamePaused` | 15 | pause, **réutilisée par la carte stellaire** |
-| `REAL.phase` | 14 | `IDLE`, `TRANSFER`, `APPROACH`, `ORBIT`, `DEPART`, `COAST`, `WARP`, `WARPOUT`, `HOP`, `JUMP` |
+| `gamePaused` | 15 | pause (seul mécanisme qui gèle la simulation) |
+| `REAL.phase` | 14 | `IDLE` (jamais lue), `TRANSFER`, `APPROACH`, `ORBIT`, `DEPART`, `COAST`, `WARP`, `WARPOUT`, `HOP`, `JUMP` |
 | `flightPhase` | 13 | `CRUISE` ou `ARRIVAL_PAUSE` |
 | `cameraMode` | 13 | mode de caméra |
 | `gameStarted` | 8 | le jeu a démarré (sinon : écran-titre) |
@@ -24,8 +24,8 @@ Aujourd'hui, « dans quel état est le jeu ? » n'a pas de réponse unique. Le c
 
 Conséquences observées dans le code :
 
-- **Pause détournée.** La carte stellaire (§23.3) réutilise `gamePaused`. Les gestionnaires d'ÉCHAP, ESPACE et ENTRÉE doivent donc tester `isStarMapOpen()` avant `gamePaused`, sinon la reprise se fait « sans fermer proprement la carte » (commentaire de `23-planification-relance-d-itineraire.js`).
-- **Clavier éclaté.** Au moins 6 enregistrements de `keydown` dans 5 fichiers (`20e`, `20g`, `23`, `24`, `42` ×2), plus un gestionnaire de la barre d'icônes (`26`) cité dans un commentaire mais non localisé. Le survol doit se placer en phase de capture et appeler `stopImmediatePropagation()` pour passer devant les autres. Chaque ajout d'un écran oblige à toucher les autres gestionnaires.
+- **États sans propriétaire commun.** La carte stellaire n'a pas d'état propre dans le jeu : elle n'existe que par des tests `isStarMapOpen()` dispersés. L'inventaire T0.1 a montré que, contrairement à ce que disent des commentaires périmés de `23-planification-relance-d-itineraire.js` (`:247-273`), elle **ne réutilise plus `gamePaused`** : la simulation continue sous la carte ouverte. Les pièges réels sont ailleurs : le clavier principal n'a aucune garde `gameStarted`, le choix du vaisseau n'isole pas le clavier, `M` s'ouvre même en pause, le survol avale toute touche (voir l'[inventaire T0.1](./PLAN-scenes-T0.1-inventaire.md#5-écarts-avec-le-plan-et-pièges-relevés)).
+- **Clavier éclaté.** Huit enregistrements clavier (K1 à K8 de l'inventaire T0.1) dans 5 fichiers (`20e`, `20g`, `23` ×2, `24` ×2, `42` ×2) ; la barre d'icônes (`26`) n'a pas d'écouteur clavier propre, ses touches F1-F9 sont traitées par `23`. Le survol doit se placer en phase de capture et appeler `stopImmediatePropagation()` pour passer devant les autres. Chaque ajout d'un écran oblige à toucher les autres gestionnaires.
 - **`animate()` branche sur des drapeaux** (`gameStarted`, puis `gamePaused`) avec des blocs dupliqués entre titre et vol (voir [DAT §4.3](./DAT.md#43-animate--une-fonction-qui-fait-tout)).
 - **Ordre de chargement fragile** : `startGame()` rafraîchit la barre d'icônes « différée jusqu'ici car elle dépend d'`orbitState` et `ROUTE`, déclarés après », et 38 gardes `typeof X !== 'undefined'` colmatent ce couplage.
 - **La démo répète le schéma** : `live2.js` enchaîne `selOpen`, `yardOpen`, `helpOpen`, `fleetOpen` et la carte dans un seul `__onKey` à retours anticipés.
@@ -62,7 +62,7 @@ GameScene = {
 
 ### 2.2 Gestionnaire `SCENES`
 
-- **Pile** : une scène de base (titre, vol, orbite, saut…) plus des scènes modales empilées (pause, carte, aide, services). `push`, `pop`, `replace(name, params)`.
+- **Pile** : une scène de base (titre, vol, orbite, saut…) plus des scènes modales empilées (pause, carte, survol, choix du vaisseau). `push`, `pop`, `replace(name, params)`.
 - **Une seule boucle** : `animate()` ne fait plus que `SCENES.update(dt)` puis `SCENES.render()`. Le gestionnaire met à jour la scène du haut, et celles du dessous seulement si la scène du haut ne les gèle pas (`freezesBelow`).
 - **Un seul répartiteur d'entrées** : un seul `keydown`, un seul `keyup`, un seul jeu d'événements de pointeur, à la fenêtre, qui appellent `onKey`/`onPointer` de la scène du haut puis, si elle ne consomme pas, celles du dessous non gelées. Plus de phase de capture ni de `stopImmediatePropagation`.
 - **Table des transitions** déclarée à un seul endroit : un changement de scène hors de cette table est refusé et journalisé.
@@ -74,23 +74,21 @@ GameScene = {
 
 ## 3. Inventaire des scènes
 
-À valider au lot 0 : la liste vient de la lecture du code, pas d'exécution.
+**Corrigée par la tâche T0.1** (inventaire par lecture du code : [PLAN-scenes-T0.1-inventaire.md](./PLAN-scenes-T0.1-inventaire.md), §6). La version initiale de ce plan comptait onze scènes ; deux n'existent pas dans le code (`dialog` pour la panne de carburant, `gameOver`) et la carte ne détourne pas la pause. La liste reste à confirmer par exécution au lot 0 (T0.3).
 
-| Scène | Remplace aujourd'hui | Type | Sous-états / remarques |
-|---|---|---|---|
-| `boot` | générique, terminal (`42-…`, `finish()`) | base | |
-| `title` | `!gameStarted`, `TITLE.tick`, `updateTitleCinematic` | base | choix de la langue |
-| `shipSelect` | `SHIP_SELECT_OPEN` | modale sur `title` | |
-| `flight` | `flightPhase === 'CRUISE'`, `REAL.phase` mouvement | base | sous-états `IDLE`, `TRANSFER`, `COAST`, `DEPART`, `APPROACH`, `HOP`, `WARP`, `WARPOUT` |
-| `orbit` | `ARRIVAL_PAUSE`, `orbitState.active`, navettes, plans de coupe | base | sous-état `ORBIT`, tableau des missions, livraison, ports |
-| `jump` | `jumpState`, lentille `WARP` | base | charge, pli, éclair, onde |
-| `flyover` | `SURVOL` (touche `G`) | modale | annulée par toute touche ou clic |
-| `starMap` | `isStarMapOpen()` + `gamePaused` détourné | modale | **fin du détournement de la pause** |
-| `pause` | `gamePaused` | modale, gèle tout | ÉCHAP vers l'écran-titre |
-| `dialog` | panne de carburant, aide (H), télémétrie | modale | un type de scène paramétré |
-| `gameOver` | « arrêter la partie » après confirmation | base | à confirmer |
+| Scène | Remplace aujourd'hui | Type | Gèle dessous ? | Sous-états / remarques |
+|---|---|---|---|---|
+| `boot` | générique, terminal (`42-…`, `finish()`) | base | n/a | |
+| `title` | `!gameStarted`, `TITLE.tick`, `updateTitleCinematic` | base | n/a | choix de la langue ; ne se termine que par `startGame` |
+| `shipSelect` | `SHIP_SELECT_OPEN` | modale sur `title` | non | doit isoler le clavier (aujourd'hui il ne le fait pas) |
+| `flight` | `REAL.phase` ∈ `TRANSFER`, `APPROACH`, `DEPART`, `COAST`, `HOP` ; `flightPhase = 'CRUISE'` hors escale | base | n/a | `APPROACH` est la seule phase qui lit le pilotage ; `IDLE` (jamais lue) à supprimer |
+| `orbit` | `REAL.phase = 'ORBIT'`, `flightPhase`, `orbitState.active`, plans automatiques, navettes | base | n/a | `ARRIVAL_PAUSE` (escale) puis `CRUISE` + `ORBIT` (attente du départ) ; le tableau des missions est un panneau |
+| `jump` | `jumpState`, lentille `WARP` | base | n/a | **automatique** après `COAST` (jamais déclenché par le joueur) ; 6,67 s ; couvre aussi `WARP` et `WARPOUT` |
+| `flyover` | `SURVOL` (touche `G`) | modale | non | avale toute touche, y compris Échap et P |
+| `starMap` | `isStarMapOpen()` | modale | **non** : la simulation continue dessous | n'utilise pas `gamePaused` |
+| `pause` | `gamePaused` | modale | **oui** | Échap recharge la page, sans confirmation |
 
-Les services portuaires et le canal radio restent des **panneaux HUD** déclarés dans `ui` (ils s'affichent *pendant* `orbit`), pas des scènes.
+Aide (H), audio (V), télémétrie, canal radio, services portuaires, tableaux de contrats, de missions et chantier naval restent des **panneaux HUD** déclarés dans `ui` (ils s'affichent *pendant* une scène), pas des scènes.
 
 ### 3.1 Transitions proposées
 
@@ -104,8 +102,8 @@ stateDiagram-v2
   title --> flight: Démarrage rapide (tests)
   flight --> orbit: Arrivée à l'escale
   orbit --> flight: Départ
-  flight --> jump: Saut quantique
-  jump --> flight: Fin du saut
+  flight --> jump: Fin de COAST (automatique)
+  jump --> flight: Fin du saut (retour au transfert)
   flight --> flyover: Touche G
   flyover --> flight: Toute touche
   flight --> starMap: Touche M
@@ -113,13 +111,10 @@ stateDiagram-v2
   flight --> pause: Échap
   orbit --> pause: Échap
   pause --> flight: Espace / Entrée
-  pause --> title: Échap, confirmation
-  flight --> dialog: Plus de carburant
-  dialog --> flight: Aide reçue
-  dialog --> title: Arrêter
+  pause --> title: Échap (rechargement aujourd'hui, sans confirmation)
 ```
 
-La matrice « scène × touche → résultat » (ÉCHAP, ESPACE, ENTRÉE, M, G, H, F1 à F9, I, L) sera écrite au lot 0 à partir du comportement **actuel** et sert de test d'acceptation de chaque lot suivant.
+La matrice « scène × touche → résultat » (ÉCHAP, ESPACE, ENTRÉE, M, G, H, F1 à F9, I, L) sera écrite au lot 0 à partir du comportement **actuel** et sert de test d'acceptation de chaque lot suivant. Les données brutes sont au §3.2 de l'[inventaire T0.1](./PLAN-scenes-T0.1-inventaire.md#32-matrice-brute-pour-t02). Le diagramme montre la pause depuis `flight` et `orbit` ; l'inventaire montre qu'elle est aussi possible pendant un saut (`jump`), car `enterPause` ne teste que `gameStarted`.
 
 ## 4. Organisation du code cible
 
@@ -159,7 +154,7 @@ Chaque lot se termine par une version taguée (`stt_vX.Y.Z`, voir `CLAUDE.md`) q
 
 | Id | Tâche | Rôle | Dépend de | Critère d'acceptation |
 |---|---|---|---|---|
-| T0.1 | Inventaire des états et valeurs réelles de `REAL.phase`, `flightPhase`, `orbitState` | Développeur | — | Table du §3 confirmée ou corrigée |
+| T0.1 | Inventaire des états et valeurs réelles de `REAL.phase`, `flightPhase`, `orbitState` | Développeur | — | Table du §3 confirmée ou corrigée. **Fait** : [inventaire](./PLAN-scenes-T0.1-inventaire.md), table corrigée (2 scènes supprimées) |
 | T0.2 | Matrice scène × touche (comportement actuel) | Architecte | T0.1 | Document relu, cas ambigus listés |
 | T0.3 | Test de caractérisation Playwright de la matrice | Développeur | T0.2 | Vert sur `stt_v2.17.0` |
 | T1.1 | `scenes/scene.js` : pile, transitions, événements | Développeur | T0.3 | Tests unitaires de la pile et des transitions refusées |
@@ -245,8 +240,9 @@ Lecture du planning :
 
 1. **Granularité** : `orbit` doit-elle rester une scène unique (arrivée, livraison, missions, ports) ou se scinder en `arrival`, `delivery` et `missionBoard` ?
 2. **Pause** : la pause doit-elle aussi couper la musique et la synthèse vocale ? Le comportement actuel est à relever au lot 0.
-3. **`gameOver`** : existe-t-il aujourd'hui un vrai écran de fin, ou seulement le retour à l'écran-titre après confirmation ?
-4. **Ordre avec le DAT** : faire ce plan (C + E) avant la [proposition A](./DAT.md#5-propositions) (hygiène du dépôt, [DAT §4.7](./DAT.md#47-hygiène-du-dépôt)), ou l'inverse ? Je recommande A en premier : le dépôt allégé facilite les revues de ce plan.
+3. ~~**`gameOver`** : existe-t-il un écran de fin ?~~ **Réglée par T0.1** : non. « Quitter » est un rechargement de page sans confirmation. Faut-il ajouter une confirmation, et la panne de carburant décrite dans `TODO.md` (non implémentée) est-elle toujours voulue ? Si oui, une scène `dialog` reviendra dans le plan.
+4. **Pièges de l'inventaire** : les défauts relevés au §5 de l'inventaire T0.1 (clavier du titre, `M` en pause, tableau des missions au-dessus de la pause…) doivent-ils être corrigés par la refonte, ou conservés à l'identique pour que la matrice du lot 0 reste un test de non-régression ?
+5. **Ordre avec le DAT** : faire ce plan (C + E) avant la [proposition A](./DAT.md#5-propositions) (hygiène du dépôt, [DAT §4.7](./DAT.md#47-hygiène-du-dépôt)), ou l'inverse ? Je recommande A en premier : le dépôt allégé facilite les revues de ce plan.
 
 ## Annexe — Propositions du DAT citées dans ce plan
 
