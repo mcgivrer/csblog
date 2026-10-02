@@ -17,7 +17,7 @@ The root-level `README.md` in this directory describes an older layout (`space-t
 cd sources
 python3 build.py            # compile + package + test, in that order
 python3 build.py compile    # assemble src/ -> target/space-travel.html (readable)
-python3 build.py package    # needs `npm install` first -> target/space-travel.min.html (terser + html-minifier-terser)
+python3 build.py package    # needs `npm ci` first (node_modules is not tracked) -> target/space-travel.min.html (terser + html-minifier-terser)
 python3 build.py test       # run src/test/*_test.py (Playwright) against target/*.html
 ```
 
@@ -32,7 +32,7 @@ python3 build.py test       # run src/test/*_test.py (Playwright) against target
 ```bash
 cd observation-des-etoiles
 python3 build/build.py      # no dependencies -> dist/observation-des-etoiles.html (readable)
-npm install && node build/build_min.js   # -> dist/ minified version
+npm ci && node build/build_min.js        # -> dist/ minified version (node_modules is not tracked)
 node tests/smoke.js         # boot + 200s simulated run on the minified build
 node tests/longrun.js LONG-10   # 20 simulated minutes: errors, memory, shot-type stats
 ```
@@ -41,6 +41,12 @@ node tests/longrun.js LONG-10   # 20 simulated minutes: errors, memory, shot-typ
 - `tests/` is a large suite of standalone Node/Playwright scripts (not a single runner) — each targets one subsystem and takes its own positional args (seed, ship id, shot list, etc.). Run `node tests/<name>.js` directly; see the "Reconstruire" section of `observation-des-etoiles/README.md` for the full list and argument meaning of each script (carrier views, map, textures, liveries, FTL, military encounters, director stats, etc.).
 - Versioned deliverables (`observation-des-etoiles-vX.Y.html` / `.min.html`) are committed snapshots, one per notable feature increment — check `README.md`'s file table before assuming the latest `vX.Y` is what to edit; always edit `src/` + `build/`, then rebuild.
 - `package.json` `name`/`version` describes this specific demo release, unrelated to the main game's version number.
+
+## Dependencies and tracked build output
+
+- `node_modules/` and `__pycache__/` are git-ignored (root `.gitignore`). Install with `npm ci` in `sources/` or `observation-des-etoiles/` (both have a real `package-lock.json`); never commit `node_modules`.
+- The two other `package-lock.json` files (repo root and `demos/space-travel/`) are empty stubs, not real projects.
+- `sources/target/*.html` and the versioned demo HTML stay **tracked on purpose**: GitHub Pages serves `main` from the repo root, so removing them would remove the game and the demo from the published site.
 
 ## Release tagging
 
