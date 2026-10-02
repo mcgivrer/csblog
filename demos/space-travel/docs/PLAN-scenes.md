@@ -6,11 +6,11 @@
 | **Date** | 2026-10-02 |
 | **Statut** | Plan proposé, rien n'est implémenté |
 | **Rôle** | Spécification d'architecte, découpée en tâches pour le chef de projet (voir `AGENTS.md`, mode agentique) |
-| **Liens** | Prolonge les propositions **C** (décomposer `animate()`) et **E** (état unique) du [DAT](./DAT.md) ; les lettres A à H citées dans le plan sont résumées dans l'[annexe](#annexe--propositions-du-dat-citées-dans-ce-plan) |
+| **Liens** | Prolonge les propositions **C** (décomposer `animate()`) et **E** (état unique) du [DAT](./DAT.md#5-propositions) ; les lettres A à H citées dans le plan sont résumées dans l'[annexe](#annexe--propositions-du-dat-citées-dans-ce-plan) |
 
 ## 1. Pourquoi une Scene
 
-Aujourd'hui, « dans quel état est le jeu ? » n'a pas de réponse unique. Le code le déduit de plusieurs drapeaux qui se recoupent (comptages sur `sources/src/JS/game`) :
+Aujourd'hui, « dans quel état est le jeu ? » n'a pas de réponse unique. Le code le déduit de plusieurs drapeaux qui se recoupent (comptages sur `sources/src/JS/game` ; voir aussi [DAT §3.4](./DAT.md#34-modules-métier-et-état) et [§4.4](./DAT.md#44-état-global-et-couplage-dordre)) :
 
 | Drapeau ou état | Utilisations | Rôle réel |
 |---|---|---|
@@ -26,7 +26,7 @@ Conséquences observées dans le code :
 
 - **Pause détournée.** La carte stellaire (§23.3) réutilise `gamePaused`. Les gestionnaires d'ÉCHAP, ESPACE et ENTRÉE doivent donc tester `isStarMapOpen()` avant `gamePaused`, sinon la reprise se fait « sans fermer proprement la carte » (commentaire de `23-planification-relance-d-itineraire.js`).
 - **Clavier éclaté.** Au moins 6 enregistrements de `keydown` dans 5 fichiers (`20e`, `20g`, `23`, `24`, `42` ×2), plus un gestionnaire de la barre d'icônes (`26`) cité dans un commentaire mais non localisé. Le survol doit se placer en phase de capture et appeler `stopImmediatePropagation()` pour passer devant les autres. Chaque ajout d'un écran oblige à toucher les autres gestionnaires.
-- **`animate()` branche sur des drapeaux** (`gameStarted`, puis `gamePaused`) avec des blocs dupliqués entre titre et vol (voir DAT §4.3).
+- **`animate()` branche sur des drapeaux** (`gameStarted`, puis `gamePaused`) avec des blocs dupliqués entre titre et vol (voir [DAT §4.3](./DAT.md#43-animate--une-fonction-qui-fait-tout)).
 - **Ordre de chargement fragile** : `startGame()` rafraîchit la barre d'icônes « différée jusqu'ici car elle dépend d'`orbitState` et `ROUTE`, déclarés après », et 38 gardes `typeof X !== 'undefined'` colmatent ce couplage.
 - **La démo répète le schéma** : `live2.js` enchaîne `selOpen`, `yardOpen`, `helpOpen`, `fleetOpen` et la carte dans un seul `__onKey` à retours anticipés.
 
@@ -70,7 +70,7 @@ GameScene = {
 
 ### 2.3 Rendu et post-traitement
 
-`renderMain()` (`28-propulsion-quantique-et-carte.js`) applique globalement la lentille de saut (`WARP`) et la profondeur de champ (`GP.dof`). Cela reste **hors des scènes** : c'est un étage du rendu par défaut, que `JumpScene` pilote en écrivant dans `WARP`/`GP`. Une scène ne remplace `render()` que si elle a un rendu vraiment différent (carte 2D, aperçu du vaisseau).
+`renderMain()` (`28-propulsion-quantique-et-carte.js`) applique globalement la lentille de saut (`WARP`) et la profondeur de champ (`GP.dof`). Cela reste **hors des scènes** (rendu en couches : [DAT §3.2](./DAT.md#32-rendu--deux-couches-origine-flottante-tranches-de-profondeur)) : c'est un étage du rendu par défaut, que `JumpScene` pilote en écrivant dans `WARP`/`GP`. Une scène ne remplace `render()` que si elle a un rendu vraiment différent (carte 2D, aperçu du vaisseau).
 
 ## 3. Inventaire des scènes
 
@@ -169,7 +169,7 @@ Chaque lot se termine par une version taguée (`stt_vX.Y.Z`, voir `CLAUDE.md`) q
 | T4.1 | Nettoyage des drapeaux et gardes, renommage | Développeur | T3.* | `grep` vide, matrice verte |
 | T5.1 | Application à la démo | Développeur | T4.1 | Voir lot 5 |
 
-Revue de l'architecte à chaque PR : respect du contrat (§2.1), aucune lecture d'un drapeau d'une autre scène, aucune allocation ajoutée dans `update()` (voir DAT §4.3).
+Revue de l'architecte à chaque PR : respect du contrat (§2.1), aucune lecture d'un drapeau d'une autre scène, aucune allocation ajoutée dans `update()` (voir [DAT §4.3](./DAT.md#43-animate--une-fonction-qui-fait-tout)).
 
 ### 6.1 Planning et dépendances
 
@@ -229,15 +229,15 @@ Lecture du planning :
 |---|---|---|
 | Régression de comportement subtile (pause, carte, arrivée) | Élevée | Matrice de caractérisation dès le lot 0 ; un lot = un comportement inchangé |
 | `flight`/`orbit` : sous-états très entremêlés (`REAL.phase` lu à 14 endroits, `orbitState` sur une vingtaine de champs) | Élevée | Faire `flight` et `orbit` en dernier ; commencer par des sous-états qui se contentent d'envelopper l'existant |
-| Temps : `orbit` utilise `arrivalTimeScale` et des chronos propres, tandis que la pause gèle tout via un `dt` à zéro | Moyenne | Tests de pause pendant l'orbite ; la proposition D du DAT (pas de temps fixe) vient **après** ce plan |
+| Temps : `orbit` utilise `arrivalTimeScale` et des chronos propres, tandis que la pause gèle tout via un `dt` à zéro | Moyenne | Tests de pause pendant l'orbite ; la [proposition D du DAT](./DAT.md#5-propositions) (pas de temps fixe) vient **après** ce plan |
 | Confusion `scene` / `GameScene` | Faible | Nommage du §2 ; revue de code |
 | Audio et radio (synthèse vocale, musique) non couverts par les tests | Moyenne | Événements `enter`/`exit` pour couper ou reprendre ; test manuel listé en lot 3 |
 | Surcoût de la couche scènes | Faible | Une seule indirection par image ; mesure avant/après au lot 1 |
 
 ## 8. Hors périmètre
 
-- Pas de pas de temps fixe ni de refonte du temps (DAT, proposition D).
-- Pas de modules ES ni de nouveau bundler (DAT, proposition H).
+- Pas de pas de temps fixe ni de refonte du temps ([DAT, proposition D](./DAT.md#5-propositions) et [§4.5](./DAT.md#45-temps-et-déterminisme)).
+- Pas de modules ES ni de nouveau bundler ([DAT, proposition H](./DAT.md#5-propositions)).
 - Pas de changement d'interface visible : les panneaux, touches et séquences restent identiques.
 - Pas de réécriture de la logique de vol, d'orbite ou de saut : seules leurs entrées, sorties et frontières changent.
 
@@ -246,19 +246,19 @@ Lecture du planning :
 1. **Granularité** : `orbit` doit-elle rester une scène unique (arrivée, livraison, missions, ports) ou se scinder en `arrival`, `delivery` et `missionBoard` ?
 2. **Pause** : la pause doit-elle aussi couper la musique et la synthèse vocale ? Le comportement actuel est à relever au lot 0.
 3. **`gameOver`** : existe-t-il aujourd'hui un vrai écran de fin, ou seulement le retour à l'écran-titre après confirmation ?
-4. **Ordre avec le DAT** : faire ce plan (C + E) avant la proposition A (hygiène du dépôt), ou l'inverse ? Je recommande A en premier : le dépôt allégé facilite les revues de ce plan.
+4. **Ordre avec le DAT** : faire ce plan (C + E) avant la [proposition A](./DAT.md#5-propositions) (hygiène du dépôt, [DAT §4.7](./DAT.md#47-hygiène-du-dépôt)), ou l'inverse ? Je recommande A en premier : le dépôt allégé facilite les revues de ce plan.
 
 ## Annexe — Propositions du DAT citées dans ce plan
 
-Les lettres renvoient à la section 5 du [DAT](./DAT.md), qui contient la liste complète (A à K) avec bénéfice, effort et risque. Résumé des six propositions que ce plan mentionne :
+Les lettres renvoient à la [section 5 du DAT](./DAT.md#5-propositions), qui contient la liste complète (A à K) avec bénéfice, effort et risque. Résumé des six propositions que ce plan mentionne :
 
 | Lettre | Proposition du DAT | Lien avec ce plan |
 |---|---|---|
-| **A** | **Hygiène du dépôt** : ne plus suivre `node_modules`, `__pycache__` et `sources/target` dans git ; `.gitignore`, `npm ci` documenté, builds publiés en artefacts | Recommandée **avant** ce plan (§9, question 4) : un dépôt allégé facilite les revues |
-| **B** | **Source unique des modules partagés** entre le jeu et la démo (dossier `shared/`), pour mettre fin à la dérive des copies | Le lot 5 y recourt : `scenes/scene.js` partagé entre jeu et démo |
-| **C** | **Décomposer `animate()`** en systèmes nommés et ordonnés | Ce plan la prolonge : `animate()` ne fait plus que `SCENES.update` puis `SCENES.render` |
-| **D** | **Pas de temps fixe** (accumulateur, interpolation) | **Hors périmètre** (§8) ; vient après ce plan, car elle change la sémantique du temps dans tout le moteur |
-| **E** | **État unique et machine à états de phase** avec transitions autorisées | Ce plan la réalise : table des transitions, pile de scènes, accesseurs dérivés des anciens drapeaux |
-| **H** | **Frontières de modules** (fichiers renommés selon leur contenu, puis modules ES regroupés en un HTML) | **Hors périmètre** pour les modules ES (§8) ; le renommage des fichiers est fait au lot 4 |
+| **A** — [§4.7](./DAT.md#47-hygiène-du-dépôt) | **Hygiène du dépôt** : ne plus suivre `node_modules`, `__pycache__` et `sources/target` dans git ; `.gitignore`, `npm ci` documenté, builds publiés en artefacts | Recommandée **avant** ce plan (§9, question 4) : un dépôt allégé facilite les revues |
+| **B** — [§4.2](./DAT.md#42-duplication-et-dérive-entre-les-deux-produits-priorité-haute) | **Source unique des modules partagés** entre le jeu et la démo (dossier `shared/`), pour mettre fin à la dérive des copies | Le lot 5 y recourt : `scenes/scene.js` partagé entre jeu et démo |
+| **C** — [§4.3](./DAT.md#43-animate--une-fonction-qui-fait-tout) | **Décomposer `animate()`** en systèmes nommés et ordonnés | Ce plan la prolonge : `animate()` ne fait plus que `SCENES.update` puis `SCENES.render` |
+| **D** — [§4.5](./DAT.md#45-temps-et-déterminisme) | **Pas de temps fixe** (accumulateur, interpolation) | **Hors périmètre** (§8) ; vient après ce plan, car elle change la sémantique du temps dans tout le moteur |
+| **E** — [§4.4](./DAT.md#44-état-global-et-couplage-dordre), [§3.4](./DAT.md#34-modules-métier-et-état) | **État unique et machine à états de phase** avec transitions autorisées | Ce plan la réalise : table des transitions, pile de scènes, accesseurs dérivés des anciens drapeaux |
+| **H** — [§4.4](./DAT.md#44-état-global-et-couplage-dordre), [§3.1](./DAT.md#31-chaîne-de-build) | **Frontières de modules** (fichiers renommés selon leur contenu, puis modules ES regroupés en un HTML) | **Hors périmètre** pour les modules ES (§8) ; le renommage des fichiers est fait au lot 4 |
 
 > Tant que la PR contenant `DAT.md` n'est pas fusionnée, le lien ci-dessus est cassé : le DAT est sur la branche `worktree-dat-architecture` (PR #12).
