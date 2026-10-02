@@ -3518,7 +3518,6 @@ function refitJumpCore(){ if(SHIP_ID && SHIP_CAN_JUMP) mountHull(SHIP_ID, { warp
 
 /* le HUD affiche la même immatriculation que celle peinte sur la coque */
 
-/* Copie de la démo « Observation des étoiles » v7.2.2 (src/shipdrive.js), inchangée — enveloppe SHIPGEN.build ; pilotée à chaque image par 20f-greffons-vaisseau.js (lot L6). */
 /* =====================================================================
    MOTEURS PRINCIPAUX RÉALISTES — tuyères de torche de fusion (option du générateur, sans modifier le moteur)
    Chaque cloche du générateur est remplacée par un ensemble moteur :
@@ -4693,7 +4692,6 @@ CR.build = function(kind, opts){
 };
 })();
 
-/* Copie de la démo « Observation des étoiles » v7.2.2 (src/warpring.js), inchangée — enveloppe SHIPGEN.build ; pilotée à chaque image par 20f-greffons-vaisseau.js (lot L6). */
 /* =====================================================================
    ANNEAUX DE DISTORSION (v7.2) — window.__WARPRING
    Les 4 modèles supraluminiques du jeu portent 1 ou 2 anneaux autour du réacteur : un tore de structure, un tore lumineux
@@ -5060,7 +5058,6 @@ SHIPGEN.build = function(model, opts){
 W.label = a => a < .2 ? 'new' : (a < .62 ? 'used' : 'old');
 })();
 
-/* Copie de la démo « Observation des étoiles » v7.2.2 (src/hitex.js), inchangée — enveloppe SHIPGEN.build ; pilotée à chaque image par 20f-greffons-vaisseau.js (lot L6). */
 /* =====================================================================
    TEXTURES HAUTE RÉSOLUTION (v7.1) — window.__HITEX
    Les textures partagées du générateur de vaisseaux (tôles 512 px pour ~7 m de coque, bandes de danger 128 × 32,
@@ -5126,7 +5123,6 @@ W.label = a => a < .2 ? 'new' : (a < .62 ? 'used' : 'old');
   HX.K = K;
 })();
 
-/* Copie de la démo « Observation des étoiles » v7.2.2 (src/postfx.js), inchangée — profondeur de champ des gros plans, réglée par 20h-gros-plans.js (lot L10). */
 /* =====================================================================
    PROFONDEUR DE CHAMP (lot 3, v6.9) — window.__POSTFX
    Flou optique selon la profondeur, réservé aux gros plans (le réalisateur règle ouverture et mise au point) :
@@ -6744,7 +6740,6 @@ function updateLagrangePanel(){
   nameEl.textContent = 'L1 · '+leg.name;
 }
 
-/* Copie de la démo « Observation des étoiles » v7.2.2 (src/planets.js), inchangée. */
 /* =====================================================================
    PLANÈTES DÉTAILLÉES — surface procédurale à détail adaptatif,
    3 couches de nuages, atmosphère diffusante — à l'échelle réelle (rayons en mètres).
@@ -7284,7 +7279,6 @@ PL.update = function(p, starPos, sunColor0, T, camPos, cT){
 PL.setPixelAngle = function(fovDeg, heightPx){ PIX.value = 2*Math.tan(fovDeg*Math.PI/360)/Math.max(1, heightPx); };
 })();
 
-/* Copie de la démo « Observation des étoiles » v7.2.2 (src/asteroids.js), inchangée. */
 /* =====================================================================
    ASTÉROÏDES TEXTURÉS — générés au démarrage
    - 5 gabarits de roches (icosphères déformées : forme irrégulière, cratères, arêtes)
@@ -7527,7 +7521,6 @@ AST.cluster = function(seed, Rmain){
 };
 })();
 
-/* Copie de la démo v7.2.2 (src/stars.js), inchangée. */
 /* =====================================================================
    ÉTOILES DE SYSTÈME — rendu « cinéma »
    - soleils à leur taille réelle (rayon du moteur × R☉) : éclipses totales par les lunes, transits
