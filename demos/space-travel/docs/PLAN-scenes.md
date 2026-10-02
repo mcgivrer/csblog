@@ -171,6 +171,58 @@ Chaque lot se termine par une version taguée (`stt_vX.Y.Z`, voir `CLAUDE.md`) q
 
 Revue de l'architecte à chaque PR : respect du contrat (§2.1), aucune lecture d'un drapeau d'une autre scène, aucune allocation ajoutée dans `update()` (voir DAT §4.3).
 
+### 6.1 Planning et dépendances
+
+Diagramme de Gantt des tâches du §6, avec le lot 3 détaillé scène par scène. Les flèches sont les dépendances (`after`) ; les barres rouges forment le **chemin critique**.
+
+> **Les durées sont des estimations de l'architecte, en jours ouvrés, non validées par un chiffrage.** La date de départ (lundi 5 octobre 2026) est arbitraire : seules les durées relatives et l'enchaînement comptent. Hypothèse : un développeur à temps plein, revue d'architecte comprise dans chaque durée.
+
+```mermaid
+gantt
+  title Réorganisation en scènes, tâches et dépendances
+  dateFormat YYYY-MM-DD
+  axisFormat %d/%m
+  excludes weekends
+
+  section Lot 0 — Filet de sécurité
+  T0.1 Inventaire des états              :crit, t01, 2026-10-05, 1d
+  T0.2 Matrice scène × touche            :crit, t02, after t01, 1d
+  T0.3 Test de caractérisation           :crit, t03, after t02, 2d
+
+  section Lot 1 — Squelette
+  T1.1 scene.js (pile, transitions)      :crit, t11, after t03, 2d
+  T1.2 Adaptateurs et accesseurs         :crit, t12, after t11, 2d
+
+  section Lot 2 — Entrées
+  T2.1 Répartiteur d'entrées unique      :crit, t21, after t12, 2d
+
+  section Lot 3 — Extraction
+  T3 pause                               :t3pause, after t21, 1d
+  T3 starMap                             :t3map, after t3pause, 2d
+  T3 flyover                             :t3fly, after t21, 1d
+  T3 shipSelect                          :crit, t3sel, after t21, 1d
+  T3 title                               :crit, t3title, after t3sel, 2d
+  T3 boot                                :crit, t3boot, after t3title, 1d
+  T3 dialog                              :t3dlg, after t3pause, 1d
+  T3 orbit                               :crit, t3orbit, after t3map t3boot t3dlg t3fly, 5d
+  T3 jump                                :crit, t3jump, after t3orbit, 3d
+  T3 flight                              :crit, t3flight, after t3orbit t3jump, 5d
+
+  section Lot 4 — Nettoyage
+  T4.1 Drapeaux, gardes, renommage       :crit, t41, after t3flight, 3d
+
+  section Lot 5 — Démo
+  T5.1 Application à la démo             :crit, t51, after t41, 5d
+```
+
+Lecture du planning :
+
+- **Chemin critique** : T0.1 → T0.2 → T0.3 → T1.1 → T1.2 → T2.1 → `shipSelect` → `title` → `boot` → `orbit` → `jump` → `flight` → T4.1 → T5.1, soit **35 jours ouvrés** (7 semaines) avec plusieurs personnes. La chaîne `pause` → `starMap` (3 jours) a 1 jour de marge sur celle de `boot` (4 jours).
+- **Un seul développeur** : les branches parallèles (`flyover`, `shipSelect`, `title`, `boot`, `dialog`) s'ajoutent au chemin critique, soit **40 jours ouvrés** (environ 8 semaines).
+- **Premier jalon livrable** : fin de T2.1 (10 jours ouvrés), sans changement de comportement visible. C'est le bon moment pour une revue d'ensemble et un tag.
+- **Point dur** : `orbit` (5 jours) puis `flight` (5 jours) concentrent le risque du §7 ; une dérive de ces deux tâches décale directement T4.1 et T5.1.
+- `jump` dépend d'`orbit` car la lentille de saut (`WARP`) et la pause partagent le rendu (§2.3) ; cette dépendance est une prudence d'architecte, à lever si le lot 0 montre que les deux sont indépendants.
+
 ## 7. Risques
 
 | Risque | Gravité | Parade |
