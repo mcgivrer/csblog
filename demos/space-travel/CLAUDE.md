@@ -17,7 +17,7 @@ The root-level `README.md` in this directory describes an older layout (`space-t
 cd sources
 python3 build.py            # compile + package + test, in that order
 python3 build.py compile    # assemble src/ -> target/space-travel.html (readable)
-python3 build.py package    # needs `npm install` first -> target/space-travel.min.html (terser + html-minifier-terser)
+python3 build.py package    # needs `npm ci` first (node_modules is not tracked) -> target/space-travel.min.html (terser + html-minifier-terser)
 python3 build.py test       # run src/test/*_test.py (Playwright) against target/*.html
 ```
 
@@ -32,7 +32,7 @@ python3 build.py test       # run src/test/*_test.py (Playwright) against target
 ```bash
 cd observation-des-etoiles
 python3 build/build.py      # no dependencies -> dist/observation-des-etoiles.html (readable)
-npm install && node build/build_min.js   # -> dist/ minified version
+npm ci && node build/build_min.js        # -> dist/ minified version (node_modules is not tracked)
 node tests/smoke.js         # boot + 200s simulated run on the minified build
 node tests/longrun.js LONG-10   # 20 simulated minutes: errors, memory, shot-type stats
 ```
@@ -49,6 +49,12 @@ Eleven modules are **single-source** in `demos/space-travel/shared/` and consume
 - The game reads them through `shared/x.js` lines in `ORDER.txt`; the demo through `../../shared/x.js` in `build/build.py` and `build/build_min.js`.
 - Game-specific behaviour does **not** go into a shared module. The game extends it from its own files loaded around it: `09b-baies-ventrales.js` extends `__SHIPGLASS.BELLY`; `20e2-carte-hote.js` sets `window.__STARMAP_HOST` (translation, no camera buttons, jump refusal messages) before `shared/starmap.js`. A new shared module that needs per-product behaviour should take a host object the same way, with the demo's behaviour as default.
 - A change in `shared/` changes the demo's output: rebuild it, and release it (version bump, tag `ode_`) when its behaviour changes. Until then the committed demo HTML lags the source.
+
+## Dependencies and tracked build output
+
+- `node_modules/` and `__pycache__/` are git-ignored (root `.gitignore`). Install with `npm ci` in `sources/` or `observation-des-etoiles/` (both have a real `package-lock.json`); never commit `node_modules`.
+- The two other `package-lock.json` files (repo root and `demos/space-travel/`) are empty stubs, not real projects.
+- `sources/target/*.html` and the versioned demo HTML stay **tracked on purpose**: GitHub Pages serves `main` from the repo root, so removing them would remove the game and the demo from the published site.
 
 ## Release tagging
 
