@@ -22,22 +22,22 @@ const TXT = {
   fr: { title: 'MISSIONS DISPONIBLES', sub: 'Couleur des conteneurs = nature du fret', accept: 'Accepter', negotiate: 'Négocier', negoSoon: 'Négociation : lot M4',
         denrees: 'denrées', equipements: 'équipements', armes: 'armes', minerais: 'minerais', mineraisRares: 'minerais rares', eau: 'eau',
         pax: 'passagers', vip: 'dont VIP', tanks: 'réservoirs d\u2019eau', lot: 'lot', local: 'local', jump: 'saut',
-        risk: ['RISQUE FAIBLE', 'RISQUE MOYEN', 'RISQUE ÉLEVÉ', 'RISQUE CRITIQUE'], mission: 'MISSION', empty: 'Aucune mission compatible ici.' },
+        risk: ['RISQUE FAIBLE', 'RISQUE MOYEN', 'RISQUE ÉLEVÉ', 'RISQUE CRITIQUE'], mission: 'MISSION', empty: 'Aucune mission compatible ici.', replace: 'Une nouvelle acceptation remplace la mission en cours.', close: 'Fermer', recall: 'J : rappeler ce tableau' },
   en: { title: 'AVAILABLE MISSIONS', sub: 'Container colour = cargo type', accept: 'Accept', negotiate: 'Negotiate', negoSoon: 'Negotiation: lot M4',
         denrees: 'foodstuffs', equipements: 'equipment', armes: 'weapons', minerais: 'ore', mineraisRares: 'rare ore', eau: 'water',
         pax: 'passengers', vip: 'incl. VIP', tanks: 'water tanks', lot: 'lot', local: 'local', jump: 'jump',
-        risk: ['LOW RISK', 'MEDIUM RISK', 'HIGH RISK', 'CRITICAL RISK'], mission: 'MISSION', empty: 'No suitable mission here.' },
+        risk: ['LOW RISK', 'MEDIUM RISK', 'HIGH RISK', 'CRITICAL RISK'], mission: 'MISSION', empty: 'No suitable mission here.', replace: 'Accepting a new one replaces the current mission.', close: 'Close', recall: 'J: recall this board' },
   de: { title: 'VERFÜGBARE AUFTRÄGE', sub: 'Containerfarbe = Frachtart', accept: 'Annehmen', negotiate: 'Verhandeln', negoSoon: 'Verhandlung: Los M4',
         denrees: 'Lebensmittel', equipements: 'Ausrüstung', armes: 'Waffen', minerais: 'Erze', mineraisRares: 'seltene Erze', eau: 'Wasser',
         pax: 'Passagiere', vip: 'davon VIP', tanks: 'Wassertanks', lot: 'Los', local: 'lokal', jump: 'Sprung',
-        risk: ['GERINGES RISIKO', 'MITTLERES RISIKO', 'HOHES RISIKO', 'KRITISCHES RISIKO'], mission: 'AUFTRAG', empty: 'Hier kein passender Auftrag.' },
+        risk: ['GERINGES RISIKO', 'MITTLERES RISIKO', 'HOHES RISIKO', 'KRITISCHES RISIKO'], mission: 'AUFTRAG', empty: 'Hier kein passender Auftrag.', replace: 'Ein neuer Auftrag ersetzt den laufenden.', close: 'Schließen', recall: 'J: Tafel erneut öffnen' },
   es: { title: 'MISIONES DISPONIBLES', sub: 'Color del contenedor = tipo de carga', accept: 'Aceptar', negotiate: 'Negociar', negoSoon: 'Negociación: lote M4',
         denrees: 'víveres', equipements: 'equipos', armes: 'armas', minerais: 'minerales', mineraisRares: 'minerales raros', eau: 'agua',
         pax: 'pasajeros', vip: 'con VIP', tanks: 'depósitos de agua', lot: 'lote', local: 'local', jump: 'salto',
-        risk: ['RIESGO BAJO', 'RIESGO MEDIO', 'RIESGO ALTO', 'RIESGO CRÍTICO'], mission: 'MISIÓN', empty: 'Ninguna misión adecuada aquí.' }
+        risk: ['RIESGO BAJO', 'RIESGO MEDIO', 'RIESGO ALTO', 'RIESGO CRÍTICO'], mission: 'MISIÓN', empty: 'Ninguna misión adecuada aquí.', replace: 'Aceptar otra sustituye la misión en curso.', close: 'Cerrar', recall: 'J: volver a abrir este tablón' }
 };
 const tx = () => TXT[typeof LANG !== 'undefined' && TXT[LANG] ? LANG : 'fr'];
-const S = { enabled: false, active: null, offers: [], el: null, hud: null, pendingGo: false, done: [], shownKey: null, delivering: false, serial: 0 };
+const S = { enabled: false, active: null, offers: [], el: null, hud: null, pendingGo: false, done: [], shownKey: null, dismissed: null, delivering: false, serial: 0 };
 const hex = c => '#' + c.toString(16).padStart(6, '0');
 
 /* ---------- vaisseau : ce qu'il transporte ---------- */
@@ -128,7 +128,7 @@ function ensureDom(){
   if(S.el) return;
   const el = document.createElement('div'); el.id = 'missionBoardOverlay'; el.className = 'mono';
   el.style.cssText = 'position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:6;background:rgba(2,5,12,.45)';
-  el.innerHTML = "<div class='board-panel' style='max-width:760px;width:92vw'><div class='board-title' id='missionTitle'></div><div class='board-sub' id='missionSub'></div><div class='board-list' id='missionList'></div></div>";
+  el.innerHTML = "<div class='board-panel' style='max-width:760px;width:92vw'><button class='panel-close-btn' data-panel-cls='__missions__' title='' id='missionClose'>×</button><div class='board-title' id='missionTitle'></div><div class='board-sub' id='missionSub'></div><div class='board-list' id='missionList'></div></div>";
   document.body.appendChild(el); S.el = el;
   el.querySelector('#missionList').addEventListener('click', e => { const b = e.target.closest('button[data-i]'); if(b && b.dataset.act === 'accept') accept(+b.dataset.i); });
   const h = document.createElement('div'); h.id = 'missionHud'; h.className = 'mono';
@@ -136,12 +136,13 @@ function ensureDom(){
   document.body.appendChild(h); S.hud = h;
 }
 function riskTag(l){ const c = ['#5eead4', '#ffb454', '#ff6b57', '#ff2d55'][l]; return "<span style='font-size:9.5px;padding:2px 6px;border:1px solid " + c + ";color:" + c + "'>" + tx().risk[l] + '</span>'; }
-function openBoard(){
+function openBoard(recall){
   ensureDom(); const T = tx(), leg = REAL.leg;
-  S.offers = generate();
+  if(!recall || !S.offers.length) S.offers = generate();   /* rappel (touche J) : mêmes offres, pas un nouveau tirage */
+  S.dismissed = null; S.el.querySelector('#missionClose').title = T.close + '  [J]';
   const here = (REAL.mission && REAL.mission.target && (REAL.mission.target.properName || REAL.mission.target.name)) || leg.name;
   S.el.querySelector('#missionTitle').textContent = T.title + ' · ' + here;
-  S.el.querySelector('#missionSub').textContent = T.sub;
+  S.el.querySelector('#missionSub').textContent = S.active ? T.sub + ' · ' + T.replace : T.sub;
   S.el.querySelector('#missionList').innerHTML = S.offers.length ? S.offers.map((o, i) =>
     "<div class='board-row' data-mission='" + i + "'><div class='board-row-info'><div class='board-row-name'>" + o.dest.name + (o.inter ? ' (' + o.dest.name + ')' : '') + "</div>" +
     "<div class='board-row-meta'>" + swatches(o) + ' ' + cargoLabel(o) + ' · ' + distLabel(o) + '</div></div>' +
@@ -150,8 +151,11 @@ function openBoard(){
     : "<div class='board-empty'>" + T.empty + '</div>';
   S.el.style.display = 'flex'; S.shownKey = keyNow();
 }
-function closeBoard(){ if(S.el) S.el.style.display = 'none'; }
+function closeBoard(byUser){ if(S.el) S.el.style.display = 'none'; if(byUser) S.dismissed = keyNow(); }   /* fermé par le joueur : pas de réouverture automatique avant la prochaine escale */
 const boardOpen = () => !!(S.el && S.el.style.display === 'flex');
+/* touche J / bouton de la barre : ferme ou rappelle le tableau (hors passage supraluminique et livraison en cours) */
+function canRecall(){ return S.enabled && REAL.started && !jumpState && !S.delivering && ['WARP', 'WARPOUT', 'HOP', 'JUMP'].indexOf(REAL.phase) < 0; }
+function toggleBoard(){ if(boardOpen()){ closeBoard(true); return false; } if(!canRecall()) return false; openBoard(true); return true; }
 function keyNow(){ return (REAL.leg ? REAL.leg.cell : '') + ':' + (REAL.hops || 0) + ':' + S.done.length; }
 function hud(){
   ensureDom(); const o = S.active; if(!o){ S.hud.style.display = 'none'; return; }
@@ -175,7 +179,7 @@ function go(){
 function afterEscale(M, depart){
   departFn = depart;
   if(S.active){ if(S.pendingGo) go(); return; }
-  if(!boardOpen()) openBoard();
+  if(!boardOpen() && S.dismissed !== keyNow()) openBoard();
 }
 function atDestination(){
   const o = S.active; if(!o || !REAL.mission) return false;
@@ -198,7 +202,7 @@ function update(){
   if(!S.enabled || !REAL.started) return;
   if(S.delivering && S.active && orbitState.creditsPaid) complete();
   /* tableau dès la mise en orbite (sans mission), pendant l'appel du contrôle */
-  if(!S.active && REAL.phase === 'ORBIT' && flightPhase === 'ARRIVAL_PAUSE' && !boardOpen() && S.shownKey !== keyNow()) openBoard();
+  if(!S.active && REAL.phase === 'ORBIT' && flightPhase === 'ARRIVAL_PAUSE' && !boardOpen() && S.shownKey !== keyNow() && S.dismissed !== keyNow()) openBoard();
 }
 /* ---------- démarrage : en orbite près de la planète de départ ---------- */
 function itineraryUi(hide){
@@ -214,5 +218,5 @@ function start(){
   const M = REAL.mission; if(!M || !M.tr) return;
   M.t = M.tr.prof.D; REAL.phase = 'APPROACH'; REAL.tau = 1; M.s = M.Lc;     /* transfert et approche sautés : mise en orbite immédiate */
 }
-return { start, update, afterEscale, setupEscale, enabled: () => S.enabled, setEnabled: v => { S.enabled = !!v; if(!v) itineraryUi(false); }, state: S, NATURES, cargoSpec, paintStack, openBoard, accept, generate };
+return { start, update, afterEscale, setupEscale, enabled: () => S.enabled, boardOpen, toggleBoard, closeBoard, setEnabled: v => { S.enabled = !!v; if(!v) itineraryUi(false); }, state: S, NATURES, cargoSpec, paintStack, openBoard, accept, generate };
 })();

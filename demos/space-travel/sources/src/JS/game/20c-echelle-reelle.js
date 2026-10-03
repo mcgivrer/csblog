@@ -413,7 +413,7 @@ R.plan = function(leg, target, local){
   const M = R.mission = { leg: leg, target: p, local: !!local, C: C, Rp: Rp, ro: ro, vo: vo, N: N, Uo: Uo, Ue: Ue, thE: thE, Lc: Lc, drop: drop,
     tr: { path: path, prof: prof }, upT: Ue.clone(), tau: tau, t: 0, s: 0, ox: 0, oy: 0, vx: 0, vy: 0, lastV: 0 };
   buildCorridor(M);
-  R.phase = 'TRANSFER'; R.tau = tau;
+  R.phase = 'TRANSFER'; R.tau = tau; R.ap.on = true;
   return M;
 };
 /* couloir holographique : portiques carrés le long de la descente vers l'orbite */
@@ -425,16 +425,42 @@ function corridorAt(M, s){
   const T = new V3().crossVectors(M.N, U).normalize().addScaledVector(U, drds).normalize();
   return { pos: M.C.clone().addScaledVector(U, r), T: T, U: U };
 }
+/* cadre de guidage d'origine (cf. buildRouteGates, 16) : carré vert en pointillés, deux angles opposés soulignés en ambre,
+   trait plein. Le pointillé est tracé dans le shader d'après la distance cumulée le long de chaque côté ; période = 0,32 ×
+   demi-côté et équerres de 0,42 × demi-côté, comme le portique de l'itinéraire (11 et 14 pour 34) : même aspect à toutes les échelles. */
+const GATE_GREEN = new THREE.Color(0x3ddc84), GATE_AMBER = new THREE.Color(0xffb454);
+function gateMaterial(period){
+  return new THREE.ShaderMaterial({
+    uniforms: { uOpacity: { value: 0 }, uPeriod: { value: period } },
+    vertexShader: 'attribute vec3 aCol; attribute float aDist; attribute float aCorner; varying vec3 vCol; varying float vDist; varying float vCorner;' +
+      'void main(){ vCol = aCol; vDist = aDist; vCorner = aCorner; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: 'precision highp float; uniform float uOpacity; uniform float uPeriod; varying vec3 vCol; varying float vDist; varying float vCorner;' +
+      'void main(){ if(vCorner < 0.5 && mod(vDist, uPeriod) > uPeriod*0.5) discard; gl_FragColor = vec4(vCol, uOpacity); }',
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false
+  });
+}
+function gateGeometry(B, U, h){
+  const c = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(q => new V3().addScaledVector(B, q[0]*h).addScaledVector(U, q[1]*h));   /* relatifs : précision float32 */
+  const pos = [], col = [], dist = [], corner = [];
+  const seg = (a, b, color, flag) => { pos.push(a.x, a.y, a.z, b.x, b.y, b.z); const L = a.distanceTo(b);
+    for(let n = 0; n < 2; n++){ col.push(color.r, color.g, color.b); corner.push(flag); } dist.push(0, L); };
+  for(let k = 0; k < 4; k++) seg(c[k], c[(k + 1) % 4], GATE_GREEN, 0);
+  [0, 2].forEach(ci => { const a = c[ci];
+    [c[(ci + 3) % 4], c[(ci + 1) % 4]].forEach(n => seg(a, a.clone().add(n.clone().sub(a).normalize().multiplyScalar(h*.42)), GATE_AMBER, 1)); });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+  g.setAttribute('aCol', new THREE.BufferAttribute(new Float32Array(col), 3));
+  g.setAttribute('aDist', new THREE.BufferAttribute(new Float32Array(dist), 1));
+  g.setAttribute('aCorner', new THREE.BufferAttribute(new Float32Array(corner), 1));
+  return g;
+}
 function buildCorridor(M){
   disposeCorridor();
   const g = new THREE.Group(); g.name = 'couloir';
   M.half = Math.min(Math.max(600, M.vo*.2), Math.max(40, M.Rp*20)); M.gates = [];
   for(let i = 1; i <= FLIGHT.GATES; i++){
     const s = M.Lc*i/(FLIGHT.GATES + .5), f = corridorAt(M, s), B = new V3().crossVectors(f.T, f.U).normalize(), h = M.half;
-    const c = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(q => new V3().addScaledVector(B, q[0]*h).addScaledVector(f.U, q[1]*h));   /* relatifs : précision float32 */
-    const pts = []; for(let j = 0; j < 4; j++){ pts.push(c[j], c[(j + 1) % 4]); }
-    const mat = new THREE.LineBasicMaterial({ color: 0x4de1ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
-    const ln = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), mat); ln.frustumCulled = false;
+    const ln = new THREE.LineSegments(gateGeometry(B, f.U, h), gateMaterial(h*.32)); ln.frustumCulled = false; ln.renderOrder = 5;
     ln.position.copy(f.pos); ln.userData.s = s; g.add(ln); M.gates.push(ln);
   }
   LAYERS.shipWorld.add(g); R.corridor = g;
@@ -447,7 +473,7 @@ function disposeCorridor(){
 function fadeGates(M, sShip){
   if(!M.gates) return;
   M.gates.forEach(ln => { const d = ln.userData.s - sShip;   /* devant : visible jusqu'à ~40 % du couloir ; derrière : s'efface vite */
-    ln.material.opacity = d < 0 ? Math.max(0, 1 + d/(M.half*1.5))*.8 : .85*smooth(1 - d/(M.Lc*.45)); });
+    ln.material.uniforms.uOpacity.value = d < 0 ? Math.max(0, 1 + d/(M.half*1.5))*.8 : .85*smooth(1 - d/(M.Lc*.45)); });
 }
 function arriveOrbit(M){
   disposeCorridor();
@@ -478,7 +504,7 @@ function planDeparture(M){
   const path = arcPath(P), prof = accelProfile(path.L, M.vo, FLIGHT.ACC_G*9.81);
   M.dep = { path: path, prof: prof, next: next, dirN: dirN, up: S.clone().sub(M.C).normalize() };
   M.tau = Math.max(1, prof.D/FLIGHT.DEPART_S); M.t = 0; M.lastV = M.vo;
-  R.phase = 'DEPART'; R.tau = M.tau;
+  R.phase = 'DEPART'; R.tau = M.tau; R.ap.on = true;
 }
 /* après une escale (L3) : long-courrier -> étoile suivante (comportement L2.3/L2.4 inchangé) ;
    sinon -> tableau de contrats (commerce local, cf. LOCAL, chargé après ce module) */
@@ -496,12 +522,15 @@ function veil(op){
     const c = document.getElementById('scene'); c.parentNode.insertBefore(hopVeil, c.nextSibling); }
   hopVeil.style.opacity = String(op);
 }
-R.flight = function(dt){
+R.flight = function(dt){ flightStep(dt); apHud(); };
+function flightStep(dt){
   const M = R.mission; if(!M || flightPhase === 'ARRIVAL_PAUSE' && R.phase !== 'ORBIT') return;
   if(jumpState) return;                                   /* séquence de saut du jeu : vaisseau et caméra tenus par updateJumpSequence */
-  angVel.set(0, 0, 0);                                     /* attitude tenue par le pilote automatique */
+  if(R.phase !== 'FREE') angVel.set(0, 0, 0);              /* attitude tenue par le pilote automatique (en vol manuel, updateFlight l'intègre) */
   const prev = shipRig.position.clone();
-  if(R.phase === 'TRANSFER'){
+  if(R.phase === 'FREE'){
+    freeFlight(M, dt);
+  } else if(R.phase === 'TRANSFER'){
     M.t += dt*M.tau;
     const st = pathState(M.tr.path, M.tr.prof, M.t, M.upT);
     shipRig.position.copy(st.pos); shipRig.quaternion.copy(st.q);
@@ -524,7 +553,13 @@ R.flight = function(dt){
     currentSpeed = M.vo; R.throttle = 0; fadeGates(M, M.s);
     if(M.s >= M.Lc) arriveOrbit(M);
   } else if(R.phase === 'ORBIT'){
-    if(flightPhase === 'CRUISE') R.afterEscale(M);
+    if(flightPhase === 'CRUISE'){
+      /* escale terminée, aucune mission acceptée : le pilote reste maître — poussée = on quitte l'orbite en vol manuel */
+      if(!missionActive() && !missionBoardUp() && thrustKey()){ startFree(M, 'none'); return; }
+      R.afterEscale(M);
+    } else if(!missionActive() && !missionBoardUp() && !missionDelivering() && (keys['ShiftLeft'] || keys['ShiftRight'])){
+      orbitState.missionGo = true;                         /* en attente d'une mission : MAJ achève l'escale, le pilote quitte l'orbite à la main */
+    }
     return;                                                /* l'escale v2.16 tient le vaisseau (updateOrbitDelivery) */
   } else if(R.phase === 'DEPART'){
     M.t += dt*M.tau;
@@ -541,9 +576,128 @@ R.flight = function(dt){
       if(M.hop >= FLIGHT.HOP_FADE && M.dep.next){ const next = M.dep.next; ROUTE.index = ROUTE.nextDelivery; R.hops = (R.hops || 0) + 1;
         R.enterSystem(next); veil(0); return; } }
   }
-  if(!R.camHold){ const d = shipRig.position.clone().sub(prev); camPos.add(d); camLook.add(d); }   /* caméras co-mobiles : suivent le vaisseau sans retard (sauf plan extérieur du départ en distorsion) */
+  const dMove = shipRig.position.clone().sub(prev);
+  if(!R.camHold){ camPos.add(dMove); camLook.add(dMove); }   /* caméras co-mobiles : suivent le vaisseau sans retard (sauf plan extérieur du départ en distorsion) */
+  if(dt > 0) R.vel.copy(dMove).divideScalar(dt*(R.tau || 1));   /* vitesse (m/s simulées) : reprise telle quelle quand le pilote débraye */
   if(jumpState){ camera.position.copy(camPos); camera.lookAt(camLook); }   /* saut déclenché : la caméra reste fixe pendant la séquence — on la cale sur la dernière position */
+}
+
+/* =====================================================================
+   PILOTE AUTOMATIQUE DÉBRAYABLE ET VOL MANUEL (phase FREE)
+   Le joueur reste maître du vaisseau : T (ou le bouton de la barre) débraye le pilote automatique à tout moment
+   pendant le transfert, l'approche, le départ et l'erre ; il reprend alors les commandes (attitude : updateFlight,
+   poussée MAJ/ESPACE, freinage X) en conservant sa vitesse. T réengage : près de la destination (station, port,
+   planète) le pilote automatique reprend l'approche, l'arrimage et l'envoi des navettes ; plus loin, le transfert.
+   Pendant l'escale (ORBIT) le pilote reste engagé : navettes et arrimage sont des séquences automatiques.
+   Temps accéléré : comme pour le transfert, il décroît avec la distance à la surface la plus proche (≈ 0,029·√d),
+   donc 1 près d'un corps ; un limiteur d'approche (√(2·a·d), à 80 %) garantit que 1 g suffit toujours à s'arrêter.
+   ===================================================================== */
+R.ap = { on: true };
+R.vel = new V3();
+const AP_PHASES = { TRANSFER: 'arrive', APPROACH: 'arrive', DEPART: 'depart', COAST: 'depart' };
+const thrustKey = () => !!(keys['ShiftLeft'] || keys['ShiftRight'] || keys['Space']);
+const missionActive = () => typeof MISSIONS !== 'undefined' && MISSIONS.enabled() && !!MISSIONS.state.active;
+const missionDelivering = () => typeof MISSIONS !== 'undefined' && MISSIONS.enabled() && !!MISSIONS.state.delivering;
+const missionBoardUp = () => typeof MISSIONS !== 'undefined' && MISSIONS.enabled() && MISSIONS.boardOpen();
+function bodiesNear(M){
+  const out = [{ position: new V3(), radius: R.leg ? R.leg.Rs : 0 }];
+  if(R.leg) R.leg.planets.forEach(p => out.push(p));
+  if(M && M.target && R.leg && R.leg.planets.indexOf(M.target) < 0) out.push(M.target);
+  return out;
+}
+function surfaceDist(M, pos){
+  let d = Infinity; bodiesNear(M).forEach(b => { d = Math.min(d, pos.distanceTo(b.position) - b.radius); }); return Math.max(0, d);
+}
+function startFree(M, intent){
+  M.intent = intent; M.fv = intent === 'none' ? new V3() : R.vel.clone(); M.lastV = M.fv.length();   /* quitter l'orbite : départ à l'arrêt (la vitesse orbitale n'est pas suivie) */
+  R.phase = 'FREE'; R.ap.on = false; R.throttle = 0; currentSpeed = M.lastV; lastInputTime = performance.now();
+  apNote('free');
+}
+R.apCanDisengage = () => !!R.mission && !jumpState && !!AP_PHASES[R.phase];
+R.apDisengage = function(){
+  if(!R.apCanDisengage()) return false;
+  const M = R.mission;
+  startFree(M, AP_PHASES[R.phase]);                         /* le couloir d'approche reste affiché : on peut le suivre à la main */
+  return true;
 };
+R.apEngage = function(){
+  const M = R.mission;
+  if(R.phase !== 'FREE' || !M || jumpState) return false;
+  if(M.intent === 'depart'){ planDeparture(M); }
+  else if(M.intent === 'arrive'){ R.plan(M.leg, M.target, M.local); }
+  else { apNote('nodest'); return false; }
+  R.ap.on = true; R.vel.set(0, 0, 0); apNote('on');
+  return true;
+};
+R.apToggle = function(){
+  if(R.phase === 'FREE') return R.apEngage();
+  if(R.apCanDisengage()) return R.apDisengage();
+  if(R.phase === 'ORBIT' || R.phase === 'IDLE') apNote('locked');
+  return false;
+};
+function freeFlight(M, dt){
+  const v = M.fv, a = FLIGHT.ACC_G*9.81, fwd = new V3(0, 0, -1).applyQuaternion(shipRig.quaternion);
+  const dRef = surfaceDist(M, shipRig.position), wantTau = Math.max(1, .029*Math.sqrt(dRef));
+  R.tau += (wantTau - R.tau)*Math.min(1, dt*2);
+  const ds = dt*R.tau;
+  const thrust = thrustKey() && fuel > 0, brake = !!keys['KeyX'];
+  if(thrust) v.addScaledVector(fwd, a*ds);
+  if(brake){ const sp = v.length(), dv = a*ds; if(sp <= dv) v.set(0, 0, 0); else v.multiplyScalar(1 - dv/sp); }
+  const sp = v.length(), vcap = Math.max(40, .8*Math.sqrt(2*a*dRef));
+  if(sp > vcap) v.multiplyScalar(1 - (1 - vcap/sp)*Math.min(1, dt*4));
+  shipRig.position.addScaledVector(v, ds);
+  bodiesNear(M).forEach(b => {                             /* pas de traversée d'un corps : on glisse sur sa surface */
+    const n = shipRig.position.clone().sub(b.position), d = n.length(), lim = b.radius*1.02 + 30;
+    if(d < lim && d > 0){ n.divideScalar(d); shipRig.position.copy(b.position).addScaledVector(n, lim); const vn = v.dot(n); if(vn < 0) v.addScaledVector(n, -vn); }
+  });
+  const spNow = v.length(); burn(M, spNow);
+  currentSpeed = spNow; R.throttle = thrust ? 1 : (brake && sp > 0 ? .5 : 0);
+  if(M.gates && M.intent === 'arrive'){                    /* couloir d'approche : visible à l'approche, suivi par le cadre le plus proche */
+    let best = M.gates[0], bd = Infinity; M.gates.forEach(g => { const d = g.position.distanceTo(shipRig.position); if(d < bd){ bd = d; best = g; } });
+    fadeGates(M, best.userData.s); const k = smooth(1 - bd/(M.Lc*1.2)); M.gates.forEach(g => { g.material.uniforms.uOpacity.value *= k; });
+  }
+}
+/* destination, distance et proximité (HUD, touche G, tests) */
+R.apInfo = function(){
+  const M = R.mission; if(!M || !M.target) return null;
+  const c = M.target.position, dC = shipRig.position.distanceTo(c), name = M.target.properName || M.target.name || '';
+  return { on: R.ap.on, phase: R.phase, name: name, dist: Math.max(0, dC - M.Rp), near: dC < Math.max(M.Lc*4, M.Rp*12), intent: M.intent || null };
+};
+const AP_TXT = {
+  fr: { on: 'PILOTE AUTOMATIQUE', off: 'COMMANDES MANUELLES', takeOver: 'T : reprendre les commandes', engage: 'T : pilote automatique', dock: 'T : ARRIMAGE / NAVETTE AUTOMATIQUES',
+        keys: 'MAJ/ESPACE poussée · X freinage', dest: 'destination', orbit: 'EN ORBITE', leave: 'MAJ/ESPACE : quitter l’orbite · J : missions', docking: 'ARRIMAGE AUTOMATIQUE EN COURS',
+        nodest: 'Aucune destination : J ouvre les missions', locked: 'Escale en cours : le pilote automatique assure l’arrimage' },
+  en: { on: 'AUTOPILOT', off: 'MANUAL CONTROL', takeOver: 'T: take the controls', engage: 'T: autopilot', dock: 'T: AUTOMATIC DOCKING / SHUTTLE',
+        keys: 'SHIFT/SPACE thrust · X brake', dest: 'destination', orbit: 'IN ORBIT', leave: 'SHIFT/SPACE: leave orbit · J: missions', docking: 'AUTOMATIC DOCKING IN PROGRESS',
+        nodest: 'No destination: J opens the missions', locked: 'Stopover in progress: the autopilot handles docking' },
+  de: { on: 'AUTOPILOT', off: 'MANUELLE STEUERUNG', takeOver: 'T: Steuerung übernehmen', engage: 'T: Autopilot', dock: 'T: AUTOMATISCHES ANDOCKEN / FÄHRE',
+        keys: 'SHIFT/LEERTASTE Schub · X Bremse', dest: 'Ziel', orbit: 'IM ORBIT', leave: 'SHIFT/LEERTASTE: Orbit verlassen · J: Aufträge', docking: 'AUTOMATISCHES ANDOCKEN LÄUFT',
+        nodest: 'Kein Ziel: J öffnet die Aufträge', locked: 'Zwischenstopp: der Autopilot übernimmt das Andocken' },
+  es: { on: 'PILOTO AUTOMÁTICO', off: 'CONTROL MANUAL', takeOver: 'T: tomar los mandos', engage: 'T: piloto automático', dock: 'T: ATRAQUE / LANZADERA AUTOMÁTICOS',
+        keys: 'MAYÚS/ESPACIO empuje · X freno', dest: 'destino', orbit: 'EN ÓRBITA', leave: 'MAYÚS/ESPACIO: salir de órbita · J: misiones', docking: 'ATRAQUE AUTOMÁTICO EN CURSO',
+        nodest: 'Sin destino: J abre las misiones', locked: 'Escala en curso: el piloto automático se encarga del atraque' }
+};
+const apTx = () => AP_TXT[typeof LANG !== 'undefined' && AP_TXT[LANG] ? LANG : 'fr'];
+let apEl = null, apShown = '', apFlash = null, apFlashT = 0;
+function apNote(kind){ apFlash = kind; apFlashT = performance.now() + 2600; }
+function apHud(){
+  if(!apEl){ apEl = document.createElement('div'); apEl.id = 'apHud'; apEl.className = 'mono';
+    apEl.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);top:40px;z-index:6;display:none;font-size:11px;letter-spacing:.06em;padding:3px 12px;border:1px solid #25375c;background:rgba(15,26,48,.88);color:#e8edf5;pointer-events:none;text-align:center;white-space:nowrap';
+    document.body.appendChild(apEl); }
+  const T = apTx(), ph = R.phase, M = R.mission; let html = '', col = '#5eead4';
+  if(!M || jumpState || ph === 'WARP' || ph === 'WARPOUT' || ph === 'HOP' || ph === 'JUMP' || ph === 'IDLE'){ html = ''; }
+  else if(ph === 'ORBIT'){
+    if(flightPhase === 'ARRIVAL_PAUSE' && (missionActive() || missionDelivering())) html = '<b style="color:#5eead4">' + T.on + '</b> · ' + T.docking;
+    else { col = '#ffb454'; html = '<b style="color:#ffb454">' + T.orbit + '</b> · ' + T.leave; }
+  } else if(ph === 'FREE'){
+    const i = R.apInfo(), near = i && i.near && i.intent === 'arrive';
+    col = '#ffb454'; html = '<b style="color:#ffb454">' + T.off + '</b> · ' + T.keys + ' · ' + (near ? '<b style="color:#3ddc84">' + T.dock + '</b>' : (i && i.intent ? T.engage : T.nodest));
+    if(i && i.name) html += ' · ' + T.dest + ' ' + i.name + ' ' + fmtDist(i.dist);
+  } else html = '<b style="color:#5eead4">' + T.on + '</b> · ' + T.takeOver;
+  if(apFlash && performance.now() < apFlashT && apFlash !== 'on' && apFlash !== 'free') html = '<b style="color:#ff6b57">' + (T[apFlash] || '') + '</b>';
+  if(html !== apShown){ apShown = html; apEl.innerHTML = html; apEl.style.display = html ? 'block' : 'none'; apEl.style.borderColor = col; if(typeof refreshHudIconBar === 'function') refreshHudIconBar(); }
+}
+const fmtDist = d => (R.fmt && R.fmt.dist) ? R.fmt.dist(d) : Math.round(d) + ' m';
 /* caméra d'escale à l'échelle réelle : plan rapproché du vaisseau, planète en dessous (remplace le plan centré planète) */
 R.orbitCam = function(angle, pitch){
   const Ls = SHIP_GAME_LEN, C = orbitState.center, rad = shipRig.position.clone().sub(C).normalize();
