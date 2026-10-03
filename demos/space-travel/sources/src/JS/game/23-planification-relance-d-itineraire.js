@@ -291,6 +291,14 @@ window.addEventListener('keydown', function(e){
     if(it) activateHudBarItem(it);
     return;
   }
+  /* T — pilote automatique (débrayer / engager), J — tableau des missions (fermer / rappeler) : mêmes circuits que M/H/V */
+  if(e.code === 'KeyT' || e.code === 'KeyJ'){
+    e.preventDefault();
+    const kind = e.code === 'KeyT' ? 'autopilot' : 'missions';
+    const it = HUD_BAR_ITEMS.find(function(x){ return x.kind === kind; });
+    if(it) activateHudBarItem(it);
+    return;
+  }
   if(!isStarMapOpen()) keys[e.code] = true;   /* sous la carte, le pilotage n'est pas mémorisé */
   if(e.code === 'KeyH'){
     /* passe par activateHudBarItem comme le bouton d'aide de la barre —

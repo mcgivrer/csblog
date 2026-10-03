@@ -503,8 +503,10 @@ function updateFlight(dt, elapsed){
     }
   }
 
+  const apLive = REAL.active && REAL.started && REAL.phase !== 'ORBIT';   /* échelle réelle : le badge suit le pilote automatique (G), pas l'inactivité des commandes */
+  const isManual = apLive ? !REAL.ap.on : manual;
   document.getElementById('modeBadge').textContent =
-    paused ? t('badge_orbit') : (manual ? t('badge_manual') : t('badge_auto'));
+    paused ? t('badge_orbit') : (isManual ? t('badge_manual') : t('badge_auto'));
   document.getElementById('modeBadge').className =
-    'hud-mode mono ' + (paused ? 'auto' : (manual?'manual':'auto'));
+    'hud-mode mono ' + (paused ? 'auto' : (isManual?'manual':'auto'));
 }
