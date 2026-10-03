@@ -98,7 +98,7 @@ L'état de partie est donc **réparti** entre plusieurs machines à états qui s
 | `gameStarted`, `gamePaused`, `worldReadyForCinematic` | `24-mode-pause` | booléens |
 | `flightPhase` | `28-propulsion-quantique` | `'CRUISE'`, `'ARRIVAL_PAUSE'` |
 | `REAL.phase` | `20c-echelle-reelle` | `'IDLE'`, `'ORBIT'`, … (autres valeurs non relevées) |
-| `orbitState.active` | `29-economie-credits` | booléen + 15 champs de séquence |
+| `orbitState.active` | `29-economie-credits` | booléen + 24 champs déclarés (4 autres ajoutés dynamiquement) |
 | `GP.state.auto` | `20h-gros-plans` | type de plan automatique en cours |
 | `cameraMode`, `jumpState` | `24`, `28` | entier, objet ou `null` |
 
