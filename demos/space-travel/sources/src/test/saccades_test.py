@@ -10,7 +10,7 @@ Mesures pendant les plans de suivi de navette (même plan) :
 Usage : python3 src/test/saccades_test.py target/space-travel.html
 """
 import os, re, sys, json, math
-os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers")
+if os.path.isdir("/opt/pw-browsers"): os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers")   # bac a sable d origine ; ailleurs, emplacement par defaut de Playwright
 from playwright.sync_api import sync_playwright
 page_path = os.path.abspath(sys.argv[1])
 INIT = r"""(() => { let t = 1000, s = 12345; const rnd = () => { s = (s*16807) % 2147483647; return s/2147483647; };

@@ -7,7 +7,7 @@ Escale d'un vaisseau à baie (lot N2) — ce que le test de la navette de baie n
 Usage : python3 src/test/escale_baie_test.py target/space-travel.html [modèle]
 """
 import os, re, sys, math, json
-os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers")
+if os.path.isdir("/opt/pw-browsers"): os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers")   # bac a sable d origine ; ailleurs, emplacement par defaut de Playwright
 from playwright.sync_api import sync_playwright
 page_path = os.path.abspath(sys.argv[1]); ship = sys.argv[2] if len(sys.argv) > 2 else "e140"
 INIT = r"""(() => { let t = 1000; performance.now = () => t; Date.now = () => 1790000000000 + t;

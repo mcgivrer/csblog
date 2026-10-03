@@ -6,7 +6,7 @@ Chaque cas porte l'identifiant de la matrice (K-…). En temps virtuel (30 image
 Usage : python3 src/test/scenes_matrice_test.py target/space-travel.html
 """
 import os, re, sys
-os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers")
+if os.path.isdir("/opt/pw-browsers"): os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers")   # bac a sable d origine ; ailleurs, emplacement par defaut de Playwright
 from playwright.sync_api import sync_playwright
 page_path = os.path.abspath(sys.argv[1])
 INIT = r"""(() => { let t = 1000; performance.now = () => t; Date.now = () => 1790000000000 + t;

@@ -4,7 +4,7 @@ sortie de la baie ventrale, trajet le long de la coque, prise directe sur la pil
 Usage : python3 src/test/navette_baie_test.py target/space-travel.html [modèle]
 """
 import os, re, sys, json, math
-os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers")
+if os.path.isdir("/opt/pw-browsers"): os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers")   # bac a sable d origine ; ailleurs, emplacement par defaut de Playwright
 from playwright.sync_api import sync_playwright
 page_path = os.path.abspath(sys.argv[1]); model = sys.argv[2] if len(sys.argv) > 2 else 'e18'
 INIT = r"""(() => { let t = 1000, s = 4242; const rnd = () => { s = (s*16807) % 2147483647; return s/2147483647; };

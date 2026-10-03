@@ -5,7 +5,7 @@ vitesse de rotation de la navette et de la caméra de suivi (plus de bascules), 
 Usage : python3 src/test/largage_test.py target/space-travel.html
 """
 import os, re, sys, json, math, base64
-os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers")
+if os.path.isdir("/opt/pw-browsers"): os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers")   # bac a sable d origine ; ailleurs, emplacement par defaut de Playwright
 from playwright.sync_api import sync_playwright
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 page_path = os.path.abspath(sys.argv[1]); tag = os.path.basename(page_path).replace(".html", "")

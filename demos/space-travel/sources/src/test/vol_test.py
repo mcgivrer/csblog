@@ -4,7 +4,7 @@ transfert → approche (couloir) → orbite (escale : navettes, radio, paiement)
 Usage : python3 src/test/vol_test.py target/space-travel.html
 """
 import os, re, sys, json, base64
-os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers")
+if os.path.isdir("/opt/pw-browsers"): os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers")   # bac a sable d origine ; ailleurs, emplacement par defaut de Playwright
 from playwright.sync_api import sync_playwright
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

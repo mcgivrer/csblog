@@ -4,7 +4,7 @@ précédente), altitude de la spec, port garanti d'une géante gazeuse destinati
 budget de rendu, et rendu en jeu. Usage : python3 src/test/ports_test.py target/space-travel.html [ancienne.html]
 """
 import os, re, sys, json, base64
-os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers")
+if os.path.isdir("/opt/pw-browsers"): os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers")   # bac a sable d origine ; ailleurs, emplacement par defaut de Playwright
 from playwright.sync_api import sync_playwright
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 page_path = os.path.abspath(sys.argv[1]); old = os.path.abspath(sys.argv[2]) if len(sys.argv) > 2 else None
