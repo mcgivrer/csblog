@@ -126,7 +126,7 @@ function distLabel(o){ const T = tx(); return o.inter ? (o.dest.dist.toFixed(1) 
 function ensureDom(){
   if(S.el) return;
   const el = document.createElement('div'); el.id = 'missionBoardOverlay'; el.className = 'mono';
-  el.style.cssText = 'position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:9;background:rgba(2,5,12,.45)';
+  el.style.cssText = 'position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:6;background:rgba(2,5,12,.45)';
   el.innerHTML = "<div class='board-panel' style='max-width:760px;width:92vw'><div class='board-title' id='missionTitle'></div><div class='board-sub' id='missionSub'></div><div class='board-list' id='missionList'></div></div>";
   document.body.appendChild(el); S.el = el;
   el.querySelector('#missionList').addEventListener('click', e => { const b = e.target.closest('button[data-i]'); if(b && b.dataset.act === 'accept') accept(+b.dataset.i); });

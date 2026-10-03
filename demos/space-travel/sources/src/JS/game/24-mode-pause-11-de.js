@@ -115,6 +115,8 @@ function resumeGame(){
   }
 }
 function quitToTitle(){
+  /* quitter perd la partie (rechargement) : confirmation obligatoire, aussi pour le bouton de la pause */
+  if(!window.confirm(t('quitConfirm'))) return;
   /* recharge complète plutôt qu'une remise à zéro manuelle de dizaines de
      variables globales interdépendantes (ROUTE, orbitState, crédits,
      orientation du vaisseau...) — le rechargement garantit un état

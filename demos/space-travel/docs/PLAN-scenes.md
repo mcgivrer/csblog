@@ -157,6 +157,7 @@ Chaque lot se termine par une version taguée (`stt_vX.Y.Z`, voir `CLAUDE.md`) q
 | T0.1 | Inventaire des états et valeurs réelles de `REAL.phase`, `flightPhase`, `orbitState` | Développeur | — | Table du §3 confirmée ou corrigée. **Fait** : [inventaire](./PLAN-scenes-T0.1-inventaire.md), table corrigée (2 scènes supprimées) |
 | T0.2 | Matrice scène × touche (comportement actuel) | Architecte | T0.1 | Document relu, cas ambigus listés. **Fait** : [matrice](./PLAN-scenes-T0.2-matrice.md), 26 cas à tester en T0.3 |
 | T0.3 | Test de caractérisation Playwright de la matrice | Développeur | T0.2 | Vert sur `stt_v2.17.0`. **Fait** : `sources/src/test/scenes_matrice_test.py`, 31 vérifications, vert sur deux exécutions consécutives ; a corrigé la matrice (Espace dans le choix du vaisseau, durée du retour du survol) |
+| T0.4 | Corriger les défauts de la matrice (décision du mainteneur : corriger avant de poursuivre) | Développeur | T0.3 | Défauts corrigés dans `sources/src/JS/game/`, test de caractérisation mis à jour sur le comportement corrigé, suite du jeu sans régression. **Fait** : [matrice §6](./PLAN-scenes-T0.2-matrice.md#6-défauts--décisions-et-comportement-corrigé) |
 | T1.1 | `scenes/scene.js` : pile, transitions, événements | Développeur | T0.3 | Tests unitaires de la pile et des transitions refusées |
 | T1.2 | Scènes adaptateurs + accesseurs dérivés | Développeur | T1.1 | Matrice et fumée vertes |
 | T2.1 | Répartiteur d'entrées unique | Développeur | T1.2 | Un seul `keydown` ; matrice verte |
@@ -240,8 +241,8 @@ Lecture du planning :
 
 1. **Granularité** : `orbit` doit-elle rester une scène unique (arrivée, livraison, missions, ports) ou se scinder en `arrival`, `delivery` et `missionBoard` ?
 2. **Pause** : la pause doit-elle aussi couper la musique et la synthèse vocale ? Le comportement actuel est à relever au lot 0.
-3. ~~**`gameOver`** : existe-t-il un écran de fin ?~~ **Réglée par T0.1** : non. « Quitter » est un rechargement de page sans confirmation. Faut-il ajouter une confirmation, et la panne de carburant décrite dans `TODO.md` (non implémentée) est-elle toujours voulue ? Si oui, une scène `dialog` reviendra dans le plan.
-4. **Pièges de l'inventaire** : les défauts relevés au §5 de l'inventaire T0.1 (clavier du titre, `M` en pause, tableau des missions au-dessus de la pause…) doivent-ils être corrigés par la refonte, ou conservés à l'identique pour que la matrice du lot 0 reste un test de non-régression ?
+3. ~~**`gameOver`** : existe-t-il un écran de fin ?~~ **Réglée par T0.1** : non. « Quitter » est un rechargement de page ; une confirmation a été ajoutée par T0.4. Reste ouvert : la panne de carburant décrite dans `TODO.md` (non implémentée) est-elle toujours voulue ? Si oui, une scène `dialog` reviendra dans le plan.
+4. ~~**Pièges de l'inventaire** : corriger ou conserver ?~~ **Réglée par le mainteneur** : à corriger avant de poursuivre. C'est la tâche T0.4 ; la décision pour chaque défaut (corrigé ou volontairement conservé) est au [§6 de la matrice](./PLAN-scenes-T0.2-matrice.md#6-défauts--décisions-et-comportement-corrigé). La matrice et son test décrivent désormais le comportement corrigé.
 5. **Ordre avec le DAT** : faire ce plan (C + E) avant la [proposition A](./DAT.md#5-propositions) (hygiène du dépôt, [DAT §4.7](./DAT.md#47-hygiène-du-dépôt)), ou l'inverse ? Je recommande A en premier : le dépôt allégé facilite les revues de ce plan.
 
 ## Annexe — Propositions du DAT citées dans ce plan

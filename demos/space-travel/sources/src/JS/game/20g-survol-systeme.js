@@ -156,8 +156,14 @@ function update(dt){
 
 /* commandes : G lance le survol ; pendant le survol, toute touche ou un clic ramène au vaisseau */
 window.addEventListener('keydown', function(e){
-  if(!gameStarted) return;
-  if(S.active){ if(!['ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight', 'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight'].includes(e.code)){ skip(); e.stopImmediatePropagation(); e.preventDefault(); } return; }
+  if(!gameStarted || gamePaused) return;   /* en pause, le survol ne démarre pas et n'avale aucune touche (Espace, Entrée, Échap restent à la pause) */
+  if(S.active){
+    if(['ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight', 'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight'].includes(e.code)) return;
+    skip();
+    /* Échap, P et Pause ramènent au vaisseau ET restent disponibles pour la pause ; toute autre touche est avalée */
+    if(e.code !== 'Escape' && e.code !== 'KeyP' && e.code !== 'Pause'){ e.stopImmediatePropagation(); e.preventDefault(); }
+    return;
+  }
   if(e.code === 'KeyG' && !(window.__STARMAP && __STARMAP.isOpen())){ e.preventDefault(); start('demande'); }
 }, true);
 window.addEventListener('pointerdown', function(e){ if(S.active && e.target && e.target.tagName === 'CANVAS') skip(); }, true);
