@@ -17,6 +17,7 @@ shared/warpring.js
 shared/shipwear.js
 shared/hitex.js
 shared/postfx.js
+09c-vaisseaux-modulaires.js
 10-panneau-de-jauges-moteur.js
 11-nebuleuses-champs-de-bouffees.js
 12-champs-proceduraux-etoiles-et.js

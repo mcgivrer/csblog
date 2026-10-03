@@ -1,0 +1,684 @@
+{
+ "format": "stt-composition",
+ "version": 1,
+ "generator": "Chantier naval STT",
+ "id": "stt-nexus",
+ "name": "Nexus Port",
+ "type": "station",
+ "company": "STT",
+ "registry": "STT-0107",
+ "root": "cmd",
+ "parts": [
+  [
+   "cmd",
+   "CMD"
+  ],
+  [
+   "n1",
+   "NODE6",
+   {
+    "zone": "pax"
+   }
+  ],
+  [
+   "tpa",
+   "TUNNEL",
+   {
+    "zone": "pax"
+   }
+  ],
+  [
+   "paxa",
+   "PAX",
+   {
+    "zone": "pax"
+   }
+  ],
+  [
+   "tpb",
+   "TUNNEL",
+   {
+    "zone": "pax"
+   }
+  ],
+  [
+   "paxb",
+   "PAX",
+   {
+    "zone": "pax"
+   }
+  ],
+  [
+   "bay1",
+   "BAY",
+   {
+    "zone": "pax",
+    "door": "field"
+   }
+  ],
+  [
+   "shuttle1",
+   "SHUTTLE",
+   {
+    "company": "HLN"
+   }
+  ],
+  [
+   "bay2",
+   "BAY",
+   {
+    "zone": "pax",
+    "door": "mech"
+   }
+  ],
+  [
+   "shuttle2",
+   "SHUTTLE",
+   {
+    "company": "STT"
+   }
+  ],
+  [
+   "ta1",
+   "TUNNEL",
+   {
+    "zone": "pax"
+   }
+  ],
+  [
+   "n1b",
+   "NODE4",
+   {
+    "zone": "pax"
+   }
+  ],
+  [
+   "tpc",
+   "TUNNEL",
+   {
+    "zone": "pax"
+   }
+  ],
+  [
+   "paxc",
+   "PAX",
+   {
+    "zone": "pax"
+   }
+  ],
+  [
+   "s1",
+   "TUNNEL"
+  ],
+  [
+   "s2",
+   "TUNNEL"
+  ],
+  [
+   "s3",
+   "TUNNEL"
+  ],
+  [
+   "n2",
+   "NODE6",
+   {
+    "zone": "cont"
+   }
+  ],
+  [
+   "tc1",
+   "TUNNEL",
+   {
+    "zone": "cont"
+   }
+  ],
+  [
+   "crg1",
+   "CRG6",
+   {
+    "zone": "cont"
+   }
+  ],
+  [
+   "tc2",
+   "TUNNEL",
+   {
+    "zone": "cont"
+   }
+  ],
+  [
+   "crg2",
+   "CRG6",
+   {
+    "zone": "cont"
+   }
+  ],
+  [
+   "tc3",
+   "TUNNEL",
+   {
+    "zone": "cont"
+   }
+  ],
+  [
+   "tc3b",
+   "TUNNEL",
+   {
+    "zone": "cont"
+   }
+  ],
+  [
+   "crg3",
+   "CRG6",
+   {
+    "zone": "cont"
+   }
+  ],
+  [
+   "tc4",
+   "TUNNEL",
+   {
+    "zone": "cont"
+   }
+  ],
+  [
+   "tc4b",
+   "TUNNEL",
+   {
+    "zone": "cont"
+   }
+  ],
+  [
+   "crg4",
+   "CRG6",
+   {
+    "zone": "cont"
+   }
+  ],
+  [
+   "s4",
+   "TUNNEL"
+  ],
+  [
+   "s5",
+   "TUNNEL"
+  ],
+  [
+   "s6",
+   "TUNNEL"
+  ],
+  [
+   "n2b",
+   "NODE4",
+   {
+    "zone": "cont"
+   }
+  ],
+  [
+   "s7",
+   "TUNNEL"
+  ],
+  [
+   "s8",
+   "TUNNEL"
+  ],
+  [
+   "s9",
+   "TUNNEL"
+  ],
+  [
+   "n3",
+   "NODE6",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "tl1",
+   "TUNNEL",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "k1",
+   "TANK",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "k2",
+   "TANK",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "tl2",
+   "TUNNEL",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "k3",
+   "TANK",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "k4",
+   "TANK",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "tl3",
+   "TUNNEL",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "k5",
+   "TANK",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "tl4",
+   "TUNNEL",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "k6",
+   "TANK",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "tl5",
+   "TUNNEL",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "n3b",
+   "NODE4",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "tl6",
+   "TUNNEL",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "k7",
+   "TANK",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "tp",
+   "TUNNEL"
+  ],
+  [
+   "pwr",
+   "PWR"
+  ]
+ ],
+ "links": [
+  [
+   "cmd.AFT",
+   "n1.FWD",
+   0
+  ],
+  [
+   "n1.PORT",
+   "tpa.FWD",
+   0
+  ],
+  [
+   "tpa.AFT",
+   "paxa.FWD",
+   0
+  ],
+  [
+   "n1.STBD",
+   "tpb.FWD",
+   0
+  ],
+  [
+   "tpb.AFT",
+   "paxb.FWD",
+   0
+  ],
+  [
+   "n1.TOP",
+   "bay1.FWD",
+   0
+  ],
+  [
+   "bay1.SHUTTLE",
+   "shuttle1.PAD",
+   0
+  ],
+  [
+   "n1.BOT",
+   "bay2.FWD",
+   0
+  ],
+  [
+   "bay2.SHUTTLE",
+   "shuttle2.PAD",
+   0
+  ],
+  [
+   "n1.AFT",
+   "ta1.FWD",
+   0
+  ],
+  [
+   "ta1.AFT",
+   "n1b.FWD",
+   0
+  ],
+  [
+   "n1b.STBD",
+   "tpc.FWD",
+   0
+  ],
+  [
+   "tpc.AFT",
+   "paxc.FWD",
+   0
+  ],
+  [
+   "n1b.AFT",
+   "s1.FWD",
+   0
+  ],
+  [
+   "s1.AFT",
+   "s2.FWD",
+   0
+  ],
+  [
+   "s2.AFT",
+   "s3.FWD",
+   0
+  ],
+  [
+   "s3.AFT",
+   "n2.FWD",
+   0
+  ],
+  [
+   "n2.PORT",
+   "tc1.FWD",
+   0
+  ],
+  [
+   "tc1.AFT",
+   "crg1.FWD",
+   0
+  ],
+  [
+   "n2.STBD",
+   "tc2.FWD",
+   0
+  ],
+  [
+   "tc2.AFT",
+   "crg2.FWD",
+   0
+  ],
+  [
+   "n2.TOP",
+   "tc3.FWD",
+   0
+  ],
+  [
+   "tc3.AFT",
+   "tc3b.FWD",
+   0
+  ],
+  [
+   "tc3b.AFT",
+   "crg3.FWD",
+   0
+  ],
+  [
+   "n2.BOT",
+   "tc4.FWD",
+   0
+  ],
+  [
+   "tc4.AFT",
+   "tc4b.FWD",
+   0
+  ],
+  [
+   "tc4b.AFT",
+   "crg4.FWD",
+   0
+  ],
+  [
+   "n2.AFT",
+   "s4.FWD",
+   0
+  ],
+  [
+   "s4.AFT",
+   "s5.FWD",
+   0
+  ],
+  [
+   "s5.AFT",
+   "s6.FWD",
+   0
+  ],
+  [
+   "s6.AFT",
+   "n2b.FWD",
+   0
+  ],
+  [
+   "n2b.AFT",
+   "s7.FWD",
+   0
+  ],
+  [
+   "s7.AFT",
+   "s8.FWD",
+   0
+  ],
+  [
+   "s8.AFT",
+   "s9.FWD",
+   0
+  ],
+  [
+   "s9.AFT",
+   "n3.FWD",
+   0
+  ],
+  [
+   "n3.PORT",
+   "tl1.FWD",
+   0
+  ],
+  [
+   "tl1.AFT",
+   "k1.FWD",
+   0
+  ],
+  [
+   "k1.AFT",
+   "k2.FWD",
+   0
+  ],
+  [
+   "n3.STBD",
+   "tl2.FWD",
+   0
+  ],
+  [
+   "tl2.AFT",
+   "k3.FWD",
+   0
+  ],
+  [
+   "k3.AFT",
+   "k4.FWD",
+   0
+  ],
+  [
+   "n3.TOP",
+   "tl3.FWD",
+   0
+  ],
+  [
+   "tl3.AFT",
+   "k5.FWD",
+   0
+  ],
+  [
+   "n3.BOT",
+   "tl4.FWD",
+   0
+  ],
+  [
+   "tl4.AFT",
+   "k6.FWD",
+   0
+  ],
+  [
+   "n3.AFT",
+   "tl5.FWD",
+   0
+  ],
+  [
+   "tl5.AFT",
+   "n3b.FWD",
+   0
+  ],
+  [
+   "n3b.STBD",
+   "tl6.FWD",
+   0
+  ],
+  [
+   "tl6.AFT",
+   "k7.FWD",
+   0
+  ],
+  [
+   "n3b.AFT",
+   "tp.FWD",
+   0
+  ],
+  [
+   "tp.AFT",
+   "pwr.FWD",
+   0
+  ]
+ ],
+ "containers": {
+  "crg1": [
+   "VESTA",
+   "ORION",
+   "NOVA",
+   "LUNA",
+   "GANY",
+   "POLARIS"
+  ],
+  "crg2": [
+   "STTC",
+   "POLARIS",
+   "VESTA",
+   "ORION",
+   "LUNA",
+   "NOVA"
+  ],
+  "crg3": [
+   "GANY",
+   "GANY",
+   "ORION",
+   "VESTA",
+   "STTC",
+   "LUNA"
+  ],
+  "crg4": [
+   "NOVA",
+   "POLARIS",
+   "POLARIS",
+   "VESTA",
+   "ORION",
+   "GANY"
+  ]
+ },
+ "docking_ports": [
+  {
+   "port": "n1b.PORT"
+  },
+  {
+   "port": "n2b.PORT"
+  },
+  {
+   "port": "n2b.STBD"
+  },
+  {
+   "port": "n3b.PORT"
+  }
+ ],
+ "stats": {
+  "parts": 52,
+  "mass": 3364,
+  "containers": 24,
+  "passengers": 160,
+  "tank_m3": 5880,
+  "length_m": 156.7,
+  "size_m": [
+   98.2,
+   60.2,
+   156.7
+  ]
+ },
+ "game": {
+  "version": 1,
+  "class": "station",
+  "description": "",
+  "berths": [
+   {
+    "port": "n1b.PORT",
+    "cls": "M"
+   },
+   {
+    "port": "n2b.PORT",
+    "cls": "M"
+   },
+   {
+    "port": "n2b.STBD",
+    "cls": "M"
+   },
+   {
+    "port": "n3b.PORT",
+    "cls": "M"
+   }
+  ]
+ }
+}

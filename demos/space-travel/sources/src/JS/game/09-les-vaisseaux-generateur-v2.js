@@ -917,10 +917,12 @@ function frameBox(obj){
   return box;
 }
 function disposeObj(obj){
+  const kept = function(x){ return typeof MODSHIP !== 'undefined' && MODSHIP.keeps(x); };   /* prototypes modulaires (09c) partagés */
   obj.traverse(function(c){
-    if(c.geometry) c.geometry.dispose();
+    if(c.geometry && !kept(c.geometry)) c.geometry.dispose();
     if(c.material){ (Array.isArray(c.material) ? c.material : [c.material]).forEach(function(m){
-      if(m.map && !SHARED_TEX.has(m.map)) m.map.dispose();
+      if(kept(m)) return;
+      if(m.map && !SHARED_TEX.has(m.map) && !kept(m.map)) m.map.dispose();
       if(m !== WIN_CACHE.bay && !Object.values(WIN_CACHE).includes(m)) m.dispose();
     }); }
   });
@@ -946,6 +948,9 @@ function build(id, opts){
   FLARE_K = opts.flareK || 1; DRIVE_LIGHTS.length = 0; S = newStats(); RND = rngFactory(11); RCS_PODS = []; ANT_TIPS = [];
   const M = MODELS.find(function(m){ return m.id === id; }) || MODELS[0];
   const g = M.build(M);
+  /* modèles modulaires (09c) : statistiques, RCS et balises fournis par l'assembleur */
+  const X = g.userData.extern;
+  if(X){ Object.assign(S, X.stats || {}); if(X.rcs) RCS_PODS = X.rcs; if(X.tips) ANT_TIPS = X.tips; }
   const hullBox = frameBox(g), hullDims = hullBox.getSize(new V3());
   /* options de propulsion (long-courriers seulement) : supraluminique = anneaux, saut = générateur */
   const warp = !!M.ftl && opts.warp !== false, jump = !!M.ftl && opts.jump !== false;
@@ -961,7 +966,8 @@ function tick(elapsed, dt, spin){
   FTL_U.uPhase.value += dt*0.7*(spin || 1);
 }
 return { MODELS:MODELS, build:build, tick:tick, setDrive:setDrive, DRIVE_U:DRIVE_U, FTL_U:FTL_U, JUMP_U:JUMP_U, NAV:NAV,
-         dispose:disposeObj, CARGO_COLORS:CARGO_COLORS };
+         dispose:disposeObj, CARGO_COLORS:CARGO_COLORS,
+         fx:{ addEpsteinDrive:addEpsteinDrive, addDriveLight:addDriveLight } };   /* fx : pour les coques modulaires (09c) */
 })();
 
 /* dock de navettes + bras de chargement : code d'origine du vaisseau v2.12,

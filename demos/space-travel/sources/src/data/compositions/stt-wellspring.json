@@ -1,0 +1,89 @@
+{
+ "format": "stt-composition",
+ "version": 1,
+ "generator": "Chantier naval STT",
+ "id": "stt-wellspring",
+ "name": "Aquila Wellspring",
+ "type": "ship",
+ "company": "AQB",
+ "registry": "AQB-0775",
+ "root": "cmd1",
+ "parts": [
+  [
+   "cmd1",
+   "CMD"
+  ],
+  [
+   "tank1",
+   "TANK"
+  ],
+  [
+   "tank2",
+   "TANK"
+  ],
+  [
+   "tank3",
+   "TANK"
+  ],
+  [
+   "pwr1",
+   "PWR"
+  ],
+  [
+   "prop1",
+   "PROP"
+  ]
+ ],
+ "links": [
+  [
+   "cmd1.AFT",
+   "tank1.FWD",
+   0
+  ],
+  [
+   "tank1.AFT",
+   "tank2.FWD",
+   0
+  ],
+  [
+   "tank2.AFT",
+   "tank3.FWD",
+   0
+  ],
+  [
+   "tank3.AFT",
+   "pwr1.FWD",
+   0
+  ],
+  [
+   "pwr1.AFT",
+   "prop1.FWD",
+   0
+  ]
+ ],
+ "containers": {},
+ "docking_ports": [],
+ "stats": {
+  "parts": 6,
+  "mass": 1090,
+  "containers": 0,
+  "passengers": 0,
+  "tank_m3": 2520,
+  "length_m": 109.1,
+  "size_m": [
+   13.1,
+   13,
+   109.1
+  ]
+ },
+ "game": {
+  "version": 1,
+  "class": "ship",
+  "family": "vrac",
+  "tier": "II",
+  "ftl": false,
+  "crew": 4,
+  "arch": "Citernier modulaire",
+  "description": ""
+ }
+}

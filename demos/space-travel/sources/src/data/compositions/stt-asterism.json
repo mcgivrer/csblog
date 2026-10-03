@@ -1,0 +1,106 @@
+{
+ "format": "stt-composition",
+ "version": 1,
+ "generator": "Chantier naval STT",
+ "id": "stt-asterism",
+ "name": "Starhaul Asterism",
+ "type": "ship",
+ "company": "SHL",
+ "registry": "SHL-0042",
+ "root": "cmd1",
+ "parts": [
+  [
+   "cmd1",
+   "CMD"
+  ],
+  [
+   "crg61",
+   "CRG6"
+  ],
+  [
+   "crg62",
+   "CRG6"
+  ],
+  [
+   "tank1",
+   "TANK"
+  ],
+  [
+   "pwr1",
+   "PWR"
+  ],
+  [
+   "prop1",
+   "PROP"
+  ]
+ ],
+ "links": [
+  [
+   "cmd1.AFT",
+   "crg61.FWD",
+   0
+  ],
+  [
+   "crg61.AFT",
+   "crg62.FWD",
+   30
+  ],
+  [
+   "crg62.AFT",
+   "tank1.FWD",
+   0
+  ],
+  [
+   "tank1.AFT",
+   "pwr1.FWD",
+   0
+  ],
+  [
+   "pwr1.AFT",
+   "prop1.FWD",
+   0
+  ]
+ ],
+ "containers": {
+  "crg61": [
+   "LUNA",
+   "VESTA",
+   "NOVA",
+   "ORION",
+   "POLARIS",
+   "GANY"
+  ],
+  "crg62": [
+   "STTC",
+   "ORION",
+   "LUNA",
+   "GANY",
+   "VESTA",
+   "NOVA"
+  ]
+ },
+ "docking_ports": [],
+ "stats": {
+  "parts": 6,
+  "mass": 1008,
+  "containers": 12,
+  "passengers": 0,
+  "tank_m3": 840,
+  "length_m": 84.1,
+  "size_m": [
+   33.3,
+   33.3,
+   84.1
+  ]
+ },
+ "game": {
+  "version": 1,
+  "class": "ship",
+  "family": "fret",
+  "tier": "II",
+  "ftl": false,
+  "crew": 4,
+  "arch": "Cargo modulaire",
+  "description": ""
+ }
+}

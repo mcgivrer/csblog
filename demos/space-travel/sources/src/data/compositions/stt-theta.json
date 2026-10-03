@@ -1,0 +1,286 @@
+{
+ "format": "stt-composition",
+ "version": 1,
+ "generator": "Chantier naval STT",
+ "id": "stt-theta",
+ "name": "Aquila Depot Theta",
+ "type": "station",
+ "company": "AQB",
+ "registry": "AQB-0775",
+ "root": "n1",
+ "parts": [
+  [
+   "n1",
+   "NODE6",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "bay",
+   "BAY",
+   {
+    "door": "mech"
+   }
+  ],
+  [
+   "shuttle1",
+   "SHUTTLE",
+   {
+    "company": "AQB"
+   }
+  ],
+  [
+   "ta",
+   "TUNNEL",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "a1",
+   "TANK",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "a2",
+   "TANK",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "tb",
+   "TUNNEL",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "b1",
+   "TANK",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "b2",
+   "TANK",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "tc",
+   "TUNNEL",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "c1",
+   "TANK",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "c2",
+   "TANK",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "td",
+   "TUNNEL",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "d1",
+   "TANK",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "d2",
+   "TANK",
+   {
+    "zone": "liq"
+   }
+  ],
+  [
+   "t1",
+   "TUNNEL"
+  ],
+  [
+   "n2",
+   "NODE4",
+   {
+    "zone": "pax"
+   }
+  ],
+  [
+   "cmd",
+   "CMD",
+   {
+    "zone": "pax"
+   }
+  ],
+  [
+   "pax",
+   "PAX",
+   {
+    "zone": "pax"
+   }
+  ],
+  [
+   "pwr",
+   "PWR"
+  ],
+  [
+   "n3",
+   "NODE4",
+   {
+    "zone": "liq"
+   }
+  ]
+ ],
+ "links": [
+  [
+   "n1.FWD",
+   "bay.AFT",
+   0
+  ],
+  [
+   "bay.SHUTTLE",
+   "shuttle1.PAD",
+   0
+  ],
+  [
+   "n1.PORT",
+   "ta.FWD",
+   0
+  ],
+  [
+   "ta.AFT",
+   "a1.FWD",
+   0
+  ],
+  [
+   "a1.AFT",
+   "a2.FWD",
+   0
+  ],
+  [
+   "n1.STBD",
+   "tb.FWD",
+   0
+  ],
+  [
+   "tb.AFT",
+   "b1.FWD",
+   0
+  ],
+  [
+   "b1.AFT",
+   "b2.FWD",
+   0
+  ],
+  [
+   "n1.TOP",
+   "tc.FWD",
+   0
+  ],
+  [
+   "tc.AFT",
+   "c1.FWD",
+   0
+  ],
+  [
+   "c1.AFT",
+   "c2.FWD",
+   0
+  ],
+  [
+   "n1.BOT",
+   "td.FWD",
+   0
+  ],
+  [
+   "td.AFT",
+   "d1.FWD",
+   0
+  ],
+  [
+   "d1.AFT",
+   "d2.FWD",
+   0
+  ],
+  [
+   "n1.AFT",
+   "t1.FWD",
+   0
+  ],
+  [
+   "t1.AFT",
+   "n2.FWD",
+   0
+  ],
+  [
+   "n2.PORT",
+   "cmd.AFT",
+   0
+  ],
+  [
+   "n2.STBD",
+   "pax.FWD",
+   0
+  ],
+  [
+   "n2.AFT",
+   "pwr.FWD",
+   0
+  ],
+  [
+   "pwr.AFT",
+   "n3.FWD",
+   0
+  ]
+ ],
+ "containers": {},
+ "docking_ports": [
+  {
+   "port": "n3.AFT"
+  }
+ ],
+ "stats": {
+  "parts": 21,
+  "mass": 2013,
+  "containers": 0,
+  "passengers": 56,
+  "tank_m3": 6720,
+  "length_m": 68.4,
+  "size_m": [
+   98.2,
+   98.2,
+   68.4
+  ]
+ },
+ "game": {
+  "version": 1,
+  "class": "station",
+  "description": "",
+  "berths": [
+   {
+    "port": "n3.AFT",
+    "cls": "M"
+   }
+  ]
+ }
+}

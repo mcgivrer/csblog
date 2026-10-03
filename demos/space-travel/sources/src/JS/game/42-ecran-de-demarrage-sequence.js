@@ -182,6 +182,10 @@ let SHIP_CATALOG = null, SHIP_SELECT_OPEN = false;
 /* masses (ordres de grandeur) et facteur supraluminique, partagés par la fiche et l'installation */
 function shipSpecs(b){
   const h = b.hullDims, st = b.stats, pax = st.cabins*2;
+  if(b.modular){                                                              /* coques modulaires (09c) : masses réelles des modules Blender */
+    const dry = Math.round(b.massT*(1 + 0.06*st.rings + 0.04*st.jumpCore)), cargo = st.containers*24 + (b.tankM3 || 0)*0.92 + pax*0.1;   /* glace : 0,92 t/m³ */
+    return { dry:dry, loaded:Math.round(dry + cargo), pax:pax, warpFactor:Math.max(5, Math.min(10, Math.round(12 - 1.4*Math.log2((b.massT + cargo)/1000)))) };
+  }
   const base = 0.35*h.z*Math.sqrt(h.x*h.y);                                   /* masse à vide de la coque seule (t) */
   const dry = Math.round(base*(1 + 0.06*st.rings + 0.04*st.jumpCore));       /* +6 % par anneau, +4 % pour le générateur */
   const cargo = st.containers*24 + st.tanks*2048 + pax*0.1;                   /* conteneur 24 t, réservoir de glace ~2 000 t */
@@ -193,16 +197,20 @@ function shipSpecs(b){
 function shipCatalogInfo(b){
   const sp = shipSpecs(b);
   return { id:b.M.id, M:b.M, len:b.dims.z, wid:b.dims.x, hei:b.dims.y, dry:sp.dry, loaded:sp.loaded, st:b.stats, pax:sp.pax,
-           crew:SS_CREW[b.M.tier] || 3, warpFactor:sp.warpFactor };
+           crew:b.M.crew || SS_CREW[b.M.tier] || 3, warpFactor:sp.warpFactor };
 }
+function buildShipCatalog(){
+  SHIP_CATALOG = SHIPGEN.MODELS.map(function(M){ const b = SHIPGEN.build(M.id); const inf = shipCatalogInfo(b); SHIPGEN.dispose(b.group); return inf; })
+    .sort(function(a, b){ return a.len - b.len; });
+}
+if(typeof MODSHIP !== 'undefined') MODSHIP.onChange = function(){ SHIP_CATALOG = null; };   /* création importée : fiche à refaire */
 function openShipSelect(onConfirm){
   const el = document.getElementById('shipSelect');
   if(!el || typeof SHIPGEN === 'undefined'){ onConfirm(SHIP_DEFAULT_ID); return; }
+  /* vaisseaux modulaires (09c) : la bibliothèque se décode pendant l'écran-titre ; on l'attend si besoin */
+  if(typeof MODSHIP !== 'undefined' && !MODSHIP.settled){ MODSHIP.whenReady(function(){ openShipSelect(onConfirm); }); return; }
   SHIP_SELECT_OPEN = true;
-  if(!SHIP_CATALOG){
-    SHIP_CATALOG = SHIPGEN.MODELS.map(function(M){ const b = SHIPGEN.build(M.id); const inf = shipCatalogInfo(b); SHIPGEN.dispose(b.group); return inf; })
-      .sort(function(a, b){ return a.len - b.len; });
-  }
+  if(!SHIP_CATALOG) buildShipCatalog();
   const loc = (I18N[LANG] && I18N[LANG].ttsLang) || 'fr-FR';
   const fmt = function(v){ return Math.round(v).toLocaleString(loc); };
   document.getElementById('ssTitle').textContent = t('ssTitle');
@@ -215,14 +223,36 @@ function openShipSelect(onConfirm){
   document.getElementById('ssOptE').textContent = t('ssOptE');
   document.getElementById('ssOptJ').textContent = t('ssOptJ');
   /* libellé de ssOptW posé dans show() : il porte le facteur du vaisseau présenté */
-  const strip = document.getElementById('ssStrip'); strip.innerHTML = '';
-  SHIP_CATALOG.forEach(function(inf, i){
-    const b = document.createElement('button'); b.type = 'button';
-    b.innerHTML = '<span></span><small></small>';
-    b.firstChild.textContent = inf.M.name; b.lastChild.textContent = fmt(inf.len) + ' m';
-    b.addEventListener('click', function(){ show(i); });
-    strip.appendChild(b);
-  });
+  const strip = document.getElementById('ssStrip');
+  function fillStrip(){
+    strip.innerHTML = '';
+    SHIP_CATALOG.forEach(function(inf, i){
+      const b = document.createElement('button'); b.type = 'button';
+      b.innerHTML = '<span></span><small></small>';
+      b.firstChild.textContent = inf.M.name; b.lastChild.textContent = fmt(inf.len) + ' m';
+      if(inf.M.modular){ b.classList.add('ss-mod'); b.title = t('ssModTip'); }   /* création du chantier naval */
+      b.addEventListener('click', function(){ show(i); });
+      strip.appendChild(b);
+    });
+  }
+  fillStrip();
+  /* import d'une création de l'éditeur (fichier stt-composition, gardé dans ce navigateur) */
+  const impBtn = document.getElementById('ssImport'), impFile = document.getElementById('ssImportFile'), impMsg = document.getElementById('ssImportMsg');
+  if(impBtn && impFile && typeof MODSHIP !== 'undefined' && MODSHIP.ready){
+    impBtn.hidden = false; impBtn.textContent = t('ssImport'); impMsg.textContent = '';
+    impBtn.onclick = function(){ impFile.value = ''; impFile.click(); };
+    impFile.onchange = function(){
+      const f = impFile.files && impFile.files[0]; if(!f) return;
+      f.text().then(function(txt){
+        const res = MODSHIP.importText(txt);
+        if(!res.ok){ impMsg.textContent = t('ssImportErr'); return; }
+        const ship = res.added.filter(function(x){ return x.build; }).pop(), nSt = res.added.filter(function(x){ return !x.build; }).length;
+        buildShipCatalog(); fillStrip();
+        impMsg.textContent = t('ssImportOk').replace('{n}', res.added.length) + (nSt ? ' ' + t('ssImportSt').replace('{n}', nSt) : '');
+        if(ship) show(SHIP_CATALOG.findIndex(function(inf){ return inf.id === ship.id; }));
+      }).catch(function(){ impMsg.textContent = t('ssImportErr'); });
+    };
+  } else if(impBtn) impBtn.hidden = true;
   /* aperçu 3D : moteur de rendu dédié, mêmes réglages que le jeu (sRGB + ACES) */
   const canvas = document.getElementById('ssCanvas');
   const r = new THREE.WebGLRenderer({ canvas:canvas, antialias:true });

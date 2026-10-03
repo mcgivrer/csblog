@@ -59,11 +59,13 @@ print("   ports :", [(s["name"], s["arch"], s["k"], s["R"]) for s in allst])
 check("des ports dans les systèmes visités", len(allst) >= 2, len(allst))
 check("chaque port a au moins un poste L (tous les vaisseaux accostent)", all(s["L"] and s["L"] >= 1 for s in allst))
 check("altitude de la spec (tellurique 1,15–1,4 R ; géante 2,5–3 R)", all((2.49 <= s["k"] <= 3.01) if s["gas"] else (1.14 <= s["k"] <= 1.41) for s in allst), [s["k"] for s in allst])
-check("tour d'amarrage autour des géantes, anneau ou moyeu sinon", all((s["arch"] == "tower") == s["gas"] for s in allst))
+check("tour d'amarrage autour des géantes, anneau, moyeu ou station modulaire sinon", all((s["arch"] == "tower") == s["gas"] for s in allst))
 gas_legs = [leg for x in new for leg in x["legs"] if leg["gasIdx"]]
 n_gas = sum(len(leg["gasIdx"]) for leg in gas_legs)
 check("chaque géante gazeuse a son port (seul port possible, destination de contrats locaux)", n_gas > 0 and all(all(any(s["pl"] == gi for s in leg["st"]) for gi in leg["gasIdx"]) for leg in gas_legs), f"{n_gas} géante(s) dans {len(gas_legs)} système(s)")
-check("budget de rendu : ≤ 14 appels de dessin par port", all(s["calls"] <= 14 for s in allst), max(s["calls"] for s in allst))
+proc = [s for s in allst if s["arch"] != "modular"]; mods = [s for s in allst if s["arch"] == "modular"]
+check("budget de rendu : ≤ 14 appels de dessin par port procédural", all(s["calls"] <= 14 for s in proc), max([s["calls"] for s in proc] or [0]))
+check("budget de rendu : ≤ 60 appels de dessin par station modulaire (une maille par matériau)", all(s["calls"] <= 60 for s in mods), [s["calls"] for s in mods])
 check("ports dans la couche du système", all(s["inSys"] for s in allst))
 if old:
     prev = run(old, SEEDS)

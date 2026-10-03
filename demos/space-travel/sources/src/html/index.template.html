@@ -31,7 +31,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Voyage spatial — Navigation quantique</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600;700&family=Barlow+Condensed:wght@600;800&display=swap" rel="stylesheet">
 <style>
 /*@CSS@*/
 </style>
@@ -293,6 +293,7 @@
         <div class="ss-prop" role="group" aria-labelledby="ssPropLbl"><span id="ssPropLbl"></span><span class="ss-base" id="ssOptE"></span><div class="ss-seg"><button type="button" id="ssOptW" aria-pressed="false"></button><button type="button" id="ssOptJ" aria-pressed="false"></button></div><span class="ss-prop-note" id="ssPropNote"></span></div>
         <dl class="ss-kv" id="ssKv"></dl>
         <div class="ss-foot"><button type="button" class="ss-confirm" id="ssConfirm"></button><span class="ss-hint" id="ssHint"></span></div>
+        <div class="ss-import"><button type="button" id="ssImport" hidden></button><input type="file" id="ssImportFile" accept=".json,application/json" hidden><span id="ssImportMsg" role="status" aria-live="polite"></span></div>
       </div>
     </div>
   </div>
@@ -312,6 +313,7 @@
   <div class="title-copyright" id="titleCopyright">(c) 2026 - game by Frédéric Delorme - music by ScoreStudio from Envato</div>
 </div>
 
+<!--@PACK@-->
 <script>/*@VENDOR@*/</script>
 <script>
 /*@JS@*/

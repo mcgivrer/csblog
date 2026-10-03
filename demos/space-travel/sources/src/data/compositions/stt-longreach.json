@@ -1,0 +1,117 @@
+{
+ "format": "stt-composition",
+ "version": 1,
+ "generator": "Chantier naval STT",
+ "id": "stt-longreach",
+ "name": "K&V Longreach",
+ "type": "ship",
+ "company": "KVF",
+ "registry": "KVF-0318",
+ "root": "cmd1",
+ "parts": [
+  [
+   "cmd1",
+   "CMD"
+  ],
+  [
+   "cargo1",
+   "CARGO"
+  ],
+  [
+   "cargo2",
+   "CARGO"
+  ],
+  [
+   "cargo3",
+   "CARGO"
+  ],
+  [
+   "tank1",
+   "TANK"
+  ],
+  [
+   "pwr1",
+   "PWR"
+  ],
+  [
+   "prop1",
+   "PROP"
+  ]
+ ],
+ "links": [
+  [
+   "cmd1.AFT",
+   "cargo1.FWD",
+   0
+  ],
+  [
+   "cargo1.AFT",
+   "cargo2.FWD",
+   0
+  ],
+  [
+   "cargo2.AFT",
+   "cargo3.FWD",
+   0
+  ],
+  [
+   "cargo3.AFT",
+   "tank1.FWD",
+   0
+  ],
+  [
+   "tank1.AFT",
+   "pwr1.FWD",
+   0
+  ],
+  [
+   "pwr1.AFT",
+   "prop1.FWD",
+   0
+  ]
+ ],
+ "containers": {
+  "cargo1": [
+   "GANY",
+   "GANY",
+   "ORION",
+   "POLARIS"
+  ],
+  "cargo2": [
+   "VESTA",
+   "LUNA",
+   "NOVA",
+   "STTC"
+  ],
+  "cargo3": [
+   "POLARIS",
+   "GANY",
+   "ORION",
+   "VESTA"
+  ]
+ },
+ "docking_ports": [],
+ "stats": {
+  "parts": 7,
+  "mass": 1173,
+  "containers": 12,
+  "passengers": 0,
+  "tank_m3": 840,
+  "length_m": 119.1,
+  "size_m": [
+   13.1,
+   13,
+   119.1
+  ]
+ },
+ "game": {
+  "version": 1,
+  "class": "ship",
+  "family": "fret",
+  "tier": "II",
+  "ftl": false,
+  "crew": 4,
+  "arch": "Cargo modulaire",
+  "description": ""
+ }
+}

@@ -232,6 +232,7 @@ R.update = function(dt){
   starLight.position.copy(_toSun); starLight.target.position.set(0, 0, 0); starLight.target.updateMatrixWorld();
   starLight.color.copy(leg.sunColor).lerp(_white, .45); starLight.intensity = 1.65;
   if(typeof SHIPFX !== 'undefined') SHIPFX.update(dt, R.T);   /* L5/L6 : tuyères, anneaux, géode, usure, tremblement */
+  if(typeof MODSHIP !== 'undefined') MODSHIP.update();          /* coques modulaires : navette de baie masquée pendant la sortie d'un engin */
 };
 
 /* occupation des tranches (sliceUnits de cine.js) : seules les tranches traversées par un objet sont rendues */

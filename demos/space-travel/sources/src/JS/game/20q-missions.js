@@ -44,7 +44,8 @@ const hex = c => '#' + c.toString(16).padStart(6, '0');
 function model(){ return SHIPGEN.MODELS.find(m => m.id === SHIP_ID) || {}; }
 function cargoSpec(){
   const m = model();
-  if(CAP[SHIP_ID]) return { kind: 'containers', range: CAP[SHIP_ID], natures: Object.keys(NATURES) };
+  const cap = CAP[SHIP_ID] || m.cap;                               /* m.cap : vaisseaux modulaires à conteneurs (09c) */
+  if(cap) return { kind: 'containers', range: cap, natures: Object.keys(NATURES) };
   if(m.group === 'Passagers') return { kind: 'passengers', range: [10, 120] };
   if(m.group === 'Fret en vrac') return { kind: 'tanks', range: [3, 15], natures: ['eau'] };
   if(m.group === 'Indépendants') return { kind: 'lot', range: [1, 1], natures: ['armes', 'equipements'] };

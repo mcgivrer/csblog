@@ -850,6 +850,15 @@
   .ss-confirm{ font:700 14px 'JetBrains Mono', monospace; color:#0b1220; background:var(--amber); border:1px solid var(--amber); padding:10px 22px; cursor:pointer; }
   .ss-confirm:focus-visible{ outline:2px solid var(--ink); outline-offset:2px; }
   .ss-hint{ font-size:11.5px; color:var(--muted); }
+  /* créations du chantier naval (vaisseaux modulaires) : repère dans la bande, import d'un fichier stt-composition */
+  .ss-strip button.ss-mod{ border-style:dashed; }
+  .ss-strip button.ss-mod span::before{ content:'◆ '; color:var(--amber); }
+  .ss-strip button.ss-mod[aria-current="true"] span::before{ color:#0b1220; }
+  .ss-import{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:10px; font-size:11.5px; color:var(--muted); }
+  .ss-import button{ font:500 12px 'JetBrains Mono', monospace; color:var(--ink); background:transparent; border:1px solid var(--line); padding:6px 12px; cursor:pointer; }
+  .ss-import button:hover{ border-color:var(--amber); color:var(--amber); }
+  .ss-import button:focus-visible{ outline:2px solid var(--amber); outline-offset:1px; }
+  .ss-import span{ min-width:0; overflow-wrap:anywhere; }
   @media (max-width:760px){
     .ss-panel{ height:auto; max-height:94vh; overflow:auto; }
     .ss-body{ grid-template-columns:1fr; }

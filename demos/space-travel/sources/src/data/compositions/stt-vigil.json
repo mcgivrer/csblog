@@ -1,0 +1,118 @@
+{
+ "format": "stt-composition",
+ "version": 1,
+ "generator": "Chantier naval STT",
+ "id": "stt-vigil",
+ "name": "Vigil Relay",
+ "type": "station",
+ "company": "STT",
+ "registry": "STT-0107",
+ "root": "n1",
+ "parts": [
+  [
+   "n1",
+   "NODE6"
+  ],
+  [
+   "cmd",
+   "CMD"
+  ],
+  [
+   "t1",
+   "TUNNEL"
+  ],
+  [
+   "pwr",
+   "PWR"
+  ],
+  [
+   "tank",
+   "TANK"
+  ],
+  [
+   "bay",
+   "BAY",
+   {
+    "door": "field"
+   }
+  ],
+  [
+   "shuttle1",
+   "SHUTTLE",
+   {
+    "company": "STT"
+   }
+  ],
+  [
+   "t2",
+   "TUNNEL"
+  ],
+  [
+   "pax",
+   "PAX"
+  ]
+ ],
+ "links": [
+  [
+   "n1.FWD",
+   "cmd.AFT",
+   0
+  ],
+  [
+   "n1.AFT",
+   "t1.FWD",
+   0
+  ],
+  [
+   "t1.AFT",
+   "pwr.FWD",
+   0
+  ],
+  [
+   "pwr.AFT",
+   "tank.FWD",
+   0
+  ],
+  [
+   "n1.PORT",
+   "bay.FWD",
+   0
+  ],
+  [
+   "bay.SHUTTLE",
+   "shuttle1.PAD",
+   0
+  ],
+  [
+   "n1.STBD",
+   "t2.FWD",
+   0
+  ],
+  [
+   "t2.AFT",
+   "pax.FWD",
+   0
+  ]
+ ],
+ "containers": {},
+ "docking_ports": [],
+ "stats": {
+  "parts": 9,
+  "mass": 907,
+  "containers": 0,
+  "passengers": 56,
+  "tank_m3": 840,
+  "length_m": 59.2,
+  "size_m": [
+   58.2,
+   13.4,
+   59.2
+  ]
+ },
+ "game": {
+  "version": 1,
+  "class": "station",
+  "description": "",
+  "berths": []
+ }
+}

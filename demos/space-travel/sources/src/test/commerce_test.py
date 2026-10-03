@@ -73,8 +73,8 @@ with sync_playwright() as pw:
     # ---------- chantier naval : achat d'un long-courrier ----------
     pg.evaluate("() => { document.getElementById('contractBoardOverlay').classList.remove('visible'); addCredits(60000 - credits); }")
     pg.evaluate("() => document.getElementById('shipyardOpenBtn').click()")
-    yard = pg.evaluate("() => ({ open: document.getElementById('shipyardOverlay').classList.contains('visible'), n: document.getElementById('shipyardList').children.length })")
-    check("chantier naval : liste des long-courriers", yard["open"] and yard["n"] == 4, yard)
+    yard = pg.evaluate("() => ({ open: document.getElementById('shipyardOverlay').classList.contains('visible'), n: document.getElementById('shipyardList').children.length, ftl: SHIPGEN.MODELS.filter(m => m.ftl).length, mod: SHIPGEN.MODELS.filter(m => m.ftl && m.modular).length })")
+    check("chantier naval : liste des long-courriers (4 procéduraux + modulaires)", yard["open"] and yard["n"] == yard["ftl"] and yard["ftl"] - yard["mod"] == 4, yard)
     bought = pg.evaluate("""() => { const b = document.querySelector('#shipyardList .board-row-btn:not(.port-disabled)'); const id = b.dataset.id; b.click();
       return { id: id, shipId: SHIP_ID, canJump: SHIP_CAN_JUMP, warp: SHIP_WARP, closed: !document.getElementById('shipyardOverlay').classList.contains('visible') }; }""")
     check("achat : la coque change pour un modèle équipé", bought["shipId"] == bought["id"] and (bought["canJump"] or bought["warp"]), bought)

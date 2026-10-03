@@ -70,7 +70,8 @@ const LOCAL = (function(){
     const shared = new Set(Object.values(PORTS.mats()));            /* matériaux partagés entre tous les ports : conservés */
     (leg.stations || []).forEach(function(s){
       LAYERS.detach(s.mesh);
-      s.mesh.traverse(function(o){ if(o.geometry) o.geometry.dispose(); if(o.material && !shared.has(o.material)) o.material.dispose(); });
+      const kept = x => typeof MODSHIP !== 'undefined' && MODSHIP.keeps(x);   /* stations modulaires : prototypes partagés (09c) */
+      s.mesh.traverse(function(o){ if(o.geometry && !kept(o.geometry)) o.geometry.dispose(); if(o.material && !shared.has(o.material) && !kept(o.material)) o.material.dispose(); });
     });
   }
 

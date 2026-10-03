@@ -1,0 +1,96 @@
+{
+ "format": "stt-composition",
+ "version": 1,
+ "generator": "Chantier naval STT",
+ "id": "stt-meridian",
+ "name": "STT Meridian",
+ "type": "ship",
+ "company": "STT",
+ "registry": "STT-0107",
+ "root": "cmd1",
+ "parts": [
+  [
+   "cmd1",
+   "CMD"
+  ],
+  [
+   "pax1",
+   "PAX"
+  ],
+  [
+   "cargo1",
+   "CARGO"
+  ],
+  [
+   "tank1",
+   "TANK"
+  ],
+  [
+   "pwr1",
+   "PWR"
+  ],
+  [
+   "prop1",
+   "PROP"
+  ]
+ ],
+ "links": [
+  [
+   "cmd1.AFT",
+   "pax1.FWD",
+   0
+  ],
+  [
+   "pax1.AFT",
+   "cargo1.FWD",
+   0
+  ],
+  [
+   "cargo1.AFT",
+   "tank1.FWD",
+   0
+  ],
+  [
+   "tank1.AFT",
+   "pwr1.FWD",
+   0
+  ],
+  [
+   "pwr1.AFT",
+   "prop1.FWD",
+   0
+  ]
+ ],
+ "containers": {
+  "cargo1": [
+   "VESTA",
+   "ORION",
+   "STTC",
+   "NOVA"
+  ]
+ },
+ "docking_ports": [],
+ "stats": {
+  "parts": 6,
+  "mass": 1191,
+  "containers": 4,
+  "passengers": 48,
+  "tank_m3": 840,
+  "length_m": 108.1,
+  "size_m": [
+   14.4,
+   13.4,
+   108.1
+  ]
+ },
+ "game": {
+  "version": 1,
+  "class": "ship",
+  "family": "fret",
+  "tier": "II",
+  "ftl": false,
+  "crew": 4,
+  "arch": "Cargo modulaire",
+  "description": ""
+ }
+}

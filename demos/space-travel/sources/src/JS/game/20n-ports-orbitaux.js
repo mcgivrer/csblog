@@ -154,9 +154,16 @@ function buildTower(rnd){
   const bc = beacon(G, L/2 + 130);
   return { group: G, spin: spin, berths: berths, beacon: bc };
 }
-const BUILD = { ring: buildRing, hub: buildHub, tower: buildTower };
+/* D « station modulaire » : une composition du chantier naval (09c, MODSHIP) — postes aux anneaux d'amarrage déclarés
+   (mode « ring » : accostage par l'avant sur un anneau STT-6), au moins un poste L ; balise au-dessus */
+function buildModular(rnd, seedStr){
+  const P = MODSHIP.stationPort(rnd, seedStr);
+  P.beacon = beacon(P.group, P.top + 30);
+  return P;
+}
+const BUILD = { ring: buildRing, hub: buildHub, tower: buildTower, modular: buildModular };
 function build(archetype, seedStr){
-  const rnd = rngFor(SEED + ':port:' + seedStr), P = BUILD[archetype](rnd);
+  const rnd = rngFor(SEED + ':port:' + seedStr), P = BUILD[archetype](rnd, SEED + ':port:' + seedStr);
   P.group.updateMatrixWorld(true);
   const b = new THREE.Box3().setFromObject(P.group), size = b.getSize(new V3());
   P.radius = .5*size.length(); P.size = size; P.archetype = archetype; P.spinRate = .02 + .02*rnd();
@@ -164,7 +171,11 @@ function build(archetype, seedStr){
   return P;
 }
 /* archétype selon la planète : géante gazeuse → tour ; sinon anneau ou moyeu (graine) */
-function archetypeFor(planet, u){ return planet.kind && planet.kind.gas ? 'tower' : (u < .45 ? 'ring' : 'hub'); }
+function archetypeFor(planet, u){
+  if(planet.kind && planet.kind.gas) return 'tower';
+  if(u >= .7 && typeof MODSHIP !== 'undefined' && MODSHIP.hasStations()) return 'modular';   /* 30 % : station du chantier naval */
+  return u < .45 ? 'ring' : 'hub';
+}
 /* altitude (spec §B.4) : tellurique 1,15–1,4 R ; géante 2,5–3 R (au-delà des anneaux) */
 function orbitRadius(planet, u){ return planet.radius*(planet.kind && planet.kind.gas ? 2.5 + .5*u : 1.15 + .25*u); }
 /* orientation : +Y du port à l'opposé de la planète (stabilisation par gradient de gravité) */

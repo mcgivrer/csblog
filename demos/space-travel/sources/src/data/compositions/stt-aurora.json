@@ -1,0 +1,98 @@
+{
+ "format": "stt-composition",
+ "version": 1,
+ "generator": "Chantier naval STT",
+ "id": "stt-aurora",
+ "name": "Helion Aurora",
+ "type": "ship",
+ "company": "HLN",
+ "registry": "HLN-2201",
+ "root": "cmd1",
+ "parts": [
+  [
+   "cmd1",
+   "CMD"
+  ],
+  [
+   "pax1",
+   "PAX"
+  ],
+  [
+   "pax2",
+   "PAX"
+  ],
+  [
+   "pax3",
+   "PAX"
+  ],
+  [
+   "tank1",
+   "TANK"
+  ],
+  [
+   "pwr1",
+   "PWR"
+  ],
+  [
+   "prop1",
+   "PROP"
+  ]
+ ],
+ "links": [
+  [
+   "cmd1.AFT",
+   "pax1.FWD",
+   0
+  ],
+  [
+   "pax1.AFT",
+   "pax2.FWD",
+   0
+  ],
+  [
+   "pax2.AFT",
+   "pax3.FWD",
+   0
+  ],
+  [
+   "pax3.AFT",
+   "tank1.FWD",
+   0
+  ],
+  [
+   "tank1.AFT",
+   "pwr1.FWD",
+   0
+  ],
+  [
+   "pwr1.AFT",
+   "prop1.FWD",
+   0
+  ]
+ ],
+ "containers": {},
+ "docking_ports": [],
+ "stats": {
+  "parts": 7,
+  "mass": 1590,
+  "containers": 0,
+  "passengers": 144,
+  "tank_m3": 840,
+  "length_m": 134.1,
+  "size_m": [
+   14.4,
+   13.4,
+   134.1
+  ]
+ },
+ "game": {
+  "version": 1,
+  "class": "ship",
+  "family": "passagers",
+  "tier": "III",
+  "ftl": true,
+  "crew": 6,
+  "arch": "Paquebot modulaire",
+  "description": ""
+ }
+}
