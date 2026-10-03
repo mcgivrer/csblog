@@ -87,7 +87,32 @@ def package():
                     os.path.join(TARGET, 'space-travel.html'),
                     os.path.join(TARGET, 'space-travel.min.html')], check=True)
 
+def playwright_env():
+    """Environnement des tests Playwright.
+    Chaque test fait `os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers")`, chemin du bac à sable
+    d'origine : absent ailleurs, Playwright y cherche Chromium et échoue alors que le navigateur est installé dans son
+    dossier habituel. Une variable déjà définie l'emporte ; on la renseigne donc ici d'après le dossier qui existe."""
+    env = dict(os.environ)
+    if env.get('PLAYWRIGHT_BROWSERS_PATH') is None:
+        home = os.path.expanduser('~')
+        found = None
+        for d in (os.path.join(os.environ.get('XDG_CACHE_HOME') or os.path.join(home, '.cache'), 'ms-playwright'),   # Linux
+                  os.path.join(home, 'Library', 'Caches', 'ms-playwright'),                                           # macOS
+                  os.path.join(os.environ.get('LOCALAPPDATA') or os.path.join(home, 'AppData', 'Local'), 'ms-playwright'),   # Windows
+                  '/opt/pw-browsers'):                                                                                # bac à sable d'origine
+            if os.path.isdir(d):
+                found = d
+                break
+        # aucun dossier trouvé : valeur vide = emplacement par défaut de Playwright, dont le message d'erreur indique `playwright install`
+        env['PLAYWRIGHT_BROWSERS_PATH'] = found or ''
+    return env
+
 def test():
+    try:
+        import playwright.sync_api   # noqa: F401
+    except ImportError:
+        sys.exit('  Playwright pour Python est absent : pip install playwright && playwright install chromium')
+    env = playwright_env()
     tests = sorted(t for t in os.listdir(os.path.join(SRC, 'test')) if t.endswith('_test.py'))
     ok = True
     for page in ('space-travel.html', 'space-travel.min.html'):
@@ -96,7 +121,7 @@ def test():
             continue
         for t in tests:
             print(f'  {t} sur {page}')
-            ok &= subprocess.run([sys.executable, os.path.join(SRC, 'test', t), path]).returncode == 0
+            ok &= subprocess.run([sys.executable, os.path.join(SRC, 'test', t), path], env=env).returncode == 0
     if not ok:
         sys.exit(1)
 
