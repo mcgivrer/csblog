@@ -155,7 +155,7 @@ Chaque lot se termine par une version taguée (`stt_vX.Y.Z`, voir `CLAUDE.md`) q
 | Id | Tâche | Rôle | Dépend de | Critère d'acceptation |
 |---|---|---|---|---|
 | T0.1 | Inventaire des états et valeurs réelles de `REAL.phase`, `flightPhase`, `orbitState` | Développeur | — | Table du §3 confirmée ou corrigée. **Fait** : [inventaire](./PLAN-scenes-T0.1-inventaire.md), table corrigée (2 scènes supprimées) |
-| T0.2 | Matrice scène × touche (comportement actuel) | Architecte | T0.1 | Document relu, cas ambigus listés |
+| T0.2 | Matrice scène × touche (comportement actuel) | Architecte | T0.1 | Document relu, cas ambigus listés. **Fait** : [matrice](./PLAN-scenes-T0.2-matrice.md), 26 cas à tester en T0.3 |
 | T0.3 | Test de caractérisation Playwright de la matrice | Développeur | T0.2 | Vert sur `stt_v2.17.0` |
 | T1.1 | `scenes/scene.js` : pile, transitions, événements | Développeur | T0.3 | Tests unitaires de la pile et des transitions refusées |
 | T1.2 | Scènes adaptateurs + accesseurs dérivés | Développeur | T1.1 | Matrice et fumée vertes |
