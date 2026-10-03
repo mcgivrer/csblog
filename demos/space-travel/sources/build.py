@@ -88,6 +88,10 @@ def package():
                     os.path.join(TARGET, 'space-travel.min.html')], check=True)
 
 def test():
+    try:
+        import playwright.sync_api   # noqa: F401
+    except ImportError:
+        sys.exit('  Playwright pour Python est absent : pip install playwright && playwright install chromium')
     tests = sorted(t for t in os.listdir(os.path.join(SRC, 'test')) if t.endswith('_test.py'))
     ok = True
     for page in ('space-travel.html', 'space-travel.min.html'):

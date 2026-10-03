@@ -6,7 +6,7 @@ navette), stations en port orbital (postes, poste L, budget de rendu), vol de 8 
 Usage : python3 src/test/modulaire_test.py target/space-travel.html
 """
 import os, re, sys, json
-os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers")
+if os.path.isdir("/opt/pw-browsers"): os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers")   # bac a sable d origine ; ailleurs, emplacement par defaut de Playwright
 from playwright.sync_api import sync_playwright
 
 page_path = os.path.abspath(sys.argv[1])

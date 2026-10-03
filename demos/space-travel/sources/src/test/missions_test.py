@@ -4,7 +4,7 @@ acceptation, pile colorée (nature), vol, livraison payée à la prime exacte, n
 Usage : python3 src/test/missions_test.py target/space-travel.html [modele]
 """
 import os, re, sys, json, base64
-os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers")
+if os.path.isdir("/opt/pw-browsers"): os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers")   # bac a sable d origine ; ailleurs, emplacement par defaut de Playwright
 from playwright.sync_api import sync_playwright
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 page_path = os.path.abspath(sys.argv[1]); ship = sys.argv[2] if len(sys.argv) > 2 else 'e18'; want_inter = len(sys.argv) > 3 and sys.argv[3] == 'saut'
