@@ -6,7 +6,7 @@
 | **Entrée** | [Inventaire T0.1](./PLAN-scenes-T0.1-inventaire.md) (§3.2 : données brutes) |
 | **Base** | jeu `stt_v2.17.0` |
 | **Date** | 2026-10-03 |
-| **Statut** | Matrice écrite ; les cas « (D) » sont à tester en T0.3 avant d'être figés |
+| **Statut** | Matrice écrite ; cas testés par T0.3 (voir « Résultats de T0.3 » au §5) |
 
 Cette matrice décrit ce que le jeu **fait aujourd'hui**, défauts compris. Elle sert de test de non-régression pour les lots suivants. Ce n'est pas le comportement cible : les défauts sont marqués ⚠ et renvoient aux pièges de l'inventaire (§5), dont la décision (corriger ou conserver) appartient au mainteneur.
 
@@ -22,7 +22,7 @@ Cette matrice décrit ce que le jeu **fait aujourd'hui**, défauts compris. Elle
 | Touche | `boot` | `title` | `shipSelect` | `flight` hors `APPROACH` | `flight` `APPROACH` | `orbit` | `jump` | `flyover` | `starMap` | `pause` |
 |---|---|---|---|---|---|---|---|---|---|---|
 | **Échap** | — (pause refusée, `24:95`) | — idem | — idem (D) | **pause** | **pause** | **pause** | **pause** | abrège le survol | ferme la carte | ⚠ **recharge la page, sans confirmation** |
-| **Espace** | — (D) | choisit la langue (K4) | avalé par K3, ne confirme pas | propulsion (`keys['Space']`) | idem | **abrège l'escale** (`arrivalSkip`) | — | abrège le survol | ferme la carte | **reprend** |
+| **Espace** | — (D) | choisit la langue (K4) | ⚠ **confirme le vaisseau** si le bouton Confirmer a le focus, ce qui est le cas 60 ms après l'ouverture (`42:316`) ; sans effet avant | propulsion (`keys['Space']`) | idem | **abrège l'escale** (`arrivalSkip`) | — | abrège le survol | ferme la carte | **reprend** |
 | **Entrée** | — (D) | choisit la langue (K4) | **confirme** le vaisseau (K3) | — | — | **abrège l'escale** | — | abrège le survol | **action sur la sélection** de la carte (K1) | **reprend** |
 | **M** (ou `;`) | — (D) | — (`openStarMap` exige `gameStarted`) | — (D) | ouvre la carte | ouvre la carte | ouvre la carte | ouvre la carte | abrège le survol | ferme la carte | ⚠ **ouvre la carte au-dessus de la pause** (D) |
 | **G** | — (`gameStarted`) | — | — | lance le survol | refusé (`20g:87`) | lance le survol | refusé | abrège le survol | refusé (carte ouverte) | ⚠ lance le survol sous la pause (D) |
@@ -95,13 +95,23 @@ Chaque cas « (D) » ci-dessus devient un cas de test ; les identifiants servent
 | K-H-TITLE | H sur l'écran-titre (D) | titre | aide visible ou non |
 | K-H-SELECT | H dans le choix du vaisseau (D) | `openShipSelect` | idem |
 | K-SELECT-ESC | Échap, P, M dans le choix du vaisseau (D) | `openShipSelect` | sans effet sur la partie |
-| K-SELECT-SPACE | Espace avalé par K3 | `openShipSelect` | pas de démarrage |
+| K-SELECT-SPACE | Espace avec le bouton Confirmer au focus | `openShipSelect`, focus forcé sur `#ssConfirm` | confirme et démarre la partie (corrigé par T0.3 : la matrice disait « avalé ») |
 | K-H-PAUSE | H en pause | pause | aucun effet |
 | K-F8-NOPORT | F8 hors de portée d'un port | vol | aucun effet |
 | K-STEER-APPROACH | flèche en `APPROACH` | forcer `APPROACH` | décalage latéral change |
 | K-STEER-TRANSFER | flèche en `TRANSFER` (D) | `TRANSFER` | trajectoire inchangée |
 | K-STEER-MAP | Z sous la carte (D) | carte ouverte | vaisseau pilotable |
 | K-STEER-PAUSE | touche tenue pendant la pause (D) | pause | sans effet à la reprise |
+
+### Résultats de T0.3
+
+Le test `sources/src/test/scenes_matrice_test.py` exécute ces cas sur le jeu actuel (`stt_v2.17.0`, rendu logiciel, temps virtuel). Il confirme les cellules « (D) » testées : `M` en pause ouvre la carte, la simulation avance sous la carte, le pilotage reste mémorisé sous la carte et ne l'est pas en pause, le survol peut se lancer en pause et avale alors Échap (la pause n'est pas quittée), la pause est possible pendant un saut et pendant l'orbite avec minuterie et saut gelés, H sur le titre et dans le choix du vaisseau ouvre l'aide, les flèches ne changent pas la trajectoire en `TRANSFER`.
+
+Deux corrections apportées par l'exécution :
+- **Espace dans le choix du vaisseau** : la matrice disait « avalé » ; il confirme le vaisseau dès que « Confirmer » a le focus (piège 10 de l'inventaire).
+- **Échap pendant le survol** : le survol ne s'arrête pas instantanément ; il lance son retour au vaisseau et se termine environ 1,1 s simulée plus tard (11 pas de 0,1 s).
+
+Non couverts par le test : H, V et F-keys sur `boot`, et les cas de la barre d'icônes à la souris.
 
 ## 6. Ce que cette matrice ne couvre pas
 

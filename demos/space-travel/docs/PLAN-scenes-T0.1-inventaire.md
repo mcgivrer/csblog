@@ -147,7 +147,8 @@ Pièges réels, qui justifient la refonte mieux que la pause « détournée » :
 7. **Pause possible pendant un saut et pendant l'orbite** : `enterPause` ne teste que `gameStarted` (`24:95`).
 8. **`M` détecté par `e.code` dans K5 et par `e.key` dans K1** : deux chemins pour la même action.
 9. **Touches de pilotage non avalées sous la carte** : le vaisseau peut être dirigé pendant que la carte est ouverte (déduit).
-10. **Commentaires périmés** : `23:247-273` (carte et pause), `26:5` (caméra = F3).
+10. **Espace dans le choix du vaisseau** (trouvé par T0.3) : `K3` n'appelle que `stopPropagation()` pour Espace (`42:295`), sans `preventDefault()`. Le focus passe sur « Confirmer » 60 ms après l'ouverture (`42:316`) : Espace déclenche alors l'activation native du bouton et **démarre la partie**. Avant ces 60 ms, le focus est sur la page et Espace ne fait rien (sondé en exécution).
+11. **Commentaires périmés** : `23:247-273` (carte et pause), `26:5` (caméra = F3).
 
 ### Combinaisons possibles (lu, sauf mention)
 
