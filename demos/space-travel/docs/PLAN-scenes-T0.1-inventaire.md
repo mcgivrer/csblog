@@ -37,6 +37,8 @@ Dix valeurs, toutes affectées dans `20c` sauf `APPROACH`, aussi forcée par `20
 | `HOP` | `20c:576`, `593` | sans cible suivante, ou sans moyen de saut |
 | `WARPOUT` | `20c:621` | fin de la distorsion, juste avant le transfert |
 
+**Démarrage normal d'une partie** (missions activées, cas du joueur) : `startGame` appelle `MISSIONS.start`, qui force `APPROACH` (`20q:214`) ; le vaisseau atteint `ORBIT` dans les premières images simulées (observé par le test des scènes après le choix du vaisseau, lot 1). Le jeu **démarre donc en orbite**, avec le tableau des missions, et non au début d'un transfert. Le démarrage rapide des tests (`__sttQuickStart` sans l'option `missions`) part, lui, en `TRANSFER`.
+
 Cycle normal : `TRANSFER` → `APPROACH` → `ORBIT` → `DEPART` → `COAST` → (`JUMP` \| `WARP` → `WARPOUT` \| `HOP`) → `TRANSFER`. Le retour de `JUMP` et de `HOP` passe par `enterSystem` → `plan` (`20c:187-190`, `633-640`), qui repose `TRANSFER`.
 
 Lecteurs hors `20c` : `20e` (libellés de la carte, report de cible pendant un passage), `20h` (coupe les gros plans en `WARP`, `WARPOUT`, `HOP`), `20g` (autorise, lance ou abrège le survol), `20f` (effets de coque), `20q` (ouvre le tableau de missions en `ORBIT`).

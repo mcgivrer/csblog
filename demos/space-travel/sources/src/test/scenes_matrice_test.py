@@ -41,6 +41,9 @@ def fly(br, seed):
     pg.evaluate("() => { LAYERS.skipRender = true; window.__step(3); }")
     return pg
 S = lambda pg: pg.evaluate(STATE)
+def stack(pg): return pg.evaluate("() => { SCENES.sync(SCENES.desired()); return SCENES.stack(); }")
+viol = []
+def collect(pg): viol.extend(pg.evaluate("() => SCENES.violations.map(v => v.reason)"))
 def press(pg, k): pg.keyboard.press(k)
 def held(pg, code): return pg.evaluate("c => !!keys[c]", code)
 
@@ -51,12 +54,14 @@ with sync_playwright() as pw:
     pg = new_page(br, "SCN-TITRE"); pg.wait_for_timeout(1500)
     s = pg.evaluate("() => ({ shown: document.getElementById('titleScreen').style.display, started: gameStarted })")
     check("K-TITLE", "écran-titre affiché, partie non démarrée", s["shown"] == "flex" and not s["started"], s)
+    check("K-SCENE-TITLE", "pile de scènes : title", stack(pg) == ["title"], stack(pg))
     for k in ("h", "v", "i", "l", "Tab", "F1", "F7"): press(pg, k)
     s = S(pg)
     ov = pg.evaluate("() => ({ audio: document.getElementById('audioOverlay').classList.contains('visible'), radio: document.getElementById('radioPanel').classList.contains('visible') })")
     check("K-H-TITLE", "H, V, I, L, Tab, F1, F7 sur le titre : aucun effet (garde gameStarted)", s["help"] is False and not ov["audio"] and not ov["radio"], f"aide = {s['help']} · {ov}")
     pg.click('.lang-btn[data-lang="en"]')
     pg.wait_for_function("() => SHIP_SELECT_OPEN === true", timeout=90000, polling=250)
+    check("K-SCENE-SELECT", "pile de scènes : title + shipSelect", stack(pg) == ["title", "shipSelect"], stack(pg))
     for k in ("h", "v", "Tab"): press(pg, k)
     s = S(pg)
     ov = pg.evaluate("() => ({ audio: document.getElementById('audioOverlay').classList.contains('visible'), radio: document.getElementById('radioPanel').classList.contains('visible') })")
@@ -68,12 +73,17 @@ with sync_playwright() as pw:
     pg.focus("#ssConfirm"); press(pg, " "); pg.wait_for_timeout(300); s = S(pg)
     check("K-SELECT-SPACE", "Espace, bouton Confirmer au focus : confirme et démarre (activation native, 42:295 n'appelle pas preventDefault)",
           s["started"] and not s["sel"], s)
-    pg.close()
+    pg.evaluate("() => { LAYERS.skipRender = true; window.__step(2); }")
+    st = stack(pg)
+    check("K-SCENE-START", "pile de scènes après un démarrage normal (missions activées) : une seule scène de jeu, orbit (MISSIONS.start place le vaisseau en orbite)",
+          st == ["orbit"] or st == ["flight"], st)
+    collect(pg); pg.close()
 
     print("  [vol : pause, carte, survol]")
     pg = fly(br, "SCN-VOL")
     press(pg, "Escape"); s = S(pg)
     check("K-ESC-PAUSE", "Échap en vol : pause", s["paused"] is True, s)
+    check("K-SCENE-PAUSE", "pile de scènes : flight + pause", stack(pg) == ["flight", "pause"], stack(pg))
     press(pg, "p"); s = S(pg)
     check("K-P-PAUSED", "P en pause : aucun changement", s["paused"] is True, s)
     press(pg, "m"); s = S(pg)
@@ -88,6 +98,7 @@ with sync_playwright() as pw:
     check("K-SKIP-CRUISE", "Espace hors escale : n'abrège rien", s["fp"] == "CRUISE" and s["skip"] is False, s)
     press(pg, "m"); s = S(pg)
     check("K-M-OPEN", "M en vol : ouvre la carte sans pause", s["map"] and not s["paused"], s)
+    check("K-SCENE-MAP", "pile de scènes : flight + starMap", stack(pg) == ["flight", "starMap"], stack(pg))
     p0 = pg.evaluate("() => shipRig.position.toArray()")
     pg.evaluate("() => window.__step(30)")
     p1 = pg.evaluate("() => shipRig.position.toArray()")
@@ -101,8 +112,10 @@ with sync_playwright() as pw:
     check("K-F8-NOPORT", "F8 hors de portée d'un port : aucun effet", s["port"] is False, s)
     press(pg, "g"); s = S(pg)
     check("K-G-OK", "G en TRANSFER : lance le survol", s["surv"] is True and s["phase"] == "TRANSFER", s)
+    check("K-SCENE-FLYOVER", "pile de scènes : flight + flyover", stack(pg) == ["flight", "flyover"], stack(pg))
     press(pg, "Escape"); s = S(pg)
     check("K-FLYOVER-ESC", "Échap pendant le survol : met en pause (et lance le retour au vaisseau)", s["paused"] is True, s)
+    check("K-SCENE-FLYOVER-PAUSE", "pile de scènes : flight + flyover + pause", stack(pg) == ["flight", "flyover", "pause"], stack(pg))
     press(pg, " ")
     n = pg.evaluate("() => { let n = 0; while(SURVOL.isActive() && n < 600){ window.__step(1); n++; } return n; }"); s2 = S(pg)
     check("K-FLYOVER-END", "après la reprise : le survol se termine (retour au vaisseau)", not s2["surv"] and not s2["paused"], f"survol terminé après {n} pas de 0,1 s")
@@ -114,7 +127,7 @@ with sync_playwright() as pw:
     check("K-G-APPROACH", "G en APPROACH : refusé", s["surv"] is False, s)
     press(pg, "Escape"); press(pg, "g"); s = S(pg)
     check("K-G-PAUSE", "G en pause : aucun effet (pas de survol sous la pause)", s["surv"] is False and s["paused"] is True, s)
-    pg.close()
+    collect(pg); pg.close()
 
     print("  [quitter vers le titre]")
     pg = fly(br, "SCN-QUIT")
@@ -139,6 +152,7 @@ with sync_playwright() as pw:
     pg.evaluate("() => { for(let i = 0; i < 1500 && REAL.phase !== 'ORBIT'; i++) window.__step(1); }")
     s = S(pg)
     check("K-ORBIT", "orbite atteinte (ORBIT + ARRIVAL_PAUSE)", s["phase"] == "ORBIT" and s["fp"] == "ARRIVAL_PAUSE", s)
+    check("K-SCENE-ORBIT", "pile de scènes : orbit", stack(pg) == ["orbit"], stack(pg))
     press(pg, " "); s = S(pg)
     check("K-SKIP-ORBIT", "Espace en ARRIVAL_PAUSE : abrège l'escale", s["skip"] is True, s)
     press(pg, "Escape")
@@ -151,9 +165,10 @@ with sync_playwright() as pw:
         j0 = pg.evaluate("() => jumpState.t"); pg.evaluate("() => window.__step(30)"); j1 = pg.evaluate("() => jumpState.t")
         s = S(pg)
         check("K-PAUSE-JUMP", "Échap pendant un saut : pause, saut gelé", s["paused"] and j0 == j1, f"jumpState.t {j0:.2f} → {j1:.2f}")
+        check("K-SCENE-JUMP", "pile de scènes : jump + pause", stack(pg) == ["jump", "pause"], stack(pg))
     else:
         check("K-PAUSE-JUMP", "saut atteint dans la borne de 8000 pas", False, "jumpState jamais créé")
-    pg.close()
+    collect(pg); pg.close()
 
     print("  [pilotage]")
     pg = fly(br, "SCN-APPROCHE")
@@ -163,7 +178,8 @@ with sync_playwright() as pw:
     o1 = pg.evaluate("() => ({ ox: REAL.mission.ox, oy: REAL.mission.oy })"); pg.keyboard.up("ArrowLeft")
     check("K-STEER-APPROACH", "flèche en APPROACH : décale le vaisseau dans le couloir",
           o0["ph"] == "APPROACH" and abs(o1["ox"] - o0["ox"]) > 0.05, f"ox {o0['ox']:.2f} → {o1['ox']:.2f}")
-    pg.close()
+    check("K-SCENE-APPROACH", "pile de scènes en APPROACH : flight", stack(pg) == ["flight"], stack(pg))
+    collect(pg); pg.close()
     pos = {}
     for held_key in (False, True):
         pg = fly(br, "SCN-TRANSFERT")
@@ -177,6 +193,7 @@ with sync_playwright() as pw:
           pos[True]["ph"] == "TRANSFER" and d < 1e-3, f"écart de position {d:.4f} m, phase {pos[True]['ph']}")
     br.close()
 
+check("K-SCENES-TABLE", "aucune transition du jeu réel ne viole la table des scènes (parcours complet du test)", not viol, viol[:3])
 check("K-ERRORS", "aucune erreur JavaScript", not errors, errors[:3])
 print(f"  {len(fails)} échec(s)" if fails else "  tous les cas de la matrice sont conformes")
 sys.exit(1 if fails else 0)

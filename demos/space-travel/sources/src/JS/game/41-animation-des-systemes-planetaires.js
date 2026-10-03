@@ -31,6 +31,7 @@ function animate(){
   const dt = Math.min(clock.getDelta(), 0.1);
   const elapsed = clock.getElapsedTime();
   adaptResolution();
+  SCENES.tick(dt, elapsed);   /* lot 1 : pile de scènes déduite des drapeaux ; aucune scène n'agit encore */
   if(window.__STARMAP && __STARMAP.isOpen()) __STARMAP.frame(performance.now());   /* L4 : carte 2D (dessin à la demande) */
 
   /* travelling de fond de l'écran-titre (demande utilisateur) : tant que

@@ -58,5 +58,7 @@
 38-dialogue-de-telemetrie-commandes.js
 39-temperature-moteur-simulation-simple.js
 40-boucle-principale.js
+../scenes/scene.js
+../scenes/scenes-jeu.js
 41-animation-des-systemes-planetaires.js
 42-ecran-de-demarrage-sequence.js
