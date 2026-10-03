@@ -8,7 +8,7 @@
 | **Date** | 2026-10-03 |
 | **Statut** | Matrice écrite ; cas testés par T0.3 (voir « Résultats de T0.3 » au §5) |
 
-Cette matrice décrit ce que le jeu **fait aujourd'hui**, défauts compris. Elle sert de test de non-régression pour les lots suivants. Ce n'est pas le comportement cible : les défauts sont marqués ⚠ et renvoient aux pièges de l'inventaire (§5), dont la décision (corriger ou conserver) appartient au mainteneur.
+Les §2 à §5 décrivent le comportement **d'origine** de `stt_v2.17.0`, défauts compris (marqués ⚠, ils renvoient aux pièges de l'inventaire §5). Le mainteneur a demandé de **corriger ces défauts avant de poursuivre** : le §6 donne, pour chacun, la décision et le comportement obtenu, et le test `scenes_matrice_test.py` vérifie désormais le comportement **corrigé**. C'est ce comportement qui sert de test de non-régression aux lots suivants.
 
 ## 1. Conventions
 
@@ -113,7 +113,31 @@ Deux corrections apportées par l'exécution :
 
 Non couverts par le test : H, V et F-keys sur `boot`, et les cas de la barre d'icônes à la souris.
 
-## 6. Ce que cette matrice ne couvre pas
+## 6. Défauts : décisions et comportement corrigé
+
+Corrections dans `sources/src/JS/game/` ; la version du jeu à publier reste à décider (voir plus bas).
+
+| # | Défaut d'origine | Décision | Comportement corrigé | Cas de test |
+|---|---|---|---|---|
+| 1 | H, V, I, L, Tab, F1-F10 agissent sur le générique, le titre et le choix du vaisseau (`23`, aucune garde `gameStarted`) | **Corrigé** | le gestionnaire principal ignore tout tant que `gameStarted` est faux (`23-…`, début du gestionnaire) | K-H-TITLE, K-H-SELECT |
+| 2 | Le choix du vaisseau laisse passer Échap, P, M… vers le gestionnaire principal | **Corrigé** par le n° 1 | le gestionnaire principal est inactif pendant le choix | K-SELECT-ESC |
+| 3 | `M` s'ouvre en pause, au-dessus de la pause | **Corrigé** | `M` est traité après la garde de pause, comme H, I, L, V | K-M-PAUSE |
+| 4 | `G` lance un survol en pause | **Corrigé** | le gestionnaire du survol ignore tout en pause (`20g-…`) | K-G-PAUSE |
+| 5 | Le survol avale Échap, P, Espace : la pause est inaccessible | **Corrigé** pour Échap, P et Pause | ces trois touches abrègent le survol **et** mettent en pause ; toute autre touche est avalée comme avant (le survol reste « une touche ou un clic ramène au vaisseau ») | K-FLYOVER-ESC, K-FLYOVER-END, K-FLYOVER-KEY |
+| 6 | Échap en pause quitte (rechargement) sans confirmation | **Corrigé** | `quitToTitle` demande confirmation (`confirm`, texte `quitConfirm` en fr, en, de, es), aussi pour le bouton « Quitter » de la pause | K-QUIT-CANCEL, K-ESC-QUIT |
+| 7 | Le tableau des missions (z-index 9) recouvre la pause (7) | **Corrigé** | z-index 6, sous la pause (`20q-…`) | non testé (z-index) : à vérifier à l'œil |
+| 8 | Le pilotage est mémorisé et agit sous la carte ouverte | **Corrigé** | `keys[]` n'est pas alimenté quand la carte est ouverte (`23-…`) | K-STEER-MAP |
+| 9 | La pause est possible pendant un saut et pendant l'orbite | **Conservé** (voulu : gel complet de la simulation) | inchangé | K-PAUSE-JUMP, K-PAUSE-ORBIT |
+| 10 | `M` détecté par `e.code` (principal) et par `e.key` (carte) | **Conservé** | inchangé : volontaire pour les claviers AZERTY (commentaire de `23-…`) | K-M-OPEN, K-M-CLOSE |
+| 11 | Tableaux de contrats et de missions sans bouton de fermeture ni clavier | **Conservé** | inchangé : le choix d'une destination est obligatoire ; Échap met en pause au-dessus du tableau (corrigé au n° 7) | — |
+| 12 | Espace confirme le vaisseau quand « Confirmer » a le focus | **Conservé** | inchangé : activation native d'un bouton, cohérente avec Entrée | K-SELECT-SPACE |
+| 13 | Commentaires périmés sur la carte et `gamePaused` | **Corrigé** | commentaires de `23-…` réécrits ; celui de `26-…` (« caméra = F3 », c'est F9) corrigé | — |
+
+Changements de cellules de la matrice : H, V, I, L, Tab, F1-F10 deviennent « — » sur `boot`, `title` et `shipSelect` ; `M` et `G` deviennent « — » en `pause` ; Échap pendant `flyover` abrège **et** met en pause ; Échap en `pause` demande confirmation ; le pilotage sous `starMap` n'est plus mémorisé.
+
+**Version.** Ces corrections changent le comportement observable du jeu : elles justifient une version `stt_v2.17.1` (tag après fusion). `sources/target/space-travel.html` et `.min.html` doivent être régénérés avant cette version.
+
+## 7. Ce que cette matrice ne couvre pas
 
 - Les cas de la barre d'icônes à la souris ou au doigt (boutons de `26`) : même logique que F1-F9 ; à couvrir en T0.3 si le temps le permet.
 - Le joystick tactile et les boutons de roulis (`26`) : ils injectent des `keys[]` virtuels.

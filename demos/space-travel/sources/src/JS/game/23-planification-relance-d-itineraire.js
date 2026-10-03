@@ -231,6 +231,9 @@ function computeRoute(origin, heading, alignShip){
 }
 const keys = {};
 window.addEventListener('keydown', function(e){
+  /* générique, écran-titre, choix du vaisseau : le clavier appartient à ces écrans (42-…), jamais aux
+     panneaux, à la pause ni au pilotage de la partie, qui n'existe pas encore */
+  if(!gameStarted) return;
   /* abrégé de la manœuvre d'orbite/livraison : le reste de la séquence se
      joue en accéléré (travelling rapide) plutôt que d'être coupé net —
      les navettes et le canal radio restent visibles, juste comprimés.
@@ -243,11 +246,7 @@ window.addEventListener('keydown', function(e){
        navigateur pour Espace) — pertinent aussi bien pour la propulsion
        en vol normal que pour l'abrégé pendant l'approche */
     e.preventDefault();
-    /* même piège que ÉCHAP ci-dessous (carte stellaire réutilisant
-       gamePaused, §23.3) : sans ce test, ESPACE reprendrait le vol via
-       resumeGame() SANS fermer proprement la carte (overlay toujours
-       affiché, étiquettes jamais nettoyées) — cf. commentaire détaillé
-       plus bas pour ÉCHAP. */
+    /* carte ouverte : ESPACE la ferme (la carte ne gèle pas la simulation et n'utilise pas gamePaused) */
     if(isStarMapOpen()){ closeStarMap(); return; }
     if(gamePaused){ resumeGame(); return; }
     if(flightPhase === 'ARRIVAL_PAUSE') arrivalSkip = true;
@@ -263,14 +262,8 @@ window.addEventListener('keydown', function(e){
      n'ont alors aucun effet — pas de bascule retour par ces deux-là). */
   if(e.code === 'Escape' || e.code === 'KeyP' || e.code === 'Pause'){
     e.preventDefault();
-    /* bug remonté en jeu : la carte stellaire réutilise gamePaused pour
-       geler le vol (§23.3), le même drapeau que la pause générale — donc
-       ÉCHAP, en vérifiant seulement gamePaused, croyait la partie déjà en
-       pause et retournait à l'écran-titre au lieu de fermer la carte. La
-       touche M avait déjà été protégée de ce piège (cf. commentaire
-       ci-dessous), mais pas ÉCHAP/P elles-mêmes, qui passaient encore par
-       le test générique. Sort de la carte en priorité, avant même de
-       regarder gamePaused. */
+    /* carte ouverte : ÉCHAP / P la ferment en priorité, sans mettre en pause (la carte ne gèle pas la
+       simulation et n'utilise pas gamePaused) */
     if(isStarMapOpen()){ closeStarMap(); return; }
     if(gamePaused){
       if(e.code === 'Escape') quitToTitle();
@@ -291,14 +284,14 @@ window.addEventListener('keydown', function(e){
      (bas du clavier, qui produit une virgule en AZERTY). Même principe
      déjà en place pour ZQSD (keys['KeyZ']||keys['KeyW'] etc.) : on
      accepte les deux codes plutôt que de supposer un unique clavier. */
+  if(gamePaused) return;   /* aucune autre touche n'agit tant que le jeu est en pause, M comprise */
   if(e.code === 'KeyM' || e.code === 'Semicolon'){
     e.preventDefault();
     const it = HUD_BAR_ITEMS.find(function(x){ return x.kind === 'starmap'; });
     if(it) activateHudBarItem(it);
     return;
   }
-  if(gamePaused) return;   /* aucune autre touche n'agit tant que le jeu est en pause */
-  keys[e.code] = true;
+  if(!isStarMapOpen()) keys[e.code] = true;   /* sous la carte, le pilotage n'est pas mémorisé */
   if(e.code === 'KeyH'){
     /* passe par activateHudBarItem comme le bouton d'aide de la barre —
        une seule logique, jamais dupliquée entre clavier et bouton */

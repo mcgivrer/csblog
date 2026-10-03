@@ -2,7 +2,7 @@
    BARRE D'ICÔNES DU HUD — §12 de la spec v2.1. Un mécanisme UNIQUE pour le
    bureau ET le tactile (fusionnée avec l'ancien menu ☰ tactile, qui
    dupliquait la même idée avec un rendu différent) : 7 bascules de
-   panneaux + 1 bouton caméra (double de F3), tous générés depuis la même
+   panneaux + 1 bouton caméra (double de F9), tous générés depuis la même
    liste, avec les mêmes icônes SVG et la même fonction d'activation —
    seule la POSITION change entre bureau (bas-gauche, fixe) et tactile
    (haut, le bas étant occupé par le joystick et les commandes de vol).
