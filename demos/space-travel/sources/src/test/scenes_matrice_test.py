@@ -56,6 +56,8 @@ with sync_playwright() as pw:
     ov = pg.evaluate("() => ({ audio: document.getElementById('audioOverlay').classList.contains('visible'), radio: document.getElementById('radioPanel').classList.contains('visible') })")
     check("K-H-TITLE", "H, V, I, L, Tab, F1, F7 sur le titre : aucun effet (garde gameStarted)", s["help"] is False and not ov["audio"] and not ov["radio"], f"aide = {s['help']} · {ov}")
     pg.click('.lang-btn[data-lang="en"]')
+    pg.wait_for_function("() => document.getElementById('modeSelect').classList.contains('open')", timeout=30000, polling=100)   # L0.6 : choix du mode avant le hangar
+    pg.click('#modeSelect [data-mode="free"]')
     pg.wait_for_function("() => SHIP_SELECT_OPEN === true", timeout=90000, polling=250)
     for k in ("h", "v", "Tab"): press(pg, k)
     s = S(pg)

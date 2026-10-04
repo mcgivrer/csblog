@@ -1,0 +1,78 @@
+{
+ "format": "stt-composition",
+ "version": 1,
+ "generator": "Chantier naval STT",
+ "id": "stt-courlis",
+ "name": "STT Courlis",
+ "type": "ship",
+ "company": "STT",
+ "registry": "STT-0001",
+ "root": "cmd1",
+ "parts": [
+  [
+   "cmd1",
+   "CMD"
+  ],
+  [
+   "cargo1",
+   "CARGO"
+  ],
+  [
+   "pwr1",
+   "PWR"
+  ],
+  [
+   "prop1",
+   "PROP"
+  ]
+ ],
+ "links": [
+  [
+   "cmd1.AFT",
+   "cargo1.FWD",
+   0
+  ],
+  [
+   "cargo1.AFT",
+   "pwr1.FWD",
+   0
+  ],
+  [
+   "pwr1.AFT",
+   "prop1.FWD",
+   0
+  ]
+ ],
+ "containers": {
+  "cargo1": [
+   "VESTA",
+   "ORION",
+   "STTC",
+   "NOVA"
+  ]
+ },
+ "docking_ports": [],
+ "stats": {
+  "parts": 4,
+  "mass": 791,
+  "containers": 4,
+  "passengers": 0,
+  "tank_m3": 0,
+  "length_m": 68.1,
+  "size_m": [
+   14.4,
+   13.4,
+   68.1
+  ]
+ },
+ "game": {
+  "version": 1,
+  "class": "ship",
+  "family": "fret",
+  "tier": "I",
+  "ftl": false,
+  "crew": 2,
+  "arch": "Cargo modulaire léger",
+  "description": "Cargo modulaire léger de la flotte STT : quatre conteneurs, deux membres d'équipage. Le vaisseau de départ de toute campagne."
+ }
+}

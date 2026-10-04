@@ -60,13 +60,15 @@
     /* v2.13 : sélection du vaisseau entre l'écran-titre et la partie. Le
        travelling de fond continue derrière le dialogue ; vaisseau et HUD
        restent masqués jusqu'au choix. */
-    openShipSelect(function(id, opts){
+    const onShip = function(id, opts){
       installShip(id, opts);
       document.body.classList.remove('title-active');
       shipRig.visible = true;
       if(ROUTE.gates) ROUTE.gates.visible = true;
       startGame();
-    });
+    };
+    /* L0.6 : choix du mode (campagne / partie libre) avant la sélection du vaisseau ; Partie libre = ce qui précède */
+    (typeof BRIDGE !== 'undefined' ? BRIDGE.chooseMode(() => openShipSelect(onShip)) : openShipSelect(onShip));
   }
   langBtns.forEach(function(btn, i){
     btn.addEventListener('click', function(){ selectLanguageAndStart(btn); });
