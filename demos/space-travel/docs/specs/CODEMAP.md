@@ -6,13 +6,13 @@ Usage : repérer `nom:ligne`, puis lire par plage (`sed -n 'a,bp' fichier`) plut
 **Liste noire** (ne jamais lire en entier) : fichiers de plus de 300 Ko (dont `src/JS/vendor/*.min.js`), `*.min.html`, `sources/target/*`, `docs/spec-*-P1.md`, `docs/specs/*-autonome.md`, `STT_ModuleLibrary.json`, `*.glb`, `archives/` ; voir aussi `CLAUDE.md`.
 Chemins : sans préfixe = `sources/src/JS/game/` ; `sim/`, `ui/` = `sources/src/JS/sim/`, `ui/` ; `shared/` = `demos/space-travel/shared/` (source unique, aussi utilisée par la démo « Observation des étoiles »).
 Légende : `fn` = function de niveau 0 · `var` = const/let/var de niveau 0 · `ns X` = `const X = (function(){…})()` et clés de son `return {…}` final (ligne de la déclaration locale, sinon de la clé) · `win` = `window.__X =` (×n = nombre d'affectations) · `[IIFE]` = module entièrement enveloppé : les déclarations listées sont locales, seuls les `win` sont globaux · `@provides` / `@requires` = balises de dépendances.
-Source de l'ordre : `src/JS/game/ORDER.txt` (69 entrées). 69 fichiers lus (0 absents ou ignorés) · 14930 lignes · 262 fn · 402 var · 21 ns · 26 window.__.
+Source de l'ordre : `src/JS/game/ORDER.txt` (70 entrées). 70 fichiers lus (0 absents ou ignorés) · 15230 lignes · 262 fn · 402 var · 22 ns · 26 window.__.
 
 ## Modules
 ### 00-prologue.js · 1 l
-### 01-internationalisation-francais-existant-anglais.js · 316 l — 0. INTERNATIONALISATION — français (existant), anglais, allemand,
-- fn: t:133, applyLanguage:284
-- var: LANG:6, I18N:7, RADIO_TEMPLATES:142
+### 01-internationalisation-francais-existant-anglais.js · 328 l — 0. INTERNATIONALISATION — français (existant), anglais, allemand,
+- fn: t:145, applyLanguage:296
+- var: LANG:6, I18N:7, RADIO_TEMPLATES:154
 ### 02-prng-seede-tout-l.js · 30 l — 1. PRNG SEEDÉ — tout l'univers découle d'une seule graine
 - fn: xmur3:4, mulberry32:17, rngFor:25
 - var: SEED:28
@@ -232,7 +232,10 @@ Source de l'ordre : `src/JS/game/ORDER.txt` (69 entrées). 69 fichiers lus (0 ab
 ### 41-animation-des-systemes-planetaires.js · 224 l — ANIMATION DES SYSTÈMES PLANÉTAIRES CONSTRUITS
 - fn: adaptResolution:19, animate:29
 - ns DYNRES:13: fixed:16, max:15, pr:15, ema:16, last:16, prev:16
-### 42-ecran-de-demarrage-sequence.js · 349 l — 11. ÉCRAN DE DÉMARRAGE — séquence terminal façon McGivrer
-- fn: shipSpecs:183, shipCatalogInfo:197, buildShipCatalog:202, openShipSelect:207
-- var: SS_ARCH:174, SS_CREW:180, SHIP_CATALOG:181, SHIP_SELECT_OPEN:181
+### 42-ecran-de-demarrage-sequence.js · 351 l — 11. ÉCRAN DE DÉMARRAGE — séquence terminal façon McGivrer
+- fn: shipSpecs:185, shipCatalogInfo:199, buildShipCatalog:204, openShipSelect:209
+- var: SS_ARCH:176, SS_CREW:182, SHIP_CATALOG:183, SHIP_SELECT_OPEN:183
 - win: __sttQuickStart:43, __sttMissions:47
+### 45-campaign-bridge.js · 286 l — CAMPAGNE 5. PONT — BRIDGE : choix du mode, reprise, synchro crédits / horloge, sauvegarde automatique, menu p…
+- ns BRIDGE:7: chooseMode:90, resume:173
+- @provides BRIDGE · @requires GAME, SAVE, DATA · @requires-engine addCredits, credits, refreshCreditsDisplay, MODSHIP, MISSIONS, SHIPGEN, SEED, LANG, t, gameStarted, gamePaused, jumpState
