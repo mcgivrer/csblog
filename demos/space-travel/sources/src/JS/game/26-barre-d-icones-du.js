@@ -39,6 +39,9 @@ const HUD_ICONS = {
      ondes barrées (ce n'est pas un bouton muet comme F10/radio, juste
      l'accès au réglage) */
   audio: '<path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M16 9.5c1 1 1 4 0 5"/>',
+  /* pilote automatique (flèche de cap dans un cercle) et tableau des missions (bloc-notes) */
+  autopilot: '<circle cx="12" cy="12" r="8.5"/><path d="M12 6.5l4.2 9.5L12 14l-4.2 2z" fill="currentColor" stroke="none"/>',
+  missions: '<rect x="6" y="4.5" width="12" height="16" rx="1.5"/><path d="M9.5 4.5v-1.2h5v1.2M9 10h6M9 13.5h6M9 17h3.5" stroke-linecap="round"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.3 9.2a2.7 2.7 0 1 1 3.8 2.4c-.7.35-1.1.9-1.1 1.7v.4" stroke-linecap="round"/><circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none"/>'
 };
 const HUD_BAR_ITEMS = [
@@ -74,7 +77,10 @@ const HUD_BAR_ITEMS = [
      un raccourci FIXE ('H', déjà établi) plutôt que le F-suivant
      automatique (F10), qui entrerait en conflit avec la coupure de voix
      déjà affectée à F10. */
-  { cls:null,            icon:'help',    labelKey:'lblHelpTitle',    kind:'help', hotkey:'H' }
+  { cls:null,            icon:'help',    labelKey:'lblHelpTitle',    kind:'help', hotkey:'H' },
+  /* pilote automatique (T) et tableau des missions (J) : touches fixes, ajoutées APRÈS l'aide pour ne pas décaler F1-F9 */
+  { cls:null,            icon:'autopilot', labelKey:'lblAutopilot',  kind:'autopilot', hotkey:'T' },
+  { cls:null,            icon:'missions',  labelKey:'lblMissions',   kind:'missions',  hotkey:'J' }
 ];
 /* #9 (bug remonté en jeu) : le panneau services portuaires n'est
    activable que près d'une planète-port ou pendant une livraison en
@@ -113,6 +119,10 @@ function activateHudBarItem(item){
     if(isStarMapOpen()) closeStarMap(); else openStarMap();
   } else if(item.kind === 'audio'){
     toggleAudioPanel();
+  } else if(item.kind === 'autopilot'){
+    if(REAL.active && REAL.started) REAL.apToggle();
+  } else if(item.kind === 'missions'){
+    if(typeof MISSIONS !== 'undefined' && MISSIONS.enabled()) MISSIONS.toggleBoard();
   }
   refreshHudIconBar();
 }
@@ -146,6 +156,12 @@ function refreshHudIconBar(){
     } else if(item.kind === 'audio'){
       const el = document.getElementById('audioOverlay');
       active = !!(el && el.classList.contains('visible'));
+    } else if(item.kind === 'autopilot'){
+      const live = REAL.active && REAL.started;
+      active = live && REAL.ap.on; disabled = !live;
+    } else if(item.kind === 'missions'){
+      const on = typeof MISSIONS !== 'undefined' && MISSIONS.enabled();
+      active = on && MISSIONS.boardOpen(); disabled = !on;
     }
     item.el.classList.toggle('active', active);
     item.el.classList.toggle('disabled', disabled);
@@ -177,6 +193,7 @@ function buildHelpGrid(){
     const label = item.kind === 'camera' ? t('cameraLabel').replace(/[\s\u2014]+$/,'') : (item.labelKey ? t(item.labelKey) : '');
     rows.push([item.hotkey, label]);
   });
+  rows.push(['X', t('hlp_brake')]);
   rows.push(['F10', t('hlp_voice')]);
   rows.push(['ESPACE / ENTR\u00c9E', t('hlp_skip')]);
   rows.push(['\u00c9CHAP / P', t('hlp_pause')]);
@@ -206,6 +223,9 @@ document.addEventListener('click', function(e){
     if(typeof refreshHudIconBar === 'function') refreshHudIconBar();
   } else if(cls === '__audio__'){
     toggleAudioPanel();
+  } else if(cls === '__missions__'){
+    if(typeof MISSIONS !== 'undefined') MISSIONS.closeBoard(true);
+    if(typeof refreshHudIconBar === 'function') refreshHudIconBar();
   } else {
     const el = document.querySelector('.'+cls);
     if(el) el.classList.add('panel-hidden');
