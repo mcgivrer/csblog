@@ -1,0 +1,87 @@
+{
+ "modele": "e18",
+ "seed": "CHRONO1",
+ "runs": [
+  {
+   "dest": "Frost Sel 571 III",
+   "qty": 1,
+   "s_board": 0.1,
+   "s_mission": 116.4,
+   "phases": [
+    [
+     "ORBIT/CRUISE",
+     0
+    ],
+    [
+     "TRANSFER/CRUISE",
+     0
+    ],
+    [
+     "APPROACH/CRUISE",
+     22
+    ],
+    [
+     "ORBIT/ARRIVAL_PAUSE",
+     52
+    ]
+   ]
+  },
+  {
+   "dest": "Frost Sel 571 III a",
+   "qty": 2,
+   "s_board": 0,
+   "s_mission": 154.9,
+   "phases": [
+    [
+     "ORBIT/ARRIVAL_PAUSE",
+     0
+    ],
+    [
+     "ORBIT/CRUISE",
+     33
+    ],
+    [
+     "TRANSFER/CRUISE",
+     33
+    ],
+    [
+     "APPROACH/CRUISE",
+     55
+    ],
+    [
+     "ORBIT/ARRIVAL_PAUSE",
+     85
+    ]
+   ]
+  },
+  {
+   "dest": "Frost Sel 571 III",
+   "qty": 2,
+   "s_board": 0,
+   "s_mission": 154.6,
+   "phases": [
+    [
+     "ORBIT/ARRIVAL_PAUSE",
+     0
+    ],
+    [
+     "ORBIT/CRUISE",
+     33
+    ],
+    [
+     "TRANSFER/CRUISE",
+     33
+    ],
+    [
+     "APPROACH/CRUISE",
+     55
+    ],
+    [
+     "ORBIT/ARRIVAL_PAUSE",
+     85
+    ]
+   ]
+  }
+ ],
+ "mean_s": 142.0
+}
