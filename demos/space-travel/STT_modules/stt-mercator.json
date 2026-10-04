@@ -1,0 +1,245 @@
+{
+  "format": "stt-composition",
+  "version": 1,
+  "generator": "Chantier naval STT",
+  "id": "cmusmz6fc6zzx",
+  "name": "STT Mercator",
+  "type": "ship",
+  "company": "STT",
+  "registry": "ELIOS-223",
+  "root": "cmd1",
+  "parts": [
+    [
+      "cmd1",
+      "CMD"
+    ],
+    [
+      "pax1",
+      "PAX"
+    ],
+    [
+      "pax2",
+      "PAX"
+    ],
+    [
+      "node61",
+      "NODE6"
+    ],
+    [
+      "tunnel1",
+      "TUNNEL"
+    ],
+    [
+      "pax4",
+      "PAX"
+    ],
+    [
+      "tunnel2",
+      "TUNNEL"
+    ],
+    [
+      "pax3",
+      "PAX"
+    ],
+    [
+      "tunnel3",
+      "TUNNEL"
+    ],
+    [
+      "pax5",
+      "PAX"
+    ],
+    [
+      "tunnel4",
+      "TUNNEL"
+    ],
+    [
+      "tank1",
+      "TANK"
+    ],
+    [
+      "tunnel5",
+      "TUNNEL"
+    ],
+    [
+      "cargo1",
+      "CARGO"
+    ],
+    [
+      "crg61",
+      "CRG6"
+    ],
+    [
+      "crg62",
+      "CRG6"
+    ],
+    [
+      "crg63",
+      "CRG6"
+    ],
+    [
+      "crg64",
+      "CRG6"
+    ],
+    [
+      "prop1",
+      "PROP"
+    ]
+  ],
+  "links": [
+    [
+      "cmd1.AFT",
+      "pax1.FWD",
+      0
+    ],
+    [
+      "pax1.AFT",
+      "pax2.FWD",
+      0
+    ],
+    [
+      "pax2.AFT",
+      "node61.FWD",
+      0
+    ],
+    [
+      "node61.STBD",
+      "tunnel1.FWD",
+      0
+    ],
+    [
+      "tunnel1.AFT",
+      "pax4.FWD",
+      0
+    ],
+    [
+      "node61.TOP",
+      "tunnel2.FWD",
+      0
+    ],
+    [
+      "tunnel2.AFT",
+      "pax3.FWD",
+      0
+    ],
+    [
+      "node61.PORT",
+      "tunnel3.FWD",
+      0
+    ],
+    [
+      "tunnel3.AFT",
+      "pax5.FWD",
+      0
+    ],
+    [
+      "node61.BOT",
+      "tunnel4.FWD",
+      0
+    ],
+    [
+      "tunnel4.AFT",
+      "tank1.FWD",
+      0
+    ],
+    [
+      "node61.AFT",
+      "tunnel5.FWD",
+      0
+    ],
+    [
+      "tunnel5.AFT",
+      "cargo1.FWD",
+      0
+    ],
+    [
+      "cargo1.AFT",
+      "crg61.FWD",
+      0
+    ],
+    [
+      "crg61.AFT",
+      "crg62.FWD",
+      0
+    ],
+    [
+      "crg62.AFT",
+      "crg63.FWD",
+      0
+    ],
+    [
+      "crg63.AFT",
+      "crg64.FWD",
+      0
+    ],
+    [
+      "crg64.AFT",
+      "prop1.FWD",
+      0
+    ]
+  ],
+  "containers": {
+    "cargo1": [
+      "ORION",
+      "STTC",
+      "POLARIS",
+      "ORION"
+    ],
+    "crg61": [
+      "ORION",
+      "STTC",
+      "POLARIS",
+      "GANY",
+      "VESTA",
+      "NOVA"
+    ],
+    "crg62": [
+      "POLARIS",
+      "LUNA",
+      "STTC",
+      "ORION",
+      "GANY",
+      "GANY"
+    ],
+    "crg63": [
+      "STTC",
+      "POLARIS",
+      "NOVA",
+      "STTC",
+      "LUNA",
+      "STTC"
+    ],
+    "crg64": [
+      "GANY",
+      "GANY",
+      "LUNA",
+      "ORION",
+      "STTC",
+      "VESTA"
+    ]
+  },
+  "docking_ports": [],
+  "stats": {
+    "parts": 19,
+    "mass": 2662,
+    "containers": 28,
+    "passengers": 240,
+    "tank_m3": 840,
+    "length_m": 141.2,
+    "size_m": [
+      64.2,
+      62.2,
+      141.2
+    ]
+  },
+  "game": {
+    "version": 1,
+    "class": "ship",
+    "family": "fret",
+    "tier": "IV",
+    "ftl": true,
+    "crew": 10,
+    "arch": "Cargo modulaire",
+    "description": ""
+  }
+}

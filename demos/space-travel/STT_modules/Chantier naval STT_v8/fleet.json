@@ -1,0 +1,1484 @@
+{
+ "version": 1,
+ "units": "metres",
+ "axes": {
+  "forward": "+Z glTF (-Y Blender)",
+  "up": "+Y glTF (+Z Blender)"
+ },
+ "assembly_rule": "place module i so that its SOCKET_FWD coincides with the SOCKET_AFT of module i-1; module origin = its front docking face; offsets below are along the ship forward axis, measured from the ship centre (negative = towards the bow); module_roll_deg = rotation of the module around the ship forward axis (docking rings are round)",
+ "runtime_material_rules": {
+  "STT_Livery": "companies[company].livery_hex",
+  "STT_Livery_Dark": "companies[company].livery_dark_hex",
+  "STT_Decals_STT": "swap baseColor texture with companies[company].decals (same atlas layout)",
+  "container colour (STT_Container_*)": "container_brands[brand].container_material colour",
+  "STT_ContDecals_*": "swap texture with container_brands[brand].decals (same layout)"
+ },
+ "modules": {
+  "CMD": {
+   "length": 13.0,
+   "glb": "export/modules/STT_CMD.glb",
+   "sockets": [
+    "fwd",
+    "aft"
+   ],
+   "role": "bridge, bow docking port, bow RCS"
+  },
+  "PAX": {
+   "length": 21.0,
+   "glb": "export/modules/STT_PAX.glb",
+   "sockets": [
+    "fwd",
+    "aft"
+   ],
+   "role": "24 cabins / 48 passengers, 5 decks"
+  },
+  "CARGO": {
+   "length": 16.0,
+   "glb": "export/modules/STT_CARGO.glb",
+   "sockets": [
+    "fwd",
+    "aft"
+   ],
+   "role": "4 x STT-36 containers (cross, slots A-D)",
+   "container_slots": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ]
+  },
+  "CRG6": {
+   "length": 6.5,
+   "glb": "export/modules/STT_CRG6.glb",
+   "sockets": [
+    "fwd",
+    "aft"
+   ],
+   "role": "6 x STT-36 containers (radial star, slots 1-6)",
+   "container_slots": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6"
+   ]
+  },
+  "TANK": {
+   "length": 19.0,
+   "glb": "export/modules/STT_TANK.glb",
+   "sockets": [
+    "fwd",
+    "aft"
+   ],
+   "role": "4 tanks, 840 m3 reaction mass"
+  },
+  "PWR": {
+   "length": 11.0,
+   "glb": "export/modules/STT_PWR.glb",
+   "sockets": [
+    "fwd",
+    "aft"
+   ],
+   "role": "solar wings + radiators, anim PWR_Deploy"
+  },
+  "PROP": {
+   "length": 28.0,
+   "glb": "export/modules/STT_PROP.glb",
+   "sockets": [
+    "fwd"
+   ],
+   "role": "fusion drive, gimballed nozzle, stern RCS"
+  },
+  "NODE6": {
+   "length": 10.1,
+   "glb": "export/modules/STT_NODE6.glb",
+   "sockets": [
+    "fwd",
+    "aft",
+    "port",
+    "stbd",
+    "top",
+    "bot"
+   ],
+   "role": "6-port connection node (3 axes)"
+  },
+  "NODE4": {
+   "length": 10.1,
+   "glb": "export/modules/STT_NODE4.glb",
+   "sockets": [
+    "fwd",
+    "aft",
+    "port",
+    "stbd"
+   ],
+   "role": "4-port planar node + radiator + dish"
+  },
+  "ELBOW": {
+   "length": 10.1,
+   "glb": "export/modules/STT_ELBOW.glb",
+   "sockets": [
+    "fwd",
+    "port"
+   ],
+   "role": "90 deg elbow, observation dome"
+  },
+  "TUNNEL": {
+   "length": 6.0,
+   "glb": "export/modules/STT_TUNNEL.glb",
+   "sockets": [
+    "fwd",
+    "aft"
+   ],
+   "role": "pressurised spacer tunnel"
+  },
+  "BAY": {
+   "length": 21.0,
+   "glb": "export/modules/STT_BAY.glb",
+   "sockets": [
+    "fwd",
+    "aft",
+    "shuttle_pad"
+   ],
+   "role": "shuttle bay, lateral opening +X, doors: mech (anim BAY_DoorMech_Open) or field"
+  },
+  "SHUTTLE": {
+   "length": 14.0,
+   "glb": "export/modules/STT_SHUTTLE.glb",
+   "sockets": [
+    "landing_pad",
+    "mini_dock"
+   ],
+   "role": "14 m utility shuttle (origin = landing point)"
+  }
+ },
+ "container_glb": "export/modules/STT_Container_STT36.glb",
+ "companies": {
+  "STT": {
+   "name": "Space Travel & Transport",
+   "registry": "STT-0107",
+   "livery_linear": [
+    0.025,
+    0.13,
+    0.42
+   ],
+   "livery_dark_linear": [
+    0.012,
+    0.05,
+    0.16
+   ],
+   "livery_hex": "#2c65ad",
+   "livery_dark_hex": "#1d3f6f",
+   "decals": "textures/decals_STT.png"
+  },
+  "HLN": {
+   "name": "Helion Lines",
+   "registry": "HLN-2201",
+   "livery_linear": [
+    0.62,
+    0.36,
+    0.04
+   ],
+   "livery_dark_linear": [
+    0.24,
+    0.12,
+    0.01
+   ],
+   "livery_hex": "#cea238",
+   "livery_dark_hex": "#866119",
+   "decals": "textures/decals_HLN.png"
+  },
+  "KVF": {
+   "name": "Kessler & Vance Freight",
+   "registry": "KVF-0318",
+   "livery_linear": [
+    0.42,
+    0.03,
+    0.02
+   ],
+   "livery_dark_linear": [
+    0.15,
+    0.012,
+    0.01
+   ],
+   "livery_hex": "#ad3027",
+   "livery_dark_hex": "#6c1d19",
+   "decals": "textures/decals_KVF.png"
+  },
+  "SHL": {
+   "name": "Starhaul Logistics",
+   "registry": "SHL-0042",
+   "livery_linear": [
+    0.03,
+    0.28,
+    0.1
+   ],
+   "livery_dark_linear": [
+    0.01,
+    0.1,
+    0.035
+   ],
+   "livery_hex": "#309059",
+   "livery_dark_hex": "#195935",
+   "decals": "textures/decals_SHL.png"
+  },
+  "AQB": {
+   "name": "Aquila Bulk",
+   "registry": "AQB-0775",
+   "livery_linear": [
+    0.72,
+    0.2,
+    0.02
+   ],
+   "livery_dark_linear": [
+    0.28,
+    0.07,
+    0.008
+   ],
+   "livery_hex": "#dd7c27",
+   "livery_dark_hex": "#904b16",
+   "decals": "textures/decals_AQB.png"
+  }
+ },
+ "container_brands": {
+  "VESTA": {
+   "name": "VESTA AGRO",
+   "container_material": "STT_Container_Green",
+   "code": "VSTU 120455 2",
+   "decals": "textures/containers_VESTA.png",
+   "container_color_linear": [
+    0.08,
+    0.22,
+    0.1
+   ]
+  },
+  "GANY": {
+   "name": "GANYMEDE MINERAL CO.",
+   "container_material": "STT_Container_Grey",
+   "code": "GMCU 778301 6",
+   "decals": "textures/containers_GANY.png",
+   "container_color_linear": [
+    0.22,
+    0.23,
+    0.24
+   ]
+  },
+  "NOVA": {
+   "name": "NOVAMED PHARMA",
+   "container_material": "STT_Container_White",
+   "code": "NMPU 300219 1",
+   "decals": "textures/containers_NOVA.png",
+   "container_color_linear": [
+    0.62,
+    0.62,
+    0.6
+   ]
+  },
+  "ORION": {
+   "name": "ORION ELECTRONICS",
+   "container_material": "STT_Container_Blue",
+   "code": "ORNU 551870 3",
+   "decals": "textures/containers_ORION.png",
+   "container_color_linear": [
+    0.04,
+    0.12,
+    0.35
+   ]
+  },
+  "LUNA": {
+   "name": "LUNA HYDROPONICS",
+   "container_material": "STT_Container_Teal",
+   "code": "LNHU 264011 8",
+   "decals": "textures/containers_LUNA.png",
+   "container_color_linear": [
+    0.03,
+    0.22,
+    0.22
+   ]
+  },
+  "POLARIS": {
+   "name": "POLARIS TEXTILES",
+   "container_material": "STT_Container_Red",
+   "code": "PLTU 902336 5",
+   "decals": "textures/containers_POLARIS.png",
+   "container_color_linear": [
+    0.45,
+    0.06,
+    0.04
+   ]
+  },
+  "STTC": {
+   "name": "STT CARGO LINES",
+   "container_material": "STT_Container_Orange",
+   "code": "STTU 401827 4",
+   "decals": "textures/containers_STTC.png",
+   "container_color_linear": [
+    0.75,
+    0.25,
+    0.03
+   ]
+  }
+ },
+ "ships": [
+  {
+   "id": "meridian",
+   "name": "STT Meridian",
+   "class": "Freighter mixte",
+   "company": "STT",
+   "modules": [
+    "CMD",
+    "PAX",
+    "CARGO",
+    "TANK",
+    "PWR",
+    "PROP"
+   ],
+   "containers": {
+    "CARGO#1": [
+     "VESTA",
+     "ORION",
+     "STTC",
+     "NOVA"
+    ]
+   },
+   "length_m": 108.0,
+   "registry": "STT-0107",
+   "module_offsets_m": [
+    -54.0,
+    -41.0,
+    -20.0,
+    -4.0,
+    15.0,
+    26.0
+   ],
+   "module_roll_deg": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "id": "aurora",
+   "name": "Helion Aurora",
+   "class": "Paquebot",
+   "company": "HLN",
+   "modules": [
+    "CMD",
+    "PAX",
+    "PAX",
+    "PAX",
+    "TANK",
+    "PWR",
+    "PROP"
+   ],
+   "containers": {},
+   "length_m": 134.0,
+   "registry": "HLN-2201",
+   "module_offsets_m": [
+    -67.0,
+    -54.0,
+    -33.0,
+    -12.0,
+    9.0,
+    28.0,
+    39.0
+   ],
+   "module_roll_deg": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "id": "longreach",
+   "name": "K&V Longreach",
+   "class": "Porte-containers long",
+   "company": "KVF",
+   "modules": [
+    "CMD",
+    "CARGO",
+    "CARGO",
+    "CARGO",
+    "TANK",
+    "PWR",
+    "PROP"
+   ],
+   "containers": {
+    "CARGO#1": [
+     "GANY",
+     "GANY",
+     "ORION",
+     "POLARIS"
+    ],
+    "CARGO#2": [
+     "VESTA",
+     "LUNA",
+     "NOVA",
+     "STTC"
+    ],
+    "CARGO#3": [
+     "POLARIS",
+     "GANY",
+     "ORION",
+     "VESTA"
+    ]
+   },
+   "length_m": 119.0,
+   "registry": "KVF-0318",
+   "module_offsets_m": [
+    -59.5,
+    -46.5,
+    -30.5,
+    -14.5,
+    1.5,
+    20.5,
+    31.5
+   ],
+   "module_roll_deg": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "id": "asterism",
+   "name": "Starhaul Asterism",
+   "class": "Porte-containers etoile",
+   "company": "SHL",
+   "modules": [
+    "CMD",
+    "CRG6",
+    "CRG6",
+    "TANK",
+    "PWR",
+    "PROP"
+   ],
+   "containers": {
+    "CRG6#1": [
+     "LUNA",
+     "VESTA",
+     "NOVA",
+     "ORION",
+     "POLARIS",
+     "GANY"
+    ],
+    "CRG6#2": [
+     "STTC",
+     "ORION",
+     "LUNA",
+     "GANY",
+     "VESTA",
+     "NOVA"
+    ]
+   },
+   "length_m": 84.0,
+   "registry": "SHL-0042",
+   "module_offsets_m": [
+    -42.0,
+    -29.0,
+    -22.5,
+    -16.0,
+    3.0,
+    14.0
+   ],
+   "module_roll_deg": [
+    0.0,
+    0.0,
+    30.0,
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "id": "wellspring",
+   "name": "Aquila Wellspring",
+   "class": "Citerne / ravitailleur",
+   "company": "AQB",
+   "modules": [
+    "CMD",
+    "TANK",
+    "TANK",
+    "TANK",
+    "PWR",
+    "PROP"
+   ],
+   "containers": {},
+   "length_m": 109.0,
+   "registry": "AQB-0775",
+   "module_offsets_m": [
+    -54.5,
+    -41.5,
+    -22.5,
+    -3.5,
+    15.5,
+    26.5
+   ],
+   "module_roll_deg": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ]
+  }
+ ],
+ "socket_mating_rule": "child_socket_world = parent_socket_world * RotX(180deg) * RotZ(roll); socket frames: +Z = outward, +X = up reference (+Y glTF / +Z Blender, or ship-aft for vertical sockets)",
+ "stations": [
+  {
+   "id": "vigil",
+   "name": "Vigil Relay",
+   "class": "Avant-poste relais",
+   "company": "STT",
+   "origin": [
+    0,
+    320,
+    0
+   ],
+   "parts": [
+    [
+     "n1",
+     "NODE6"
+    ],
+    [
+     "cmd",
+     "CMD"
+    ],
+    [
+     "t1",
+     "TUNNEL"
+    ],
+    [
+     "pwr",
+     "PWR"
+    ],
+    [
+     "tank",
+     "TANK"
+    ],
+    [
+     "bay",
+     "BAY",
+     {
+      "door": "field"
+     }
+    ],
+    [
+     "t2",
+     "TUNNEL"
+    ],
+    [
+     "pax",
+     "PAX"
+    ]
+   ],
+   "links": [
+    [
+     "n1.FWD",
+     "cmd.AFT"
+    ],
+    [
+     "n1.AFT",
+     "t1.FWD"
+    ],
+    [
+     "t1.AFT",
+     "pwr.FWD"
+    ],
+    [
+     "pwr.AFT",
+     "tank.FWD"
+    ],
+    [
+     "n1.PORT",
+     "bay.FWD"
+    ],
+    [
+     "n1.STBD",
+     "t2.FWD"
+    ],
+    [
+     "t2.AFT",
+     "pax.FWD"
+    ]
+   ],
+   "shuttles": [
+    [
+     "bay.SHUTTLE",
+     "STT"
+    ]
+   ],
+   "docking_ports": []
+  },
+  {
+   "id": "theta",
+   "name": "Aquila Depot Theta",
+   "class": "Depot de carburant",
+   "company": "AQB",
+   "origin": [
+    260,
+    320,
+    0
+   ],
+   "parts": [
+    [
+     "n1",
+     "NODE6",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "bay",
+     "BAY",
+     {
+      "door": "mech"
+     }
+    ],
+    [
+     "ta",
+     "TUNNEL",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "a1",
+     "TANK",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "a2",
+     "TANK",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "tb",
+     "TUNNEL",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "b1",
+     "TANK",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "b2",
+     "TANK",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "tc",
+     "TUNNEL",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "c1",
+     "TANK",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "c2",
+     "TANK",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "td",
+     "TUNNEL",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "d1",
+     "TANK",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "d2",
+     "TANK",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "t1",
+     "TUNNEL"
+    ],
+    [
+     "n2",
+     "NODE4",
+     {
+      "zone": "pax"
+     }
+    ],
+    [
+     "cmd",
+     "CMD",
+     {
+      "zone": "pax"
+     }
+    ],
+    [
+     "pax",
+     "PAX",
+     {
+      "zone": "pax"
+     }
+    ],
+    [
+     "pwr",
+     "PWR"
+    ],
+    [
+     "n3",
+     "NODE4",
+     {
+      "zone": "liq"
+     }
+    ]
+   ],
+   "links": [
+    [
+     "n1.FWD",
+     "bay.AFT"
+    ],
+    [
+     "n1.PORT",
+     "ta.FWD"
+    ],
+    [
+     "ta.AFT",
+     "a1.FWD"
+    ],
+    [
+     "a1.AFT",
+     "a2.FWD"
+    ],
+    [
+     "n1.STBD",
+     "tb.FWD"
+    ],
+    [
+     "tb.AFT",
+     "b1.FWD"
+    ],
+    [
+     "b1.AFT",
+     "b2.FWD"
+    ],
+    [
+     "n1.TOP",
+     "tc.FWD"
+    ],
+    [
+     "tc.AFT",
+     "c1.FWD"
+    ],
+    [
+     "c1.AFT",
+     "c2.FWD"
+    ],
+    [
+     "n1.BOT",
+     "td.FWD"
+    ],
+    [
+     "td.AFT",
+     "d1.FWD"
+    ],
+    [
+     "d1.AFT",
+     "d2.FWD"
+    ],
+    [
+     "n1.AFT",
+     "t1.FWD"
+    ],
+    [
+     "t1.AFT",
+     "n2.FWD"
+    ],
+    [
+     "n2.PORT",
+     "cmd.AFT"
+    ],
+    [
+     "n2.STBD",
+     "pax.FWD"
+    ],
+    [
+     "n2.AFT",
+     "pwr.FWD"
+    ],
+    [
+     "pwr.AFT",
+     "n3.FWD"
+    ]
+   ],
+   "shuttles": [
+    [
+     "bay.SHUTTLE",
+     "AQB"
+    ]
+   ],
+   "docking_ports": [
+    {
+     "port": "n3.AFT",
+     "suggested_ship": "wellspring"
+    }
+   ]
+  },
+  {
+   "id": "nexus",
+   "name": "Nexus Port",
+   "class": "Port commercial (zones dediees)",
+   "company": "STT",
+   "origin": [
+    620,
+    360,
+    0
+   ],
+   "parts": [
+    [
+     "cmd",
+     "CMD"
+    ],
+    [
+     "n1",
+     "NODE6",
+     {
+      "zone": "pax"
+     }
+    ],
+    [
+     "tpa",
+     "TUNNEL",
+     {
+      "zone": "pax"
+     }
+    ],
+    [
+     "paxa",
+     "PAX",
+     {
+      "zone": "pax"
+     }
+    ],
+    [
+     "tpb",
+     "TUNNEL",
+     {
+      "zone": "pax"
+     }
+    ],
+    [
+     "paxb",
+     "PAX",
+     {
+      "zone": "pax"
+     }
+    ],
+    [
+     "bay1",
+     "BAY",
+     {
+      "zone": "pax",
+      "door": "field"
+     }
+    ],
+    [
+     "bay2",
+     "BAY",
+     {
+      "zone": "pax",
+      "door": "mech"
+     }
+    ],
+    [
+     "ta1",
+     "TUNNEL",
+     {
+      "zone": "pax"
+     }
+    ],
+    [
+     "n1b",
+     "NODE4",
+     {
+      "zone": "pax"
+     }
+    ],
+    [
+     "tpc",
+     "TUNNEL",
+     {
+      "zone": "pax"
+     }
+    ],
+    [
+     "paxc",
+     "PAX",
+     {
+      "zone": "pax"
+     }
+    ],
+    [
+     "s1",
+     "TUNNEL"
+    ],
+    [
+     "s2",
+     "TUNNEL"
+    ],
+    [
+     "s3",
+     "TUNNEL"
+    ],
+    [
+     "n2",
+     "NODE6",
+     {
+      "zone": "cont"
+     }
+    ],
+    [
+     "tc1",
+     "TUNNEL",
+     {
+      "zone": "cont"
+     }
+    ],
+    [
+     "crg1",
+     "CRG6",
+     {
+      "zone": "cont"
+     }
+    ],
+    [
+     "tc2",
+     "TUNNEL",
+     {
+      "zone": "cont"
+     }
+    ],
+    [
+     "crg2",
+     "CRG6",
+     {
+      "zone": "cont"
+     }
+    ],
+    [
+     "tc3",
+     "TUNNEL",
+     {
+      "zone": "cont"
+     }
+    ],
+    [
+     "tc3b",
+     "TUNNEL",
+     {
+      "zone": "cont"
+     }
+    ],
+    [
+     "crg3",
+     "CRG6",
+     {
+      "zone": "cont"
+     }
+    ],
+    [
+     "tc4",
+     "TUNNEL",
+     {
+      "zone": "cont"
+     }
+    ],
+    [
+     "tc4b",
+     "TUNNEL",
+     {
+      "zone": "cont"
+     }
+    ],
+    [
+     "crg4",
+     "CRG6",
+     {
+      "zone": "cont"
+     }
+    ],
+    [
+     "s4",
+     "TUNNEL"
+    ],
+    [
+     "s5",
+     "TUNNEL"
+    ],
+    [
+     "s6",
+     "TUNNEL"
+    ],
+    [
+     "n2b",
+     "NODE4",
+     {
+      "zone": "cont"
+     }
+    ],
+    [
+     "s7",
+     "TUNNEL"
+    ],
+    [
+     "s8",
+     "TUNNEL"
+    ],
+    [
+     "s9",
+     "TUNNEL"
+    ],
+    [
+     "n3",
+     "NODE6",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "tl1",
+     "TUNNEL",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "k1",
+     "TANK",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "k2",
+     "TANK",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "tl2",
+     "TUNNEL",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "k3",
+     "TANK",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "k4",
+     "TANK",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "tl3",
+     "TUNNEL",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "k5",
+     "TANK",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "tl4",
+     "TUNNEL",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "k6",
+     "TANK",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "tl5",
+     "TUNNEL",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "n3b",
+     "NODE4",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "tl6",
+     "TUNNEL",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "k7",
+     "TANK",
+     {
+      "zone": "liq"
+     }
+    ],
+    [
+     "tp",
+     "TUNNEL"
+    ],
+    [
+     "pwr",
+     "PWR"
+    ]
+   ],
+   "links": [
+    [
+     "n1.FWD",
+     "cmd.AFT"
+    ],
+    [
+     "n1.PORT",
+     "tpa.FWD"
+    ],
+    [
+     "tpa.AFT",
+     "paxa.FWD"
+    ],
+    [
+     "n1.STBD",
+     "tpb.FWD"
+    ],
+    [
+     "tpb.AFT",
+     "paxb.FWD"
+    ],
+    [
+     "n1.TOP",
+     "bay1.FWD"
+    ],
+    [
+     "n1.BOT",
+     "bay2.FWD"
+    ],
+    [
+     "n1.AFT",
+     "ta1.FWD"
+    ],
+    [
+     "ta1.AFT",
+     "n1b.FWD"
+    ],
+    [
+     "n1b.STBD",
+     "tpc.FWD"
+    ],
+    [
+     "tpc.AFT",
+     "paxc.FWD"
+    ],
+    [
+     "n1b.AFT",
+     "s1.FWD"
+    ],
+    [
+     "s1.AFT",
+     "s2.FWD"
+    ],
+    [
+     "s2.AFT",
+     "s3.FWD"
+    ],
+    [
+     "s3.AFT",
+     "n2.FWD"
+    ],
+    [
+     "n2.PORT",
+     "tc1.FWD"
+    ],
+    [
+     "tc1.AFT",
+     "crg1.FWD"
+    ],
+    [
+     "n2.STBD",
+     "tc2.FWD"
+    ],
+    [
+     "tc2.AFT",
+     "crg2.FWD"
+    ],
+    [
+     "n2.TOP",
+     "tc3.FWD"
+    ],
+    [
+     "tc3.AFT",
+     "tc3b.FWD"
+    ],
+    [
+     "tc3b.AFT",
+     "crg3.FWD"
+    ],
+    [
+     "n2.BOT",
+     "tc4.FWD"
+    ],
+    [
+     "tc4.AFT",
+     "tc4b.FWD"
+    ],
+    [
+     "tc4b.AFT",
+     "crg4.FWD"
+    ],
+    [
+     "n2.AFT",
+     "s4.FWD"
+    ],
+    [
+     "s4.AFT",
+     "s5.FWD"
+    ],
+    [
+     "s5.AFT",
+     "s6.FWD"
+    ],
+    [
+     "s6.AFT",
+     "n2b.FWD"
+    ],
+    [
+     "n2b.AFT",
+     "s7.FWD"
+    ],
+    [
+     "s7.AFT",
+     "s8.FWD"
+    ],
+    [
+     "s8.AFT",
+     "s9.FWD"
+    ],
+    [
+     "s9.AFT",
+     "n3.FWD"
+    ],
+    [
+     "n3.PORT",
+     "tl1.FWD"
+    ],
+    [
+     "tl1.AFT",
+     "k1.FWD"
+    ],
+    [
+     "k1.AFT",
+     "k2.FWD"
+    ],
+    [
+     "n3.STBD",
+     "tl2.FWD"
+    ],
+    [
+     "tl2.AFT",
+     "k3.FWD"
+    ],
+    [
+     "k3.AFT",
+     "k4.FWD"
+    ],
+    [
+     "n3.TOP",
+     "tl3.FWD"
+    ],
+    [
+     "tl3.AFT",
+     "k5.FWD"
+    ],
+    [
+     "n3.BOT",
+     "tl4.FWD"
+    ],
+    [
+     "tl4.AFT",
+     "k6.FWD"
+    ],
+    [
+     "n3.AFT",
+     "tl5.FWD"
+    ],
+    [
+     "tl5.AFT",
+     "n3b.FWD"
+    ],
+    [
+     "n3b.STBD",
+     "tl6.FWD"
+    ],
+    [
+     "tl6.AFT",
+     "k7.FWD"
+    ],
+    [
+     "n3b.AFT",
+     "tp.FWD"
+    ],
+    [
+     "tp.AFT",
+     "pwr.FWD"
+    ]
+   ],
+   "containers": {
+    "crg1": [
+     "VESTA",
+     "ORION",
+     "NOVA",
+     "LUNA",
+     "GANY",
+     "POLARIS"
+    ],
+    "crg2": [
+     "STTC",
+     "POLARIS",
+     "VESTA",
+     "ORION",
+     "LUNA",
+     "NOVA"
+    ],
+    "crg3": [
+     "GANY",
+     "GANY",
+     "ORION",
+     "VESTA",
+     "STTC",
+     "LUNA"
+    ],
+    "crg4": [
+     "NOVA",
+     "POLARIS",
+     "POLARIS",
+     "VESTA",
+     "ORION",
+     "GANY"
+    ]
+   },
+   "shuttles": [
+    [
+     "bay1.SHUTTLE",
+     "HLN"
+    ],
+    [
+     "bay2.SHUTTLE",
+     "STT"
+    ]
+   ],
+   "docking_ports": [
+    {
+     "port": "n1b.PORT",
+     "suggested_ship": "aurora"
+    },
+    {
+     "port": "n2b.PORT",
+     "suggested_ship": "longreach"
+    },
+    {
+     "port": "n2b.STBD",
+     "suggested_ship": "asterism"
+    },
+    {
+     "port": "n3b.PORT",
+     "suggested_ship": "wellspring"
+    }
+   ]
+  }
+ ],
+ "zones": {
+  "pax": {
+   "name": "Zone A - Passagers",
+   "livery_linear": [
+    0.03,
+    0.3,
+    0.12
+   ],
+   "decal": "zone_pax"
+  },
+  "cont": {
+   "name": "Zone B - Containers",
+   "livery_linear": [
+    0.7,
+    0.46,
+    0.02
+   ],
+   "decal": "zone_cont"
+  },
+  "liq": {
+   "name": "Zone C - Liquides",
+   "livery_linear": [
+    0.62,
+    0.12,
+    0.02
+   ],
+   "decal": "zone_liq"
+  }
+ },
+ "socket_mating_rule_gltf": "glTF space: socket outward axis = node local +Y, up reference = local +X; child_root = parent_socket_world * RotX(180deg) * RotY(roll) * inverse(child_socket_local)",
+ "texture_factor_note": "livery/container colours are linear; baseColorFactor = colour / albedo_mean (panels 0.806, container 0.745), clamp to 1",
+ "station_rule": "a station never includes propulsion (PROP); ships dock on the free ports listed in docking_ports"
+}
