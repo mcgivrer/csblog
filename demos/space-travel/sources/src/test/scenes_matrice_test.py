@@ -1,7 +1,7 @@
 """
-Caractérisation des scènes — matrice scène × touche (docs/PLAN-scenes-T0.2-matrice.md, §5).
+Caractérisation des scènes — matrice scène × touche (docs/DAT-annexe_3-matrice_des_scenes_T0.2-V1.0.md, §5).
 Filet de sécurité de la refonte en scènes : ce test fige le comportement du jeu APRÈS correction des défauts
-relevés par l'inventaire (docs/PLAN-scenes-T0.1-inventaire.md, §5) ; la version précédente figeait le comportement d'origine.
+relevés par l'inventaire (docs/DAT-annexe_2-inventaire_des_etats_T0.1-V1.0.md, §5) ; la version précédente figeait le comportement d'origine.
 Chaque cas porte l'identifiant de la matrice (K-…). En temps virtuel (30 images/s, sans rendu).
 Usage : python3 src/test/scenes_matrice_test.py target/space-travel.html
 """

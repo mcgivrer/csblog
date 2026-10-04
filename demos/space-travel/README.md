@@ -29,7 +29,7 @@ La musique de fond est un fichier `.m4a` chargé depuis le dossier `musics/`, à
 | Paramètre                         | Effet                                                                                                                                                                                                                                              |
 |-----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `seed=XXX`                        | Fixe la graine de l'univers : la même graine redonne toujours le même univers. Sans ce paramètre, une graine est tirée au hasard et affichée dans la barre du haut.                                                                                  |
-| `scale=actuel` ou `scale=allegee` | Choisit le profil d'échelle des tailles et des distances (défaut : `actuel`). `allegee` est en construction : seule la génération est câblée pour l'instant, voir [`docs/etude-echelles.md`](./docs/etude-echelles.md).                              |
+| `scale=actuel` ou `scale=allegee` | Choisit le profil d'échelle des tailles et des distances (défaut : `actuel`). `allegee` est en construction : seule la génération est câblée pour l'instant, voir [`docs/specs/SPEC-003-etude_des_echelles-V1.0.md`](./docs/specs/SPEC-003-etude_des_echelles-V1.0.md).                              |
 | `selftest=1` ou `selftest=boot`   | Réservé à `selftest.sh`, le test de non-régression sous Chrome sans écran.                                                                                                                                                                         |
 
 ## Fonctionnalités
@@ -114,11 +114,11 @@ Toutes les captures de la documentation sont produites par `screenshots.sh` (voi
 | `screenshots.sh`, `screenshots.js`                 | Refont les captures d'écran de la documentation (Chrome sans écran, ImageMagick)                 |
 | `spec-pack.py`                                     | Assemble une spécification : `.md` autonome (images en base64) et `.zip`                         |
 | `docs/spec-space_travel_and_transport-2.12.md`     | Spécification v2.12 en français (`_en.md` : traduction anglaise ; `.zip` : version légère)       |
-| `docs/generation-de-l-univers.md`                  | Génération de l'univers : graine, étoiles, nébuleuses, route, systèmes planétaires               |
-| `docs/etude-echelles.md`                           | Étude : révision des échelles (étoiles, planètes, lunes, vaisseau), décisions et plan par paliers |
-| `docs/etude-vaisseaux-generatifs.md`               | Étude : construction générative des vaisseaux cargo (proposition, non implémentée)               |
+| `docs/specs/SPEC-002-generation_de_l_univers-V1.0.md`                  | Génération de l'univers : graine, étoiles, nébuleuses, route, systèmes planétaires               |
+| `docs/specs/SPEC-003-etude_des_echelles-V1.0.md`                           | Étude : révision des échelles (étoiles, planètes, lunes, vaisseau), décisions et plan par paliers |
+| `docs/specs/SPEC-001-vaisseaux_generatifs-V1.0.md`               | Étude : construction générative des vaisseaux cargo (proposition, non implémentée)               |
 | `TODO.md`                                          | Relevé des demandes et des correctifs, version par version                                       |
 
 ## Feuille de route
 
-Ce qui reste à faire est listé au §18 de la [spécification](./docs/spec-space_travel_and_transport-2.12.md) (« Restant à faire »), avec pour chaque chantier ses décisions déjà arrêtées. La **révision des échelles** — planètes plus petites et plus lointaines de leur étoile, vaisseau bien plus petit que les planètes — est en cours par paliers : le palier P0 (profils d'échelle, `?scale=`) est livré, la suite est décrite dans [`docs/etude-echelles.md`](./docs/etude-echelles.md).
+Ce qui reste à faire est listé au §18 de la [spécification](./docs/spec-space_travel_and_transport-2.12.md) (« Restant à faire »), avec pour chaque chantier ses décisions déjà arrêtées. La **révision des échelles** — planètes plus petites et plus lointaines de leur étoile, vaisseau bien plus petit que les planètes — est en cours par paliers : le palier P0 (profils d'échelle, `?scale=`) est livré, la suite est décrite dans [`docs/specs/SPEC-003-etude_des_echelles-V1.0.md`](./docs/specs/SPEC-003-etude_des_echelles-V1.0.md).

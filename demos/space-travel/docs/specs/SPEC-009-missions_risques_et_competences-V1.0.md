@@ -2,8 +2,8 @@
 
 **Spécification** — refonte de la boucle de jeu : l'itinéraire imposé disparaît au profit de **missions négociées au port**.
 Source : demande du 29/09/2026 (missions, ressources et passagers, risques et primes, composante RPG, missions et LLM,
-incidents). Liée à [`spec-ports-orbitaux-navette.md`](spec-ports-orbitaux-navette.md) (ports, amarrage, navettes) et
-à [`spec-L9-jeu.md`](spec-L9-jeu.md) (trafic, concurrence, escorte, radar).
+incidents). Liée à [`SPEC-008-ports_orbitaux_et_navette-V1.0.md`](SPEC-008-ports_orbitaux_et_navette-V1.0.md) (ports, amarrage, navettes) et
+à [`SPEC-007-l9_trafic_concurrence_escorte_jeu-V1.0.md`](SPEC-007-l9_trafic_concurrence_escorte_jeu-V1.0.md) (trafic, concurrence, escorte, radar).
 
 | | |
 |---|---|

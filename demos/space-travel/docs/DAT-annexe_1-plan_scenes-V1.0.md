@@ -24,7 +24,7 @@ Aujourd'hui, « dans quel état est le jeu ? » n'a pas de réponse unique. Le c
 
 Conséquences observées dans le code :
 
-- **États sans propriétaire commun.** La carte stellaire n'a pas d'état propre dans le jeu : elle n'existe que par des tests `isStarMapOpen()` dispersés. L'inventaire T0.1 a montré que, contrairement à ce que disent des commentaires périmés de `23-planification-relance-d-itineraire.js` (`:247-273`), elle **ne réutilise plus `gamePaused`** : la simulation continue sous la carte ouverte. Les pièges réels sont ailleurs : le clavier principal n'a aucune garde `gameStarted`, le choix du vaisseau n'isole pas le clavier, `M` s'ouvre même en pause, le survol avale toute touche (voir l'[inventaire T0.1](./PLAN-scenes-T0.1-inventaire.md#5-écarts-avec-le-plan-et-pièges-relevés)).
+- **États sans propriétaire commun.** La carte stellaire n'a pas d'état propre dans le jeu : elle n'existe que par des tests `isStarMapOpen()` dispersés. L'inventaire T0.1 a montré que, contrairement à ce que disent des commentaires périmés de `23-planification-relance-d-itineraire.js` (`:247-273`), elle **ne réutilise plus `gamePaused`** : la simulation continue sous la carte ouverte. Les pièges réels sont ailleurs : le clavier principal n'a aucune garde `gameStarted`, le choix du vaisseau n'isole pas le clavier, `M` s'ouvre même en pause, le survol avale toute touche (voir l'[inventaire T0.1](./DAT-annexe_2-inventaire_des_etats_T0.1-V1.0.md#5-écarts-avec-le-plan-et-pièges-relevés)).
 - **Clavier éclaté.** Huit enregistrements clavier (K1 à K8 de l'inventaire T0.1) dans 5 fichiers (`20e`, `20g`, `23` ×2, `24` ×2, `42` ×2) ; la barre d'icônes (`26`) n'a pas d'écouteur clavier propre, ses touches F1-F9 sont traitées par `23`. Le survol doit se placer en phase de capture et appeler `stopImmediatePropagation()` pour passer devant les autres. Chaque ajout d'un écran oblige à toucher les autres gestionnaires.
 - **`animate()` branche sur des drapeaux** (`gameStarted`, puis `gamePaused`) avec des blocs dupliqués entre titre et vol (voir [DAT §4.3](./DAT.md#43-animate--une-fonction-qui-fait-tout)).
 - **Ordre de chargement fragile** : `startGame()` rafraîchit la barre d'icônes « différée jusqu'ici car elle dépend d'`orbitState` et `ROUTE`, déclarés après », et 38 gardes `typeof X !== 'undefined'` colmatent ce couplage.
@@ -74,7 +74,7 @@ GameScene = {
 
 ## 3. Inventaire des scènes
 
-**Corrigée par la tâche T0.1** (inventaire par lecture du code : [PLAN-scenes-T0.1-inventaire.md](./PLAN-scenes-T0.1-inventaire.md), §6). La version initiale de ce plan comptait onze scènes ; deux n'existent pas dans le code (`dialog` pour la panne de carburant, `gameOver`) et la carte ne détourne pas la pause. La liste reste à confirmer par exécution au lot 0 (T0.3).
+**Corrigée par la tâche T0.1** (inventaire par lecture du code : [PLAN-scenes-T0.1-inventaire.md](./DAT-annexe_2-inventaire_des_etats_T0.1-V1.0.md), §6). La version initiale de ce plan comptait onze scènes ; deux n'existent pas dans le code (`dialog` pour la panne de carburant, `gameOver`) et la carte ne détourne pas la pause. La liste reste à confirmer par exécution au lot 0 (T0.3).
 
 | Scène | Remplace aujourd'hui | Type | Gèle dessous ? | Sous-états / remarques |
 |---|---|---|---|---|
@@ -114,7 +114,7 @@ stateDiagram-v2
   pause --> title: Échap (rechargement aujourd'hui, sans confirmation)
 ```
 
-La matrice « scène × touche → résultat » (ÉCHAP, ESPACE, ENTRÉE, M, G, H, F1 à F9, I, L) sera écrite au lot 0 à partir du comportement **actuel** et sert de test d'acceptation de chaque lot suivant. Les données brutes sont au §3.2 de l'[inventaire T0.1](./PLAN-scenes-T0.1-inventaire.md#32-matrice-brute-pour-t02). Le diagramme montre la pause depuis `flight` et `orbit` ; l'inventaire montre qu'elle est aussi possible pendant un saut (`jump`), car `enterPause` ne teste que `gameStarted`.
+La matrice « scène × touche → résultat » (ÉCHAP, ESPACE, ENTRÉE, M, G, H, F1 à F9, I, L) sera écrite au lot 0 à partir du comportement **actuel** et sert de test d'acceptation de chaque lot suivant. Les données brutes sont au §3.2 de l'[inventaire T0.1](./DAT-annexe_2-inventaire_des_etats_T0.1-V1.0.md#32-matrice-brute-pour-t02). Le diagramme montre la pause depuis `flight` et `orbit` ; l'inventaire montre qu'elle est aussi possible pendant un saut (`jump`), car `enterPause` ne teste que `gameStarted`.
 
 ## 4. Organisation du code cible
 
@@ -154,10 +154,10 @@ Chaque lot se termine par une version taguée (`stt_vX.Y.Z`, voir `CLAUDE.md`) q
 
 | Id | Tâche | Rôle | Dépend de | Critère d'acceptation |
 |---|---|---|---|---|
-| T0.1 | Inventaire des états et valeurs réelles de `REAL.phase`, `flightPhase`, `orbitState` | Développeur | — | Table du §3 confirmée ou corrigée. **Fait** : [inventaire](./PLAN-scenes-T0.1-inventaire.md), table corrigée (2 scènes supprimées) |
-| T0.2 | Matrice scène × touche (comportement actuel) | Architecte | T0.1 | Document relu, cas ambigus listés. **Fait** : [matrice](./PLAN-scenes-T0.2-matrice.md), 26 cas à tester en T0.3 |
+| T0.1 | Inventaire des états et valeurs réelles de `REAL.phase`, `flightPhase`, `orbitState` | Développeur | — | Table du §3 confirmée ou corrigée. **Fait** : [inventaire](./DAT-annexe_2-inventaire_des_etats_T0.1-V1.0.md), table corrigée (2 scènes supprimées) |
+| T0.2 | Matrice scène × touche (comportement actuel) | Architecte | T0.1 | Document relu, cas ambigus listés. **Fait** : [matrice](./DAT-annexe_3-matrice_des_scenes_T0.2-V1.0.md), 26 cas à tester en T0.3 |
 | T0.3 | Test de caractérisation Playwright de la matrice | Développeur | T0.2 | Vert sur `stt_v2.17.0`. **Fait** : `sources/src/test/scenes_matrice_test.py`, 31 vérifications, vert sur deux exécutions consécutives ; a corrigé la matrice (Espace dans le choix du vaisseau, durée du retour du survol) |
-| T0.4 | Corriger les défauts de la matrice (décision du mainteneur : corriger avant de poursuivre) | Développeur | T0.3 | Défauts corrigés dans `sources/src/JS/game/`, test de caractérisation mis à jour sur le comportement corrigé, suite du jeu sans régression. **Fait** : [matrice §6](./PLAN-scenes-T0.2-matrice.md#6-défauts--décisions-et-comportement-corrigé) |
+| T0.4 | Corriger les défauts de la matrice (décision du mainteneur : corriger avant de poursuivre) | Développeur | T0.3 | Défauts corrigés dans `sources/src/JS/game/`, test de caractérisation mis à jour sur le comportement corrigé, suite du jeu sans régression. **Fait** : [matrice §6](./DAT-annexe_3-matrice_des_scenes_T0.2-V1.0.md#6-défauts--décisions-et-comportement-corrigé) |
 | T1.1 | `scenes/scene.js` : pile, transitions, événements | Développeur | T0.3 | Tests unitaires de la pile et des transitions refusées |
 | T1.2 | Scènes adaptateurs + accesseurs dérivés | Développeur | T1.1 | Matrice et fumée vertes |
 | T2.1 | Répartiteur d'entrées unique | Développeur | T1.2 | Un seul `keydown` ; matrice verte |
@@ -242,7 +242,7 @@ Lecture du planning :
 1. **Granularité** : `orbit` doit-elle rester une scène unique (arrivée, livraison, missions, ports) ou se scinder en `arrival`, `delivery` et `missionBoard` ?
 2. **Pause** : la pause doit-elle aussi couper la musique et la synthèse vocale ? Le comportement actuel est à relever au lot 0.
 3. ~~**`gameOver`** : existe-t-il un écran de fin ?~~ **Réglée par T0.1** : non. « Quitter » est un rechargement de page ; une confirmation a été ajoutée par T0.4. Reste ouvert : la panne de carburant décrite dans `TODO.md` (non implémentée) est-elle toujours voulue ? Si oui, une scène `dialog` reviendra dans le plan.
-4. ~~**Pièges de l'inventaire** : corriger ou conserver ?~~ **Réglée par le mainteneur** : à corriger avant de poursuivre. C'est la tâche T0.4 ; la décision pour chaque défaut (corrigé ou volontairement conservé) est au [§6 de la matrice](./PLAN-scenes-T0.2-matrice.md#6-défauts--décisions-et-comportement-corrigé). La matrice et son test décrivent désormais le comportement corrigé.
+4. ~~**Pièges de l'inventaire** : corriger ou conserver ?~~ **Réglée par le mainteneur** : à corriger avant de poursuivre. C'est la tâche T0.4 ; la décision pour chaque défaut (corrigé ou volontairement conservé) est au [§6 de la matrice](./DAT-annexe_3-matrice_des_scenes_T0.2-V1.0.md#6-défauts--décisions-et-comportement-corrigé). La matrice et son test décrivent désormais le comportement corrigé.
 5. **Ordre avec le DAT** : faire ce plan (C + E) avant la [proposition A](./DAT.md#5-propositions) (hygiène du dépôt, [DAT §4.7](./DAT.md#47-hygiène-du-dépôt)), ou l'inverse ? Je recommande A en premier : le dépôt allégé facilite les revues de ce plan.
 
 ## Annexe — Propositions du DAT citées dans ce plan

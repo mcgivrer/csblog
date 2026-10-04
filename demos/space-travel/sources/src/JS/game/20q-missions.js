@@ -1,5 +1,5 @@
 /* =========================================================================
-   MISSIONS — lot M1 (spec-missions.md) : système de missions AUTONOME
+   MISSIONS — lot M1 (SPEC-009-missions_risques_et_competences-V1.0.md) : système de missions AUTONOME
    - plus d'itinéraire : la partie commence en orbite près d'une planète dotée d'un port ; le contrôle
      appelle ; le TABLEAU DES MISSIONS s'ouvre ; après chaque livraison, celui du port d'arrivée prend le relais ;
    - 5 natures de fret, couleur des conteneurs = nature (denrées orange, équipements vert, armes rouge,

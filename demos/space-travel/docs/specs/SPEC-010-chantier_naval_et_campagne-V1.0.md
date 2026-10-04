@@ -1,6 +1,6 @@
 # SPEC-010 — Chantier Naval STT : campagne, flotte et architecture
 
-2026-10-05 · Frédéric Delorme · réponse à SPEC-010 « arbre des technologies et missions »
+2026-10-04 · Frédéric Delorme · réponse à SPEC-010 « arbre des technologies et missions »
 
 > Version de travail pour les agents (CP, ARCHI, DEV). Relecture et commentaires : [Claude Doc](https://claude.ai/code/artifact/852ce71b-afb7-44ba-b78d-b41981473f89). Modèle d'équilibrage : `sources/tools/eco_sim.py`. Suivi : `docs/work_in_progress/kanban.html`. Maquettes : `img/spec010/`.
 
@@ -12,7 +12,7 @@ Cette proposition intègre l'éditeur STT\_Modules dans *Space Travel & Transpor
 | --- | --- |
 | **Base** | jeu `stt_v2.17` (`sources/`), éditeur STT\_Modules (`STT_modules/sources/index.html`), assembleur `MODSHIP` (`09c-vaisseaux-modulaires.js`) |
 | **Entrée** | SPEC-010 : scénario + propositions 1 (technologies), 2 (compétences), 3 (dialogue à onglets) |
-| **Statut** | Validée le 05/10/2026 (toutes les recommandations du § 4). Les valeurs marquées ⚑ restent à calibrer en jeu |
+| **Statut** | Validée le 04/10/2026 (toutes les recommandations du § 4). Les valeurs marquées ⚑ restent à calibrer en jeu |
 | **Rôles** | rédigé en rôles CP + ARCHI, à valider par le mainteneur |
 
 **Décisions déjà prises (04/10/2026)** : flotte **hybride** (amiral piloté + flotte simulée, bascule possible) ; campagne **longue** (première station vers 6 h de jeu) ; livrables en Markdown dans `docs/specs/` **et** en Claude Doc ; plan + fichiers d'agents.
@@ -207,7 +207,7 @@ La flotte est bornée par les **postes d'amarrage** possédés (station) plus 2 
 - **Identité** : nom (générateur `03`), portrait (avatars radio existants et variantes), planète d'origine.
 - **Métier** et niveau 1 à 10, une compétence secondaire, un **trait** (Économe, Téméraire, Prudent, Charismatique, Bricoleur, Loyal, Ambitieux…).
 - **Salaire** en CR par heure de jeu (métier × niveau^1,3 ⚑), **moral** de 0 à 100 (paie, confort, succès), **expérience**.
-- Les aptitudes du joueur (conviction, courage, dextérité : § 7 de `spec-missions.md`) restent celles du capitaine-joueur ; l'équipage ajoute des bonus.
+- Les aptitudes du joueur (conviction, courage, dextérité : § 7 de `SPEC-009-missions_risques_et_competences-V1.0.md`) restent celles du capitaine-joueur ; l'équipage ajoute des bonus.
 
 ### Métiers et ouverture progressive (proposition 2)
 
@@ -703,7 +703,7 @@ Question : …
 
 L0, tâche 1 : `codemap.py` et le chronométrage des missions. Deux résultats utiles tout de suite : la carte de code sert à tous les agents, et la mesure conditionne tout l'équilibrage (§ 1.7).
 
-## 4. Décisions (validées le 05/10/2026)
+## 4. Décisions (validées le 04/10/2026)
 
 | # | Sujet | Recommandation | Autres options |
 | --- | --- | --- | --- |
@@ -718,7 +718,7 @@ L0, tâche 1 : `codemap.py` et le chronométrage des missions. Deux résultats u
 | 9 | Nouveaux maillages (laboratoire, raffinerie, serre, tourelle) | après L5 (lot L6), par la chaîne Blender pilotée via le MCP Blender | variantes Mk II seulement jusqu'à la v3.0 |
 | 10 | Lots M3, P2, M4 déjà spécifiés | intercalés (§ 3.3) | reportés après la v3.0, avec des replis simplifiés |
 
-**Validation du 05/10/2026** : le mainteneur retient les dix recommandations.
+**Validation du 04/10/2026** : le mainteneur retient les dix recommandations.
 
 **Point 9, nouveaux maillages (lot L6)** : laboratoire, raffinerie, fabrique, serre et tourelle sont modélisés dans le projet Blender `~/Documents/Blender/space-travel/` par le **MCP Blender**, avec les conventions et les scripts de `STT_INTEGRATION.md` (anneau STT-6, origine sur la face d'amarrage avant, sockets `SOCKET_<KEY>_<PORT>`, extras `stt_mass_t`, AO précalculée, `export_glb.run()` puis `build_game_pack.py`). L'agent **demande au mainteneur de démarrer Blender et son serveur MCP** au moment de la tâche, jamais avant ; les appels longs (bake, export) sont vérifiés par la présence des fichiers produits (limite de 60 s par appel MCP).
 

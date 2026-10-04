@@ -14,10 +14,10 @@ Décisions du mainteneur (04/10/2026) :
 
 | N° | Fichier actuel | Nouveau nom | Apparition | Ordre |
 |---|---|---|---|---|
-| 001 | `generation-de-l-univers.md` | `SPEC-001-generation_de_l_univers-V1.0.md` | décrit le code v2.12 | à confirmer |
-| 002 | `etude-echelles.md` | `SPEC-002-etude_des_echelles-V1.0.md` | décisions du 20/09 | à confirmer |
-| 003 | `etude-vaisseaux-generatifs.md` et `.pdf` | `SPEC-003-vaisseaux_generatifs-V1.0.md` et `.pdf` | spec 2.12, avant le générateur v2.13 | à confirmer |
-| 004 | `etude-rendu-etoiles.md` | `SPEC-004-rendu_des_etoiles-V1.0.md` | entre v2.12 et v2.16 | à confirmer |
+| 001 | `etude-vaisseaux-generatifs.md` et `.pdf` | `SPEC-001-vaisseaux_generatifs-V1.0.md` et `.pdf` | ajout git 20/09 15:38 | confirmé (git) |
+| 002 | `generation-de-l-univers.md` | `SPEC-002-generation_de_l_univers-V1.0.md` | ajout git 20/09 16:55 | confirmé (git) |
+| 003 | `etude-echelles.md` | `SPEC-003-etude_des_echelles-V1.0.md` | ajout git 20/09 17:47 | confirmé (git) |
+| 004 | `etude-rendu-etoiles.md` | `SPEC-004-rendu_des_etoiles-V1.0.md` | ajout git 20/09 20:05 | confirmé (git) |
 | 005 | `Observation des étoiles — plan des corrections et améliorations (v6.7 → v7).md` | `SPEC-005-plan_corrections_observation_des_etoiles-V1.0.md` | 26/09 | sûr |
 | 006 | `etude-integration-demo.md` | `SPEC-006-integration_de_la_demo-V1.0.md` | 26/09, après 005 (cite la démo v7.2.2) | sûr |
 | 007 | `spec-L9-jeu.md` | `SPEC-007-l9_trafic_concurrence_escorte_jeu-V1.0.md` | base v2.17, cité par 008 | sûr |

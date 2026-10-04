@@ -5,7 +5,7 @@
    used   : tokens mesurés (total_tokens du bloc <usage> rendu par l'appel Agent) ; null = non mesuré ; est:true = estimation
    Le total d'un lot est calculé par la page (somme des tâches) : ne pas le saisir. */
 window.PLAN = {
-  updated: "2026-10-05 09:30",
+  updated: "2026-10-04 23:38",
   spec: "SPEC-010-chantier_naval_et_campagne-V1.0.md",
   currentLot: "C0",
   models: { cp: "CP Sonnet", archi: "ARCHI Opus", dev: "DEV Sonnet / Haiku" },
@@ -25,11 +25,11 @@ window.PLAN = {
   tasks: [
     { id: "C0.1", lot: "C0", title: "SPEC-010 : mécanique, architecture, plan, équilibrage", agent: "archi", model: "opus", status: "done", progress: 100, budget: 300000, used: 330000, est: true, updated: "2026-10-04 23:00", note: "Session Cowork : estimation d'après le compteur de session." },
     { id: "C0.2", lot: "C0", title: "Fichiers d'agents stt-cp / stt-archi / stt-dev", agent: "cp", model: "opus", status: "done", progress: 100, budget: 20000, used: 15000, est: true, updated: "2026-10-04 23:10", note: "" },
-    { id: "C0.3", lot: "C0", title: "Kanban des agents (kanban.html + plan-status.js)", agent: "cp", model: "opus", status: "done", progress: 100, budget: 40000, used: 40000, est: true, updated: "2026-10-05 00:20", note: "" },
-    { id: "C0.4", lot: "C0", title: "Maquettes SVG des 5 nouveaux écrans", agent: "archi", model: "opus", status: "done", progress: 100, budget: 60000, used: 65000, est: true, updated: "2026-10-05 01:00", note: "docs/specs/img/spec010/*.svg, intégrées à SPEC-010." },
-    { id: "C0.5", lot: "C0", title: "Renumérotation des specs (git mv + liens)", agent: "dev", model: "haiku", status: "todo", progress: 0, budget: 60000, used: null, updated: "", note: "Table et procédure : work_in_progress/renumerotation-specs.md" },
-    { id: "C0.6", lot: "C0", title: "Installer les agents dans .claude/agents, supprimer specs/PLAN-STATUS.md", agent: "dev", model: "haiku", status: "todo", progress: 0, budget: 10000, used: null, updated: "", note: "Écriture dans .claude/ impossible depuis la session Cowork." },
-    { id: "C0.7", lot: "C0", title: "Valider les 10 décisions de SPEC-010 § 4", agent: "cp", model: "sonnet", status: "done", progress: 100, budget: 5000, used: 4000, est: true, updated: "2026-10-05 09:30", note: "Toutes les recommandations retenues par le mainteneur ; spec et Claude Doc mis à jour." },
+    { id: "C0.3", lot: "C0", title: "Kanban des agents (kanban.html + plan-status.js)", agent: "cp", model: "opus", status: "done", progress: 100, budget: 40000, used: 40000, est: true, updated: "2026-10-04 22:00", note: "" },
+    { id: "C0.4", lot: "C0", title: "Maquettes SVG des 5 nouveaux écrans", agent: "archi", model: "opus", status: "done", progress: 100, budget: 60000, used: 65000, est: true, updated: "2026-10-04 22:30", note: "docs/specs/img/spec010/*.svg, intégrées à SPEC-010." },
+    { id: "C0.5", lot: "C0", title: "Renumérotation des specs (git mv + liens)", agent: "dev", model: "haiku", status: "review", progress: 90, budget: 60000, used: 85616, updated: "2026-10-04 23:38", note: "Fait par stt-dev (Haiku) : 20 fichiers renommés, ordre 001–004 corrigé d'après git log, liens mis à jour. Revue CP faite." },
+    { id: "C0.6", lot: "C0", title: "Installer les agents dans .claude/agents, supprimer specs/PLAN-STATUS.md", agent: "dev", model: "haiku", status: "doing", progress: 50, budget: 10000, used: null, updated: "2026-10-04 23:33", note: "Agents suivis dans .claude/agents/ (gitignore ajusté) ; suppressions faites dans la branche." },
+    { id: "C0.7", lot: "C0", title: "Valider les 10 décisions de SPEC-010 § 4", agent: "cp", model: "sonnet", status: "done", progress: 100, budget: 5000, used: 4000, est: true, updated: "2026-10-04 23:00", note: "Toutes les recommandations retenues par le mainteneur ; spec et Claude Doc mis à jour." },
     { id: "L0.0", lot: "L0", title: "Fiche de lot et pilotage", agent: "cp", model: "sonnet", status: "todo", progress: 0, budget: 40000, used: null, est: true, updated: "", note: "Consommation du CP non mesurable par lui-même : estimation." },
     { id: "L0.1", lot: "L0", title: "Contrat L0 et découpage en tâches", agent: "archi", model: "opus", status: "todo", progress: 0, budget: 60000, used: null, updated: "", note: "" },
     { id: "L0.2", lot: "L0", title: "codemap.py → docs/specs/CODEMAP.md", agent: "dev", model: "sonnet", status: "todo", progress: 0, budget: 50000, used: null, updated: "", note: "" },
@@ -42,21 +42,22 @@ window.PLAN = {
   ],
 
   decisions: [
-    { n: 1,  subject: "Intégration de l'éditeur : portage natif + shared/sttcomp.js", status: "validée (05/10)" },
-    { n: 2,  subject: "Départ : Courlis modulaire, 4 000 CR", status: "validée (05/10)" },
-    { n: 3,  subject: "Vaisseaux procéduraux en occasion", status: "validée (05/10)" },
-    { n: 4,  subject: "Pas de progression hors ligne", status: "validée (05/10)" },
-    { n: 5,  subject: "F1–F8 → onglets de la console", status: "validée (05/10)" },
-    { n: 6,  subject: "Station construite par missions d'approvisionnement", status: "validée (05/10)" },
-    { n: 7,  subject: "Flotte bornée par les postes", status: "validée (05/10)" },
-    { n: 8,  subject: "Rendement automatisé 65 %", status: "validée (05/10)" },
-    { n: 9,  subject: "Nouveaux maillages après L5", status: "validée (05/10)" },
-    { n: 10, subject: "Lots M3 / P2 / M4 intercalés", status: "validée (05/10)" }
+    { n: 1,  subject: "Intégration de l'éditeur : portage natif + shared/sttcomp.js", status: "validée (04/10)" },
+    { n: 2,  subject: "Départ : Courlis modulaire, 4 000 CR", status: "validée (04/10)" },
+    { n: 3,  subject: "Vaisseaux procéduraux en occasion", status: "validée (04/10)" },
+    { n: 4,  subject: "Pas de progression hors ligne", status: "validée (04/10)" },
+    { n: 5,  subject: "F1–F8 → onglets de la console", status: "validée (04/10)" },
+    { n: 6,  subject: "Station construite par missions d'approvisionnement", status: "validée (04/10)" },
+    { n: 7,  subject: "Flotte bornée par les postes", status: "validée (04/10)" },
+    { n: 8,  subject: "Rendement automatisé 65 %", status: "validée (04/10)" },
+    { n: 9,  subject: "Nouveaux maillages après L5", status: "validée (04/10)" },
+    { n: 10, subject: "Lots M3 / P2 / M4 intercalés", status: "validée (04/10)" }
   ],
 
   journal: [
     { at: "2026-10-04", text: "SPEC-010 proposée : mécanique, architecture, plan ; fichiers d'agents et Kanban créés." },
-    { at: "2026-10-05", text: "Décisions 1 à 10 validées par le mainteneur ; point 9 : maillages par le MCP Blender, démarré à la demande." },
-    { at: "2026-10-05", text: "Maquettes SVG intégrées ; règle de nommage SPEC-NNN décidée (010/011 conservés, plan Scene en annexes de la DAT, suffixe -autonome) ; Kanban déplacé dans docs/work_in_progress/." }
+    { at: "2026-10-04", text: "Décisions 1 à 10 validées par le mainteneur ; point 9 : maillages par le MCP Blender, démarré à la demande." },
+    { at: "2026-10-04", text: "Maquettes SVG intégrées ; règle de nommage SPEC-NNN décidée (010/011 conservés, plan Scene en annexes de la DAT, suffixe -autonome) ; Kanban déplacé dans docs/work_in_progress/." },
+    { at: "2026-10-04", text: "Lancement : clone cloud, branche stt-C0-L0, livraison par bundle git (pas d'accès en écriture à GitHub)." }
   ]
 };

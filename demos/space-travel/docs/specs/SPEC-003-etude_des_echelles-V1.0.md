@@ -1,6 +1,6 @@
 # Étude — Révision des échelles : étoiles, planètes, satellites et vaisseau
 
-Document de travail séparé de la spécification principale : ce chantier modifie en profondeur les tailles et les distances de tout l'univers, et mérite d'être arbitré avant toute implémentation. Il s'appuie sur [`generation-de-l-univers.md`](./generation-de-l-univers.md), qui décrit le code actuel, et sur des mesures faites en exécutant ce code (méthode au [§12](#12-comment-les-chiffres-ont-été-mesurés)).
+Document de travail séparé de la spécification principale : ce chantier modifie en profondeur les tailles et les distances de tout l'univers, et mérite d'être arbitré avant toute implémentation. Il s'appuie sur [`SPEC-002-generation_de_l_univers-V1.0.md`](./SPEC-002-generation_de_l_univers-V1.0.md), qui décrit le code actuel, et sur des mesures faites en exécutant ce code (méthode au [§12](#12-comment-les-chiffres-ont-été-mesurés)).
 
 **Statut : décisions arrêtées le 20 septembre 2026, implémentation par paliers.** Les choix retenus sont regroupés au [§11](#11-décisions-retenues) et le déroulement au [§10](#10-plan-par-paliers). Les valeurs des sections 5 à 9 restent des propositions tant que le palier correspondant n'est pas livré.
 
@@ -292,7 +292,7 @@ Chaque palier est livrable séparément, testable, et n'altère pas le suivant.
 | **P2 — Vitesses et approche** | Vitesse et carburant, zones exprimées en rayons, saut quantique, carte stellaire, portiques. | Durée d'une route conservée (environ 9 min) ; carburant recalculé. |
 | **P3 — Rendu et caméra** | `near` / `far`, brouillard, caméra de poursuite relative, poussière locale, étiquettes. | Captures à plusieurs distances ; absence de scintillement de profondeur. |
 | **P4 — Vaisseau ÷ 4** | Modèle et constantes de caméra, navettes, plans de largage, recadrage de la vue d'ensemble. | Captures des plans de largage ; comparaison avec l'état actuel. |
-| **P5 — Recalage et documentation** | Prix, réglages fins, mise à jour de la spécification et de `generation-de-l-univers.md`, bascule du profil par défaut sur `allegee` et renouvellement des références du `selftest`. | Partie complète jouée, sur les trois profils. |
+| **P5 — Recalage et documentation** | Prix, réglages fins, mise à jour de la spécification et de `SPEC-002-generation_de_l_univers-V1.0.md`, bascule du profil par défaut sur `allegee` et renouvellement des références du `selftest`. | Partie complète jouée, sur les trois profils. |
 
 P0 est un pur refactoring : il est sans risque visuel et sert de filet de sécurité aux paliers suivants. Il permet aussi de **comparer les profils dans le jeu** en changeant simplement l'URL.
 
