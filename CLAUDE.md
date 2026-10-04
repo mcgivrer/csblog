@@ -33,4 +33,4 @@ This is the one place where the "no build tools" rule does not hold. It contains
 - Keep CSS and JS inline in the HTML files; no separate `.css`/`.js` at the repo root.
 - Demos load Three.js and fonts from CDNs, so offline previews degrade (system font fallback, no 3D).
 - Prose, UI strings and commit-adjacent docs are French-first; the Space Travel demo also ships fr/en/de/es translations.
-- `.claude/` is git-ignored.
+- `.claude/` is git-ignored, except `.claude/agents/` (shared agent definitions for the CP / ARCHI / DEV mode of `AGENTS.md`).
