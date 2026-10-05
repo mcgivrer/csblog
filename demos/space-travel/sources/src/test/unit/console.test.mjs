@@ -186,12 +186,12 @@ test('keyAction : rien si !started, paused ou typing', () => {
   const { C } = setup();
   for(const code of ['Tab', 'Escape', 'F2', 'KeyM', 'Digit3', 'Space'])
     for(const ctx of [{ ...OK, started: false }, { ...OK, paused: true }, { ...OK, typing: true }])
-      assert.equal(C.keyAction(K(code, { altKey: code === 'Digit3' }), ctx), null, code);
+      assert.equal(C.keyAction(K(code), ctx), null, code);
   C.open('nav');
   assert.equal(C.keyAction(K('KeyX'), { ...OK, paused: true }), null);
 });
 
-test('keyAction console fermée : Tab, Échap, F1–F8, Alt+n, lettres, Espace/Entrée', () => {
+test('keyAction console fermée : Tab, Échap, F1–F8, chiffres 1–8, lettres, Espace/Entrée', () => {
   const { C } = setup();
   const a = (code, o) => plain(C.keyAction(K(code, o), OK));
   assert.deepEqual(a('Tab'), { act: 'last' });
@@ -202,10 +202,11 @@ test('keyAction console fermée : Tab, Échap, F1–F8, Alt+n, lettres, Espace/E
   assert.deepEqual(a('F5'), { act: 'toggle', tab: 'yard' });
   for(const f of ['F1', 'F6', 'F7', 'F8']) assert.deepEqual(a(f), { act: 'reserved' }, f);
   for(const f of ['F9', 'F10', 'KeyP', 'Pause', 'KeyL', 'KeyI', 'KeyT', 'KeyG']) assert.equal(a(f), null, f);
-  for(let n = 1; n <= 8; n++) assert.deepEqual(a('Digit' + n, { altKey: true }), { act: 'hud', index: n - 1 });
-  assert.deepEqual(a('Digit3', { altKey: true }), { act: 'hud', index: 2 });
-  assert.equal(a('Digit3'), null);                   // sans Alt : non traité
-  assert.equal(a('Digit9', { altKey: true }), null);
+  for(let n = 1; n <= 8; n++) assert.deepEqual(a('Digit' + n), { act: 'hud', index: n - 1 });
+  assert.deepEqual(a('Digit3'), { act: 'hud', index: 2 });
+  for(const m of ['altKey', 'ctrlKey', 'metaKey', 'shiftKey']) assert.equal(a('Digit1', { [m]: true }), null, m);
+  assert.equal(a('Digit9'), null);
+  assert.equal(a('Digit0'), null);
   assert.equal(a('KeyM', { altKey: true }), null);
   assert.deepEqual(a('KeyM'), { act: 'toggle', tab: 'nav' });
   assert.deepEqual(a('Semicolon'), { act: 'toggle', tab: 'nav' });
@@ -229,7 +230,9 @@ test('keyAction console ouverte : fermeture, avalement, exceptions', () => {
   assert.deepEqual(a('F1'), { act: 'reserved' });
   assert.deepEqual(a('KeyJ'), { act: 'toggle', tab: 'missions' });
   assert.deepEqual(a('KeyH'), { act: 'toggle', tab: 'help' });
-  assert.deepEqual(a('Digit1', { altKey: true }), { act: 'hud', index: 0 });
+  assert.deepEqual(a('Digit1'), { act: 'hud', index: 0 });
+  assert.deepEqual(a('Digit5'), { act: 'hud', index: 4 });
+  assert.equal(a('Digit1', { altKey: true }), null);
   assert.deepEqual(a('Space'), { act: 'swallow' });
   assert.deepEqual(a('Enter'), { act: 'swallow' });
   assert.deepEqual(a('KeyW'), { act: 'swallow' });

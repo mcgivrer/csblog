@@ -1,6 +1,6 @@
 # L1 — Console de bord : contrat technique (ARCHI)
 
-Branche `worktree-stt-L1-console`, cible `stt_v2.19`. Références : SPEC-010 § 1.8, § 2.3–2.4, § 4 décision 5 (F1–F8 → onglets, HUD en `Alt+1`…`Alt+8`, **validée**). Chemins relatifs à `demos/space-travel/sources/`.
+Branche `worktree-stt-L1-console`, cible `stt_v2.19`. Références : SPEC-010 § 1.8, § 2.3–2.4, § 4 décision 5 (F1–F8 → onglets, HUD en touches `1`…`8`, **validée** ; décision du mainteneur 06/10 : sans Alt). Chemins relatifs à `demos/space-travel/sources/`.
 Invariants : contenus et logique des overlays **hébergés, pas réécrits** (ids DOM et états `visible` / `display:flex` / `on` conservés : les tests existants les lisent) ; la console ne met pas en pause ; aucune globale hors de `CONSOLE` ; 4 langues ; *Partie libre* inchangée hors ouverture des panneaux ; pas de modification de `index.template.html` ni de `main.css` (CSS injectée par JS, comme `shared/starmap.js`).
 
 ## 1. Inventaire réel des overlays (7 nœuds, 6 « overlays » de la fiche)
@@ -21,16 +21,16 @@ Croix de fermeture : gestionnaire délégué `.panel-close-btn` `26:205-230` (in
 
 | Touche | Aujourd'hui (`23:233-351`) | L1 |
 |---|---|---|
-| `Tab` | bascule le canal radio (`23:329`) | **console** sur le dernier onglet (bascule) ; radio → `Alt+7` + icône de la barre |
+| `Tab` | bascule le canal radio (`23:329`) | **console** sur le dernier onglet (bascule) ; radio → `7` + icône de la barre |
 | `Échap` | pause (`23:263`), en pause → écran-titre ; ferme la carte en priorité | console ouverte : la ferme (pas de pause) ; fermée : pause **inchangée** |
 | F1–F8 | `HUD_BAR_ITEMS[0..7]` (`23:337`) : nav, route, proche, temp., moteurs, télémétrie, radio, port | F2 Navigation, F3 Missions, F4 Port, F5 Chantier ; F1, F6, F7, F8 réservés (`preventDefault`, sans effet en L1) |
-| `Alt+1`…`Alt+8` | libres | `activateHudBarItem(HUD_BAR_ITEMS[n-1])` (par `e.code` `Digit1`…`Digit8`, AZERTY compris) |
+| `1`…`8` (sans Alt, Ctrl, Méta ni Maj) | libres | `activateHudBarItem(HUD_BAR_ITEMS[n-1])` (par `e.code` `Digit1`…`Digit8`, AZERTY compris ; décision du mainteneur 06/10 : sans Alt, le navigateur captant Alt+n) ; avec un modificateur : non traité |
 | F9 / F10 | caméra / voix | inchangés |
 | M, `;` · J · H · V | carte · missions · aide · audio | bascule de l'onglet Navigation · Missions · Aide · Aide (section audio) |
 | L · I · T · G · P | Lagrange · itinéraire · pilote · survol · pause | inchangés (L reste Lagrange faute de Journal) |
 | Espace / Entrée | ferment la carte, reprise, abrégé | sur Navigation : ferment la console (parité carte) ; sinon avalés tant que la console est ouverte |
 
-Console ouverte : tout `keydown` non traité est avalé (pas de pilotage sous la console, comme sous la carte), sauf P, Pause, F9, F10, `Alt+n` ; `keyup` passe toujours. Aucune action si `!gameStarted` ou `gamePaused`. La carte garde sa priorité (écouteur de capture `20e:87` chargé avant) : sa fermeture par Échap/M ferme la console (§ 3, observateur).
+Console ouverte : tout `keydown` non traité est avalé (pas de pilotage sous la console, comme sous la carte), sauf P, Pause, F9, F10, touches `1`…`8` ; `keyup` passe toujours. Aucune action si `!gameStarted` ou `gamePaused`. La carte garde sa priorité (écouteur de capture `20e:87` chargé avant) : sa fermeture par Échap/M ferme la console (§ 3, observateur).
 
 ## 3. Fichiers et interfaces
 
@@ -62,7 +62,7 @@ Onglets (`ui/52…56`, `@requires CONSOLE, CONSOLE.view` + `@requires-engine` de
 | `yard` | 50 / F5 / — | `isNearPortService()` | `#shipyardOverlay` ; `LOCAL.openShipyard/closeShipyard` |
 | `help` | 90 / — / H, V | toujours | `#helpOverlay` puis `#audioOverlay` dans le même panneau ; V ouvre et fait défiler jusqu'à l'audio |
 
-Modifications du moteur (minimes) : `20d` exporte `openShipyard`, `closeShipyard`, `closeContractBoard` dans le `return` de `LOCAL` ; `26` `activateHudBarItem` : branches `port`, `help`, `starmap`, `audio`, `missions` → `CONSOLE.toggle(id)` si `CONSOLE` existe (repli historique sinon), `refreshHudIconBar` lit `CONSOLE.isOpen(id)` ; `23` : retire `Tab`→radio, restreint le bloc F à F9, ajoute `Alt+Digit1..8` ; `26:178` `buildHelpGrid` : `Alt+n` pour les slots, lignes Tab / F2–F5.
+Modifications du moteur (minimes) : `20d` exporte `openShipyard`, `closeShipyard`, `closeContractBoard` dans le `return` de `LOCAL` ; `26` `activateHudBarItem` : branches `port`, `help`, `starmap`, `audio`, `missions` → `CONSOLE.toggle(id)` si `CONSOLE` existe (repli historique sinon), `refreshHudIconBar` lit `CONSOLE.isOpen(id)` ; `23` : retire `Tab`→radio, restreint le bloc F à F9, ajoute `Digit1..8` (sans Alt) ; `26:178` `buildHelpGrid` : `n` (touches 1 à 8) pour les slots, lignes Tab / F2–F5.
 
 Clés `I18N` (fr, en, de, es — fichier `01-…js`, 328 l : lire par plages `8-41`, `42-75`, `76-109`, `110-143`) : `conTitle`, `conClose`, `conTabNav`, `conTabMissions`, `conTabPort`, `conTabYard`, `conTabHelp`, `conEmptyMissions`, `hk_console`, `hlp_console`, `hlp_hudAlt`.
 
@@ -76,19 +76,19 @@ Clés `I18N` (fr, en, de, es — fichier `01-…js`, 328 l : lire par plages `8-
 | L1.4 | Onglet Navigation (`53`) : `#stmMap`, redimensionnement, fermeture par Échap/M de la carte | L1.3 | Sonnet | ORDER |
 | L1.5 | Onglet Missions (`54`) : deux tableaux, ouvertures automatiques, J ; export `closeContractBoard` | L1.4 | Sonnet | ORDER |
 | L1.6 | Onglets Port (`55`) et Chantier (`56`) ; exports `LOCAL` ; disparition hors zone portuaire | L1.5 | Sonnet | ORDER |
-| L1.7 | Raccourcis : `23` (Tab, F1–F8, `Alt+1..8`, avalement), `buildHelpGrid`, titres `[Alt+n]` de la barre | L1.6 | Sonnet | I18N (si libellés) |
+| L1.7 | Raccourcis : `23` (Tab, F1–F8, touches `1..8`, avalement), `buildHelpGrid`, titres `[n]` de la barre | L1.6 | Sonnet | I18N (si libellés) |
 | L1.8 | Tactile et étroit : plein écran ≤ 760 px, barre d'onglets défilante (`overflow-x:auto`), un panneau, aucun débordement à 390 et 960 px | L1.7 | Haiku | — |
 | L1.9 | `src/test/console_test.py` (Playwright) + adaptation des tests existants si un sélecteur casse ; suite complète | L1.8 | Sonnet | — |
 
 Vérifications :
-- L1.1 : `node --test src/test/unit/` (inscription, doublon, `visible()` qui lève, ouverture refusée si invisible, dernier onglet, `toggle`, `refresh` qui ferme, badges, événements et désabonnement, `keyAction` : table du § 2 complète, `Alt+Digit3` → `hud 2`, F1/F6–F8 → `reserved`, rien si `paused`/`!started`/`typing`) ; `python3 build.py compile` (contrôle `@requires` vert).
+- L1.1 : `node --test src/test/unit/` (inscription, doublon, `visible()` qui lève, ouverture refusée si invisible, dernier onglet, `toggle`, `refresh` qui ferme, badges, événements et désabonnement, `keyAction` : table du § 2 complète, `Digit3` → `hud 2`, F1/F6–F8 → `reserved`, rien si `paused`/`!started`/`typing`) ; `python3 build.py compile` (contrôle `@requires` vert).
 - L1.2 : `compile` + parité i18n ; `smoke_test.py` ; `Tab` sans onglet visible : console fermée, touche avalée, sans erreur JS (amendé après revue L1.2 : `CONSOLE.open()` refuse sans onglet visible) ; avec un onglet inscrit, `Tab` ouvre et Échap ferme. Transitoire L1.2→L1.7 : `Tab` n'ouvre plus la radio (retour par `Alt+7` et l'icône en L1.7).
 - L1.3–L1.6 : un commit par onglet ; test ciblé existant vert sur la page lisible : L1.3 `scenes_matrice_test.py`, L1.4 `carte_test.py`, L1.5 `missions_test.py`, `pilote_test.py`, `commerce_test.py`, L1.6 `commerce_test.py`, `ports_test.py` ; plus un `page.evaluate` : l'overlay est descendant de `#sttConsole` et `CONSOLE.current()` est l'onglet attendu.
-- L1.7 : `pilote_test.py` (J), `campagne_test.py` (Échap = pause), contrôle manuel des 8 `Alt+n`.
+- L1.7 : `pilote_test.py` (J), `campagne_test.py` (Échap = pause), contrôle manuel des 8 touches `1`…`8`.
 - L1.8 : captures 960×600 et 390×844 (`hasTouch`) dans `target/` ; `document.documentElement.scrollWidth <= innerWidth`.
 - L1.9 : `python3 build.py test` vert (lisible et obfusquée), `campagne_test.py` compris.
 
-`console_test.py` couvre : chaque ancienne touche ouvre le bon onglet ; Tab rouvre le dernier ; Échap ferme sans pause ; F2–F5 ; `Alt+1` bascule `.hud-left` ; Port masqué loin d'un port puis affiché à l'approche (`hidden` sur le bouton) ; ouverture automatique du tableau de missions à l'escale ⇒ console sur `missions` ; aucun overlay visible hors de `#sttConsole` ; Partie libre et campagne ; aucune `pageerror`.
+`console_test.py` couvre : chaque ancienne touche ouvre le bon onglet ; Tab rouvre le dernier ; Échap ferme sans pause ; F2–F5 ; `1` bascule `.hud-left` ; Port masqué loin d'un port puis affiché à l'approche (`hidden` sur le bouton) ; ouverture automatique du tableau de missions à l'escale ⇒ console sur `missions` ; aucun overlay visible hors de `#sttConsole` ; Partie libre et campagne ; aucune `pageerror`.
 
 ## 5. Risques et cas limites
 
@@ -113,7 +113,7 @@ Vérifications :
 ## 7. Critères d'acceptation (fiche L1)
 
 1. Une seule console héberge les 7 nœuds ; aucun ne s'affiche hors de `#sttConsole` ; chaque ancien raccourci (M, J, H, V, F8→F4) ouvre le bon onglet.
-2. `Tab`, `Échap`, F1–F8, M, J, H (L inchangé) fonctionnent ; aucun conflit avec le vol ni la radio (`Alt+7` + icône).
+2. `Tab`, `Échap`, F1–F8, M, J, H (L inchangé) fonctionnent ; aucun conflit avec le vol ni la radio (`7` + icône).
 3. Onglets masqués `hidden` ; Port et Chantier apparaissent et disparaissent avec la zone portuaire.
 4. 960 px et 390 px tactile : plein écran, un panneau, onglets défilants, pas de défilement horizontal de la page.
 5. *Partie libre* inchangée hors panneaux ; `campagne_test.py` vert.

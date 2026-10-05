@@ -209,6 +209,7 @@ function buildHelpGrid(){
     const label = item.kind === 'camera' ? t('cameraLabel').replace(/[\s\u2014]+$/,'') : (item.labelKey ? t(item.labelKey) : '');
     rows.push([item.hotkey, label]);
   });
+  rows.push(['1 \u2013 8', t('hlp_hudAlt')]);
   rows.push(['X', t('hlp_brake')]);
   rows.push(['F10', t('hlp_voice')]);
   rows.push(['ESPACE / ENTR\u00c9E', t('hlp_skip')]);
@@ -254,7 +255,7 @@ document.addEventListener('click', function(e){
   const bar = document.getElementById('hudIconBar');
   if(!bar) return;
   HUD_BAR_ITEMS.forEach(function(item, idx){
-    if(!item.hotkey) item.hotkey = idx < 8 ? 'Alt+' + (idx+1) : 'F' + (idx+1);   /* Alt+1..8 (F1-F8 migrés vers la console, L1.7), F9 caméra — l'aide fixe déjà la sienne à 'H' */
+    if(!item.hotkey) item.hotkey = idx < 8 ? String(idx+1) : 'F' + (idx+1);   /* touches 1..8 sans Alt (F1-F8 migrés vers la console, L1.7), F9 caméra — l'aide fixe déjà la sienne à 'H' */
     const btn = document.createElement('button');
     btn.className = 'hud-icon-btn';
     btn.innerHTML = '<svg viewBox="0 0 24 24">'+HUD_ICONS[item.icon]+'</svg>';

@@ -325,12 +325,12 @@ window.addEventListener('keydown', function(e){
     const it = HUD_BAR_ITEMS.find(function(x){ return x.kind === 'audio'; });
     if(it) activateHudBarItem(it);
   }
-  /* Alt+1 à Alt+8 — slots de la barre du HUD (par position physique : AZERTY compris). Normalement traité
-     avant par la console (51-console-view, capture) ; repli si la vue est absente. Tab (console) et F1-F8
-     (onglets F2-F5, F1/F6-F8 réservés) appartiennent à la console depuis L1.7 : la radio est sur Alt+7. */
-  if(e.altKey && !e.ctrlKey && !e.metaKey && /^Digit[1-8]$/.test(e.code)){
-    e.preventDefault();
+  /* Touches 1 à 8 (sans modificateur) — slots de la barre du HUD (par position physique : AZERTY compris). Normalement
+     traité avant par la console (51-console-view, capture) ; repli si la vue est absente. Tab (console) et F1-F8
+     (onglets F2-F5, F1/F6-F8 réservés) appartiennent à la console depuis L1.7 : la radio est sur 7. */
+  if(!e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && /^Digit[1-8]$/.test(e.code)){
     if(typeof CONSOLE !== 'undefined' && CONSOLE.view) return;   /* la vue (capture) s'en charge : pas de double bascule */
+    e.preventDefault();
     const it = HUD_BAR_ITEMS[Number(e.code.slice(5)) - 1];
     if(it) activateHudBarItem(it);
     return;

@@ -1,5 +1,5 @@
 """
-Lot L1.9 — console de bord (#sttConsole) : anciennes touches, Tab, Échap sans pause, F2-F5, Alt+1..8, onglets Port/Chantier
+Lot L1.9 — console de bord (#sttConsole) : anciennes touches, Tab, Échap sans pause, F2-F5, touches 1..8 (sans Alt), onglets Port/Chantier
 masqués loin d'un port, ouverture automatique du tableau de missions, overlays hébergés, saisie de texte, écran tactile étroit.
 Joué en Partie libre ET en campagne.
 Usage : python3 src/test/console_test.py target/space-travel.html
@@ -32,8 +32,8 @@ def reset(pg):
     """Console fermée, jeu hors pause, plus de champ de saisie, plus de proximité simulée."""
     pg.evaluate("() => { if(gamePaused) resumeGame(); CONSOLE.close('user'); orbitState.active = false; CONSOLE.refresh(); }"); settle(pg)
 
-def alt_digit(pg, n):
-    pg.evaluate("(n) => { document.body.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit' + n, key: String(n), altKey: true, bubbles: true, cancelable: true })); }", n); settle(pg)
+def digit(pg, n, alt=False):
+    pg.evaluate("([n, alt]) => { document.body.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit' + n, key: String(n), altKey: alt, bubbles: true, cancelable: true })); }", [n, alt]); settle(pg)
 
 def boot(br, mobile=False):
     kw = dict(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True) if mobile else dict(viewport={"width": 1100, "height": 640})
@@ -135,16 +135,18 @@ def scenario(pg, label):
     check(f"{label} : F1/F7 sans effet console ouverte", cur(pg) == "help", cur(pg))
     reset(pg)
 
-    # --- Alt+1 : .hud-left ; Alt+7 : radio
+    # --- 1 : .hud-left ; 7 : radio (sans Alt)
     h0 = pg.evaluate("() => document.querySelector('.hud-left').classList.contains('panel-hidden')")
-    alt_digit(pg, 1); h1 = pg.evaluate("() => document.querySelector('.hud-left').classList.contains('panel-hidden')")
-    alt_digit(pg, 1); h2 = pg.evaluate("() => document.querySelector('.hud-left').classList.contains('panel-hidden')")
-    check(f"{label} : Alt+1 bascule .hud-left (puis rebascule)", h1 != h0 and h2 == h0, [h0, h1, h2])
+    digit(pg, 1); h1 = pg.evaluate("() => document.querySelector('.hud-left').classList.contains('panel-hidden')")
+    digit(pg, 1); h2 = pg.evaluate("() => document.querySelector('.hud-left').classList.contains('panel-hidden')")
+    check(f"{label} : Digit1 bascule .hud-left (puis rebascule)", h1 != h0 and h2 == h0, [h0, h1, h2])
     r0 = pg.evaluate("() => document.getElementById('radioPanel').classList.contains('visible')")
-    alt_digit(pg, 7); r1 = pg.evaluate("() => document.getElementById('radioPanel').classList.contains('visible')")
-    alt_digit(pg, 7); r2 = pg.evaluate("() => document.getElementById('radioPanel').classList.contains('visible')")
-    check(f"{label} : Alt+7 bascule le radio (puis rebascule)", r1 != r0 and r2 == r0, [r0, r1, r2])
-    check(f"{label} : Alt+chiffre n'ouvre pas la console", cur(pg) is None, cur(pg))
+    digit(pg, 7); r1 = pg.evaluate("() => document.getElementById('radioPanel').classList.contains('visible')")
+    digit(pg, 7); r2 = pg.evaluate("() => document.getElementById('radioPanel').classList.contains('visible')")
+    check(f"{label} : Digit7 bascule le radio (puis rebascule)", r1 != r0 and r2 == r0, [r0, r1, r2])
+    check(f"{label} : chiffre n'ouvre pas la console", cur(pg) is None, cur(pg))
+    digit(pg, 1, alt=True); h3 = pg.evaluate("() => document.querySelector('.hud-left').classList.contains('panel-hidden')")
+    check(f"{label} : Alt+Digit1 ne bascule PAS .hud-left", h3 == h0, [h0, h3])
 
     # --- saisie dans un champ texte : aucun raccourci
     pg.evaluate("() => { const i = document.createElement('input'); i.type = 'text'; i.id = '__tin'; document.body.appendChild(i); i.focus(); }")
@@ -153,6 +155,12 @@ def scenario(pg, label):
     pg.wait_for_timeout(100)
     st = pg.evaluate("() => ({ cur: CONSOLE.current(), paused: gamePaused, focus: document.activeElement.id })")
     check(f"{label} : frappes dans un champ texte focalisé : aucun raccourci", st["cur"] is None and not st["paused"], st)
+    hl0 = pg.evaluate("() => document.querySelector('.hud-left').classList.contains('panel-hidden')")
+    rv0 = pg.evaluate("() => document.getElementById('radioPanel').classList.contains('visible')")
+    pg.keyboard.press("Digit1"); pg.keyboard.press("Digit7"); pg.wait_for_timeout(100)
+    hl1 = pg.evaluate("() => document.querySelector('.hud-left').classList.contains('panel-hidden')")
+    rv = pg.evaluate("() => document.getElementById('radioPanel').classList.contains('visible')")
+    check(f"{label} : Digit1/Digit7 dans un champ texte focalisé : aucun effet", hl1 == hl0 and rv == rv0, [hl0, hl1, rv0, rv])
     pg.evaluate("() => { document.getElementById('__tin').remove(); }")
     reset(pg)
 

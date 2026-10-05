@@ -157,8 +157,10 @@ const CONSOLE = (function(){
     if(k.ctrlKey || k.metaKey) return null;                    // raccourcis du navigateur : jamais touchés
     const code = k.code, isOpen = current !== null;
 
+    /* touches 1 à 8 SANS modificateur (décision du mainteneur 06/10 : le navigateur capte Alt+n) : panneaux du HUD,
+       console ouverte comprise. Avec Alt ou Maj : rien (Alt+n, Maj+n restent au navigateur / au jeu). */
     const dig = /^Digit([1-8])$/.exec(code);
-    if(k.altKey && dig) return { act: 'hud', index: Number(dig[1]) - 1 };
+    if(dig) return (k.altKey || k.shiftKey) ? null : { act: 'hud', index: Number(dig[1]) - 1 };
 
     if(isOpen){
       if(code === 'KeyP' || code === 'Pause' || code === 'F9' || code === 'F10') return null;
