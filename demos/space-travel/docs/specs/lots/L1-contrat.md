@@ -82,7 +82,7 @@ Clés `I18N` (fr, en, de, es — fichier `01-…js`, 328 l : lire par plages `8-
 
 Vérifications :
 - L1.1 : `node --test src/test/unit/` (inscription, doublon, `visible()` qui lève, ouverture refusée si invisible, dernier onglet, `toggle`, `refresh` qui ferme, badges, événements et désabonnement, `keyAction` : table du § 2 complète, `Alt+Digit3` → `hud 2`, F1/F6–F8 → `reserved`, rien si `paused`/`!started`/`typing`) ; `python3 build.py compile` (contrôle `@requires` vert).
-- L1.2 : `compile` + parité i18n ; `smoke_test.py` ; console vide ouvrable par `Tab`, fermée par Échap, sans erreur JS.
+- L1.2 : `compile` + parité i18n ; `smoke_test.py` ; `Tab` sans onglet visible : console fermée, touche avalée, sans erreur JS (amendé après revue L1.2 : `CONSOLE.open()` refuse sans onglet visible) ; avec un onglet inscrit, `Tab` ouvre et Échap ferme. Transitoire L1.2→L1.7 : `Tab` n'ouvre plus la radio (retour par `Alt+7` et l'icône en L1.7).
 - L1.3–L1.6 : un commit par onglet ; test ciblé existant vert sur la page lisible : L1.3 `scenes_matrice_test.py`, L1.4 `carte_test.py`, L1.5 `missions_test.py`, `pilote_test.py`, `commerce_test.py`, L1.6 `commerce_test.py`, `ports_test.py` ; plus un `page.evaluate` : l'overlay est descendant de `#sttConsole` et `CONSOLE.current()` est l'onglet attendu.
 - L1.7 : `pilote_test.py` (J), `campagne_test.py` (Échap = pause), contrôle manuel des 8 `Alt+n`.
 - L1.8 : captures 960×600 et 390×844 (`hasTouch`) dans `target/` ; `document.documentElement.scrollWidth <= innerWidth`.
