@@ -1,6 +1,6 @@
 /* Chargeur des tests unitaires de la couche sim/ : reproduit le build (scripts classiques, portée globale commune,
    « use strict » en tête) dans un contexte vm avec bouchons (location, document, stockage en mémoire).
-   Usage : const t = load({ search: '?seed=ABC' }); t.GAME, t.RNG, t.DATA, t.SAVE, t.SEED, t.xmur3, t.mulberry32 */
+   Usage : const t = load({ search: '?seed=ABC' }); t.GAME, t.RNG, t.DATA, t.SAVE, t.JOURNAL, t.SEED, t.xmur3, t.mulberry32 */
 import vm from 'node:vm';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -75,7 +75,7 @@ export function load(opts = {}){
   return {
     ctx, logs, timers, elements, localStorage, plain,
     run: code => vm.runInContext(code, ctx),
-    GAME: get('GAME'), RNG: get('RNG'), DATA: get('DATA'), SAVE: get('SAVE'),
+    GAME: get('GAME'), RNG: get('RNG'), DATA: get('DATA'), SAVE: get('SAVE'), JOURNAL: get('JOURNAL'),
     SEED: get('SEED'), CONSOLE: (opts.ui || []).includes('50-console.js') ? get('CONSOLE') : undefined, xmur3: get('xmur3'), mulberry32: get('mulberry32'),
     /* propriétés globales ajoutées par les fichiers sim/ (doit rester vide : les consts ne sont pas des propriétés) */
     nouvellesGlobales: apresSim.filter(n => !apresPrng.has(n) && !(opts.headless && (n === 'document' || n === 'localStorage'))),
