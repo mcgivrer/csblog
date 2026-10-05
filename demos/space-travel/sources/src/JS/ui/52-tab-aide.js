@@ -43,7 +43,11 @@
     }
     CONSOLE.open('help');
     a.classList.add('visible');
-    if(typeof a.scrollIntoView === 'function') a.scrollIntoView({ block: 'nearest' });
+    /* #audioOverlay reste display:none tant que l'observateur n'a pas posé data-con-shown (microtâche) */
+    if(typeof a.scrollIntoView === 'function'){
+      const go = function(){ a.scrollIntoView({ block: 'nearest' }); };
+      if(typeof requestAnimationFrame === 'function') requestAnimationFrame(go); else setTimeout(go, 0);
+    }
   }
 
   CONSOLE.help = { toggleAudio: toggleAudio };

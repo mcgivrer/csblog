@@ -12,7 +12,8 @@
     '#sttConsole .con-panel[data-tab="nav"]{ padding:0; height:100%; }',
     '#sttConsole #stmMap.con-hosted{ height:100% !important; }',
     '#sttConsole #stmMap.con-hosted.on{ display:block; }',
-    '#sttConsole #stmMap .p{ width:100%; height:100%; border:0; }'
+    '#sttConsole #stmMap .p{ width:100%; height:100%; border:0; }',
+    '#sttConsole #stmMap .x{ display:none; }'
   ].join('\n');
   document.head.appendChild(st);
 
