@@ -1,7 +1,9 @@
 /* Données du Kanban des agents — SPEC-010 (Chantier Naval STT et campagne).
    SEUL fichier modifié par le chef de projet (stt-cp), par Edit ciblé : jamais kanban.html.
    Emplacement : demos/space-travel/docs/work_in_progress/ — mis à jour à chaque transition de tâche et à chaque rapport d'agent.
-   status : todo | doing | review | blocked | done      agent : cp | archi | dev
+   status : todo | doing | review | blocked | done      agent : cp | archi | dev | revue
+   inst   : (optionnel, entier 1 à 3, pour agent "dev") numéro de l'instance DEV parallèle qui exécute la tâche (une instance = un worktree/une branche) ;
+            absent = DEV non distingué. model reste par tâche : opus | sonnet | haiku.
    used   : tokens mesurés (total_tokens du bloc <usage> rendu par l'appel Agent) ; null = non mesuré ; est:true = estimation
    docs   : (optionnel) documents liés à la tâche : [ { f: "chemin relatif à demos/space-travel/", r: "lu" | "modifié" | "créé" } ]
             lu = nécessaire à la tâche ; modifié / créé = produit par elle. Docs de spec/contrat/plan/maquette/carte de code, pas le code du jeu.
@@ -53,6 +55,7 @@ window.PLAN = {
     { id: "L1.8", lot: "L1", title: "Tactile et étroit (390 / 960 px)", agent: "dev", model: "haiku", status: "todo", progress: 0, budget: 15000, used: null, updated: "2026-10-05 12:30", note: "", docs: [ { f: "docs/specs/lots/L1-contrat.md", r: "lu" } ] },
     { id: "L1.9", lot: "L1", title: "console_test.py et suite complète", agent: "dev", model: "sonnet", status: "todo", progress: 0, budget: 50000, used: null, updated: "2026-10-05 12:30", note: "", docs: [ { f: "docs/specs/lots/L1-contrat.md", r: "lu" } ] },
     { id: "L1.R", lot: "L1", title: "Revues des diffs L1", agent: "archi", model: "opus", status: "doing", progress: 20, budget: 30000, used: 140204, updated: "2026-10-05 13:10", note: "Revues L1.1 et L1.2 : 140 k tokens (budget 30 k dépassé ×4,7) : revues Opus coûteuses, à resserrer.", docs: [ { f: "docs/specs/lots/L1-contrat.md", r: "lu" } ] },
+    { id: "L1.V", lot: "L1", title: "Revues de conformité L1 (REVUE, Haiku)", agent: "revue", model: "haiku", status: "todo", progress: 0, budget: 40000, used: null, updated: "", note: "Première passe de conformité sur chaque commit DEV, avant l'ARCHI.", docs: [ { f: "../../.claude/agents/stt-revue.md", r: "créé" }, { f: "docs/specs/lots/L1-contrat.md", r: "lu" } ] },
     { id: "L6.M", lot: "L6", title: "Nouveaux maillages : laboratoire, raffinerie, fabrique, serre, tourelle (MCP Blender)", agent: "dev", model: "sonnet", status: "todo", progress: 0, budget: 250000, used: null, updated: "", note: "Décision 9. Le CP demande au mainteneur de démarrer Blender et son serveur MCP au moment de la tâche.", docs: [ { f: "docs/specs/SPEC-010-chantier_naval_et_campagne-V1.0.md", r: "lu" }, { f: "docs/specs/img/spec010/chantier.svg", r: "lu" }, { f: "docs/specs/img/spec010/station-site.svg", r: "lu" }, { f: "docs/specs/SPEC-001-vaisseaux_generatifs-V1.0.md", r: "lu" }, { f: "docs/specs/CODEMAP.md", r: "lu" } ] }
   ],
 

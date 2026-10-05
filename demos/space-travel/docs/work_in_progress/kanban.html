@@ -63,7 +63,10 @@ label{font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center}
 .card .id{color:var(--amber);font-size:12px}
 .card h3{font:600 14px/1.4 var(--sans);margin:6px 0 8px}
 .badge{font-size:10px;padding:1px 6px;border:1px solid currentColor;text-transform:uppercase;letter-spacing:.08em}
-.badge.cp{color:var(--cyan)} .badge.archi{color:var(--amber)} .badge.dev{color:var(--ink)}
+.badge.cp{color:var(--cyan)} .badge.archi{color:var(--amber)} .badge.dev{color:var(--ink)} .badge.revue{color:#c4a7ff} .badge.autre{color:var(--muted)}
+.agent.sub{margin:0 0 8px 18px} .agent.sub .row{color:var(--muted)}
+.sub td:first-child{padding-left:22px}
+[hidden]{display:none!important}
 .row{display:flex;justify-content:space-between;font:11px var(--mono);color:var(--muted-2);margin:6px 0 3px}
 .note{font-size:12px;color:var(--muted);margin-top:8px;border-top:1px dashed var(--line);padding-top:6px}
 .docs{margin-top:8px;border-top:1px dashed var(--line);padding-top:6px}
@@ -161,6 +164,11 @@ footer{color:var(--muted-2);font:11px var(--mono);margin-top:40px}
       <button data-agent="cp" aria-pressed="false">CP</button>
       <button data-agent="archi" aria-pressed="false">ARCHI</button>
       <button data-agent="dev" aria-pressed="false">DEV</button>
+      <button data-agent="dev1" aria-pressed="false" hidden>DEV 1</button>
+      <button data-agent="dev2" aria-pressed="false" hidden>DEV 2</button>
+      <button data-agent="dev3" aria-pressed="false" hidden>DEV 3</button>
+      <button data-agent="revue" aria-pressed="false">REVUE</button>
+      <button data-agent="autre" aria-pressed="false" hidden>Autre</button>
       <label><input type="checkbox" id="auto" checked> actualiser toutes les 30 s</label>
       <button id="docsToggle" aria-pressed="true">Docs</button>
       <button id="foldAll" title="Tout déplier / tout replier les tâches terminées">Tout déplier</button>
@@ -192,7 +200,34 @@ footer{color:var(--muted-2);font:11px var(--mono);margin-top:40px}
 (function(){
   const COLS = [['todo','À faire'],['doing','En cours'],['review','En revue'],['blocked','Bloqué'],['done','Fait']];
   const LOT_ST = { todo:'à faire', doing:'en cours', review:'en revue', blocked:'bloqué', done:'fait' };
-  const AG = { cp:'CP', archi:'ARCHI', dev:'DEV' };
+  const AG = { cp:'CP', archi:'ARCHI', dev:'DEV', revue:'REVUE' };
+  const KNOWN = ['cp', 'archi', 'dev', 'revue'];
+  // Profils dérivés des données : ordre fixe cp, archi, dev (+ DEV 1..3), revue, puis agents inconnus (« autre »).
+  const instOf = (t) => { const n = Number(t && t.inst); return t && t.agent === 'dev' && Number.isInteger(n) && n >= 1 && n <= 3 ? n : 0; };
+  const agOf = (t) => (t && t.agent) || '?';
+  const clsOf = (a) => KNOWN.indexOf(a) >= 0 ? a : 'autre';
+  const labOf = (a) => AG[a] || (a === '?' ? 'AUTRE' : 'AUTRE · ' + String(a).toUpperCase());
+  const DEVC = { 1:'#c9d4ea', 2:'#9db0dc', 3:'#7389c4', 0:'#aab4cc' };
+  function badgeText(t){ const n = instOf(t); return labOf(agOf(t)) + (n ? ' · ' + n : ''); }
+  function matchAgent(t, v){
+    if(v === 'all') return true;
+    if(/^dev[1-3]$/.test(v)) return instOf(t) === +v.slice(3);
+    if(v === 'autre') return KNOWN.indexOf(agOf(t)) < 0;
+    return agOf(t) === v;
+  }
+  function profiles(tasks){
+    const seen = []; tasks.forEach(t => { const a = agOf(t); if(seen.indexOf(a) < 0) seen.push(a); });
+    const keys = KNOWN.filter(k => seen.indexOf(k) >= 0).concat(seen.filter(k => KNOWN.indexOf(k) < 0).sort());
+    return keys.map(k => {
+      const own = tasks.filter(t => agOf(t) === k), subs = [];
+      if(k === 'dev'){
+        [1, 2, 3].forEach(i => { const s = own.filter(t => instOf(t) === i); if(s.length) subs.push({ label:'DEV ' + i, cls:'dev', color:DEVC[i], tasks:s }); });
+        if(subs.length){ const r = own.filter(t => !instOf(t)); if(r.length) subs.push({ label:'DEV (non distingué)', cls:'dev', color:DEVC[0], tasks:r }); }
+      }
+      return { k, label:labOf(k), cls:clsOf(k), color:AGC[k] || 'var(--muted)', tasks:own, subs };
+    });
+  }
+  const sum = (arr) => arr.reduce((s, t) => s + used(t), 0);
   const view = { lot:'all', agent:'all' };
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -224,20 +259,24 @@ footer{color:var(--muted-2);font:11px var(--mono);margin-top:40px}
         return '<button class="lot" data-lot="' + esc(l.id) + '" aria-pressed="' + (view.lot === l.id) + '" title="' + esc(l.title) + '"><div class="t">' + esc(l.id) + ' · ' + esc(l.title) + '</div>' +
           '<div class="s">' + esc(LOT_ST[l.status] || l.status) + ' · ' + esc(l.version || '') + '</div>' + bar(u, l.budget) +
           '<div class="s" style="margin:4px 0 0">' + tok(u) + ' / ' + tok(l.budget) + (pct > 100 ? ' · +' + (pct - 100) + ' %' : '') + '</div></button>'; }).slice(0).join('');
-    const shown = tasks.filter(t => (view.lot === 'all' || t.lot === view.lot) && (view.agent === 'all' || t.agent === view.agent));
+    [1, 2, 3].forEach(i => { const b = document.querySelector('[data-agent=dev' + i + ']'); if(b) b.hidden = !tasks.some(t => instOf(t) === i); });
+    const ab = document.querySelector('[data-agent=autre]'); if(ab) ab.hidden = !tasks.some(t => KNOWN.indexOf(agOf(t)) < 0);
+    { const cb = document.querySelector('[data-agent="' + view.agent + '"]'); if(view.agent !== 'all' && (!cb || cb.hidden)) view.agent = 'all'; }
+    document.querySelectorAll('[data-agent]').forEach(b => b.setAttribute('aria-pressed', b.dataset.agent === view.agent));
+    const shown = tasks.filter(t => (view.lot === 'all' || t.lot === view.lot) && matchAgent(t, view.agent));
     $('board').innerHTML = COLS.map(([s, label]) => {
       const list = shown.filter(t => t.status === s);
       return '<div class="col" data-s="' + s + '"><header><span>' + label + '</span><span>' + list.length + '</span></header><div class="list">' +
         (list.length ? list.map(card).join('') : '<div class="empty">—</div>') + '</div></div>';
     }).join('');
-    const byAgent = { cp:0, archi:0, dev:0 }; tasks.forEach(t => { if(t.agent in byAgent) byAgent[t.agent] += used(t); });
-    const maxA = Math.max(1, byAgent.cp, byAgent.archi, byAgent.dev);
-    $('agents').innerHTML = Object.keys(byAgent).map(a => '<div class="agent"><div class="row" style="margin:0 0 4px"><span><span class="badge ' + a + '">' + AG[a] + '</span></span><span>' + tok(byAgent[a]) +
-      (totUsed ? ' · ' + Math.round(100*byAgent[a]/totUsed) + ' %' : '') + '</span></div>' + bar(byAgent[a], maxA, a === 'cp' ? 'cy' : '') + '</div>').join('') +
-      '<div class="small">Modèles : ' + esc((P.models && [P.models.cp, P.models.archi, P.models.dev].join(' · ')) || 'CP Sonnet · ARCHI Opus · DEV Sonnet') + '</div>';
+    const profs = profiles(tasks), pu = (p) => sum(p.tasks), maxA = Math.max(1, ...profs.map(pu));
+    const prow = (label, cls, u, mx, c, sub) => '<div class="agent' + (sub ? ' sub' : '') + '"><div class="row" style="margin:0 0 4px"><span><span class="badge ' + cls + '">' + esc(label) + '</span></span><span>' + tok(u) +
+      (totUsed ? ' · ' + Math.round(100*u/totUsed) + ' %' : '') + '</span></div>' + bar(u, mx, c) + '</div>';
+    $('agents').innerHTML = profs.map(p => prow(p.label, p.cls, pu(p), maxA, p.k === 'cp' ? 'cy' : '') + p.subs.map(q => prow(q.label, q.cls, sum(q.tasks), maxA, '', true)).join('')).join('') +
+      '<div class="small">Modèles : ' + esc((P.models && [P.models.cp, P.models.archi, P.models.dev, P.models.revue || (profs.some(p => p.k === 'revue') ? 'REVUE Haiku' : '')].filter(Boolean).join(' · ')) || 'CP Sonnet · ARCHI Opus · DEV Sonnet') + '</div>';
     $('decisions').innerHTML = '<tr><th>#</th><th>Sujet</th><th>Statut</th></tr>' + (P.decisions || []).map(d =>
       '<tr><td class="mono">' + esc(d.n) + '</td><td>' + esc(d.subject) + '</td><td class="st ' + (/valid|retenu|ok/i.test(d.status) && !/à valider/i.test(d.status) ? 'ok' : 'wait') + '">' + esc(d.status) + '</td></tr>').join('');
-    renderInd(tasks, lots, byAgent, totUsed);
+    renderInd(tasks, lots, profs, totUsed);
     $('journal').innerHTML = (P.journal || []).slice().reverse().map(j => '<li><time>' + esc(j.at) + '</time>' + esc(j.text) + '</li>').join('') || '<li class="empty">—</li>';
   }
   const ROLES = { 'lu':'lu', 'modifié':'modifié', 'créé':'créé' };
@@ -248,7 +287,7 @@ footer{color:var(--muted-2);font:11px var(--mono);margin-top:40px}
       return '<li><span class="badge r-' + esc(r) + '">' + esc(r) + '</span><a href="' + esc(href) + '" target="_blank" rel="noopener" title="' + esc(d.f + ' (' + r + ')') + '">' + esc(name) + '</a></li>';
     }).join('') + '</ul></div>';
   }
-  const AGC = { cp:'var(--cyan)', archi:'var(--amber)', dev:'#c9d4ea' };
+  const AGC = { cp:'var(--cyan)', archi:'var(--amber)', dev:'#c9d4ea', revue:'#c4a7ff' };
   const pct = (a, b) => b ? Math.round(1000 * a / b) / 10 : 0;
   const fr1 = (n) => String(n).replace('.', ',');
   const ts = (s) => { const d = new Date(String(s).replace(' ', 'T')); return isNaN(d) ? null : d.getTime(); };
@@ -274,7 +313,7 @@ footer{color:var(--muted-2);font:11px var(--mono);margin-top:40px}
       '<circle cx="' + X(last[0]).toFixed(1) + '" cy="' + Y(last[1]).toFixed(1) + '" r="3.5" fill="var(--amber)"/></svg>' +
       '<div class="legend"><span><i style="background:var(--amber)"></i>Restant (réel)</span><span><i style="background:var(--cyan)"></i>Trajectoire idéale</span><span>Restant : <b style="color:var(--ink)">' + fmt(last[1]) + ' ' + esc(unit) + '</b> / ' + fmt(total) + '</span></div>';
   }
-  function renderInd(tasks, lots, byAgent, totUsed){
+  function renderInd(tasks, lots, profs, totUsed){
     const dated = tasks.filter(t => t.status === 'done' && ts(t.updated) != null).sort((a, b) => ts(a.updated) - ts(b.updated));
     const nT = tasks.length, bud = (t) => num(t.budget);
     const totB = tasks.reduce((s, t) => s + bud(t), 0);
@@ -291,20 +330,25 @@ footer{color:var(--muted-2);font:11px var(--mono);margin-top:40px}
         '<span>Tâches : ' + d + ' / ' + lt.length + ' · reste ' + (lt.length - d) + (lt.length ? bar(d, lt.length, 'cy') : '<div class="small">aucune tâche détaillée</div>') + '</span>' +
         '<span>Tokens : ' + tok(u) + ' / ' + tok(b) + ' · reste ' + tok(Math.max(0, b - u)) + (u > b ? ' (dépassement +' + tok(u - b) + ')' : '') + bar(u, b) + '</span></div>';
     }).join('');
-    const ks = ['cp', 'archi', 'dev'], R = 52, C = 2 * Math.PI * R;
+    const R = 52, C = 2 * Math.PI * R;
+    // Donut et parts : feuilles uniquement (DEV 1/2/3 à la place du total DEV) : pas de double comptage.
+    const leaves = []; profs.forEach(p => { if(p.subs.length) p.subs.forEach(q => leaves.push({ label:q.label, color:q.color, u:sum(q.tasks) })); else leaves.push({ label:p.label, color:p.color, u:sum(p.tasks) }); });
     let off = 0, arcs = '';
-    ks.forEach(a => { const f = totUsed ? byAgent[a] / totUsed : 0, len = f * C;
-      arcs += '<circle cx="70" cy="70" r="' + R + '" fill="none" stroke="' + AGC[a] + '" stroke-width="22" stroke-dasharray="' + len.toFixed(2) + ' ' + (C - len).toFixed(2) + '" stroke-dashoffset="' + (-off).toFixed(2) + '" transform="rotate(-90 70 70)"><title>' + AG[a] + ' : ' + tok(byAgent[a]) + '</title></circle>'; off += len; });
+    leaves.forEach(a => { const f = totUsed ? a.u / totUsed : 0, len = f * C;
+      arcs += '<circle cx="70" cy="70" r="' + R + '" fill="none" stroke="' + a.color + '" stroke-width="22" stroke-dasharray="' + len.toFixed(2) + ' ' + (C - len).toFixed(2) + '" stroke-dashoffset="' + (-off).toFixed(2) + '" transform="rotate(-90 70 70)"><title>' + esc(a.label) + ' : ' + tok(a.u) + '</title></circle>'; off += len; });
     $('agentShare').innerHTML = '<div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap"><svg viewBox="0 0 140 140" style="width:170px;flex:none" role="img" aria-label="Part des tokens par profil">' + arcs +
       '<text x="70" y="68" text-anchor="middle" style="font:700 15px var(--mono);fill:var(--ink)">' + tok(totUsed) + '</text><text x="70" y="82" text-anchor="middle">tokens</text></svg><div style="flex:1;min-width:160px">' +
-      ks.map(a => '<div style="margin:0 0 10px"><div class="row" style="margin:0 0 3px"><span><i style="display:inline-block;width:10px;height:10px;background:' + AGC[a] + ';margin-right:6px"></i>' + AG[a] + '</span><span>' + fr1(pct(byAgent[a], totUsed)) + ' %</span></div>' +
-        '<div class="bar"><i style="width:' + pct(byAgent[a], totUsed) + '%;background:' + AGC[a] + '"></i></div></div>').join('') + '</div></div>';
-    $('agentTable').innerHTML = '<table><tr><th>Profil</th><th>Consommés</th><th>Budget</th><th>Part</th><th>Tâches faites</th></tr>' + ks.map(a => {
-      const at = tasks.filter(t => t.agent === a), b = at.reduce((s, t) => s + bud(t), 0), d = at.filter(t => t.status === 'done').length;
-      return '<tr><td><span class="badge ' + a + '">' + AG[a] + '</span></td><td class="mono">' + tok(byAgent[a]) + '</td><td class="mono">' + tok(b) + (b && byAgent[a] > b ? ' <span style="color:var(--red)">+' + Math.round(100 * (byAgent[a] / b - 1)) + ' %</span>' : '') +
-        '</td><td class="mono">' + fr1(pct(byAgent[a], totUsed)) + ' %</td><td class="mono">' + d + ' / ' + at.length + '</td></tr>'; }).join('') +
-      '<tr><td class="mono">Total</td><td class="mono">' + tok(totUsed) + '</td><td class="mono">' + tok(totB) + '</td><td class="mono">100 %</td><td class="mono">' + tasks.filter(t => t.status === 'done').length + ' / ' + nT + '</td></tr></table>' +
-      '<div class="small" style="margin-top:8px">Les tokens « ≈ » (estimés) et « n/m » (non mesurés, comptés 0) sont repris tels quels de plan-status.js.</div>';
+      leaves.map(a => '<div style="margin:0 0 10px"><div class="row" style="margin:0 0 3px"><span><i style="display:inline-block;width:10px;height:10px;background:' + a.color + ';margin-right:6px"></i>' + esc(a.label) + '</span><span>' + fr1(pct(a.u, totUsed)) + ' %</span></div>' +
+        '<div class="bar"><i style="width:' + pct(a.u, totUsed) + '%;background:' + a.color + '"></i></div></div>').join('') + '</div></div>';
+    const trow = (label, cls, ts_, sub) => {
+      const u = sum(ts_), b = ts_.reduce((s, t) => s + bud(t), 0), d = ts_.filter(t => t.status === 'done').length;
+      const gap = b && u ? (u > b ? ' <span style="color:var(--red)">+' + Math.round(100 * (u / b - 1)) + ' %</span>' : ' <span style="color:var(--green)">−' + Math.round(100 * (1 - u / b)) + ' %</span>') : '<span class="small">—</span>';
+      return '<tr' + (sub ? ' class="sub"' : '') + '><td><span class="badge ' + cls + '">' + esc(label) + '</span></td><td class="mono">' + tok(u) + '</td><td class="mono">' + tok(b) +
+        '</td><td class="mono">' + fr1(pct(u, totUsed)) + ' %' + (sub ? ' <span class="small">(dans DEV)</span>' : '') + '</td><td class="mono">' + d + ' / ' + ts_.length + '</td><td class="mono">' + gap + '</td></tr>'; };
+    $('agentTable').innerHTML = '<table><tr><th>Profil</th><th>Consommés</th><th>Budget</th><th>Part</th><th>Tâches faites</th><th>Écart</th></tr>' +
+      profs.map(p => trow(p.label + (p.subs.length ? ' (total)' : ''), p.cls, p.tasks, false) + p.subs.map(q => trow(q.label, q.cls, q.tasks, true)).join('')).join('') +
+      '<tr><td class="mono">Total</td><td class="mono">' + tok(totUsed) + '</td><td class="mono">' + tok(totB) + '</td><td class="mono">100 %</td><td class="mono">' + tasks.filter(t => t.status === 'done').length + ' / ' + nT + '</td><td></td></tr></table>' +
+      '<div class="small" style="margin-top:8px">Les lignes DEV 1/2/3 détaillent le total DEV (non ajoutées au total). Les tokens « ≈ » (estimés) et « n/m » (non mesurés, comptés 0) sont repris tels quels de plan-status.js.</div>';
   }
   const open = {};  // état déplié (mémoire JS, survit au rafraîchissement) ; undefined = défaut (replié si done)
   try { Object.assign(open, JSON.parse(localStorage.getItem('kanbanOpen') || '{}')); } catch(e){}
@@ -321,7 +365,7 @@ footer{color:var(--muted-2);font:11px var(--mono);margin-top:40px}
     const u = used(t), b = num(t.budget), p = Math.max(0, Math.min(100, num(t.progress)));
     const o = isOpen(t), fold = t.status === 'done';
     const tg = fold ? '<button class="tg" data-toggle="' + esc(t.id) + '" aria-expanded="' + o + '" aria-label="' + (o ? 'Replier' : 'Déplier') + ' la tâche ' + esc(t.id) + '">' + (o ? '▾' : '▸') + '</button>' : '';
-    return '<article class="card' + (o ? '' : ' folded') + '" data-s="' + esc(t.status) + '"><div class="top"><span class="lead">' + tg + modBadge(t) + '<span class="id">' + esc(t.id) + '</span></span><span class="badge ' + esc(t.agent) + '">' + esc(AG[t.agent] || t.agent) +
+    return '<article class="card' + (o ? '' : ' folded') + '" data-s="' + esc(t.status) + '"><div class="top"><span class="lead">' + tg + modBadge(t) + '<span class="id">' + esc(t.id) + '</span></span><span class="badge ' + clsOf(agOf(t)) + '">' + esc(badgeText(t)) +
       (t.model ? ' · ' + esc(t.model) : '') + '</span></div><h3>' + esc(t.title) + '</h3><div class="body">' +
       '<div class="row"><span>Avancement</span><span>' + p + ' %</span></div>' + bar(p, 100, 'cy') +
       '<div class="row"><span>Tokens</span><span>' + (t.est ? '≈ ' : '') + (t.used == null ? 'n/m' : tok(u)) + (b ? ' / ' + tok(b) : '') + '</span></div>' + (b ? bar(u, b) : '') +
@@ -339,7 +383,7 @@ footer{color:var(--muted-2);font:11px var(--mono);margin-top:40px}
       g.setAttribute('aria-label', (o ? 'Replier' : 'Déplier') + ' la tâche ' + id); return; }
     const l = e.target.closest('[data-lot]'); if(l){ view.lot = l.dataset.lot; render(); return; }
     const a = e.target.closest('[data-agent]');
-    if(a){ view.agent = a.dataset.agent; document.querySelectorAll('[data-agent]').forEach(b => b.setAttribute('aria-pressed', b === a)); render(); }
+    if(a){ view.agent = a.dataset.agent; render(); }
   });
   function reload(){
     const old = document.getElementById('planData'), s = document.createElement('script');
