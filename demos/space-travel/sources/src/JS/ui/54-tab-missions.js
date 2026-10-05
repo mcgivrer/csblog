@@ -8,7 +8,8 @@
   const st = document.createElement('style');
   st.textContent = [
     '#sttConsole .con-panel[data-tab="missions"] .con-empty{ padding:18px; text-align:center; opacity:.7; }',
-    '#sttConsole .con-panel[data-tab="missions"]:has(.con-hosted[data-con-shown]) .con-empty{ display:none; }'
+    '#sttConsole .con-panel[data-tab="missions"]:has(.con-hosted[data-con-shown]) .con-empty{ display:none; }',
+    '#sttConsole #missionClose{ display:none; }'
   ].join('\n');
   document.head.appendChild(st);
 

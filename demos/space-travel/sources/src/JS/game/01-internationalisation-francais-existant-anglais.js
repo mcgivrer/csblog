@@ -38,7 +38,7 @@ const I18N = {
     modeTitle:'MODE DE JEU', modeNew:'Nouvelle campagne', modeNewSub:'Dirigez STT : un cargo Courlis, un capital de départ, une compagnie à bâtir.', modeContinue:'Continuer', modeContinueSub:'Reprendre la sauvegarde de ce navigateur.', modeFree:'Partie libre', modeFreeSub:'Choisir un vaisseau et voyager librement, sans campagne.',
     saveExport:'Exporter la sauvegarde', saveImport:'Importer…', saveDone:'Sauvegarde terminée.', saveError:'Sauvegarde impossible : fichier invalide ou trop récent.',
     modeReplace:'Une campagne existe : la remplacer ?', modeConfirm:'Confirmer', modeCancel:'Annuler', modeExportFirst:'Exporter d\u2019abord',
-    conTitle:'Console de bord', conClose:'Fermer la console', conTabNav:'Navigation', conTabMissions:'Missions', conTabPort:'Port', conTabYard:'Chantier naval', conTabHelp:'Aide · Réglages', conEmptyMissions:'Aucune mission à afficher.', hk_console:'TAB', hlp_console:'Ouvre/ferme la console de bord (dernier onglet)', hlp_hudAlt:'Bascule les éléments du HUD (barre d\u2019icônes)'
+    conTitle:'Console de bord', conClose:'Fermer la console', conTabNav:'Navigation', conTabMissions:'Missions', conTabPort:'Port', conTabYard:'Chantier naval', conTabHelp:'Aide · Réglages', conEmptyMissions:'Aucune mission à afficher.', hk_console:'TAB', hlp_console:'Ouvre/ferme la console de bord (dernier onglet)', hlp_hudAlt:'Bascule les éléments du HUD (barre d\u2019icônes ; si le navigateur intercepte Alt+n, cliquer l\u2019icône)'
   },
   en: {
     title_sub: 'Choose a language',
@@ -73,7 +73,7 @@ const I18N = {
     modeTitle:'GAME MODE', modeNew:'New campaign', modeNewSub:'Run STT: a Courlis freighter, starting capital, a company to build.', modeContinue:'Continue', modeContinueSub:'Resume the save stored in this browser.', modeFree:'Free play', modeFreeSub:'Pick a ship and fly freely, no campaign.',
     saveExport:'Export save', saveImport:'Import…', saveDone:'Save complete.', saveError:'Save failed: invalid or too recent a file.',
     modeReplace:'A campaign exists: replace it?', modeConfirm:'Confirm', modeCancel:'Cancel', modeExportFirst:'Export first',
-    conTitle:'Ship console', conClose:'Close console', conTabNav:'Navigation', conTabMissions:'Missions', conTabPort:'Port', conTabYard:'Shipyard', conTabHelp:'Help · Settings', conEmptyMissions:'No mission to display.', hk_console:'TAB', hlp_console:'Open/close the ship console (last tab)', hlp_hudAlt:'Toggle HUD elements (icon bar)'
+    conTitle:'Ship console', conClose:'Close console', conTabNav:'Navigation', conTabMissions:'Missions', conTabPort:'Port', conTabYard:'Shipyard', conTabHelp:'Help · Settings', conEmptyMissions:'No mission to display.', hk_console:'TAB', hlp_console:'Open/close the ship console (last tab)', hlp_hudAlt:'Toggle HUD elements (icon bar; if the browser grabs Alt+n, click the icon)'
   },
   de: {
     title_sub: 'Sprache wählen',
@@ -108,7 +108,7 @@ const I18N = {
     modeTitle:'SPIELMODUS', modeNew:'Neue Kampagne', modeNewSub:'Führen Sie STT: ein Frachter Courlis, Startkapital, eine Firma zum Aufbauen.', modeContinue:'Fortsetzen', modeContinueSub:'Den in diesem Browser gespeicherten Spielstand laden.', modeFree:'Freies Spiel', modeFreeSub:'Ein Schiff wählen und frei fliegen, ohne Kampagne.',
     saveExport:'Spielstand exportieren', saveImport:'Importieren…', saveDone:'Speichern abgeschlossen.', saveError:'Speichern fehlgeschlagen: ungültige oder zu neue Datei.',
     modeReplace:'Es gibt bereits eine Kampagne: ersetzen?', modeConfirm:'Bestätigen', modeCancel:'Abbrechen', modeExportFirst:'Zuerst exportieren',
-    conTitle:'Bordkonsole', conClose:'Konsole schließen', conTabNav:'Navigation', conTabMissions:'Aufträge', conTabPort:'Hafen', conTabYard:'Werft', conTabHelp:'Hilfe · Einstellungen', conEmptyMissions:'Keine Aufträge anzuzeigen.', hk_console:'TAB', hlp_console:'Bordkonsole öffnen/schließen (letzter Reiter)', hlp_hudAlt:'HUD-Elemente umschalten (Symbolleiste)'
+    conTitle:'Bordkonsole', conClose:'Konsole schließen', conTabNav:'Navigation', conTabMissions:'Aufträge', conTabPort:'Hafen', conTabYard:'Werft', conTabHelp:'Hilfe · Einstellungen', conEmptyMissions:'Keine Aufträge anzuzeigen.', hk_console:'TAB', hlp_console:'Bordkonsole öffnen/schließen (letzter Reiter)', hlp_hudAlt:'HUD-Elemente umschalten (Symbolleiste; fängt der Browser Alt+n ab, das Symbol anklicken)'
   },
   es: {
     title_sub: 'Elige un idioma',
@@ -143,7 +143,7 @@ const I18N = {
     modeTitle:'MODO DE JUEGO', modeNew:'Nueva campaña', modeNewSub:'Dirige STT: un carguero Courlis, capital inicial, una compañía por construir.', modeContinue:'Continuar', modeContinueSub:'Retomar la partida guardada en este navegador.', modeFree:'Partida libre', modeFreeSub:'Elegir una nave y volar libremente, sin campaña.',
     saveExport:'Exportar partida', saveImport:'Importar…', saveDone:'Guardado completado.', saveError:'Error al guardar: archivo inválido o demasiado reciente.',
     modeReplace:'Ya existe una campaña: ¿reemplazarla?', modeConfirm:'Confirmar', modeCancel:'Cancelar', modeExportFirst:'Exportar primero',
-    conTitle:'Consola de a bordo', conClose:'Cerrar la consola', conTabNav:'Navegación', conTabMissions:'Misiones', conTabPort:'Puerto', conTabYard:'Astillero', conTabHelp:'Ayuda · Ajustes', conEmptyMissions:'Ninguna misión que mostrar.', hk_console:'TAB', hlp_console:'Abre/cierra la consola de a bordo (última pestaña)', hlp_hudAlt:'Alterna elementos del HUD (barra de iconos)'
+    conTitle:'Consola de a bordo', conClose:'Cerrar la consola', conTabNav:'Navegación', conTabMissions:'Misiones', conTabPort:'Puerto', conTabYard:'Astillero', conTabHelp:'Ayuda · Ajustes', conEmptyMissions:'Ninguna misión que mostrar.', hk_console:'TAB', hlp_console:'Abre/cierra la consola de a bordo (última pestaña)', hlp_hudAlt:'Alterna elementos del HUD (barra de iconos; si el navegador intercepta Alt+n, pulsa el icono)'
   }
 };
 function t(key){
