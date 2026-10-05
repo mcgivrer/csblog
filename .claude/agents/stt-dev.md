@@ -33,3 +33,10 @@ Vérifications : …
 Question : …
 ```
 Puis commit sur la branche du lot (message en français, une ligne + attribution demandée par le dépôt).
+
+## Mise à jour du Kanban (uniquement sur demande du CP)
+Le CP est responsable du contenu du Kanban : il décide quoi inscrire. C'est **toi, le DEV, qui écris** dans `demos/space-travel/docs/work_in_progress/plan-status.js`, quand le CP te le demande par un message du type « Kanban : tâche X → statut, progress, used, note ».
+- Modifie **uniquement** `plan-status.js`, par Edit ciblé (une ligne de tâche à la fois), jamais par réécriture complète ni `kanban.html` (page fixe, sauf demande explicite du CP). Applique à la lettre les valeurs données par le CP (`status`, `progress`, `used` cumulé, `updated`, `note`, `inst`, `docs`, `journal`, `decisions`) : tu n'en inventes aucune.
+- Mets à jour `updated` de la tâche et celui du haut de fichier. Vérifie la syntaxe : `node -e "global.window={};require('./demos/space-travel/docs/work_in_progress/plan-status.js');console.log(window.PLAN.tasks.length)"`.
+- Fais cette mise à jour **dans le worktree de la branche du lot** (jamais dans le worktree d'une instance DEV parallèle) et **une instance à la fois** : le Kanban est un point sérialisé. Commit séparé de ta tâche de code : « Kanban : <tâches> ». Les tâches purement mécaniques de ce type se font avec le modèle Haiku.
+- Rapport : une ligne (« Kanban à jour : <ids> »).
