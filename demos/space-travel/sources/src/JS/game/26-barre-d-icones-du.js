@@ -199,6 +199,8 @@ function buildHelpGrid(){
     [t('hk_aim'), t('hlp_aim')],
     [t('hk_freelook'), t('hlp_freelook')]
   ];
+  rows.push([t('hk_console'), t('hlp_console')]);
+  [['F2','conTabNav'],['F3','conTabMissions'],['F4','conTabPort'],['F5','conTabYard']].forEach(function(r){ rows.push([r[0], t(r[1])]); });
   HUD_BAR_ITEMS.forEach(function(item){
     /* l'aide se décrit elle-même juste en dessous (« Affiche/masque cette
        aide ») — l'inclure ici aussi ferait doublon sur la touche H, comme
@@ -252,7 +254,7 @@ document.addEventListener('click', function(e){
   const bar = document.getElementById('hudIconBar');
   if(!bar) return;
   HUD_BAR_ITEMS.forEach(function(item, idx){
-    if(!item.hotkey) item.hotkey = 'F' + (idx+1);   /* F1..F9, dans l'ordre — l'aide fixe déjà la sienne à 'H' */
+    if(!item.hotkey) item.hotkey = idx < 8 ? 'Alt+' + (idx+1) : 'F' + (idx+1);   /* Alt+1..8 (F1-F8 migrés vers la console, L1.7), F9 caméra — l'aide fixe déjà la sienne à 'H' */
     const btn = document.createElement('button');
     btn.className = 'hud-icon-btn';
     btn.innerHTML = '<svg viewBox="0 0 24 24">'+HUD_ICONS[item.icon]+'</svg>';

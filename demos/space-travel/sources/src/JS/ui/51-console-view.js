@@ -3,7 +3,7 @@
    Le modèle (CONSOLE, 50-console.js) décide ; ce fichier dessine et relaie les touches.
    Seul le membre CONSOLE.view est ajouté : aucune globale nouvelle.
    ========================================================================= */
-/* @provides CONSOLE.view @requires CONSOLE @requires-engine t, gameStarted, gamePaused */
+/* @provides CONSOLE.view @requires CONSOLE @requires-engine t, gameStarted, gamePaused, activateHudBarItem, HUD_BAR_ITEMS */
 (function(){
   const CSS = [
     '#sttConsole{ position:fixed; inset:0; z-index:6; display:flex; align-items:center; justify-content:center; pointer-events:none; font-family:"JetBrains Mono",monospace; }',
@@ -204,11 +204,13 @@
       { started: gameStarted, paused: gamePaused, typing: typing(e.target) || typing(document.activeElement) });
     if(!a) return;
     switch(a.act){
-      case 'last':   CONSOLE.open(); eat(e); break;
-      case 'close':  CONSOLE.close('user'); if(e.code === 'Escape') escHeld = true; eat(e); break;
-      case 'swallow': eat(e); break;
-      default: break;   /* toggle, hud, reserved : branchés en L1.7 (le jeu garde la touche d'ici là) */
+      case 'toggle': CONSOLE.toggle(a.tab); break;
+      case 'last':   CONSOLE.open(); break;
+      case 'close':  CONSOLE.close('user'); if(e.code === 'Escape') escHeld = true; break;
+      case 'hud':    if(HUD_BAR_ITEMS[a.index]) activateHudBarItem(HUD_BAR_ITEMS[a.index]); break;
+      default: break;   /* swallow, reserved : sans effet */
     }
+    eat(e);   /* toute action non nulle : le jeu (23) ne voit plus la touche, même si open/toggle a refusé */
   }
 
   function onKeyUp(e){ if(e.code === 'Escape') escHeld = false; }

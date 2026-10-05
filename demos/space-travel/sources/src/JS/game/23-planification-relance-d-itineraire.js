@@ -234,6 +234,9 @@ window.addEventListener('keydown', function(e){
   /* générique, écran-titre, choix du vaisseau : le clavier appartient à ces écrans (42-…), jamais aux
      panneaux, à la pause ni au pilotage de la partie, qui n'existe pas encore */
   if(!gameStarted) return;
+  /* frappe dans un champ texte (import de sauvegarde, réglages) : aucun raccourci, sauf Échap (pause) */
+  if(e.code !== 'Escape' && e.target && e.target.tagName && (e.target.tagName === 'TEXTAREA' || e.target.isContentEditable ||
+     (e.target.tagName === 'INPUT' && /^(|text|search|url|tel|email|password|number)$/i.test(e.target.getAttribute('type') || '')))) return;
   /* abrégé de la manœuvre d'orbite/livraison : le reste de la séquence se
      joue en accéléré (travelling rapide) plutôt que d'être coupé net —
      les navettes et le canal radio restent visibles, juste comprimés.
@@ -322,24 +325,20 @@ window.addEventListener('keydown', function(e){
     const it = HUD_BAR_ITEMS.find(function(x){ return x.kind === 'audio'; });
     if(it) activateHudBarItem(it);
   }
-  /* TAB bascule directement l'affichage du canal radio, à tout moment —
-     un simple interrupteur, pas une préférence qui viendrait interférer
-     avec l'affichage/masquage automatique au début/fin de la manœuvre.
-     preventDefault : Tab déplacerait sinon le focus clavier sur la page. */
-  if(e.code === 'Tab'){
+  /* Alt+1 à Alt+8 — slots de la barre du HUD (par position physique : AZERTY compris). Normalement traité
+     avant par la console (51-console-view, capture) ; repli si la vue est absente. Tab (console) et F1-F8
+     (onglets F2-F5, F1/F6-F8 réservés) appartiennent à la console depuis L1.7 : la radio est sur Alt+7. */
+  if(e.altKey && !e.ctrlKey && !e.metaKey && /^Digit[1-8]$/.test(e.code)){
     e.preventDefault();
-    toggleRadioPanel();
+    if(typeof CONSOLE !== 'undefined' && CONSOLE.view) return;   /* la vue (capture) s'en charge : pas de double bascule */
+    const it = HUD_BAR_ITEMS[Number(e.code.slice(5)) - 1];
+    if(it) activateHudBarItem(it);
+    return;
   }
-  /* F1 à F9 — bascule chacune des icônes de la barre du HUD (§12), dans
-     leur ordre d'affichage (remplace l'ancienne affectation dédiée de F3
-     à la caméra, désormais F9 comme les autres icônes — une seule
-     numérotation, plus simple à retenir et à documenter dans l'aide). */
-  if(e.code.length === 2 && e.code[0] === 'F' && e.code >= 'F1' && e.code <= 'F9'){
-    const idx = Number(e.code.slice(1)) - 1;
-    if(HUD_BAR_ITEMS[idx]){
-      e.preventDefault();
-      activateHudBarItem(HUD_BAR_ITEMS[idx]);
-    }
+  /* F9 — caméra (slot 9 de la barre) */
+  if(e.code === 'F9'){
+    e.preventDefault();
+    if(HUD_BAR_ITEMS[8]) activateHudBarItem(HUD_BAR_ITEMS[8]);
   }
   /* F10 — coupe/rétablit la voix de synthèse. Agit sur le MÊME état que le
      bouton muet du panneau radio (une seule source de vérité) : l'icône du
