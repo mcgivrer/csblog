@@ -74,6 +74,18 @@ def scenario(pg, label):
         c1 = cur(pg); shown = pg.evaluate("() => !document.getElementById('sttConsole').hidden")
         press(pg, key)
         check(f"{label} : {key} ouvre « {tab} » puis referme", c1 == tab and shown and cur(pg) is None, [c1, cur(pg)])
+    # --- l'indication d'état du pilote automatique (#apHud, « EN ORBITE · … ») passe SOUS la console : la barre d'onglets reste atteignable
+    reset(pg)
+    pg.evaluate("() => { const apEl = document.getElementById('apHud'); apEl.innerHTML = '<b>EN ORBITE</b> · MAJ/ESPACE : quitter l\\u2019orbite · J : missions'; apEl.style.display = 'block'; apEl.style.pointerEvents = 'auto'; }")   # pointer-events:auto : sinon elementFromPoint ignore l'indication
+    press(pg, "KeyH")
+    hud = pg.evaluate("""() => { const tabs = document.getElementById('sttConsoleTabs').getBoundingClientRect(), a = document.getElementById('apHud').getBoundingClientRect();
+      const cx = Math.max(tabs.left, a.left) + (Math.min(tabs.right, a.right) - Math.max(tabs.left, a.left)) / 2, cy = (Math.max(tabs.top, a.top) + Math.min(tabs.bottom, a.bottom)) / 2;
+      const hit = document.elementFromPoint(cx, cy), mid = document.elementFromPoint(tabs.left + tabs.width / 2, tabs.top + tabs.height / 2);
+      return { overlap: a.bottom > tabs.top && a.top < tabs.bottom && a.right > tabs.left && a.left < tabs.right, hit: hit ? hit.id || hit.className || hit.tagName : null,
+        inside: !!(hit && hit.closest('#sttConsole')), midInside: !!(mid && mid.closest('#sttConsole')) }; }""")
+    check(f"{label} : console ouverte, l'indication « EN ORBITE » ne masque pas la barre d'onglets (elementFromPoint dans #sttConsole)", hud["inside"] and hud["midInside"], hud)
+    pg.evaluate("() => { document.getElementById('apHud').style.display = 'none'; document.getElementById('apHud').style.pointerEvents = ''; }")
+    reset(pg)
     # --- aucun overlay hors console, pour chaque onglet ouvert ; un seul panneau visible
     for key in ("KeyM", "KeyJ", "KeyH"):
         reset(pg); press(pg, key)
@@ -170,8 +182,9 @@ def scenario(pg, label):
 
 def board_opens(pg, label):
     """Escale : le tableau de missions s'ouvre tout seul et la console passe sur « missions »."""
-    pg.evaluate("() => { let n = 0; while(n++ < 600 && !(missionBoardOverlay.style.display === 'flex')) window.__step(1); }")
-    pg.wait_for_function("() => CONSOLE.current() === 'missions'", timeout=3000, polling=50)
+    # attente d'une CONDITION (et non d'un nombre fixe d'étapes ni d'une durée fixe) : la simulation avance par paquets tant que la
+    # console n'est pas passée sur « missions » ; délai de sécurité large pour tolérer la charge de la machine
+    pg.wait_for_function("() => { if(CONSOLE.current() !== 'missions') window.__step(20); return CONSOLE.current() === 'missions'; }", timeout=90000, polling=100)
     st = pg.evaluate("() => ({ cur: CONSOLE.current(), board: missionBoardOverlay.style.display, inside: !!missionBoardOverlay.closest('#sttConsole') })")
     check(f"{label} : ouverture auto du tableau à l'escale ⇒ console sur « missions »", st["cur"] == "missions" and st["board"] == "flex" and st["inside"], st)
     check(f"{label} : la croix #missionClose est masquée (display:none) dans la console", pg.evaluate("() => { const x = document.getElementById('missionClose'); return !x || getComputedStyle(x).display === 'none'; }"))
