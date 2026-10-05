@@ -119,7 +119,8 @@ function activateHudBarItem(item){
       if(el) el.classList.toggle('visible');
     }
   } else if(item.kind === 'starmap'){
-    if(isStarMapOpen()) closeStarMap(); else openStarMap();
+    if(typeof CONSOLE !== 'undefined'){ CONSOLE.toggle('nav'); }
+    else if(isStarMapOpen()) closeStarMap(); else openStarMap();
   } else if(item.kind === 'audio'){
     if(typeof CONSOLE !== 'undefined' && CONSOLE.help) CONSOLE.help.toggleAudio();
     else toggleAudioPanel();
