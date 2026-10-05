@@ -176,6 +176,6 @@ const LOCAL = (function(){
   document.querySelectorAll('[data-panel-cls="__contracts__"]').forEach(function(b){ b.addEventListener('click', closeContractBoard); });
 
   return { buildStations: buildStations, updateStations: updateStations, disposeStations: disposeStations,
-    refreshShipyardRow: refreshShipyardRow, openContractBoard: openContractBoard };
+    refreshShipyardRow: refreshShipyardRow, openContractBoard: openContractBoard, closeContractBoard: closeContractBoard };
 })();
 function buildStations(leg){ LOCAL.buildStations(leg); }

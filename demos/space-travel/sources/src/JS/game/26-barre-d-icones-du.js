@@ -127,7 +127,8 @@ function activateHudBarItem(item){
   } else if(item.kind === 'autopilot'){
     if(REAL.active && REAL.started) REAL.apToggle();
   } else if(item.kind === 'missions'){
-    if(typeof MISSIONS !== 'undefined' && MISSIONS.enabled()) MISSIONS.toggleBoard();
+    if(typeof CONSOLE !== 'undefined'){ CONSOLE.toggle('missions'); }
+    else if(typeof MISSIONS !== 'undefined' && MISSIONS.enabled()) MISSIONS.toggleBoard();
   }
   refreshHudIconBar();
 }
@@ -160,7 +161,7 @@ function refreshHudIconBar(){
         active = !!(el && el.classList.contains('visible'));
       }
     } else if(item.kind === 'starmap'){
-      active = isStarMapOpen();
+      active = (typeof CONSOLE !== 'undefined') ? CONSOLE.isOpen('nav') : isStarMapOpen();
     } else if(item.kind === 'audio'){
       const el = document.getElementById('audioOverlay');
       active = !!(el && el.classList.contains('visible'));
@@ -169,7 +170,8 @@ function refreshHudIconBar(){
       active = live && REAL.ap.on; disabled = !live;
     } else if(item.kind === 'missions'){
       const on = typeof MISSIONS !== 'undefined' && MISSIONS.enabled();
-      active = on && MISSIONS.boardOpen(); disabled = !on;
+      active = (typeof CONSOLE !== 'undefined') ? CONSOLE.isOpen('missions') : (on && MISSIONS.boardOpen());
+      disabled = !on;
     }
     item.el.classList.toggle('active', active);
     item.el.classList.toggle('disabled', disabled);
