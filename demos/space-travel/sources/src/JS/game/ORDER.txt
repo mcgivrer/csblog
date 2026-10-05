@@ -68,3 +68,4 @@ shared/starmap.js
 41-animation-des-systemes-planetaires.js
 42-ecran-de-demarrage-sequence.js
 45-campaign-bridge.js
+ui/50-console.js
