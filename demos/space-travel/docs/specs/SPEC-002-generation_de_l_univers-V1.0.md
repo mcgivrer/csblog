@@ -773,7 +773,7 @@ Cinq **gabarits** de forme sont générés une fois au chargement (`ASTEROID_TEM
 
 ## 11. Paramètres de référence
 
-Les valeurs ci-dessous sont celles du profil d'échelle **`actuel`**, le profil par défaut. Depuis le palier P0 de l'[étude des échelles](./etude-echelles.md), les constantes de génération (côtés de cellule, longueur des sauts, rayons des planètes et des astéroïdes, orbites, lunes, ceintures, rayon visuel des étoiles) sont lues dans la table `SCALE_PROFILES`, où `actuel` reproduit exactement ce tableau et `allegee` applique la révision des échelles.
+Les valeurs ci-dessous sont celles du profil d'échelle **`actuel`**, le profil par défaut. Depuis le palier P0 de l'[étude des échelles](./SPEC-003-etude_des_echelles-V1.0.md), les constantes de génération (côtés de cellule, longueur des sauts, rayons des planètes et des astéroïdes, orbites, lunes, ceintures, rayon visuel des étoiles) sont lues dans la table `SCALE_PROFILES`, où `actuel` reproduit exactement ce tableau et `allegee` applique la révision des échelles.
 
 | Paramètre | Valeur | Rôle |
 |---|---:|---|
@@ -813,7 +813,7 @@ Ouvrir le jeu avec `?seed=` suivi de n'importe quelle chaîne :
 http://localhost:8000/space-travel.html?seed=TEST
 ```
 
-Le paramètre `scale=actuel` (défaut) ou `scale=allegee` choisit le profil d'échelle et se combine avec la graine : `?seed=TEST&scale=allegee`. Le profil `allegee` est en construction : seule la génération est câblée pour l'instant (voir l'[étude des échelles](./etude-echelles.md)).
+Le paramètre `scale=actuel` (défaut) ou `scale=allegee` choisit le profil d'échelle et se combine avec la graine : `?seed=TEST&scale=allegee`. Le profil `allegee` est en construction : seule la génération est câblée pour l'instant (voir l'[étude des échelles](./SPEC-003-etude_des_echelles-V1.0.md)).
 
 ### 12.2 Interroger le générateur dans la console
 

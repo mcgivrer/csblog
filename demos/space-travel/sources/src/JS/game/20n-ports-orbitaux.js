@@ -1,5 +1,5 @@
 /* =========================================================================
-   PORTS ORBITAUX — lot P1 : génération et rendu (spec-ports-orbitaux-navette.md, Partie B)
+   PORTS ORBITAUX — lot P1 : génération et rendu (SPEC-008-ports_orbitaux_et_navette-V1.0.md, Partie B)
    Décisions : archétypes + modules tirés par graine ; tous les vaisseaux accostent → chaque port offre au moins
    un poste L (vaisseau ≤ 240 m) ; les stations du commerce local (L3) sont absorbées (mêmes planètes, angles, noms).
    - A « anneau » (280–380 m) : anneau habité tournant, moyeu, rayons, un ponton L (+ parfois un ponton S/M) ;

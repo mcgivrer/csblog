@@ -64,7 +64,7 @@ commerce local (vaisseau de départ) → long-courrier (distorsion) → module d
 | L6 ✅ | Greffons vaisseau : moteurs, usure et livrées, textures HD, anneaux, tremblement | L1 |
 | L7 ✅ | Hublots, baies et hangars réalistes | L1 |
 | L8 | ~~Soleils « cinéma »~~ — absorbé par L2.2 | — |
-| L9 | Trafic, petits engins, baies à champ de force, concurrence et escorte, radar — **spécifié** : [`spec-L9-jeu.md`](spec-L9-jeu.md), [`spec-L9-technique.md`](spec-L9-technique.md) | L2, L4 |
+| L9 | Trafic, petits engins, baies à champ de force, concurrence et escorte, radar — **spécifié** : [`SPEC-007-l9_trafic_concurrence_escorte_jeu-V1.0.md`](SPEC-007-l9_trafic_concurrence_escorte_jeu-V1.0.md), [`SPEC-007-l9_trafic_concurrence_escorte_technique-V1.0.md`](SPEC-007-l9_trafic_concurrence_escorte_technique-V1.0.md) | L2, L4 |
 | L10 ✅ | Profondeur de champ, gros plans | L6 |
 
 ## 4 bis. Avancement du lot 2
@@ -388,7 +388,7 @@ décor d'abord « nulle » faute de relevés (centre de la planète au-delà du 
 
 ## 4 decies. Lots N et N2 — navette-cargo et navettes de baie
 
-Voir [`spec-ports-orbitaux-navette.md`](spec-ports-orbitaux-navette.md) (décisions, chorégraphie, mesures). En bref :
+Voir [`SPEC-008-ports_orbitaux_et_navette-V1.0.md`](SPEC-008-ports_orbitaux_et_navette-V1.0.md) (décisions, chorégraphie, mesures). En bref :
 `20p-navette.js` (`CARGO`) — conteneur ISO 20' réel ; navette-cargo (corps de navette de la démo + berceau dorsal) ;
 **baie ventrale ajoutée aux 4 porte-conteneurs** (table `BELLY` de `shipglass.js`, seule modification de la copie) ;
 prise directe sur la pile ; engins de baie sans conteneur pour les autres vaisseaux ; plus aucun module d'amarrage.
@@ -399,7 +399,7 @@ prise directe sur la pile ; engins de baie sans conteneur pour les autres vaisse
 
 `20n-ports-orbitaux.js` (`PORTS`) : anneau, moyeu à pontons, tour d'amarrage, déclinés par graine ; poste L sur chaque
 port ; stations du commerce local absorbées (mêmes planètes et noms) ; toute géante gazeuse dotée d'une tour. Détails,
-rendus et mesures : [`spec-ports-orbitaux-navette.md`](spec-ports-orbitaux-navette.md) §B.3 bis. Test : `ports_test.py`.
+rendus et mesures : [`SPEC-008-ports_orbitaux_et_navette-V1.0.md`](SPEC-008-ports_orbitaux_et_navette-V1.0.md) §B.3 bis. Test : `ports_test.py`.
 
 ## 5. Build et tests
 

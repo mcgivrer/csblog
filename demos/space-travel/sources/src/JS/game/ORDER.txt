@@ -1,6 +1,10 @@
 00-prologue.js
 01-internationalisation-francais-existant-anglais.js
 02-prng-seede-tout-l.js
+sim/00-game-state.js
+sim/01-rng-game.js
+sim/02-data.js
+sim/03-save.js
 03-generateur-de-noms-melange.js
 04-modele-astrophysique.js
 05-scene-three-js.js
@@ -63,3 +67,4 @@ shared/starmap.js
 40-boucle-principale.js
 41-animation-des-systemes-planetaires.js
 42-ecran-de-demarrage-sequence.js
+45-campaign-bridge.js

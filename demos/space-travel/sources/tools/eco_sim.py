@@ -1,4 +1,5 @@
-"""Usage : python3 eco_sim.py — affiche l'heure de jeu de chaque jalon de la campagne.
+"""Usage : python3 eco_sim.py [--mesures target/mesures/missions-<modele>.json] — affiche l'heure de jeu de chaque jalon de la campagne.
+(--mesures : MIN_LOCAL = mean_s/60 de la mesure, au lieu de la valeur supposée.)
 Modèle d'équilibrage de la campagne STT (proposition SPEC-010). Pas de hasard : valeurs moyennes."""
 UNIT_AVG = 300          # CR par conteneur (moyenne pondérée des natures, 20q-missions.js)
 UNIT_INTER = 360        # entre systèmes : natures de valeur plus fréquentes (armes, minerais rares)
@@ -63,5 +64,11 @@ def run(start=4000, verbose=True):
     return log
 
 if __name__ == '__main__':
+    import sys, json
+    if '--mesures' in sys.argv:   # L0.3 : durée locale mesurée (src/test/chrono_missions_bench.py) à la place de MIN_LOCAL
+        _m = json.load(open(sys.argv[sys.argv.index('--mesures') + 1], encoding='utf-8'))
+        if not _m.get('mean_s'): raise SystemExit('mesure sans mean_s')
+        MIN_LOCAL = _m['mean_s']/60
+        print(f"Mesure {_m.get('modele')} : MIN_LOCAL = {MIN_LOCAL:.2f} min (au lieu de 6.0), n = {sum(1 for r in _m.get('runs', []) if r.get('s_mission') is not None)}")
     print('Revenus nets/h :', {s: round(Ship(s,c,tr,v,a,f).rate()[0]) for s,c,tr,v,a,f in [('départ',4,'I',39000,False,False),('amiral 8c',8,'II',47000,False,False),('amiral 12c saut',12,'III',80000,False,True),('auto 4c',4,'I',39000,True,False)]})
     run()

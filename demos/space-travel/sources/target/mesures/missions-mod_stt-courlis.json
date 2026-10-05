@@ -1,0 +1,79 @@
+{
+ "modele": "mod_stt-courlis",
+ "seed": "CHRONO1",
+ "runs": [
+  {
+   "dest": "Frost Sel 571 III",
+   "qty": 1,
+   "s_board": 0.1,
+   "s_mission": 71,
+   "phases": [
+    [
+     "ORBIT/CRUISE",
+     0
+    ],
+    [
+     "TRANSFER/CRUISE",
+     0
+    ],
+    [
+     "APPROACH/CRUISE",
+     22
+    ],
+    [
+     "ORBIT/ARRIVAL_PAUSE",
+     52
+    ]
+   ]
+  },
+  {
+   "dest": "Frost Sel 571 III a",
+   "qty": 1,
+   "s_board": 0,
+   "s_mission": 71,
+   "phases": [
+    [
+     "ORBIT/CRUISE",
+     0
+    ],
+    [
+     "TRANSFER/CRUISE",
+     0
+    ],
+    [
+     "APPROACH/CRUISE",
+     22
+    ],
+    [
+     "ORBIT/ARRIVAL_PAUSE",
+     52
+    ]
+   ]
+  },
+  {
+   "dest": "Frost Sel 571 III",
+   "qty": 1,
+   "s_board": 0,
+   "s_mission": 71,
+   "phases": [
+    [
+     "ORBIT/CRUISE",
+     0
+    ],
+    [
+     "TRANSFER/CRUISE",
+     0
+    ],
+    [
+     "APPROACH/CRUISE",
+     22
+    ],
+    [
+     "ORBIT/ARRIVAL_PAUSE",
+     52
+    ]
+   ]
+  }
+ ],
+ "mean_s": 71.0
+}

@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| **Tâche** | T0.2 du [plan Scene](./PLAN-scenes.md) (lot 0), rôle architecte |
-| **Entrée** | [Inventaire T0.1](./PLAN-scenes-T0.1-inventaire.md) (§3.2 : données brutes) |
+| **Tâche** | T0.2 du [plan Scene](./DAT-annexe_1-plan_scenes-V1.0.md) (lot 0), rôle architecte |
+| **Entrée** | [Inventaire T0.1](./DAT-annexe_2-inventaire_des_etats_T0.1-V1.0.md) (§3.2 : données brutes) |
 | **Base** | jeu `stt_v2.17.0` |
 | **Date** | 2026-10-03 |
 | **Statut** | Matrice écrite ; cas testés par T0.3 (voir « Résultats de T0.3 » au §5) |

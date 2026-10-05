@@ -69,6 +69,6 @@ Push the tags to **both** remotes: `git push origin <tag>` and `git push nex <ta
 ## Conventions specific to this directory
 
 - Both engines are **French-first**; UI strings and TTS/radio dialogue originate in French with in-file translation tables (see root `AGENTS.md`).
-- `docs/` holds versioned Markdown specs (`spec-space_travel_and_transport-*.md`, `spec-L9-*.md`, `spec-missions*.md`, `spec-ports-orbitaux-navette*.md`) plus matching `.pdf` exports and `illustrations/`/`etude-*` subfolders of reference images — when a spec changes, the versioned `.md`/`.pdf` pair and relevant illustration usually change together.
+- `docs/` holds versioned Markdown specs (`SPEC-NNN-titre-Vx.y.md`) plus matching `.pdf` exports and `illustrations/`/`etude-*` subfolders of reference images — when a spec changes, the versioned `.md`/`.pdf` pair and relevant illustration usually change together.
 - `archives/` holds zipped source snapshots and retired `.min.html` builds — treat as historical, not live code.
 - `TODO.md` is a running, dated log of feature requests/bug reports written by the maintainer in French, organized by date/version heading; treat it as an input backlog, not documentation of current behavior.

@@ -1,7 +1,7 @@
 """
-Caractérisation des scènes — matrice scène × touche (docs/PLAN-scenes-T0.2-matrice.md, §5).
+Caractérisation des scènes — matrice scène × touche (docs/DAT-annexe_3-matrice_des_scenes_T0.2-V1.0.md, §5).
 Filet de sécurité de la refonte en scènes : ce test fige le comportement du jeu APRÈS correction des défauts
-relevés par l'inventaire (docs/PLAN-scenes-T0.1-inventaire.md, §5) ; la version précédente figeait le comportement d'origine.
+relevés par l'inventaire (docs/DAT-annexe_2-inventaire_des_etats_T0.1-V1.0.md, §5) ; la version précédente figeait le comportement d'origine.
 Chaque cas porte l'identifiant de la matrice (K-…). En temps virtuel (30 images/s, sans rendu).
 Usage : python3 src/test/scenes_matrice_test.py target/space-travel.html
 """
@@ -56,6 +56,8 @@ with sync_playwright() as pw:
     ov = pg.evaluate("() => ({ audio: document.getElementById('audioOverlay').classList.contains('visible'), radio: document.getElementById('radioPanel').classList.contains('visible') })")
     check("K-H-TITLE", "H, V, I, L, Tab, F1, F7 sur le titre : aucun effet (garde gameStarted)", s["help"] is False and not ov["audio"] and not ov["radio"], f"aide = {s['help']} · {ov}")
     pg.click('.lang-btn[data-lang="en"]')
+    pg.wait_for_function("() => document.getElementById('modeSelect').classList.contains('open')", timeout=30000, polling=100)   # L0.6 : choix du mode avant le hangar
+    pg.click('#modeSelect [data-mode="free"]')
     pg.wait_for_function("() => SHIP_SELECT_OPEN === true", timeout=90000, polling=250)
     for k in ("h", "v", "Tab"): press(pg, k)
     s = S(pg)

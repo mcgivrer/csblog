@@ -371,7 +371,7 @@ Une barre d'icônes SVG, générée dynamiquement depuis une seule liste (`HUD_B
 
 ## 13. Événements aléatoires et réparations
 
-> **v2.17** — remplacé par le **moteur d'incidents interactif** des missions (météorites, astéroïdes, pirates, vol par un concurrent — lot M3, `spec-missions.md`).
+> **v2.17** — remplacé par le **moteur d'incidents interactif** des missions (météorites, astéroïdes, pirates, vol par un concurrent — lot M3, `SPEC-009-missions_risques_et_competences-V1.0.md`).
 
 
 ```mermaid
@@ -1214,8 +1214,8 @@ Quand les images dépassent en moyenne 23 ms (gros plan planétaire), la défini
 La v2.17 fusionne dans le jeu la démo cinématique « Observation des étoiles » v7.2.2 et **abandonne le monde
 compressé** : l'**échelle réelle** devient le seul mode. Les chapitres ci-dessous décrivent l'état du jeu à la
 livraison du lot **P1** (ports orbitaux). Les spécifications détaillées des chantiers en cours sont des documents
-séparés : `spec-L9-jeu.md` / `spec-L9-technique.md` (trafic, concurrence, escorte, radar),
-`spec-ports-orbitaux-navette.md` (navettes, ports), `spec-missions.md` (missions, risques, compétences, Gemini Nano).
+séparés : `SPEC-007-l9_trafic_concurrence_escorte_jeu-V1.0.md` / `SPEC-007-l9_trafic_concurrence_escorte_technique-V1.0.md` (trafic, concurrence, escorte, radar),
+`SPEC-008-ports_orbitaux_et_navette-V1.0.md` (navettes, ports), `SPEC-009-missions_risques_et_competences-V1.0.md` (missions, risques, compétences, Gemini Nano).
 
 ## 32. Échelle réelle et rendu en deux couches — ✅ implémenté
 
@@ -1402,9 +1402,9 @@ flowchart LR
 
 | Chantier | Référence | Statut |
 |---|---|---|
-| P2 → P4 : amarrage, escale au port, missions et escortes | `spec-ports-orbitaux-navette.md` | P2 en cours |
-| M1 → M5 : missions (plus d'itinéraire), natures de fret, risques, SMP, incidents interactifs, compétences, **Gemini Nano hybride** (le LLM interprète, le jeu décide) | `spec-missions.md` | spécifié |
-| L9 : trafic ambiant, petits engins, concurrence, escorte, radar (touche B) | `spec-L9-jeu.md`, `spec-L9-technique.md` | spécifié |
+| P2 → P4 : amarrage, escale au port, missions et escortes | `SPEC-008-ports_orbitaux_et_navette-V1.0.md` | P2 en cours |
+| M1 → M5 : missions (plus d'itinéraire), natures de fret, risques, SMP, incidents interactifs, compétences, **Gemini Nano hybride** (le LLM interprète, le jeu décide) | `SPEC-009-missions_risques_et_competences-V1.0.md` | spécifié |
+| L9 : trafic ambiant, petits engins, concurrence, escorte, radar (touche B) | `SPEC-007-l9_trafic_concurrence_escorte_jeu-V1.0.md`, `SPEC-007-l9_trafic_concurrence_escorte_technique-V1.0.md` | spécifié |
 | Évitement d'obstacles en vol (planètes, lunes, stations, vaisseaux, anneaux) | — | à spécifier |
 | Nettoyage : portiques et spline de l'ancien vol, alternatives ancien/réel, panneau d'itinéraire | — | à faire (en partie rendu caduc par M1) |
 

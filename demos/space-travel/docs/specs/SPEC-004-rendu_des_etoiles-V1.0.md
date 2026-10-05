@@ -1,6 +1,6 @@
 # Étude — Rendu des étoiles : halo, lumière et lens-flare
 
-Document de travail séparé de la spécification principale. Il décrit un changement de rendu de l'écran-titre (et, pour les halos et les lumières, du jeu), le mesure et propose ce qu'il reste à trancher. Il s'appuie sur [`generation-de-l-univers.md`](./generation-de-l-univers.md), qui décrit la génération des étoiles.
+Document de travail séparé de la spécification principale. Il décrit un changement de rendu de l'écran-titre (et, pour les halos et les lumières, du jeu), le mesure et propose ce qu'il reste à trancher. Il s'appuie sur [`SPEC-002-generation_de_l_univers-V1.0.md`](./SPEC-002-generation_de_l_univers-V1.0.md), qui décrit la génération des étoiles.
 
 **Statut : implémenté sur la branche `worktree-rendu-etoiles-flare`, non fusionné, à relire.** Le rendu des étoiles est actif par défaut ; le lens-flare est actif à l'écran-titre seulement et désactivé en partie (`?flare=1` le force). Les choix à trancher sont regroupés au [§9](#9-décisions-à-trancher).
 

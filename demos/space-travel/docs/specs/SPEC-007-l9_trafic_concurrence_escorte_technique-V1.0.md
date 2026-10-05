@@ -1,6 +1,6 @@
 # Space Travel & Transport — L9 · Spécification technique
 
-Mise en œuvre de [`spec-L9-jeu.md`](spec-L9-jeu.md) : trafic ambiant, petits engins et baies à
+Mise en œuvre de [`SPEC-007-l9_trafic_concurrence_escorte_jeu-V1.0.md`](SPEC-007-l9_trafic_concurrence_escorte_jeu-V1.0.md) : trafic ambiant, petits engins et baies à
 champ de force, radar, concurrence, escorte et incidents.
 
 | | |

@@ -1,7 +1,7 @@
 # Space Travel & Transport — L9 · Trafic, petits engins, concurrence, escorte, radar
 
 **Spécification « jeu »** — ce que le joueur voit, fait et gagne. Lisible sans connaître le code ;
-la mise en œuvre est décrite dans [`spec-L9-technique.md`](spec-L9-technique.md).
+la mise en œuvre est décrite dans [`SPEC-007-l9_trafic_concurrence_escorte_technique-V1.0.md`](SPEC-007-l9_trafic_concurrence_escorte_technique-V1.0.md).
 
 | | |
 |---|---|

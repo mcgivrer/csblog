@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Tâche** | T0.1 du [plan Scene](./PLAN-scenes.md) (lot 0, filet de sécurité) |
+| **Tâche** | T0.1 du [plan Scene](./DAT-annexe_1-plan_scenes-V1.0.md) (lot 0, filet de sécurité) |
 | **Base** | jeu `stt_v2.17.0`, `demos/space-travel/sources/src/JS/game/` |
 | **Date** | 2026-10-03 |
 | **Statut** | Terminé : la table des scènes du plan est corrigée (§6) |
@@ -136,7 +136,7 @@ Cinq affirmations du plan sont corrigées ; elles reposaient sur des commentaire
 | 4 | Saut quantique déclenché par le joueur (`flight → jump`) | Le saut est **automatique** après `COAST` (`20c:538`, `582`) ; ni le joueur ni la carte ne le déclenchent. |
 | 5 | `flight` regroupe toutes les phases de `REAL.phase` | `ORBIT` est **dédoublé** par `flightPhase` ; `IDLE` est mort ; `APPROACH` est la seule phase qui lit le pilotage. |
 
-Pièges réels, qui justifient la refonte mieux que la pause « détournée ». **Corrigés ensuite par la tâche T0.4** (sauf les n°s 7, 8 et 10 conservés volontairement : voir les décisions au [§6 de la matrice](./PLAN-scenes-T0.2-matrice.md#6-défauts--décisions-et-comportement-corrigé)) ; la liste ci-dessous décrit le comportement d'origine de `stt_v2.17.0` :
+Pièges réels, qui justifient la refonte mieux que la pause « détournée ». **Corrigés ensuite par la tâche T0.4** (sauf les n°s 7, 8 et 10 conservés volontairement : voir les décisions au [§6 de la matrice](./DAT-annexe_3-matrice_des_scenes_T0.2-V1.0.md#6-défauts--décisions-et-comportement-corrigé)) ; la liste ci-dessous décrit le comportement d'origine de `stt_v2.17.0` :
 
 1. **Aucune garde `gameStarted` dans le clavier principal** : H, V, I, L, Tab et F1-F10 agissent sur l'écran-titre et le choix du vaisseau (déduit pour l'affichage ; lu pour l'absence de garde).
 2. **Le choix du vaisseau n'isole pas le clavier** : seules ses propres touches sont arrêtées, Échap, P, M, H… passent à K5.
