@@ -33,7 +33,27 @@
     '  transform:none !important; z-index:auto !important; width:auto !important; max-width:none !important; height:auto !important; max-height:none !important; margin:0 !important;',
     '  background:none !important; backdrop-filter:none !important; box-shadow:none !important; opacity:1 !important; pointer-events:auto !important; transition:none !important; }',
     '#sttConsole .con-hosted:not([data-con-shown]){ display:none !important; }',
-    '#sttConsole .con-hosted .help-panel{ width:auto; max-width:none; max-height:none; border:none; background:none; padding:0; }'
+    '#sttConsole .con-hosted .help-panel{ width:auto; max-width:none; max-height:none; border:none; background:none; padding:0; }',
+    /* Tactile et écran étroit : ≤760px de large ou pointeur tactile */
+    '@media (max-width:760px), (pointer:coarse){',
+    '  #sttConsole{ position:fixed; inset:0; width:100%; height:100%; max-width:100%; max-height:100%;',
+    '    inset:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }',
+    '  #sttConsole .con-frame{ width:100%; height:100%; border:none; border-radius:0;',
+    '    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }',
+    '  #sttConsole .con-frame::before, #sttConsole .con-frame::after{ display:none; }',
+    '  #sttConsoleTabs{ overflow-x:auto; white-space:nowrap; -webkit-overflow-scrolling:touch; flex-wrap:nowrap; }',
+    '  #sttConsoleTabs button{ min-height:44px; flex-shrink:0; }',
+    '  #sttConsole .con-close{ min-width:44px; min-height:44px; width:44px; height:44px; }',
+    '  #sttConsole .con-body{ overflow:auto; -webkit-overflow-scrolling:touch; }',
+    '  #sttConsole .con-hosted{ box-sizing:border-box; max-width:100%; }',
+    '  #helpOverlay{ max-width:100%; box-sizing:border-box; }',
+    '  #audioOverlay{ max-width:100%; box-sizing:border-box; }',
+    '  #stmMap{ max-width:100%; box-sizing:border-box; }',
+    '  #missionBoardOverlay{ max-width:100%; box-sizing:border-box; }',
+    '  #contractBoardOverlay{ max-width:100%; box-sizing:border-box; }',
+    '  #portPanel{ max-width:100%; box-sizing:border-box; }',
+    '  #shipyardOverlay{ max-width:100%; box-sizing:border-box; }',
+    '}'
   ].join('\n');
 
   const hosts = [];          // { id, node, shown }
