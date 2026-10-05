@@ -10408,7 +10408,7 @@ const LOCAL = (function(){
   document.getElementById('shipyardList').addEventListener('click', function(e){
     const b = e.target.closest('.board-row-btn'); if(!b || b.classList.contains('port-disabled')) return;
     const price = +b.dataset.price; if(credits < price) return;
-    addCredits(-price);
+    addCredits(-price, 'yard');
     installShip(b.dataset.id, {});
     closeShipyard(); refreshShipyardRow(); refreshPortPanel();
   });
@@ -11309,7 +11309,7 @@ function startBayOther(){
 function deliverDirect(){
   const os = orbitState; os.deliveredCount = (os.deliveredCount || 0) + 1;
   if(!os.creditsPaid && os.spawned.every(Boolean) && os.deliveredCount >= os.spawnFractions.length){
-    const total = os.cargoSplit.reduce((a, b) => a + b, 0); addCredits(total*os.unitPrice); os.creditsPaid = true; }
+    const total = os.cargoSplit.reduce((a, b) => a + b, 0); addCredits(total*os.unitPrice, 'delivery'); os.creditsPaid = true; }
 }
 function startBay(){
   if(!isContainerShip(SHIP_ID)) return startBayOther();
@@ -13929,7 +13929,7 @@ function refreshCreditsDisplay(flash){
     creditsFlashTimer = setTimeout(function(){ el.style.color = ''; }, 1500);
   }
 }
-function addCredits(amount){
+function addCredits(amount, reason){   // reason : motif facultatif (relayé par les adaptateurs 45 et 46), ignoré ici
   credits = Math.max(0, credits + amount);
   refreshCreditsDisplay(amount > 0);
   if(typeof refreshPortPanel === 'function') refreshPortPanel();
@@ -14205,7 +14205,7 @@ function buySpeedUpgrade(){
   if(speedUpgradeLevel >= SPEED_UPGRADE_MAX) return;
   const cost = speedUpgradeCost(speedUpgradeLevel);
   if(credits < cost) return;
-  addCredits(-cost);
+  addCredits(-cost, 'speed');
   speedUpgradeLevel++;
   refreshPortPanel();
 }
@@ -14213,14 +14213,14 @@ function buyFuel(){
   if(fuel >= FUEL_CAPACITY - 0.5) return;
   const cost = fuelRefuelCost();
   if(credits < cost) return;
-  addCredits(-cost);
+  addCredits(-cost, 'fuel');
   fuel = FUEL_CAPACITY;
   refreshPortPanel();
 }
 function buyQuantumJump(){
   if(hasQuantumJump || !SHIP_CAN_JUMP) return;
   if(credits < QUANTUM_JUMP_PRICE) return;
-  addCredits(-QUANTUM_JUMP_PRICE);
+  addCredits(-QUANTUM_JUMP_PRICE, 'jump');
   hasQuantumJump = true;
   refitJumpCore();
   refreshPortPanel();
@@ -15111,7 +15111,7 @@ function updateShuttles(dt, elapsed){
         if(!orbitState.creditsPaid && orbitState.spawned.every(Boolean)
            && orbitState.deliveredCount >= orbitState.spawnFractions.length){
           const total = orbitState.cargoSplit.reduce(function(a,b){ return a+b; }, 0);
-          addCredits(total * orbitState.unitPrice);
+          addCredits(total * orbitState.unitPrice, 'delivery');
           orbitState.creditsPaid = true;
         }
         if(s.noReturn){                                             /* navette du port : reste au port */
@@ -16679,11 +16679,11 @@ const BRIDGE = (function(){
     linked = true;
     /* crédits : addCredits reste l'unique point d'écriture du moteur ; GAME.state suit */
     const addCredits0 = addCredits;
-    addCredits = function(amount){
-      addCredits0(amount);
+    addCredits = function(amount, reason){
+      addCredits0(amount, reason);
       const st = GAME.state;
       if(!st || st.credits === credits) return;
-      try{ GAME.cmd('credits.set', { credits: credits, reason: 'jeu' }); }catch(err){ console.error('[BRIDGE] crédits :', err); }
+      try{ GAME.cmd('credits.set', { credits: credits, reason: reason || 'jeu' }); }catch(err){ console.error('[BRIDGE] crédits :', err); }
     };
     /* horloge : secondes de jeu actif (ni avant le départ, ni en pause) */
     setInterval(function(){ if(GAME.state && gameStarted && !gamePaused) GAME.tick(1); }, 1000);
@@ -16736,6 +16736,89 @@ const BRIDGE = (function(){
   }
 
   return { chooseMode: chooseMode, resume: resume };
+})();
+
+/* =========================================================================
+   CAMPAGNE 1b. SOURCES DU JOURNAL — adaptateur : radio, finances (avec motif) et événements de bord
+   Branche JOURNAL (sim/04) sur le moteur sans modifier celui-ci, hors le 2e argument « reason » des addCredits.
+   ========================================================================= */
+/* @provides JOURNAL.sources @requires JOURNAL, GAME @requires-engine addCredits, credits, appendRadioLine, REAL, MISSIONS, fuel, FUEL_CAPACITY, FUEL_WARN_RATIO, FUEL_CRIT_RATIO, jumpState, isNearPortService, gameStarted, gamePaused */
+(function(){
+  const PERIOD = 250;                       // ms entre deux instantanés
+  let prev = null;                          // instantané précédent (null : premier ou reprise -> aucun événement)
+
+  /* ---- radio : enveloppe de appendRadioLine, texte brut, mémoire seule ---- */
+  if(typeof appendRadioLine === 'function'){
+    const radio0 = appendRadioLine;
+    appendRadioLine = function(entry){
+      const r = radio0.apply(this, arguments);
+      try{
+        if(entry) JOURNAL.add({ kind: 'radio', from: entry.from === 'tower' ? 'tower' : 'ship', who: entry.label, text: String(entry.text == null ? '' : entry.text) });
+      }catch(err){ console.error('[JOURNAL] radio :', err); }
+      return r;
+    };
+  }
+
+  /* ---- finances : en libre, delta réel et solde ; en campagne le grand livre (state.ledger) fait foi (cf. 45) ---- */
+  if(typeof addCredits === 'function'){
+    const credits0 = addCredits;
+    addCredits = function(amount, reason){
+      const before = credits;
+      const r = credits0.apply(this, arguments);
+      try{
+        if(!GAME.state){
+          const delta = credits - before;
+          JOURNAL.add({ kind: 'fin', reason: reason || 'jeu', delta: delta, bal: credits });
+        }
+      }catch(err){ console.error('[JOURNAL] finances :', err); }
+      return r;
+    };
+  }
+
+  /* ---- événements : instantané du moteur ---- */
+  function snapshot(){
+    const s = { phase: null, legName: null, missionTarget: null, active: null, doneCount: 0, jump: false, nearPort: false,
+                fuelRatio: 1, fuelWarn: 0.25, fuelCrit: 0.10 };
+    try{ s.phase = REAL.phase || null; }catch(e){}
+    try{ s.legName = (REAL.leg && REAL.leg.name) || null; }catch(e){}
+    try{ s.missionTarget = (REAL.mission && REAL.mission.target && REAL.mission.target.name) || null; }catch(e){}
+    try{
+      const a = MISSIONS.state.active;
+      s.active = a ? { id: a.id, dest: a.dest ? a.dest.name : null, reward: a.reward } : null;
+    }catch(e){}
+    try{ s.doneCount = MISSIONS.state.done.length; }catch(e){}
+    try{ s.jump = !!jumpState; }catch(e){}
+    try{ s.nearPort = isNearPortService() || false; }catch(e){}
+    try{ s.fuelRatio = fuel / FUEL_CAPACITY; }catch(e){}
+    try{ s.fuelWarn = FUEL_WARN_RATIO; s.fuelCrit = FUEL_CRIT_RATIO; }catch(e){}
+    return s;
+  }
+
+  function sample(){
+    let on = false;
+    try{ on = gameStarted && !gamePaused; }catch(e){}
+    if(!on) return;
+    if(!GAME.state) JOURNAL.tickFree(PERIOD / 1000);
+    const snap = snapshot();
+    const evts = JOURNAL.detect(prev, snap);
+    prev = snap;
+    evts.forEach(function(evt){
+      const e = JOURNAL.add(evt);
+      if(GAME.state){
+        try{ GAME.cmd('journal.push', { e: [e.t, e.code, e.a, e.b] }); }catch(err){ console.error('[JOURNAL] push :', err); }
+      }
+    });
+  }
+
+  /* reprise / nouvelle campagne : journal sauvegardé restauré, puis instantané neuf (aucun événement fantôme) */
+  function reset(){
+    JOURNAL.restore((GAME.state && GAME.state.journal) || []);
+    prev = null;
+  }
+  GAME.on('new', reset);
+  GAME.on('loaded', reset);
+
+  setInterval(sample, PERIOD);
 })();
 
 /* =========================================================================
