@@ -108,8 +108,11 @@ function activateHudBarItem(item){
     toggleRadioPanel();
   } else if(item.kind === 'port'){
     if(!isNearPortService()) return;   /* icône inerte hors zone/livraison */
-    const el = document.getElementById('portPanel');
-    if(el){ el.classList.toggle('visible'); if(el.classList.contains('visible')) refreshPortPanel(); }
+    if(typeof CONSOLE !== 'undefined'){ CONSOLE.toggle('port'); }
+    else {
+      const el = document.getElementById('portPanel');
+      if(el){ el.classList.toggle('visible'); if(el.classList.contains('visible')) refreshPortPanel(); }
+    }
   } else if(item.kind === 'camera'){
     nextCameraMode();
   } else if(item.kind === 'help'){
@@ -144,13 +147,14 @@ function refreshHudIconBar(){
       active = !!(el && el.classList.contains('visible'));
     } else if(item.kind === 'port'){
       const el = document.getElementById('portPanel');
-      active = !!(el && el.classList.contains('visible'));
+      active = (typeof CONSOLE !== 'undefined') ? CONSOLE.isOpen('port') : !!(el && el.classList.contains('visible'));
       disabled = !isNearPortService();
       if(disabled && active){
         /* la fenêtre d'activation s'est refermée (le vaisseau s'est
            éloigné) pendant que le panneau était ouvert : on le referme
            plutôt que de laisser un service inaccessible affiché */
-        el.classList.remove('visible'); active = false;
+        if(typeof CONSOLE !== 'undefined') CONSOLE.refresh(); else if(el) el.classList.remove('visible');
+        active = false;
       }
     } else if(item.kind === 'camera'){
       item.el.querySelector('svg').innerHTML = HUD_ICONS['cam_'+CAMERA_MODES[cameraMode]];

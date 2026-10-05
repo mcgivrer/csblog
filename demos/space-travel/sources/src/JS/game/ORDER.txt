@@ -73,3 +73,5 @@ ui/51-console-view.js
 ui/52-tab-aide.js
 ui/53-tab-navigation.js
 ui/54-tab-missions.js
+ui/55-tab-port.js
+ui/56-tab-chantier.js
