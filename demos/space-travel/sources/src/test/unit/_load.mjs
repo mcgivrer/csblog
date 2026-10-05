@@ -68,8 +68,8 @@ export function load(opts = {}){
   const sims = simFiles();
   if(opts.concat) exec('sim-concat.js', sims.map(lire).join('\n'));
   else sims.forEach(f => exec(f, lire(f)));
-  const apresSim = Object.getOwnPropertyNames(ctx);
   (opts.ui || []).forEach(n => { const f = path.join(UI_DIR, n); exec(f, lire(f)); });
+  const apresSim = Object.getOwnPropertyNames(ctx);
 
   const get = nom => vm.runInContext(nom, ctx);
   return {
