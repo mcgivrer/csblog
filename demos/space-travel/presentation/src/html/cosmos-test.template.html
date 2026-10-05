@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  Voyage Spatial — présentation, lot P1 : visionneuse de test du moteur allégé (shared/cosmos.js)
+  Page générée par presentation/build/build.py : ne pas modifier, éditer src/.
+  MIT License — Copyright (c) 2026 Frédéric Delorme
+-->
+<title>Cosmos — visionneuse de test</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #05080f; overflow: hidden; color: #e8edf5;
+    font: 13px/1.45 ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, Consolas, monospace; }
+  canvas { display: block; width: 100vw; height: 100vh; cursor: grab; }
+  canvas:active { cursor: grabbing; }
+  #hud { position: fixed; left: 16px; top: 14px; max-width: min(520px, calc(100vw - 32px)); pointer-events: none;
+    text-shadow: 0 1px 3px #000; }
+  #hud b { color: #5eead4; font-weight: 600; }
+  #hud .dim { color: #8ea0c4; }
+  #keys { position: fixed; left: 16px; bottom: 12px; right: 16px; color: #8ea0c4; pointer-events: none; text-shadow: 0 1px 3px #000; }
+  #keys kbd { color: #ffb454; font: inherit; }
+  body.nohud #hud, body.nohud #keys { display: none; }
+  #boot { position: fixed; inset: 0; display: grid; place-items: center; background: #05080f; color: #8ea0c4; transition: opacity .6s; }
+  #boot.off { opacity: 0; pointer-events: none; }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div id="hud"></div>
+<div id="keys"><kbd>0</kbd> étoile · <kbd>1</kbd>–<kbd>3</kbd> planètes · <kbd>L</kbd> lune · <kbd>A</kbd> astéroïdes · <kbd>N</kbd>/<kbd>P</kbd> système suivant/précédent ·
+  glisser : orbiter · molette : distance · <kbd>F</kbd> focale · <kbd>H</kbd> masquer</div>
+<div id="boot">Génération de l'univers…</div>
+<script>
+/*@VENDOR@*/
+</script>
+<script>
+/*@JS@*/
+</script>
+</body>
+</html>
