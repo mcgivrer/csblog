@@ -77,3 +77,4 @@ ui/53-tab-navigation.js
 ui/54-tab-missions.js
 ui/55-tab-port.js
 ui/56-tab-chantier.js
+ui/57-tab-journal.js

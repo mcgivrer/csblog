@@ -2,17 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { load, plain } from './_load.mjs';
 
-/* Console avec les cinq onglets du contrat (nav, missions, port, yard, help) ; vis = états de visible() modifiables */
+/* Console avec les six onglets du contrat (nav, missions, port, yard, journal, help) ; vis = états de visible() modifiables */
 function setup(){
   const t = load({ ui: ['50-console.js'] });
   const C = t.CONSOLE;
-  const vis = { nav: true, missions: true, port: true, yard: true, help: true };
+  const vis = { nav: true, missions: true, port: true, yard: true, journal: true, help: true };
   const log = [];
   const def = (id, order, fkey, keys) => ({
     id, order, fkey, keys, labelKey: 'conTab' + id,
     visible: () => vis[id],
     onShow: p => log.push(['show', id]),
-    onHide: r => log.push(['hide', id, r])
+    onHide: r => log.push(['hide', id, r]),
+    ...(id === 'journal' ? { onKey: c => log.push(['key', id, c]) } : {})
   });
   // inscrits dans le désordre pour tester le tri
   C.register(def('help', 90, null, ['KeyH', 'KeyV']));
@@ -20,6 +21,7 @@ function setup(){
   C.register(def('nav', 20, 'F2', ['KeyM', 'Semicolon']));
   C.register(def('yard', 50, 'F5', []));
   C.register(def('missions', 30, 'F3', ['KeyJ']));
+  C.register(def('journal', 80, null, ['KeyL']));
   return { t, C, vis, log };
 }
 const K = (code, o = {}) => ({ code, altKey: false, ctrlKey: false, metaKey: false, shiftKey: false, repeat: false, ...o });
@@ -34,9 +36,9 @@ test('la console se charge sans globale parasite', () => {
 
 test('inscription : tri par order, doublon refusé', () => {
   const { C } = setup();
-  assert.deepEqual(plain(C.tabs().map(x => x.id)), ['nav', 'missions', 'port', 'yard', 'help']);
+  assert.deepEqual(plain(C.tabs().map(x => x.id)), ['nav', 'missions', 'port', 'yard', 'journal', 'help']);
   assert.throws(() => C.register({ id: 'nav', order: 1 }), { message: 'onglet_double' });
-  assert.equal(C.tabs().length, 5);
+  assert.equal(C.tabs().length, 6);
   assert.equal(C.current(), null);
   assert.equal(C.last(), null);
   assert.equal(C.isOpen(), false);
@@ -45,14 +47,14 @@ test('inscription : tri par order, doublon refusé', () => {
 test('visible() : exception = faux, ouverture refusée si invisible', () => {
   const { C, vis, t } = setup();
   C.register({ id: 'x', order: 60, visible: () => { throw new Error('boum'); } });
-  assert.deepEqual(plain(C.visibleTabs().map(x => x.id)), ['nav', 'missions', 'port', 'yard', 'help']);
+  assert.deepEqual(plain(C.visibleTabs().map(x => x.id)), ['nav', 'missions', 'port', 'yard', 'journal', 'help']);
   assert.equal(t.logs.some(l => l[0] === 'error'), true);
   assert.equal(C.open('x'), false);
   vis.port = false;
   assert.equal(C.open('port'), false);
   assert.equal(C.current(), null);
   assert.equal(C.open('inconnu'), false);
-  assert.deepEqual(plain(C.visibleTabs().map(x => x.id)), ['nav', 'missions', 'yard', 'help']);
+  assert.deepEqual(plain(C.visibleTabs().map(x => x.id)), ['nav', 'missions', 'yard', 'journal', 'help']);
 });
 
 test('open() : premier visible, puis dernier onglet visible, repli sur le premier visible', () => {
@@ -144,7 +146,7 @@ test('événements open / tab / close / tabs et désabonnement', () => {
     ['open', { id: 'nav' }],
     ['tab', { from: 'nav', to: 'help' }],
     ['close', { id: 'help', reason: 'user' }],
-    ['tabs', { ids: ['nav', 'missions', 'yard', 'help'] }]
+    ['tabs', { ids: ['nav', 'missions', 'yard', 'journal', 'help'] }]
   ]);
   offs.forEach(f => f());
   offs.forEach(f => f());                            // idempotent
@@ -201,7 +203,7 @@ test('keyAction console fermée : Tab, Échap, F1–F8, chiffres 1–8, lettres,
   assert.deepEqual(a('F4'), { act: 'toggle', tab: 'port' });
   assert.deepEqual(a('F5'), { act: 'toggle', tab: 'yard' });
   for(const f of ['F1', 'F6', 'F7', 'F8']) assert.deepEqual(a(f), { act: 'reserved' }, f);
-  for(const f of ['F9', 'F10', 'KeyP', 'Pause', 'KeyL', 'KeyI', 'KeyT', 'KeyG']) assert.equal(a(f), null, f);
+  for(const f of ['F9', 'F10', 'KeyP', 'Pause', 'KeyI', 'KeyT', 'KeyG']) assert.equal(a(f), null, f);
   for(let n = 1; n <= 8; n++) assert.deepEqual(a('Digit' + n), { act: 'hud', index: n - 1 });
   assert.deepEqual(a('Digit3'), { act: 'hud', index: 2 });
   for(const m of ['altKey', 'ctrlKey', 'metaKey', 'shiftKey']) assert.equal(a('Digit1', { [m]: true }), null, m);
@@ -211,6 +213,7 @@ test('keyAction console fermée : Tab, Échap, F1–F8, chiffres 1–8, lettres,
   assert.deepEqual(a('KeyM'), { act: 'toggle', tab: 'nav' });
   assert.deepEqual(a('Semicolon'), { act: 'toggle', tab: 'nav' });
   assert.deepEqual(a('KeyJ'), { act: 'toggle', tab: 'missions' });
+  assert.deepEqual(a('KeyL'), { act: 'toggle', tab: 'journal' });
   assert.deepEqual(a('KeyH'), { act: 'toggle', tab: 'help' });
   assert.deepEqual(a('KeyV'), { act: 'toggle', tab: 'help' });
   assert.equal(a('Space'), null);
@@ -245,4 +248,49 @@ test('keyAction console ouverte : fermeture, avalement, exceptions', () => {
   assert.deepEqual(a('Enter'), { act: 'close' });
   assert.deepEqual(a('NumpadEnter'), { act: 'close' });
   assert.deepEqual(a('KeyM'), { act: 'toggle', tab: 'nav' });
+});
+
+test('touche L : bascule sur le Journal, le ferme, Alt+L, répétition, typing', () => {
+  const { C, log } = setup();
+  const a = (code, o, ctx) => plain(C.keyAction(K(code, o), ctx || OK));
+  assert.deepEqual(a('KeyL'), { act: 'toggle', tab: 'journal' });
+  assert.equal(a('KeyL', { altKey: true }), null);              // fermée : au navigateur
+  assert.equal(a('KeyL', { repeat: true }), null);
+  assert.equal(a('KeyL', {}, { ...OK, typing: true }), null);
+  assert.equal(a('KeyL', {}, { ...OK, paused: true }), null);
+  assert.equal(a('KeyL', {}, { ...OK, started: false }), null);
+  C.open('missions');                                           // ouverte sur un autre onglet : bascule
+  assert.deepEqual(a('KeyL'), { act: 'toggle', tab: 'journal' });
+  assert.equal(C.toggle('journal'), true);                      // la vue exécute toggle
+  assert.equal(C.current(), 'journal');
+  assert.deepEqual(a('KeyL'), { act: 'toggle', tab: 'journal' });   // sur Journal : toggle ferme
+  assert.deepEqual(a('KeyL', { altKey: true }), { act: 'swallow' });
+  assert.deepEqual(a('KeyL', { repeat: true }), { act: 'swallow' });
+  assert.equal(a('KeyL', {}, { ...OK, typing: true }), null);
+  C.toggle('journal');
+  assert.equal(C.current(), null);
+  assert.ok(log.length > 0);
+});
+
+test('navigation interne : tabkey si l’onglet courant a onKey, sinon swallow', () => {
+  const { C } = setup();
+  const a = (code, o) => plain(C.keyAction(K(code, o), OK));
+  const NAV = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End'];
+  C.open('journal');
+  for(const code of NAV) assert.deepEqual(a(code), { act: 'tabkey', tab: 'journal', code }, code);
+  assert.deepEqual(a('ArrowDown', { repeat: true }), { act: 'tabkey', tab: 'journal', code: 'ArrowDown' });
+  assert.deepEqual(a('KeyW'), { act: 'swallow' });
+  assert.deepEqual(a('Tab'), { act: 'close' });
+  assert.deepEqual(a('Escape'), { act: 'close' });
+  assert.deepEqual(a('Digit2'), { act: 'hud', index: 1 });
+  assert.deepEqual(a('ArrowUp', { altKey: true }), { act: 'swallow' });
+  C.open('missions');
+  for(const code of NAV) assert.deepEqual(a(code), { act: 'swallow' }, code);
+  C.close('user');
+  for(const code of NAV) assert.equal(a(code), null, code);
+  assert.equal(C.keyAction(K('ArrowUp'), { ...OK, typing: true }), null);
+  C.open('journal');
+  assert.equal(C.keyAction(K('ArrowUp'), { ...OK, typing: true }), null);
+  assert.equal(C.keyAction(K('ArrowUp'), { ...OK, paused: true }), null);
+  assert.equal(C.tabs().filter(x => x.id === 'journal')[0].onKey instanceof Function, true);
 });

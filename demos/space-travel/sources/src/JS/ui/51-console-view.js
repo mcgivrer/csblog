@@ -207,6 +207,7 @@
       case 'toggle': CONSOLE.toggle(a.tab); break;
       case 'last':   CONSOLE.open(); break;
       case 'close':  CONSOLE.close('user'); if(e.code === 'Escape') escHeld = true; break;
+      case 'tabkey': { const tb = CONSOLE.tabs().filter(function(x){ return x.id === a.tab; })[0]; if(tb && typeof tb.onKey === 'function'){ try{ tb.onKey(a.code); }catch(err){ console.error('[CONSOLE] onKey « ' + a.tab + ' » :', err); } } break; }
       case 'hud':    if(HUD_BAR_ITEMS[a.index]) activateHudBarItem(HUD_BAR_ITEMS[a.index]); break;
       default: break;   /* swallow, reserved : sans effet */
     }

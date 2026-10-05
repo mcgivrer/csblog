@@ -195,7 +195,7 @@ function buildHelpGrid(){
     [t('hk_freelook'), t('hlp_freelook')]
   ];
   rows.push([t('hk_console'), t('hlp_console')]);
-  [['F2','conTabNav'],['F3','conTabMissions'],['F4','conTabPort'],['F5','conTabYard']].forEach(function(r){ rows.push([r[0], t(r[1])]); });
+  [['F2','conTabNav'],['F3','conTabMissions'],['F4','conTabPort'],['F5','conTabYard'],['L','conTabJournal']].forEach(function(r){ rows.push([r[0], t(r[1])]); });
   HUD_BAR_ITEMS.forEach(function(item){
     /* l'aide se décrit elle-même juste en dessous (« Affiche/masque cette
        aide ») — l'inclure ici aussi ferait doublon sur la touche H, comme

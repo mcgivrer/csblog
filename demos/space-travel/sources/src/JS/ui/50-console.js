@@ -53,7 +53,7 @@ const CONSOLE = (function(){
   function signature(){ return visibleTabs().map(function(t){ return t.id; }).join(','); }
   function ids(sig){ return sig ? sig.split(',') : []; }
 
-  /* def : { id, order, labelKey, fkey, keys, visible, onShow, onHide } ; doublon d'id -> Error('onglet_double') */
+  /* def : { id, order, labelKey, fkey, keys, visible, onShow, onHide, onKey } ; doublon d'id -> Error('onglet_double') */
   function register(def){
     if(!def || typeof def.id !== 'string' || !def.id) throw new TypeError('onglet_invalide');
     if(find(def.id)) throw new Error('onglet_double');
@@ -66,6 +66,7 @@ const CONSOLE = (function(){
       visible: def.visible,
       onShow: def.onShow,
       onHide: def.onHide,
+      onKey: def.onKey,                     // facultatif : clavier interne (flèches, Page*, Début, Fin)
       panel: null                           // renseigné par la vue : élément passé à onShow
     };
     tabs.push(t);
@@ -150,8 +151,9 @@ const CONSOLE = (function(){
 
   /* ---- touches ----------------------------------------------------------
      Pure : décide seulement. k = { code, altKey, ctrlKey, metaKey, shiftKey, repeat }, ctx = { started, paused, typing }.
-     Renvoie { act:'toggle', tab } | { act:'last' } | { act:'close' } | { act:'hud', index }
+     Renvoie { act:'toggle', tab } | { act:'last' } | { act:'close' } | { act:'hud', index } | { act:'tabkey', tab, code }
            | { act:'swallow' } | { act:'reserved' } | null (touche non traitée : le jeu la garde). */
+  const NAV_KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End'];
   function keyAction(k, ctx){
     if(!k || !ctx || !ctx.started || ctx.paused || ctx.typing) return null;
     if(k.ctrlKey || k.metaKey) return null;                    // raccourcis du navigateur : jamais touchés
@@ -168,6 +170,11 @@ const CONSOLE = (function(){
     }else if(k.altKey) return null;
 
     if(code === 'Escape') return isOpen ? { act: 'close' } : null;   // fermée : la pause garde Échap
+    /* navigation interne : l'onglet courant la prend s'il a onKey (la répétition de touche est permise : défilement) */
+    if(isOpen && NAV_KEYS.indexOf(code) >= 0){
+      const cur = find(current);
+      if(cur && typeof cur.onKey === 'function') return { act: 'tabkey', tab: cur.id, code: code };
+    }
     if(k.repeat) return isOpen ? { act: 'swallow' } : null;
 
     if(code === 'Tab') return isOpen ? { act: 'close' } : { act: 'last' };

@@ -27,7 +27,7 @@ Croix de fermeture : gestionnaire délégué `.panel-close-btn` `26:205-230` (in
 | `1`…`8` (sans Alt, Ctrl, Méta ni Maj) | libres | `activateHudBarItem(HUD_BAR_ITEMS[n-1])` (par `e.code` `Digit1`…`Digit8`, AZERTY compris ; décision du mainteneur 06/10 : sans Alt, le navigateur captant Alt+n) ; avec un modificateur : non traité |
 | F9 / F10 | caméra / voix | inchangés |
 | M, `;` · J · H · V | carte · missions · aide · audio | bascule de l'onglet Navigation · Missions · Aide · Aide (section audio) |
-| L · I · T · G · P | Lagrange · itinéraire · pilote · survol · pause | inchangés (L reste Lagrange faute de Journal) |
+| L · I · T · G · P | Lagrange · itinéraire · pilote · survol · pause | inchangés (L : onglet Journal (décision du mainteneur 06/10) ; Lagrange abandonné) |
 | Espace / Entrée | ferment la carte, reprise, abrégé | sur Navigation : ferment la console (parité carte) ; sinon avalés tant que la console est ouverte |
 
 Console ouverte : tout `keydown` non traité est avalé (pas de pilotage sous la console, comme sous la carte), sauf P, Pause, F9, F10, touches `1`…`8` ; `keyup` passe toujours. Aucune action si `!gameStarted` ou `gamePaused`. La carte garde sa priorité (écouteur de capture `20e:87` chargé avant) : sa fermeture par Échap/M ferme la console (§ 3, observateur).
