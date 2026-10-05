@@ -165,7 +165,7 @@ const LOCAL = (function(){
   document.getElementById('shipyardList').addEventListener('click', function(e){
     const b = e.target.closest('.board-row-btn'); if(!b || b.classList.contains('port-disabled')) return;
     const price = +b.dataset.price; if(credits < price) return;
-    addCredits(-price);
+    addCredits(-price, 'yard');
     installShip(b.dataset.id, {});
     closeShipyard(); refreshShipyardRow(); refreshPortPanel();
   });

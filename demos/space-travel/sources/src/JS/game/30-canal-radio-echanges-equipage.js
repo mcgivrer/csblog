@@ -251,7 +251,7 @@ function buySpeedUpgrade(){
   if(speedUpgradeLevel >= SPEED_UPGRADE_MAX) return;
   const cost = speedUpgradeCost(speedUpgradeLevel);
   if(credits < cost) return;
-  addCredits(-cost);
+  addCredits(-cost, 'speed');
   speedUpgradeLevel++;
   refreshPortPanel();
 }
@@ -259,14 +259,14 @@ function buyFuel(){
   if(fuel >= FUEL_CAPACITY - 0.5) return;
   const cost = fuelRefuelCost();
   if(credits < cost) return;
-  addCredits(-cost);
+  addCredits(-cost, 'fuel');
   fuel = FUEL_CAPACITY;
   refreshPortPanel();
 }
 function buyQuantumJump(){
   if(hasQuantumJump || !SHIP_CAN_JUMP) return;
   if(credits < QUANTUM_JUMP_PRICE) return;
-  addCredits(-QUANTUM_JUMP_PRICE);
+  addCredits(-QUANTUM_JUMP_PRICE, 'jump');
   hasQuantumJump = true;
   refitJumpCore();
   refreshPortPanel();
