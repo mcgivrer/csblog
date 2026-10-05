@@ -438,23 +438,6 @@
     transition:left 0.25s linear; pointer-events:none;
   }
 
-  /* ---------- orientation / point de Lagrange (§ amélioration v2.4) — bas
-     gauche. Le point visé n'est pas simulé en toute rigueur (les masses
-     réelles des planètes générées ne sont pas modélisées) : c'est un point
-     fixe placé sur l'axe étoile→planète de l'étape en cours, à 92% de la
-     distance en partant de l'étoile — une approximation assumée de L1,
-     suffisante pour donner un cap et une distance à suivre, pas une
-     simulation à N corps. */
-  .hud-lagrange{ left:18px; bottom:58px; width:196px; padding:10px 14px 12px; }
-  @media (max-width:900px){ .hud-lagrange{ display:none !important; } }
-  .touch-mode .hud-lagrange{ display:none !important; }
-  .lagrange-body{ display:flex; align-items:center; gap:12px; margin-top:8px; }
-  .lagrange-dial{ width:52px; height:52px; flex:none; }
-  #lagrangeNeedle{ transform-origin:30px 30px; transition:transform 0.15s linear; }
-  .lagrange-info{ display:flex; flex-direction:column; gap:3px; min-width:0; }
-  .lagrange-dist{ font-family:'JetBrains Mono',monospace; font-size:15px; font-weight:700; color:var(--amber); }
-  .lagrange-name{ font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--muted-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-
   /* ---------- canal radio — échanges équipage / contrôle du port ---------- */
   .hud-radio{
     position:absolute; right:18px; top:230px; width:300px;

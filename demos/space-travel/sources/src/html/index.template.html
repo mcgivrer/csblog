@@ -184,27 +184,6 @@
     </div>
   </div>
 
-  <!-- orientation / point de Lagrange (§ amélioration v2.4) : bas gauche -->
-  <div class="panel hud-lagrange mono" id="lagrangePanel">
-    <button class="panel-close-btn" data-panel-cls="hud-lagrange" title="Fermer">×</button>
-    <div class="tm-title" id="lblLagrange">POINT DE LAGRANGE</div>
-    <div class="lagrange-body">
-      <svg class="lagrange-dial" viewBox="0 0 60 60">
-        <circle cx="30" cy="30" r="26" fill="none" stroke="var(--line)" stroke-width="1.5"/>
-        <path d="M30 6v8" stroke="var(--muted-2)" stroke-width="1.5"/>
-        <g id="lagrangeNeedle">
-          <path d="M30 30L30 10" stroke="var(--amber)" stroke-width="2" stroke-linecap="round"/>
-          <circle cx="30" cy="10" r="2.6" fill="var(--amber)" stroke="none"/>
-        </g>
-        <circle cx="30" cy="30" r="1.8" fill="var(--muted-2)" stroke="none"/>
-      </svg>
-      <div class="lagrange-info">
-        <div class="lagrange-dist" id="lagrangeDist">— u</div>
-        <div class="lagrange-name" id="lagrangeName">—</div>
-      </div>
-    </div>
-  </div>
-
   <!-- barre d'icônes du HUD (§12) — unifiée bureau + tactile, générée en JS -->
   <div id="hudIconBar" class="mono"></div>
 

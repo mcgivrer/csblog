@@ -309,15 +309,10 @@ window.addEventListener('keydown', function(e){
     const helpItem = HUD_BAR_ITEMS.find(function(it){ return it.kind === 'help'; });
     if(helpItem) activateHudBarItem(helpItem);
   }
-  /* I / L — itinéraire et point de Lagrange (§ amélioration v2.4), mêmes
-     touches fixes que H : passent par activateHudBarItem, jamais dupliquées
-     entre clavier et bouton de la barre. */
+  /* I — itinéraire (§ amélioration v2.4), même touche fixe que H : passe par
+     activateHudBarItem, jamais dupliquée entre clavier et bouton de la barre. */
   if(e.code === 'KeyI'){
     const it = HUD_BAR_ITEMS.find(function(x){ return x.cls === 'hud-itinerary'; });
-    if(it) activateHudBarItem(it);
-  }
-  if(e.code === 'KeyL'){
-    const it = HUD_BAR_ITEMS.find(function(x){ return x.cls === 'hud-lagrange'; });
     if(it) activateHudBarItem(it);
   }
   /* V — réglage des volumes (demande utilisateur), même principe que H/I/L */

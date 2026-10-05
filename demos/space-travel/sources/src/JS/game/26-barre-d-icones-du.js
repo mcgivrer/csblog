@@ -26,10 +26,6 @@ const HUD_ICONS = {
      pointillé — distinct de « route » (juste un trait entre deux points),
      pour ne pas confondre le plan de vol textuel et ce mini-suivi visuel. */
   itinerary: '<path d="M3 15h5.5M15.5 15H21" stroke-dasharray="2.5 3"/><circle cx="12" cy="15" r="1.8" fill="currentColor" stroke="none"/><path d="M12 3.5a4 4 0 0 1 4 4c0 3-4 7.5-4 7.5s-4-4.5-4-7.5a4 4 0 0 1 4-4z"/><circle cx="12" cy="7.3" r="1.3" fill="currentColor" stroke="none"/>',
-  /* point de Lagrange : boussole (cadran + aiguille) plutôt qu'un pictogramme
-     orbital littéral — c'est l'ORIENTATION relative qui est montrée, pas la
-     géométrie à N corps elle-même */
-  lagrange: '<circle cx="12" cy="12" r="8.5"/><path d="M12 5L14 12L12 19L10 12Z" fill="currentColor" stroke="none"/>',
   /* carte stellaire (§23) : trois points reliés par des traits fins,
      évoquant une petite constellation — distinct de « route » (un seul
      trait) et de « itinerary » (repère + trajet pointillé) déjà utilisés
@@ -54,14 +50,13 @@ const HUD_BAR_ITEMS = [
   { cls:null,            icon:'radio',   labelKey:'lblRadioChannel', kind:'radio'  },
   { cls:null,            icon:'port',    labelKey:'lblPortServices', kind:'port'   },
   { cls:null,            icon:'camera',  labelKey:null,              kind:'camera' },
-  /* itinéraire et point de Lagrange (§ amélioration v2.4) : deux nouveaux
-     panneaux, ajoutés APRÈS camera plutôt qu'entremêlés aux six premiers
+  /* itinéraire (§ amélioration v2.4) : nouvel
+     panneau, ajouté APRÈS camera plutôt qu'entremêlé aux six premiers
      panneaux d'info — F1-F9 sont affectés par POSITION dans ce tableau
      (cf. le gestionnaire keydown plus bas, indexé sur e.code), donc tout
      insertion avant radio/port/camera aurait décalé leurs raccourcis F7-F9.
-     Comme l'aide (H), ceux-ci prennent une touche FIXE plutôt qu'un F-slot. */
+     Comme l'aide (H), celui-ci prend une touche FIXE plutôt qu'un F-slot. */
   { cls:'hud-itinerary', icon:'itinerary', labelKey:'lblItinerary',  kind:'panel', hotkey:'I' },
-  { cls:'hud-lagrange',  icon:'lagrange',  labelKey:'lblLagrange',   kind:'panel', hotkey:'L' },
   /* carte stellaire (§23) : même principe (touche fixe, ajoutée après les
      six premiers panneaux pour ne pas décaler F7-F9) — indispensable au
      clavier ET au tactile, faute de quoi le module resterait totalement
@@ -382,7 +377,7 @@ document.addEventListener('click', function(e){
      bascule automatique) : pas la place de les garder tous ouverts en
      continu sur un écran de smartphone. */
   if(document.body.classList.contains('portrait-touch')){
-    ['hud-left','hud-route','hud-right','hud-temp','hud-engines','hud-telemetry','hud-itinerary','hud-lagrange'].forEach(function(cls){
+    ['hud-left','hud-route','hud-right','hud-temp','hud-engines','hud-telemetry','hud-itinerary'].forEach(function(cls){
       const el = document.querySelector('.'+cls);
       if(el) el.classList.add('panel-hidden');
     });

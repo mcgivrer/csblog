@@ -111,15 +111,15 @@ function repositionAllPanels(){
   repositionPortPanel();   /* enchaîne déjà repositionRadioPanel() */
   repositionCornerBottomPanels();
 }
-/* évite le chevauchement entre les deux panneaux bas-coin (itinéraire,
-   Lagrange, §21) et la rangée basse CENTRÉE (température/propulsion/
+/* évite le chevauchement entre le panneau bas-coin (itinéraire,
+   §21) et la rangée basse CENTRÉE (température/propulsion/
    commandes, §8) — repéré sur une capture d'écran de documentation à
    1100px de large : la rangée centrée peut s'étendre assez pour mordre
-   sur leur emplacement habituel, alors qu'à 1280px l'un et l'autre
-   semblaient avoir assez de marge. On les remonte au-dessus d'elle plutôt
-   que de les laisser se chevaucher. Repositionnement dynamique (mesuré),
-   pas un simple seuil de largeur fixe : la largeur de la rangée centrée
-   dépend aussi de QUELS panneaux elle contient à l'instant.
+   sur son emplacement habituel, alors qu'à 1280px il semblait avoir assez
+   de marge. On le remonte au-dessus d'elle plutôt que de le laisser se
+   chevaucher. Repositionnement dynamique (mesuré), pas un simple seuil
+   de largeur fixe : la largeur de la rangée centrée dépend aussi de QUELS
+   panneaux elle contient à l'instant.
 
    Bug remonté en jeu (v2.6, ajout du carburant §22) : le panneau ITINÉRAIRE
    peut AUSSI chevaucher la pile de droite (objet proche → services
@@ -137,17 +137,7 @@ function repositionAllPanels(){
 function repositionCornerBottomPanels(){
   const row = document.querySelector('.hud-bottom-row');
   const itin = document.querySelector('.hud-itinerary');
-  const lag = document.querySelector('.hud-lagrange');
   const MARGIN = 14;
-
-  if(lag) lag.style.bottom = '';
-  if(row && lag && !lag.classList.contains('panel-hidden')){
-    const rowRect = row.getBoundingClientRect();
-    const lagRect = lag.getBoundingClientRect();
-    if(lagRect.right > rowRect.left - MARGIN){
-      lag.style.bottom = ((window.innerHeight - rowRect.top) + MARGIN)+'px';
-    }
-  }
 
   if(!itin || itin.classList.contains('panel-hidden')) return;
   itin.style.bottom = '';
