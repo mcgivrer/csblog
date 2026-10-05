@@ -3,7 +3,7 @@
    Le modèle (CONSOLE, 50-console.js) décide ; ce fichier dessine et relaie les touches.
    Seul le membre CONSOLE.view est ajouté : aucune globale nouvelle.
    ========================================================================= */
-/* @provides CONSOLE.view @requires CONSOLE @requires-engine t, LANG, gameStarted, gamePaused */
+/* @provides CONSOLE.view @requires CONSOLE @requires-engine t,gameStarted, gamePaused */
 (function(){
   const CSS = [
     '#sttConsole{ position:fixed; inset:0; z-index:6; display:flex; align-items:center; justify-content:center; pointer-events:none; font-family:"JetBrains Mono",monospace; }',

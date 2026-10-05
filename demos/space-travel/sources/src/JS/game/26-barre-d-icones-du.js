@@ -113,12 +113,16 @@ function activateHudBarItem(item){
   } else if(item.kind === 'camera'){
     nextCameraMode();
   } else if(item.kind === 'help'){
-    const el = document.getElementById('helpOverlay');
-    if(el) el.classList.toggle('visible');
+    if(typeof CONSOLE !== 'undefined'){ CONSOLE.toggle('help'); }
+    else {
+      const el = document.getElementById('helpOverlay');
+      if(el) el.classList.toggle('visible');
+    }
   } else if(item.kind === 'starmap'){
     if(isStarMapOpen()) closeStarMap(); else openStarMap();
   } else if(item.kind === 'audio'){
-    toggleAudioPanel();
+    if(typeof CONSOLE !== 'undefined' && CONSOLE.help) CONSOLE.help.toggleAudio();
+    else toggleAudioPanel();
   } else if(item.kind === 'autopilot'){
     if(REAL.active && REAL.started) REAL.apToggle();
   } else if(item.kind === 'missions'){
@@ -149,8 +153,11 @@ function refreshHudIconBar(){
     } else if(item.kind === 'camera'){
       item.el.querySelector('svg').innerHTML = HUD_ICONS['cam_'+CAMERA_MODES[cameraMode]];
     } else if(item.kind === 'help'){
-      const el = document.getElementById('helpOverlay');
-      active = !!(el && el.classList.contains('visible'));
+      if(typeof CONSOLE !== 'undefined') active = CONSOLE.isOpen('help');
+      else {
+        const el = document.getElementById('helpOverlay');
+        active = !!(el && el.classList.contains('visible'));
+      }
     } else if(item.kind === 'starmap'){
       active = isStarMapOpen();
     } else if(item.kind === 'audio'){

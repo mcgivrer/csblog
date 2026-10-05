@@ -70,3 +70,4 @@ shared/starmap.js
 45-campaign-bridge.js
 ui/50-console.js
 ui/51-console-view.js
+ui/52-tab-aide.js
