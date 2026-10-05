@@ -473,23 +473,6 @@
     transition:left 0.25s linear; pointer-events:none;
   }
 
-  /* ---------- orientation / point de Lagrange (§ amélioration v2.4) — bas
-     gauche. Le point visé n'est pas simulé en toute rigueur (les masses
-     réelles des planètes générées ne sont pas modélisées) : c'est un point
-     fixe placé sur l'axe étoile→planète de l'étape en cours, à 92% de la
-     distance en partant de l'étoile — une approximation assumée de L1,
-     suffisante pour donner un cap et une distance à suivre, pas une
-     simulation à N corps. */
-  .hud-lagrange{ left:18px; bottom:58px; width:196px; padding:10px 14px 12px; }
-  @media (max-width:900px){ .hud-lagrange{ display:none !important; } }
-  .touch-mode .hud-lagrange{ display:none !important; }
-  .lagrange-body{ display:flex; align-items:center; gap:12px; margin-top:8px; }
-  .lagrange-dial{ width:52px; height:52px; flex:none; }
-  #lagrangeNeedle{ transform-origin:30px 30px; transition:transform 0.15s linear; }
-  .lagrange-info{ display:flex; flex-direction:column; gap:3px; min-width:0; }
-  .lagrange-dist{ font-family:'JetBrains Mono',monospace; font-size:15px; font-weight:700; color:var(--amber); }
-  .lagrange-name{ font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--muted-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-
   /* ---------- canal radio — échanges équipage / contrôle du port ---------- */
   .hud-radio{
     position:absolute; right:18px; top:230px; width:300px;
@@ -1083,27 +1066,6 @@
     </div>
   </div>
 
-  <!-- orientation / point de Lagrange (§ amélioration v2.4) : bas gauche -->
-  <div class="panel hud-lagrange mono" id="lagrangePanel">
-    <button class="panel-close-btn" data-panel-cls="hud-lagrange" title="Fermer">×</button>
-    <div class="tm-title" id="lblLagrange">POINT DE LAGRANGE</div>
-    <div class="lagrange-body">
-      <svg class="lagrange-dial" viewBox="0 0 60 60">
-        <circle cx="30" cy="30" r="26" fill="none" stroke="var(--line)" stroke-width="1.5"/>
-        <path d="M30 6v8" stroke="var(--muted-2)" stroke-width="1.5"/>
-        <g id="lagrangeNeedle">
-          <path d="M30 30L30 10" stroke="var(--amber)" stroke-width="2" stroke-linecap="round"/>
-          <circle cx="30" cy="10" r="2.6" fill="var(--amber)" stroke="none"/>
-        </g>
-        <circle cx="30" cy="30" r="1.8" fill="var(--muted-2)" stroke="none"/>
-      </svg>
-      <div class="lagrange-info">
-        <div class="lagrange-dist" id="lagrangeDist">— u</div>
-        <div class="lagrange-name" id="lagrangeName">—</div>
-      </div>
-    </div>
-  </div>
-
   <!-- barre d'icônes du HUD (§12) — unifiée bureau + tactile, générée en JS -->
   <div id="hudIconBar" class="mono"></div>
 
@@ -1363,7 +1325,7 @@ const I18N = {
     topBrand: 'NAVIGATION QUANTIQUE', seedLabel: 'SEED', onlineLabel: 'EN LIGNE',
     lblSpeed: 'Vitesse', lblSector: 'Secteur', lblHeading: 'Cap',
     lblFlightPlan: 'Plan de vol', lblNearest: 'OBJET LE PLUS PROCHE',
-    lblItinerary: 'ITINÉRAIRE', lblLagrange: 'POINT DE LAGRANGE',
+    lblItinerary: 'ITINÉRAIRE',
     lblEngineTemp: 'TEMPÉRATURE MOTEUR', lblPropulsion: 'PROPULSION', lblEngineCmd: 'COMMANDES MOTEUR',
     lblRadioChannel: 'CANAL RADIO', radioMuteTitle: 'Couper le son du canal radio',
     badge_auto: 'AUTOPILOTE', badge_manual: 'MANUEL', badge_orbit: 'MISE EN ORBITE',
@@ -1398,7 +1360,7 @@ const I18N = {
     topBrand: 'QUANTUM NAVIGATION', seedLabel: 'SEED', onlineLabel: 'ONLINE',
     lblSpeed: 'Speed', lblSector: 'Sector', lblHeading: 'Heading',
     lblFlightPlan: 'Flight plan', lblNearest: 'NEAREST OBJECT',
-    lblItinerary: 'ITINERARY', lblLagrange: 'LAGRANGE POINT',
+    lblItinerary: 'ITINERARY',
     lblEngineTemp: 'ENGINE TEMPERATURE', lblPropulsion: 'PROPULSION', lblEngineCmd: 'ENGINE COMMANDS',
     lblRadioChannel: 'RADIO CHANNEL', radioMuteTitle: 'Mute the radio channel',
     badge_auto: 'AUTOPILOT', badge_manual: 'MANUAL', badge_orbit: 'ORBITAL INSERTION',
@@ -1433,7 +1395,7 @@ const I18N = {
     topBrand: 'QUANTENNAVIGATION', seedLabel: 'SEED', onlineLabel: 'ONLINE',
     lblSpeed: 'Geschwindigkeit', lblSector: 'Sektor', lblHeading: 'Kurs',
     lblFlightPlan: 'Flugplan', lblNearest: 'N\u00c4CHSTES OBJEKT',
-    lblItinerary: 'ROUTE', lblLagrange: 'LAGRANGE-PUNKT',
+    lblItinerary: 'ROUTE',
     lblEngineTemp: 'TRIEBWERKSTEMPERATUR', lblPropulsion: 'ANTRIEB', lblEngineCmd: 'TRIEBWERKSSTEUERUNG',
     lblRadioChannel: 'FUNKKANAL', radioMuteTitle: 'Funkkanal stummschalten',
     badge_auto: 'AUTOPILOT', badge_manual: 'MANUELL', badge_orbit: 'ORBITEINSCHUSS',
@@ -1468,7 +1430,7 @@ const I18N = {
     topBrand: 'NAVEGACI\u00d3N CU\u00c1NTICA', seedLabel: 'SEED', onlineLabel: 'EN L\u00cdNEA',
     lblSpeed: 'Velocidad', lblSector: 'Sector', lblHeading: 'Rumbo',
     lblFlightPlan: 'Plan de vuelo', lblNearest: 'OBJETO M\u00c1S CERCANO',
-    lblItinerary: 'ITINERARIO', lblLagrange: 'PUNTO DE LAGRANGE',
+    lblItinerary: 'ITINERARIO',
     lblEngineTemp: 'TEMPERATURA DE MOTORES', lblPropulsion: 'PROPULSI\u00d3N', lblEngineCmd: 'CONTROL DE MOTORES',
     lblRadioChannel: 'CANAL DE RADIO', radioMuteTitle: 'Silenciar el canal de radio',
     badge_auto: 'PILOTO AUTOM\u00c1TICO', badge_manual: 'MANUAL', badge_orbit: 'INSERCI\u00d3N ORBITAL',
@@ -1655,7 +1617,7 @@ function applyLanguage(){
     topBrand:'topBrand', seedLabel:'seedLabel', onlineLabel:'onlineLabel',
     lblSpeed:'lblSpeed', lblSector:'lblSector', lblHeading:'lblHeading',
     lblFlightPlan:'lblFlightPlan', lblNearest:'lblNearest',
-    lblItinerary:'lblItinerary', lblLagrange:'lblLagrange',
+    lblItinerary:'lblItinerary',
     lblEngineTemp:'lblEngineTemp', lblPropulsion:'lblPropulsion', lblEngineCmd:'lblEngineCmd',
     lblRadioChannel:'lblRadioChannel', creditsLabel:'creditsLabel',
     lblPortServices:'lblPortServices', lblSpeedUpgrade:'lblSpeedUpgrade', lblFuelService:'lblFuelService', lblFuel:'lblFuel',
@@ -1722,6 +1684,7 @@ document.getElementById('seedVal').textContent = SEED;
 /* @provides GAME */
 const GAME = (function(){
   const LEDGER_MAX = 200;                   // entrées conservées dans state.ledger (les plus anciennes sont écartées)
+  const JOURNAL_SAVED_MAX = 100;            // événements conservés dans state.journal (les plus anciens sont écartés)
   let state = null;                         // null = Partie libre
   const listeners = Object.create(null);    // événement -> [{ fn, off }]
 
@@ -1764,6 +1727,7 @@ const GAME = (function(){
       credits: credits,
       rp: 0,
       ledger: [],
+      journal: [],
       flagship: 's1',
       ships: [{ id: 's1', name: o.name || 'STT Courlis', comp: o.starter || 'stt-courlis', wear: 0, fuel: 1, at: null, order: null, crew: [] }],
       blueprints: {},
@@ -1800,6 +1764,16 @@ const GAME = (function(){
       if(state.ledger.length > LEDGER_MAX) state.ledger.splice(0, state.ledger.length - LEDGER_MAX);
       emit('credits', { credits: state.credits, delta: delta, reason: reason });
       return state.credits;
+    },
+    /* { e:[t, code, a, b] } : ajoute un événement du Journal à state.journal (champ additif de v:1) */
+    'journal.push': function(a){
+      const e = a.e;
+      if(!Array.isArray(e) || typeof e[1] !== 'string') throw new Error('journal_invalide');
+      if(!Array.isArray(state.journal)) state.journal = [];
+      state.journal.push([e[0], e[1], e[2] === undefined ? null : e[2], e[3] === undefined ? null : e[3]]);
+      if(state.journal.length > JOURNAL_SAVED_MAX) state.journal.splice(0, state.journal.length - JOURNAL_SAVED_MAX);
+      emit('journal', { e: state.journal[state.journal.length - 1] });
+      return state.journal.length;
     }
   };
 
@@ -1979,6 +1953,171 @@ const SAVE = (function(){
     exportFile: exportFile, importText: importText
   };
   return api;
+})();
+
+/* =========================================================================
+   CAMPAGNE 1b. JOURNAL — radio, grand livre et événements de bord : anneau de 300 entrées, lecture fusionnée, détection
+   Couche simulation : ni THREE ni DOM. Détails (entrées, instantanés de detect, codes) plus bas.
+   ========================================================================= */
+/* @provides JOURNAL @requires GAME */
+/* Entrées { seq, t, kind, ... }, t = secondes de jeu actif.
+     radio { from:'ship'|'tower', who, text }   fin { reason, delta, bal }   evt { code, a, b, imp }
+   En campagne, les « fin » ne sont pas stockées ici : la source est state.ledger (cf. ledgerRows) ; les « evt » sont
+   aussi sauvegardés par GAME.cmd('journal.push') (state.journal) et réinjectés par restore(). La radio reste en mémoire.
+   detect(prev, snap) est pur : il compare deux instantanés du moteur (remplis par l'adaptateur de L1.13) :
+     { phase:      REAL.phase ('JUMP' | 'WARP' | 'WARPOUT' | 'ORBIT' | autre ; null/undefined ok),
+       legName:    nom de l'étape en cours (REAL.leg.name) ou null,
+       missionTarget: nom de la cible de mission (REAL.mission.target.name) ou null,
+       active:     mission acceptée { id, dest, reward } ou null (MISSIONS.state.active),
+       doneCount:  nombre de missions livrées (MISSIONS.state.done.length),
+       jump:       booléen, saut quantique classique en cours (jumpState),
+       nearPort:   faux, vrai, ou nom du port (isNearPortService),
+       fuelRatio:  fuel / FUEL_CAPACITY (0..1),
+       fuelWarn, fuelCrit: seuils FUEL_WARN_RATIO / FUEL_CRIT_RATIO (défauts 0.25 / 0.10) }
+   Codes : msn.accept (a = destination, b = prime), msn.done (imp), jump (a = étape), arrive (a = étape),
+   orbit (a = cible, sur front → 'ORBIT'), dock (a = port), fuel.low (imp, b = %), fuel.crit (imp, b = %).
+   ------------------------------------------------------------------------- */
+const JOURNAL = (function(){
+  const RING_MAX = 300;                     // entrées conservées, toutes rubriques (les plus anciennes sont écartées)
+  const IMPORTANT = { 'msn.done': 1, 'fuel.low': 1, 'fuel.crit': 1 };
+  let ring = [];
+  let seq = 0;                              // dernier numéro attribué
+  let readSeq = 0;                          // dernier numéro lu (markRead)
+  let freeClock = 0;                        // horloge de la Partie libre (pas de GAME.state)
+  const listeners = Object.create(null);
+
+  function warn(msg, err){ if(typeof console !== 'undefined') console.error(msg, err); }
+
+  /* ---- événements : même contrat que GAME.on / GAME.emit ---- */
+  function on(evt, fn){
+    if(typeof fn !== 'function') throw new TypeError('ecouteur_invalide');
+    const entry = { fn: fn, off: false };
+    (listeners[evt] || (listeners[evt] = [])).push(entry);
+    return function(){
+      if(entry.off) return;
+      entry.off = true;
+      const l = listeners[evt], i = l ? l.indexOf(entry) : -1;
+      if(i >= 0) l.splice(i, 1);
+    };
+  }
+  function emit(evt, data){
+    const l = listeners[evt];
+    if(!l) return;
+    l.slice().forEach(function(e){
+      if(e.off) return;
+      try{ e.fn(data); }catch(err){ warn('[JOURNAL] écouteur « ' + evt + ' » :', err); }
+    });
+  }
+
+  /* ---- horloge ---- */
+  function now(){ return GAME.state ? GAME.state.clock : freeClock; }
+  function tickFree(dt){
+    if(typeof dt !== 'number' || !(dt > 0) || !isFinite(dt)) return freeClock;
+    freeClock = Math.round((freeClock + dt) * 1000) / 1000;
+    return freeClock;
+  }
+
+  /* ---- collecte ---- */
+  /* add(e) : e = { kind, ... } (t facultatif : now()) ; renvoie l'entrée. En campagne une « fin » n'est pas stockée
+     (state.ledger fait foi) mais l'entrée est rendue et l'événement émis. */
+  function add(e){
+    if(!e || typeof e !== 'object') throw new TypeError('entree_invalide');
+    if(e.kind !== 'radio' && e.kind !== 'fin' && e.kind !== 'evt') throw new Error('kind_invalide');
+    const entry = Object.assign({}, e, { seq: ++seq, t: (typeof e.t === 'number' && isFinite(e.t)) ? e.t : now() });
+    if(entry.kind === 'evt' && entry.imp === undefined) entry.imp = !!IMPORTANT[entry.code];
+    if(!(entry.kind === 'fin' && GAME.state)){
+      ring.push(entry);
+      if(ring.length > RING_MAX) ring.splice(0, ring.length - RING_MAX);
+    }
+    emit('add', entry);
+    return entry;
+  }
+
+  /* Grand livre de la campagne : [{ t, kind:'fin', reason, delta, bal }] chronologique, bal recalculé à rebours depuis st.credits */
+  function ledgerRows(st){
+    if(!st || !Array.isArray(st.ledger)) return [];
+    const rows = new Array(st.ledger.length);
+    let bal = typeof st.credits === 'number' ? st.credits : 0;
+    for(let i = st.ledger.length - 1; i >= 0; i--){
+      const l = st.ledger[i];
+      rows[i] = { t: l[0], kind: 'fin', reason: l[1], delta: l[2], bal: bal };
+      bal -= l[2];
+    }
+    return rows;
+  }
+
+  /* list({ kinds, limit }) : plus récent d'abord ; en campagne, anneau fusionné avec ledgerRows (tri stable par t) */
+  function list(o){
+    const opt = o || {};
+    const kinds = Array.isArray(opt.kinds) && opt.kinds.length ? opt.kinds : null;
+    const ok = r => !kinds || kinds.indexOf(r.kind) >= 0;
+    let out = ring.filter(ok).reverse();
+    if(GAME.state){
+      const fin = kinds && kinds.indexOf('fin') < 0 ? [] : ledgerRows(GAME.state).reverse();
+      out = out.concat(fin).sort((x, y) => y.t - x.t);
+    }
+    if(typeof opt.limit === 'number' && opt.limit >= 0) out = out.slice(0, opt.limit);
+    return out;
+  }
+
+  function unread(){
+    let n = 0;
+    for(let i = 0; i < ring.length; i++) if(ring[i].seq > readSeq && ring[i].kind === 'evt' && ring[i].imp) n++;
+    return n;
+  }
+  function markRead(){ readSeq = seq; }
+
+  /* restore(arr) : remplace l'anneau par les événements sauvegardés [t, code, a, b] (undefined accepté = journal vide) ;
+     les entrées restaurées sont considérées comme lues. */
+  function restore(arr){
+    ring = []; seq = 0; readSeq = 0;
+    (Array.isArray(arr) ? arr : []).forEach(function(r){
+      if(!Array.isArray(r) || typeof r[1] !== 'string') return;
+      ring.push({ seq: ++seq, t: typeof r[0] === 'number' ? r[0] : 0, kind: 'evt', code: r[1], a: r[2], b: r[3], imp: !!IMPORTANT[r[1]] });
+    });
+    if(ring.length > RING_MAX) ring.splice(0, ring.length - RING_MAX);
+    readSeq = seq;
+    emit('restore', null);
+  }
+
+  /* ---- détection : pure, sans état ; prev null (premier instantané ou reprise) -> aucun événement ---- */
+  const LEAP = { JUMP: 1, WARP: 1 };
+  function detect(prev, snap){
+    const out = [];
+    if(!prev || !snap) return out;
+    const evt = (code, a, b) => out.push({ kind: 'evt', code: code, a: a === undefined ? null : a, b: b === undefined ? null : b, imp: !!IMPORTANT[code] });
+    const leg = snap.legName || prev.legName || null;
+    const pa = prev.active, sa = snap.active;
+    if(sa && (!pa || pa.id !== sa.id)) evt('msn.accept', sa.dest, sa.reward);
+    if((snap.doneCount | 0) > (prev.doneCount | 0)){
+      const m = pa || sa;
+      evt('msn.done', m ? m.dest : null, m ? m.reward : null);
+    }
+    if((LEAP[snap.phase] && !LEAP[prev.phase]) || (snap.jump && !prev.jump)) evt('jump', leg);
+    if((snap.phase === 'WARPOUT' && prev.phase !== 'WARPOUT') || (prev.jump && !snap.jump)) evt('arrive', leg);
+    if(snap.phase === 'ORBIT' && prev.phase !== 'ORBIT') evt('orbit', snap.missionTarget || leg);
+    if(snap.nearPort && !prev.nearPort) evt('dock', typeof snap.nearPort === 'string' ? snap.nearPort : null);
+    const warnR = typeof snap.fuelWarn === 'number' ? snap.fuelWarn : 0.25;
+    const critR = typeof snap.fuelCrit === 'number' ? snap.fuelCrit : 0.10;
+    const pf = prev.fuelRatio, sf = snap.fuelRatio;
+    if(typeof pf === 'number' && typeof sf === 'number'){
+      const pct = Math.round(sf * 100);
+      if(sf <= critR && pf > critR) evt('fuel.crit', null, pct);
+      else if(sf <= warnR && sf > critR && pf > warnR) evt('fuel.low', null, pct);
+    }
+    return out;
+  }
+
+  function _reset(){
+    ring = []; seq = 0; readSeq = 0; freeClock = 0;
+    Object.keys(listeners).forEach(k => { delete listeners[k]; });
+  }
+
+  return {
+    RING_MAX: RING_MAX,
+    add: add, list: list, ledgerRows: ledgerRows, unread: unread, markRead: markRead,
+    on: on, now: now, tickFree: tickFree, detect: detect, restore: restore, _reset: _reset
+  };
 })();
 
 /* =========================================================================
@@ -7850,7 +7989,7 @@ function refreshRoutePanel(){
 }
 
 /* =========================================================================
-   ITINÉRAIRE + POINT DE LAGRANGE (§ amélioration v2.4)
+   ITINÉRAIRE (§ amélioration v2.4)
    ========================================================================= */
 
 /* Pastilles de la piste — régénérées seulement quand ROUTE.index change
@@ -7896,46 +8035,6 @@ function updateItineraryShip(){
   const localIdx = THREE.MathUtils.clamp(idx-start, 0, count-1);
   const frac = count>1 ? (localIdx+legFrac)/(count-1) : 0;
   ship.style.left = (THREE.MathUtils.clamp(frac,0,1)*100)+'%';
-}
-
-/* Point de Lagrange approximatif (L1) de l'étape en cours : sur l'axe
-   étoile→planète cible, à 92% de la distance en partant de l'étoile — une
-   approximation assumée (cf. commentaire CSS de .hud-lagrange), pas un
-   calcul à N corps : les planètes générées n'ont pas de masse simulée dont
-   tirer un vrai point de libration. */
-const LAGRANGE_FRACTION = 0.92;
-function computeLagrangePoint(leg){
-  if(!leg || !leg.planet || !leg.starPosition) return null;
-  const dir = leg.planet.position.clone().sub(leg.starPosition);
-  const dist = dir.length();
-  if(dist < 1) return leg.planet.position.clone();
-  dir.normalize();
-  return leg.starPosition.clone().addScaledVector(dir, dist*LAGRANGE_FRACTION);
-}
-const _lagTmp = new THREE.Vector3();
-function updateLagrangePanel(){
-  const panel = document.querySelector('.hud-lagrange');
-  if(!panel || panel.classList.contains('panel-hidden')) return;
-  const distEl = document.getElementById('lagrangeDist');
-  const nameEl = document.getElementById('lagrangeName');
-  const needle = document.getElementById('lagrangeNeedle');
-  if(!distEl || !nameEl || !needle) return;
-  const leg = ROUTE.legs[ROUTE.index];
-  const lp = computeLagrangePoint(leg);
-  if(!lp){
-    distEl.textContent = '—';
-    nameEl.textContent = t('noRoute');
-    return;
-  }
-  const forward = new THREE.Vector3(0,0,-1).applyQuaternion(shipRig.quaternion);
-  const heading = ((Math.atan2(forward.x, -forward.z)*180/Math.PI)+360)%360;
-  _lagTmp.copy(lp).sub(shipRig.position);
-  const dist = _lagTmp.length();
-  const targetHeading = ((Math.atan2(_lagTmp.x, -_lagTmp.z)*180/Math.PI)+360)%360;
-  const relBearing = (targetHeading-heading+360)%360;
-  needle.style.transform = 'rotate('+relBearing.toFixed(1)+'deg)';
-  distEl.textContent = Math.round(dist)+' u';
-  nameEl.textContent = 'L1 · '+leg.name;
 }
 
 /* =====================================================================
@@ -11553,7 +11652,7 @@ function update(){
 /* ---------- démarrage : en orbite près de la planète de départ ---------- */
 function itineraryUi(hide){
   if(!document.getElementById('missionModeCss')){ const st = document.createElement('style'); st.id = 'missionModeCss';
-    st.textContent = 'body.missions-mode #itineraryPanel, body.missions-mode #lagrangePanel, body.missions-mode .route-panel, body.missions-mode #routePanel{ display:none !important; }';
+    st.textContent = 'body.missions-mode #itineraryPanel, body.missions-mode .route-panel, body.missions-mode #routePanel{ display:none !important; }';
     document.head.appendChild(st); }
   document.body.classList.toggle('missions-mode', !!hide);
   const fp = document.getElementById('lblFlightPlan'); const panel = fp && fp.closest('.panel'); if(panel) panel.style.display = hide ? 'none' : '';
@@ -12850,15 +12949,10 @@ window.addEventListener('keydown', function(e){
     const helpItem = HUD_BAR_ITEMS.find(function(it){ return it.kind === 'help'; });
     if(helpItem) activateHudBarItem(helpItem);
   }
-  /* I / L — itinéraire et point de Lagrange (§ amélioration v2.4), mêmes
-     touches fixes que H : passent par activateHudBarItem, jamais dupliquées
-     entre clavier et bouton de la barre. */
+  /* I — itinéraire (§ amélioration v2.4), même touche fixe que H : passe par
+     activateHudBarItem, jamais dupliquée entre clavier et bouton de la barre. */
   if(e.code === 'KeyI'){
     const it = HUD_BAR_ITEMS.find(function(x){ return x.cls === 'hud-itinerary'; });
-    if(it) activateHudBarItem(it);
-  }
-  if(e.code === 'KeyL'){
-    const it = HUD_BAR_ITEMS.find(function(x){ return x.cls === 'hud-lagrange'; });
     if(it) activateHudBarItem(it);
   }
   /* V — réglage des volumes (demande utilisateur), même principe que H/I/L */
@@ -13199,10 +13293,6 @@ const HUD_ICONS = {
      pointillé — distinct de « route » (juste un trait entre deux points),
      pour ne pas confondre le plan de vol textuel et ce mini-suivi visuel. */
   itinerary: '<path d="M3 15h5.5M15.5 15H21" stroke-dasharray="2.5 3"/><circle cx="12" cy="15" r="1.8" fill="currentColor" stroke="none"/><path d="M12 3.5a4 4 0 0 1 4 4c0 3-4 7.5-4 7.5s-4-4.5-4-7.5a4 4 0 0 1 4-4z"/><circle cx="12" cy="7.3" r="1.3" fill="currentColor" stroke="none"/>',
-  /* point de Lagrange : boussole (cadran + aiguille) plutôt qu'un pictogramme
-     orbital littéral — c'est l'ORIENTATION relative qui est montrée, pas la
-     géométrie à N corps elle-même */
-  lagrange: '<circle cx="12" cy="12" r="8.5"/><path d="M12 5L14 12L12 19L10 12Z" fill="currentColor" stroke="none"/>',
   /* carte stellaire (§23) : trois points reliés par des traits fins,
      évoquant une petite constellation — distinct de « route » (un seul
      trait) et de « itinerary » (repère + trajet pointillé) déjà utilisés
@@ -13227,14 +13317,13 @@ const HUD_BAR_ITEMS = [
   { cls:null,            icon:'radio',   labelKey:'lblRadioChannel', kind:'radio'  },
   { cls:null,            icon:'port',    labelKey:'lblPortServices', kind:'port'   },
   { cls:null,            icon:'camera',  labelKey:null,              kind:'camera' },
-  /* itinéraire et point de Lagrange (§ amélioration v2.4) : deux nouveaux
-     panneaux, ajoutés APRÈS camera plutôt qu'entremêlés aux six premiers
+  /* itinéraire (§ amélioration v2.4) : nouvel
+     panneau, ajouté APRÈS camera plutôt qu'entremêlé aux six premiers
      panneaux d'info — F1-F9 sont affectés par POSITION dans ce tableau
      (cf. le gestionnaire keydown plus bas, indexé sur e.code), donc tout
      insertion avant radio/port/camera aurait décalé leurs raccourcis F7-F9.
-     Comme l'aide (H), ceux-ci prennent une touche FIXE plutôt qu'un F-slot. */
+     Comme l'aide (H), celui-ci prend une touche FIXE plutôt qu'un F-slot. */
   { cls:'hud-itinerary', icon:'itinerary', labelKey:'lblItinerary',  kind:'panel', hotkey:'I' },
-  { cls:'hud-lagrange',  icon:'lagrange',  labelKey:'lblLagrange',   kind:'panel', hotkey:'L' },
   /* carte stellaire (§23) : même principe (touche fixe, ajoutée après les
      six premiers panneaux pour ne pas décaler F7-F9) — indispensable au
      clavier ET au tactile, faute de quoi le module resterait totalement
@@ -13555,7 +13644,7 @@ document.addEventListener('click', function(e){
      bascule automatique) : pas la place de les garder tous ouverts en
      continu sur un écran de smartphone. */
   if(document.body.classList.contains('portrait-touch')){
-    ['hud-left','hud-route','hud-right','hud-temp','hud-engines','hud-telemetry','hud-itinerary','hud-lagrange'].forEach(function(cls){
+    ['hud-left','hud-route','hud-right','hud-temp','hud-engines','hud-telemetry','hud-itinerary'].forEach(function(cls){
       const el = document.querySelector('.'+cls);
       if(el) el.classList.add('panel-hidden');
     });
@@ -13976,15 +14065,15 @@ function repositionAllPanels(){
   repositionPortPanel();   /* enchaîne déjà repositionRadioPanel() */
   repositionCornerBottomPanels();
 }
-/* évite le chevauchement entre les deux panneaux bas-coin (itinéraire,
-   Lagrange, §21) et la rangée basse CENTRÉE (température/propulsion/
+/* évite le chevauchement entre le panneau bas-coin (itinéraire,
+   §21) et la rangée basse CENTRÉE (température/propulsion/
    commandes, §8) — repéré sur une capture d'écran de documentation à
    1100px de large : la rangée centrée peut s'étendre assez pour mordre
-   sur leur emplacement habituel, alors qu'à 1280px l'un et l'autre
-   semblaient avoir assez de marge. On les remonte au-dessus d'elle plutôt
-   que de les laisser se chevaucher. Repositionnement dynamique (mesuré),
-   pas un simple seuil de largeur fixe : la largeur de la rangée centrée
-   dépend aussi de QUELS panneaux elle contient à l'instant.
+   sur son emplacement habituel, alors qu'à 1280px il semblait avoir assez
+   de marge. On le remonte au-dessus d'elle plutôt que de le laisser se
+   chevaucher. Repositionnement dynamique (mesuré), pas un simple seuil
+   de largeur fixe : la largeur de la rangée centrée dépend aussi de QUELS
+   panneaux elle contient à l'instant.
 
    Bug remonté en jeu (v2.6, ajout du carburant §22) : le panneau ITINÉRAIRE
    peut AUSSI chevaucher la pile de droite (objet proche → services
@@ -14002,17 +14091,7 @@ function repositionAllPanels(){
 function repositionCornerBottomPanels(){
   const row = document.querySelector('.hud-bottom-row');
   const itin = document.querySelector('.hud-itinerary');
-  const lag = document.querySelector('.hud-lagrange');
   const MARGIN = 14;
-
-  if(lag) lag.style.bottom = '';
-  if(row && lag && !lag.classList.contains('panel-hidden')){
-    const rowRect = row.getBoundingClientRect();
-    const lagRect = lag.getBoundingClientRect();
-    if(lagRect.right > rowRect.left - MARGIN){
-      lag.style.bottom = ((window.innerHeight - rowRect.top) + MARGIN)+'px';
-    }
-  }
 
   if(!itin || itin.classList.contains('panel-hidden')) return;
   itin.style.bottom = '';
@@ -15704,13 +15783,11 @@ function updateHud(now){
   const forward = new THREE.Vector3(0,0,-1).applyQuaternion(shipRig.quaternion);
   const heading = ((Math.atan2(forward.x, -forward.z)*180/Math.PI)+360)%360;
   document.getElementById('headingVal').textContent = String(Math.round(heading)).padStart(3,'0')+'°';
-  /* itinéraire (point-vaisseau) et point de Lagrange (§ v2.4) : hors du
+  /* itinéraire (point-vaisseau) : hors du
      throttle ci-dessous comme vitesse/secteur/cap juste au-dessus — un
      point qui saute par paliers de 350ms serait visiblement saccadé,
-     contrairement à un texte qui change peu d'une image à l'autre. Chaque
-     fonction sort tout de suite si son panneau est masqué. */
+     contrairement à un texte qui change peu d'une image à l'autre. */
   updateItineraryShip();
-  updateLagrangePanel();
 
   if(now - lastHudUpdate < 350) return;
   lastHudUpdate = now;
