@@ -181,6 +181,7 @@ details[open] summary::after { content: "\2212"; }
 .tog[aria-pressed="true"] { border-color: color-mix(in srgb, var(--field) 55%, var(--line)); }
 .tog[aria-pressed="true"]::before { background: var(--field); box-shadow: 0 0 6px var(--field); }
 .tog:focus-visible { outline: 2px solid var(--field); outline-offset: 2px; }
+.tog:disabled { opacity: .38; cursor: default; }
 .sub-label { font-size: 11.5px; color: var(--dim); margin-top: 2px; }
 #render details summary { font-size: 12px; padding-block: 2px; }
 #render details > div { margin-top: 8px; display: flex; flex-direction: column; gap: 7px; }
@@ -251,9 +252,11 @@ dialog textarea.inp { min-height: 280px; font-family: var(--font-data); font-siz
 #frame .win { position: relative; box-shadow: 0 0 0 9999px rgba(3, 5, 9, .62); outline: 1px solid rgba(255, 255, 255, .28); }
 #frame .win.grid { background-image: linear-gradient(to right, transparent calc(33.333% - .5px), rgba(255,255,255,.32) calc(33.333% - .5px), rgba(255,255,255,.32) calc(33.333% + .5px), transparent calc(33.333% + .5px), transparent calc(66.666% - .5px), rgba(255,255,255,.32) calc(66.666% - .5px), rgba(255,255,255,.32) calc(66.666% + .5px), transparent calc(66.666% + .5px)), linear-gradient(to bottom, transparent calc(33.333% - .5px), rgba(255,255,255,.32) calc(33.333% - .5px), rgba(255,255,255,.32) calc(33.333% + .5px), transparent calc(33.333% + .5px), transparent calc(66.666% - .5px), rgba(255,255,255,.32) calc(66.666% - .5px), rgba(255,255,255,.32) calc(66.666% + .5px), transparent calc(66.666% + .5px)); }
 #b-exitfull { position: absolute; right: 12px; top: 10px; z-index: 7; background: color-mix(in srgb, var(--plate) 85%, transparent); }
-#recbadge { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 7; font: 600 12px var(--font-data); color: #fff; background: rgba(200, 30, 30, .85); padding: 4px 10px; border-radius: 5px; }
+#recbadge { position: absolute; left: 50%; top: 62px; transform: translateX(-50%); z-index: 7; font: 600 12px var(--font-data); font-variant-numeric: tabular-nums; color: #fff; background: rgba(200, 30, 30, .85); padding: 4px 10px 6px; border-radius: 5px; overflow: hidden; white-space: nowrap; }
+#rec-bar { position: absolute; left: 0; bottom: 0; height: 2px; width: 0; background: #fff; opacity: .85; }
 #app.full { grid-template-columns: minmax(0, 1fr); }
 #app.full #panel, #app.full #side, #app.full #topbar, #app.full #hud { display: none; }
+#app.full #recbadge { top: 12px; }
 #app[data-mode="shot"] #hud { bottom: 10px; }
 .planet-note { font-size: 11.5px; color: var(--dim); margin: 0; }
 
@@ -478,11 +481,15 @@ dialog textarea.inp { min-height: 280px; font-family: var(--font-data); font-siz
           <button type="button" data-m="orbit">Orbite</button><button type="button" data-m="pass">Passage</button><button type="button" data-m="push">Approche</button>
         </div>
         <div class="slider"><label for="t-speed">Vitesse</label><input id="t-speed" type="range" min="0.1" max="2" step="0.05"><output id="t-speed-v"></output></div>
-        <div class="controls">
-          <button class="btn center" id="t-go" type="button">Lancer <kbd>Espace</kbd></button>
-          <button class="btn center" id="t-rec" type="button">Enregistrer 10 s</button>
+        <button class="btn center" id="t-go" type="button">Lancer <kbd>Espace</kbd></button>
+        <div class="sub-label" id="t-rec-label">Vidéo</div>
+        <div class="segs" id="t-recmode" role="group" aria-labelledby="t-rec-label">
+          <button type="button" data-r="fixed" title="Durée choisie avec le curseur">Durée fixe</button><button type="button" data-r="cycle" title="Exactement un tour, un passage ou une approche : la vidéo boucle sans à-coup">Un cycle</button><button type="button" data-r="free" title="Jusqu’à ce que tu arrêtes (10 min au plus)">Libre</button>
         </div>
-        <p class="note">La vidéo (WebM) enregistre la vue entière, filtres compris.</p>
+        <div class="slider" id="t-dur-row"><label for="t-dur">Durée</label><input id="t-dur" type="range" min="0" max="12" step="1"><output id="t-dur-v"></output></div>
+        <div class="toggles"><button class="tog" type="button" id="t-reccine" style="grid-column: 1 / -1">Lancer le travelling avec la vidéo</button></div>
+        <button class="btn center accent" id="t-rec" type="button">Enregistrer 10 s</button>
+        <p class="note" id="t-rec-note">La vidéo (WebM) enregistre la vue entière, filtres compris : compte environ 1,5 Mo par seconde.</p>
       </section>
     </div>
 
@@ -511,7 +518,7 @@ dialog textarea.inp { min-height: 280px; font-family: var(--font-data); font-siz
     <div id="legend"></div>
     <div id="frame" hidden><div class="win"></div></div>
     <button class="btn sm" id="b-exitfull" type="button" hidden>Quitter le plein cadre <kbd>Échap</kbd></button>
-    <div id="recbadge" role="status" hidden>● REC <span id="rec-t">0 s</span></div>
+    <div id="recbadge" role="status" hidden>● REC <span id="rec-t">0 s</span><i id="rec-bar" aria-hidden="true"></i></div>
     <div id="toast" role="status" aria-live="polite" hidden></div>
     <div id="empty" hidden>
       <div class="box">
@@ -804,7 +811,13 @@ dialog textarea.inp { min-height: 280px; font-family: var(--font-data); font-siz
           </ul>
           <figure><img data-src="manual/m13.webp" alt="Profondeur de champ au format 21:9 avec grille des tiers" width="1100" height="760"><figcaption>Mise au point sur le vaisseau, planète floue en arrière-plan, format 21:9 et grille des tiers.</figcaption></figure>
           <h4>Travelling et vidéo</h4>
-          <p>Choisis un mouvement (<b>Orbite</b>, <b>Passage</b> latéral ou <b>Approche</b>), règle la vitesse, puis <b>Lancer</b> (<kbd>Espace</kbd>). <b>Enregistrer 10 s</b> lance le travelling et produit une vidéo WebM de la vue entière, filtres compris.</p>
+          <p>Choisis un mouvement (<b>Orbite</b>, <b>Passage</b> latéral ou <b>Approche</b>), règle la vitesse, puis <b>Lancer</b> (<kbd>Espace</kbd>). <b>Enregistrer</b> produit une vidéo WebM de la vue entière, filtres compris. Sous <b>Vidéo</b>, choisis la durée :</p>
+          <ul>
+            <li><b>Durée fixe</b> : de 3 s à 5 min, au curseur.</li>
+            <li><b>Un cycle</b> : exactement un tour d'orbite, un passage ou une approche. La vidéo boucle sans à-coup, et la vitesse du travelling règle sa durée (42 s pour un tour à ×0,60). Arrêter le travelling arrête la vidéo.</li>
+            <li><b>Libre</b> : la vidéo tourne jusqu'à ce que tu cliques sur <b>Arrêter l'enregistrement</b>, dans la limite de 10 min.</li>
+          </ul>
+          <p><b>Lancer le travelling avec la vidéo</b> est actif par défaut. Désactive-le pour filmer en plan fixe, par exemple le départ d'une navette ou un container qu'on décroche. Le bandeau <b>REC</b> affiche le temps écoulé et la progression. Il n'apparaît pas dans la vidéo. Compte environ 1,5 Mo par seconde.</p>
         </section>
 
         <section id="m-planet" data-title="Planète">
@@ -956,6 +969,9 @@ let fleet, gltf, protos = {}, containerProto = null, clips = {};
 let customCos = {};
 const companyOf = (k) => customCos[k] || fleet.companies[k] || fleet.companies.STT;
 
+// offline single-file build (build_viewer_standalone.py): files are embedded and served as blob: URLs
+const assetURL = (u) => window.STT_EMBED?.url(u) ?? u;
+if (window.STT_EMBED) THREE.DefaultLoadingManager.setURLModifier(assetURL);
 function loadGLB(url) {
   return new Promise((res, rej) => {
     new GLTFLoader().load(url, res, (ev) => {
@@ -1044,7 +1060,7 @@ const fontsReady = () => (fontsP ||= (document.fonts
   : Promise.resolve()));
 const imgCache = new Map();
 function loadImage(url) {
-  if (!imgCache.has(url)) imgCache.set(url, new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = url; }));
+  if (!imgCache.has(url)) imgCache.set(url, new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = assetURL(url); }));
   return imgCache.get(url);
 }
 function measure(g, txt) {
@@ -2809,6 +2825,7 @@ const RS_DEFAULT = {
   shadows: true, sky: true, sunAz: 35, sunEl: 18,
   bloom: true, cinema: false, crt: false, thermal: false, blueprint: false, ssao: false,
   dof: false, aperture: 0.45, grid: false, format: 'free', focal: 35, tmode: 'orbit', tspeed: 0.6,
+  recMode: 'fixed', recDur: 10, recCine: true,
 };
 const RS = Object.assign({}, RS_DEFAULT, LS.get('stt.render.v1', {}) || {});
 const saveRS = () => LS.set('stt.render.v1', RS);
@@ -3283,6 +3300,8 @@ function launchShuttle(s, c = ctx) {
 function shuttlesUI() {
   const list = (ctx?.shuttles || []).filter((s) => s.dock), b = $('#b-shuttle');
   b.disabled = !list.length;
+  b.title = list.length ? 'Départ de la baie (portes, patin, sortie latérale) ou de l’anneau d’amarrage, puis retour'
+    : 'Aucune navette amarrée dans cette vue : ajoute une navette (SHUTTLE) au patin d’une baie ou à un anneau, ou ouvre Nexus Port, Vigil Relay ou Aquila Depot Theta dans la Galerie';
   const away = list.some((s) => s.dir > 0 || (s.dir === 0 && s.t > 0));
   b.textContent = list.length > 1 ? (away ? 'Rappeler les navettes' : 'Lancer les navettes') : (away ? 'Rappeler la navette' : 'Lancer la navette');
   b.setAttribute('aria-pressed', String(away));
@@ -4319,28 +4338,83 @@ function updateCine(dt) {
   camera.position.copy(p); controls.target.copy(c); camera.lookAt(c);
   camera.far = Math.max(camera.far, R * 60); camera.updateProjectionMatrix();
 }
+// video length: fixed (slider stops), one travelling cycle (seamless loop) or free (manual stop, capped)
 let rec = null;
-function recUI() {
-  $('#t-rec').textContent = rec ? 'Arrêter l’enregistrement' : 'Enregistrer 10 s';
-  $('#recbadge').hidden = !rec;
+const REC_STOPS = [3, 5, 8, 10, 15, 20, 30, 45, 60, 90, 120, 180, 300], REC_MAX = 600;
+// one cycle in travelling time units (cine.t): full orbit, one lateral pass, one push-in
+const CYCLE = { orbit: Math.PI * 8, pass: 25, push: 1 / 0.06 };
+const CYCLE_FR = { orbit: 'un tour', pass: 'un passage', push: 'une approche' };
+const recStop = () => REC_STOPS.reduce((b, v, i) => (Math.abs(v - RS.recDur) < Math.abs(REC_STOPS[b] - RS.recDur) ? i : b), 0);
+function fmtDur(sec) {
+  sec = Math.round(sec); if (sec < 60) return `${sec} s`;
+  const m = Math.floor(sec / 60), r = sec % 60; return r ? `${m} min ${String(r).padStart(2, '0')}` : `${m} min`;
 }
-function recordVideo(sec = 10) {
-  if (rec) { rec.mr.stop(); return; }
+const fmtClock = (sec) => (sec < 60 ? `${Math.floor(sec)} s` : `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`);
+const recMode = () => (RS.recMode === 'cycle' && !RS.recCine ? 'fixed' : RS.recMode);
+const cycleSec = () => CYCLE[RS.tmode] / Math.max(0.05, RS.tspeed);
+function recUI() {
+  const m = recMode();
+  document.querySelectorAll('#t-recmode [data-r]').forEach((b) => {
+    b.setAttribute('aria-pressed', String(b.dataset.r === m)); b.disabled = !!rec || (b.dataset.r === 'cycle' && !RS.recCine);
+  });
+  const sl = $('#t-dur'); sl.value = recStop(); sl.disabled = !!rec; $('#t-dur-row').hidden = m !== 'fixed';
+  $('#t-dur-v').textContent = fmtDur(RS.recDur);
+  const tc = $('#t-reccine'); tc.setAttribute('aria-pressed', String(!!RS.recCine)); tc.disabled = !!rec;
+  $('#t-rec').textContent = rec ? 'Arrêter l’enregistrement'
+    : m === 'fixed' ? `Enregistrer ${fmtDur(RS.recDur)}`
+    : m === 'cycle' ? `Enregistrer ${CYCLE_FR[RS.tmode]} · ${fmtDur(cycleSec())}`
+    : 'Enregistrer jusqu’à l’arrêt';
+  $('#t-rec').classList.toggle('danger', !!rec); $('#t-rec').classList.toggle('accent', !rec);
+  const sz = m === 'free' ? 0 : (m === 'fixed' ? RS.recDur : cycleSec()) * 1.5;
+  $('#t-rec-note').textContent = m === 'cycle'
+    ? `La vidéo couvre exactement ${CYCLE_FR[RS.tmode]} : elle boucle sans à-coup. La vitesse règle sa durée. Environ ${Math.max(1, Math.round(sz))} Mo.`
+    : m === 'free'
+      ? 'Clique de nouveau pour arrêter. La vidéo s’arrête d’elle-même à 10 min. Compte environ 1,5 Mo par seconde.'
+      : `La vidéo (WebM) enregistre la vue entière, filtres compris. Environ ${Math.max(1, Math.round(sz))} Mo.`;
+  $('#recbadge').hidden = !rec;
+  if (!rec) $('#rec-bar').style.width = '0';
+}
+function recordVideo() {
+  if (rec) { if (rec.mr.state === 'recording') rec.mr.stop(); return; }
   if (!canvas.captureStream || !window.MediaRecorder) { toast('Enregistrement vidéo non pris en charge par ce navigateur.'); return; }
   const mime = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'].find((m) => MediaRecorder.isTypeSupported(m));
   let mr;
   try { mr = new MediaRecorder(canvas.captureStream(30), mime ? { mimeType: mime, videoBitsPerSecond: 12e6 } : undefined); }
   catch (e) { toast('Enregistrement impossible : ' + (e.message || e)); return; }
-  const chunks = [];
+  const chunks = [], m = recMode();
   mr.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
-  mr.onstop = () => { rec = null; recUI(); const blob = new Blob(chunks, { type: 'video/webm' }); if (blob.size) saveFile(`${slug(subjectName())}-travelling.webm`, blob); };
-  if (!cine.on) startCine();
-  mr.start(250); rec = { mr, t0: performance.now(), dur: sec * 1000 }; recUI();
+  mr.onstop = () => {
+    const r = rec; rec = null; clearTimeout(r?.timer); recUI();
+    if (r?.mode === 'cycle' && cine.on && r.ownCine) stopCine();
+    const blob = new Blob(chunks, { type: 'video/webm' });
+    if (blob.size) saveFile(`${slug(subjectName())}-${r?.mode === 'cycle' ? 'boucle' : 'travelling'}.webm`, blob);
+  };
+  // a cycle starts the travelling from its beginning so the clip loops; otherwise keep what is running
+  let ownCine = false;
+  if (m === 'cycle') { startCine(); ownCine = true; }
+  else if (RS.recCine && !cine.on) { startCine(); ownCine = true; }
+  mr.start(250);
+  rec = { mr, mode: m, ownCine, t0: performance.now(), dur: m === 'fixed' ? RS.recDur * 1000 : m === 'free' ? REC_MAX * 1000 : 0, c0: cine.t, C: CYCLE[RS.tmode], tm: RS.tmode };
+  // wall-clock stop, independent of frame hitches (the render loop only refreshes the badge)
+  if (rec.dur) rec.timer = setTimeout(() => { if (mr.state === 'recording') { mr.stop(); if (m === 'free') toast('Enregistrement arrêté à 10 min.'); } }, rec.dur);
+  recUI();
 }
 function updateRec() {
   if (!rec) return;
-  const el = performance.now() - rec.t0; $('#rec-t').textContent = `${Math.floor(el / 1000)} s`;
-  if (el >= rec.dur && rec.mr.state === 'recording') rec.mr.stop();
+  const el = (performance.now() - rec.t0) / 1000;
+  let k = 0, tot = '';
+  if (rec.mode === 'cycle') {
+    // stop on travelling time, not wall time: frame drops or speed changes still give exactly one cycle
+    if (!cine.on || RS.tmode !== rec.tm || cine.t < rec.c0) k = 1;
+    else k = (cine.t - rec.c0) / rec.C;
+    tot = ` / ${fmtClock(el + Math.max(0, rec.C - (cine.t - rec.c0)) / Math.max(0.05, RS.tspeed))}`;
+  } else {
+    k = el * 1000 / rec.dur;
+    if (rec.mode === 'fixed') tot = ` / ${fmtClock(rec.dur / 1000)}`;
+  }
+  $('#rec-t').textContent = fmtClock(el) + tot;
+  $('#rec-bar').style.width = rec.mode === 'free' ? '0' : `${Math.min(100, k * 100).toFixed(1)}%`;
+  if (rec.mode === 'cycle' && k >= 1 && rec.mr.state === 'recording') rec.mr.stop();
 }
 function updateTween(dt) {
   if (!tween || cine.on) return;
@@ -4366,6 +4440,7 @@ function cameraUI() {
   document.querySelectorAll('#c-format [data-f]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.f === RS.format)));
   document.querySelectorAll('#t-mode [data-m]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.m === RS.tmode)));
   $('#t-speed').value = RS.tspeed; $('#t-speed-v').textContent = '×' + (+RS.tspeed).toFixed(2);
+  recUI();
   $('#c-ap').disabled = !RS.dof;
 }
 $('#p-kind').innerHTML = Object.entries(STTPlanet.KINDS).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join('');
@@ -4413,7 +4488,11 @@ $('#t-mode').addEventListener('click', (e) => { const b = e.target.closest('[dat
 $('#t-speed').addEventListener('input', (e) => { RS.tspeed = +e.target.value; cameraUI(); });
 $('#t-speed').addEventListener('change', saveRS);
 $('#t-go').addEventListener('click', () => (cine.on ? stopCine() : startCine()));
-$('#t-rec').addEventListener('click', () => recordVideo(10));
+$('#t-rec').addEventListener('click', () => recordVideo());
+$('#t-recmode').addEventListener('click', (e) => { const b = e.target.closest('[data-r]'); if (!b || b.disabled) return; RS.recMode = b.dataset.r; recUI(); saveRS(); });
+$('#t-dur').addEventListener('input', (e) => { RS.recDur = REC_STOPS[+e.target.value] ?? 10; recUI(); });
+$('#t-dur').addEventListener('change', saveRS);
+$('#t-reccine').addEventListener('click', () => { RS.recCine = !RS.recCine; recUI(); saveRS(); });
 document.addEventListener('keydown', (e) => {
   if (mode !== 'shot' || e.target.closest?.('input, textarea, select') || dlg.open || !man.hidden) return;
   const k = e.key.toLowerCase();
@@ -4455,7 +4534,7 @@ let manLast = null;
 $('#man-toc').innerHTML = [...manArt.querySelectorAll('section')].map((s) => `<button type="button" data-to="${s.id}">${esc(s.dataset.title)}</button>`).join('');
 function openManual(sectionId) {
   manLast = document.activeElement;
-  manArt.querySelectorAll('img[data-src]').forEach((im) => { im.src = im.dataset.src; im.removeAttribute('data-src'); });
+  manArt.querySelectorAll('img[data-src]').forEach((im) => { im.src = assetURL(im.dataset.src); im.removeAttribute('data-src'); });
   man.hidden = false; $('#man-close').focus();
   if (sectionId) $('#' + sectionId)?.scrollIntoView({ block: 'start' });
   manSpy();
@@ -4491,12 +4570,13 @@ window.__stt = {
   stepShuttles: (sec) => { for (let k = 0; k < sec * 20; k++) { updateShuttles(ctx, 0.05); for (const b of ctx.bays) b.mx.update(0.05); } },
   shuttles: () => (ctx?.shuttles || []).map((s) => ({ pid: s.inst.userData.pid ?? null, mode: s.dock?.mode ?? null, t: +s.t.toFixed(2), T: s.T ?? null, dir: s.dir, visible: s.inst.visible, thr: s.fx?.thr.value ?? 0, pos: new V3().setFromMatrixPosition(s.inst.matrix).toArray().map((v) => +v.toFixed(2)) })),
   load: (o) => { const l = importObject(o); if (l[0]) loadComp(l[0]); return l.length; },
+  rec: () => ({ mode: recMode(), dur: RS.recDur, cycle: +cycleSec().toFixed(2), on: !!rec, cine: cine.on, label: $('#t-rec').textContent, badge: $('#rec-t').textContent, bar: $('#rec-bar').style.width }),
 };
 
 // ------------------------------------------------------------------ boot
 (async () => {
   try {
-    fleet = await (await fetch('fleet.json')).json();
+    fleet = await (await fetch(assetURL('fleet.json'))).json();
     for (const [k, d] of Object.entries(LS.get('stt.companies.v1', {}) || {})) if (!fleet.companies[k] && d?.name) customCos[k] = finalizeCompany(k, d);
     library = LS.get('stt.library.v1', []); if (!Array.isArray(library)) library = [];
     listUI(); companiesUI();
