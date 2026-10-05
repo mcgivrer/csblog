@@ -51,7 +51,7 @@ For any non-trivial task (new feature, refactor, multi-file change), work as fou
 - Verifies its own work (opens the page, runs the build/tests when the project has them) and reports what was checked.
 - Up to **three developer instances** may run in parallel (see Parallel developers); each reports only on its own task.
 
-**Reviewer (`stt-revue`, Haiku)** — checks, never edits and never designs.
+**Reviewer (`stt-revue`, Haiku 4.5)** — checks, never edits and never designs.
 - Makes the first pass on each developer commit, before the architect: scope (only the task's files), conformity to the contract (names, signatures, DOM ids, i18n keys, `ORDER.txt` placement, `@provides` / `@requires` headers), repo invariants, the tests listed for the task, and commit hygiene.
 - Read-only: it does not modify files, does not commit, and runs tests only in a worktree where no other agent is building (`build.py` and the tests rewrite `target/`).
 - Returns "conforme" or a numbered list of deviations (blocking / minor). Anything that needs a design judgement is written as "à arbitrer par l'ARCHI" with the precise question, never decided by the reviewer.
