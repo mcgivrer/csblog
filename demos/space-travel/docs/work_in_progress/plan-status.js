@@ -8,7 +8,7 @@
             Le chemin doit exister (ou avoir existé dans l'historique git pour une tâche passée).
    Le total d'un lot est calculé par la page (somme des tâches) : ne pas le saisir. */
 window.PLAN = {
-  updated: "2026-10-05 12:00",
+  updated: "2026-10-05 12:30",
   spec: "SPEC-010-chantier_naval_et_campagne-V1.0.md",
   currentLot: "L1",
   models: { cp: "CP Sonnet", archi: "ARCHI Opus", dev: "DEV Sonnet / Haiku" },
@@ -16,7 +16,7 @@ window.PLAN = {
   lots: [
     { id: "C0", title: "Cadrage SPEC-010",      status: "done", budget: 500000,  version: "—" },
     { id: "L0", title: "Fondations",            status: "done"  , budget: 600000,  version: "stt_v2.18" },
-    { id: "L1", title: "Console",               status: "todo", budget: 500000,  version: "stt_v2.19" },
+    { id: "L1", title: "Console",               status: "doing", budget: 500000,  version: "stt_v2.19" },
     { id: "L2", title: "Chantier v1",           status: "todo", budget: 1200000, version: "stt_v2.20" },
     { id: "L3", title: "Flotte + équipages",    status: "todo", budget: 1200000, version: "stt_v2.21" },
     { id: "L4", title: "Technologies",          status: "todo", budget: 600000,  version: "stt_v2.22" },
@@ -41,6 +41,18 @@ window.PLAN = {
     { id: "L0.5", lot: "L0", title: "GAME, RNG.game, DATA, SAVE + tests Node", agent: "dev", model: "sonnet", status: "done", progress: 100, budget: 140000, used: 116508, updated: "2026-10-04 23:51", note: "GAME, RNG.game, DATA, SAVE : 50 tests Node verts.", docs: [ { f: "docs/specs/lots/L0-contrat.md", r: "lu" }, { f: "docs/specs/SPEC-010-chantier_naval_et_campagne-V1.0.md", r: "lu" }, { f: "docs/specs/CODEMAP.md", r: "lu" }, { f: "sources/src/data/economy.json", r: "créé" } ] },
     { id: "L0.6", lot: "L0", title: "Choix Campagne / Partie libre, Courlis de départ", agent: "dev", model: "sonnet", status: "done", progress: 100, budget: 100000, used: 194050, updated: "2026-10-05 00:17", note: "Fait + 4 corrections de revue (reprise sur la même graine, confirmation, import, tests). Corrections non mesurées (reprise d'agent) : total réel plus élevé.", docs: [ { f: "docs/specs/lots/L0-contrat.md", r: "lu" }, { f: "docs/specs/SPEC-010-chantier_naval_et_campagne-V1.0.md", r: "lu" }, { f: "docs/specs/CODEMAP.md", r: "lu" }, { f: "docs/specs/img/spec010/console-flotte.svg", r: "lu" }, { f: "sources/src/data/economy.json", r: "lu" } ] },
     { id: "L0.7", lot: "L0", title: "Revue des diffs L0", agent: "archi", model: "opus", status: "done", progress: 100, budget: 50000, used: 12000, updated: "2026-10-05 00:17", note: "Revues sur diff faites par le CP-ARCHI de la session à chaque tâche.", est: true, docs: [ { f: "docs/specs/lots/L0-contrat.md", r: "lu" }, { f: "docs/specs/SPEC-010-chantier_naval_et_campagne-V1.0.md", r: "lu" }, { f: "docs/specs/CODEMAP.md", r: "modifié" } ] },
+    { id: "L1.P", lot: "L1", title: "Fiche de lot et pilotage", agent: "cp", model: "opus", status: "doing", progress: 10, budget: 30000, used: null, updated: "2026-10-05 12:30", note: "Pilotage CP de la session ; fiche L1-fiche.md.", docs: [ { f: "docs/specs/lots/L1-fiche.md", r: "créé" }, { f: "docs/specs/SPEC-010-chantier_naval_et_campagne-V1.0.md", r: "lu" }, { f: "docs/work_in_progress/plan-status.js", r: "modifié" } ] },
+    { id: "L1.A", lot: "L1", title: "Contrat L1 et découpage en tâches", agent: "archi", model: "opus", status: "done", progress: 100, budget: 40000, used: 120560, updated: "2026-10-05 12:30", note: "Contrat L1-contrat.md (121 lignes). Dépassement ×3 : inventaire des 7 nœuds DOM et des touches. 5 points à trancher (Tab, Échap, L, Alt+n, nommage).", docs: [ { f: "docs/specs/lots/L1-contrat.md", r: "créé" }, { f: "docs/specs/lots/L1-fiche.md", r: "lu" }, { f: "docs/specs/SPEC-010-chantier_naval_et_campagne-V1.0.md", r: "lu" }, { f: "docs/specs/CODEMAP.md", r: "lu" }, { f: "docs/specs/lots/L0-contrat.md", r: "lu" } ] },
+    { id: "L1.1", lot: "L1", title: "ui/50-console.js (modèle pur) + tests Node", agent: "dev", model: "sonnet", status: "todo", progress: 0, budget: 40000, used: null, updated: "2026-10-05 12:30", note: "", docs: [ { f: "docs/specs/lots/L1-contrat.md", r: "lu" }, { f: "docs/specs/CODEMAP.md", r: "lu" } ] },
+    { id: "L1.2", lot: "L1", title: "Cadre : vue, CSS, hébergement, observateur, clés I18N", agent: "dev", model: "sonnet", status: "todo", progress: 0, budget: 70000, used: null, updated: "2026-10-05 12:30", note: "", docs: [ { f: "docs/specs/lots/L1-contrat.md", r: "lu" }, { f: "docs/specs/CODEMAP.md", r: "lu" } ] },
+    { id: "L1.3", lot: "L1", title: "Onglet Aide · Réglages", agent: "dev", model: "sonnet", status: "todo", progress: 0, budget: 30000, used: null, updated: "2026-10-05 12:30", note: "", docs: [ { f: "docs/specs/lots/L1-contrat.md", r: "lu" } ] },
+    { id: "L1.4", lot: "L1", title: "Onglet Navigation (carte)", agent: "dev", model: "sonnet", status: "todo", progress: 0, budget: 40000, used: null, updated: "2026-10-05 12:30", note: "", docs: [ { f: "docs/specs/lots/L1-contrat.md", r: "lu" } ] },
+    { id: "L1.5", lot: "L1", title: "Onglet Missions (deux tableaux)", agent: "dev", model: "sonnet", status: "todo", progress: 0, budget: 50000, used: null, updated: "2026-10-05 12:30", note: "", docs: [ { f: "docs/specs/lots/L1-contrat.md", r: "lu" } ] },
+    { id: "L1.6", lot: "L1", title: "Onglets Port et Chantier", agent: "dev", model: "sonnet", status: "todo", progress: 0, budget: 50000, used: null, updated: "2026-10-05 12:30", note: "", docs: [ { f: "docs/specs/lots/L1-contrat.md", r: "lu" } ] },
+    { id: "L1.7", lot: "L1", title: "Raccourcis (Tab, F1–F8, Alt+1..8)", agent: "dev", model: "sonnet", status: "todo", progress: 0, budget: 30000, used: null, updated: "2026-10-05 12:30", note: "Dépend des décisions 12 à 15 (touches).", docs: [ { f: "docs/specs/lots/L1-contrat.md", r: "lu" } ] },
+    { id: "L1.8", lot: "L1", title: "Tactile et étroit (390 / 960 px)", agent: "dev", model: "haiku", status: "todo", progress: 0, budget: 15000, used: null, updated: "2026-10-05 12:30", note: "", docs: [ { f: "docs/specs/lots/L1-contrat.md", r: "lu" } ] },
+    { id: "L1.9", lot: "L1", title: "console_test.py et suite complète", agent: "dev", model: "sonnet", status: "todo", progress: 0, budget: 50000, used: null, updated: "2026-10-05 12:30", note: "", docs: [ { f: "docs/specs/lots/L1-contrat.md", r: "lu" } ] },
+    { id: "L1.R", lot: "L1", title: "Revues des diffs L1", agent: "archi", model: "opus", status: "todo", progress: 0, budget: 30000, used: null, updated: "2026-10-05 12:30", note: "", docs: [ { f: "docs/specs/lots/L1-contrat.md", r: "lu" } ] },
     { id: "L6.M", lot: "L6", title: "Nouveaux maillages : laboratoire, raffinerie, fabrique, serre, tourelle (MCP Blender)", agent: "dev", model: "sonnet", status: "todo", progress: 0, budget: 250000, used: null, updated: "", note: "Décision 9. Le CP demande au mainteneur de démarrer Blender et son serveur MCP au moment de la tâche.", docs: [ { f: "docs/specs/SPEC-010-chantier_naval_et_campagne-V1.0.md", r: "lu" }, { f: "docs/specs/img/spec010/chantier.svg", r: "lu" }, { f: "docs/specs/img/spec010/station-site.svg", r: "lu" }, { f: "docs/specs/SPEC-001-vaisseaux_generatifs-V1.0.md", r: "lu" }, { f: "docs/specs/CODEMAP.md", r: "lu" } ] }
   ],
 
@@ -55,7 +67,11 @@ window.PLAN = {
     { n: 8,  subject: "Rendement automatisé 65 %", status: "validée (04/10)" },
     { n: 9,  subject: "Nouveaux maillages après L5", status: "validée (04/10)" },
     { n: 10, subject: "Lots M3 / P2 / M4 intercalés", status: "validée (04/10)" },
-    { n: 11, subject: "Campagne : facteur de primes ≈ 0,33 (economy.json) pour garder la station vers 6 h, à re-mesurer après M2 (gabares)", status: "validée (05/10)" }
+    { n: 11, subject: "Campagne : facteur de primes ≈ 0,33 (economy.json) pour garder la station vers 6 h, à re-mesurer après M2 (gabares)", status: "validée (05/10)" },
+    { n: 12, subject: "L1 : Tab ouvre la console ; la radio passe à Alt+7 (+ icône de la barre)", status: "à valider" },
+    { n: 13, subject: "L1 : Échap ferme la console, sinon pause inchangée ; Aide · Réglages par H (la SPEC dit « H, Échap »)", status: "à valider" },
+    { n: 14, subject: "L1 : pas d'onglet Journal (aucun overlay) ; L reste Lagrange ; critère 2 de la fiche amendé", status: "à valider" },
+    { n: 15, subject: "L1 : Alt+1..8 peut être capté par le navigateur (changement d'onglet) ; repli = barre d'icônes ; autre combinaison ?", status: "à valider" }
   ],
 
   journal: [
