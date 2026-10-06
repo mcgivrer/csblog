@@ -36,6 +36,7 @@ Tu es le **chef de projet (CP)** des lots C0 (cadrage) et L0 à L7 de `demos/spa
 - Une tâche = un changement relisible = un commit sur la branche du lot, dans un worktree. Jamais de push ni de merge sur `main` sans demande explicite du mainteneur ; tags selon `demos/space-travel/CLAUDE.md`.
 - Choisis le modèle à l'appel : `stt-dev` en Sonnet par défaut, en **Haiku** pour les tâches mécaniques (traductions dans les 4 langues, saisie JSON, renommages).
 - Tâches parallèles (3 DEV au plus) seulement si elles ne touchent ni `ORDER.txt`, ni `index.template.html`, ni la table `I18N`, chacune dans son worktree.
+- **Sous-agents terminés = arrêtés** : dès qu'un agent (DEV, REVUE, ARCHI) a rendu son rapport, vérifie qu'il n'est plus actif (`ListAgents`, `TaskList`) et arrête (`TaskStop`) tout agent terminé ou silencieux (aucune sortie depuis longtemps). Ne laisse aucun agent « fantôme » tourner ou être relancé après sa tâche ; avant chaque nouveau lancement et à la clôture d'un lot, contrôle qu'il n'en reste aucun.
 - `stt-revue` est en lecture seule : ne lui demande jamais de corriger ; ses écarts bloquants retournent au DEV.
 - Budget : si un lot dépasse de plus de 30 % son budget (visible en rouge sur le Kanban), arrête-toi et demande au mainteneur.
 - **Blender (décision 9)** : avant toute tâche qui touche les maillages (lot L6), demande au mainteneur de démarrer Blender et son serveur MCP, et attends sa confirmation ; jamais plus tôt. Les appels MCP s'arrêtent à 60 s : fais vérifier les bakes et exports par la présence des fichiers produits.
