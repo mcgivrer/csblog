@@ -17,13 +17,11 @@ JS = """(srcs) => {
     for (const c of list) {
       const ex = P.toExport(c); delete ex.id;
       const rec = { export: ex };
-      P.withComp(c, (cc, W) => {
-        const a = P.analyze();
-        rec.analyze = { issues: a.issues, colliding: [...a.colliding].sort(), pairs: a.pairs, stats: a.stats,
-          aabb: [a.aabb.min.toArray(), a.aabb.max.toArray()], com: a.com.toArray() };
-        rec.freePorts = P.freePortsList();
-        rec.world = {}; for (const [id, M] of W) rec.world[id] = M.elements.slice();
-      });
+      const W = P.computeWorld(c), a = P.analyze(c, W);
+      rec.analyze = { issues: a.issues, colliding: [...a.colliding].sort(), pairs: a.pairs, stats: a.stats,
+        aabb: [a.aabb.min.toArray(), a.aabb.max.toArray()], com: a.com.toArray() };
+      rec.freePorts = P.freePortsList(null, c);
+      rec.world = {}; for (const [id, M] of W) rec.world[id] = M.elements.slice();
       recs.push(rec);
     }
     out[name] = recs;

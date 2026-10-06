@@ -887,6 +887,7 @@ dialog textarea.inp { min-height: 280px; font-family: var(--font-data); font-siz
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
 } }
 </script>
+<script src="../../shared/sttcomp.js"></script>
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -962,9 +963,10 @@ function resize() {
 new ResizeObserver(resize).observe(stage); resize();
 
 // ------------------------------------------------------------------ data
-const C = new M4().set(1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1);   // Blender -> glTF axes
-const Ci = C.clone().invert();
-const RX = new M4().makeRotationX(Math.PI);
+const toM4 = (a) => new M4().fromArray(a);   // tableau colonne-major (STTCOMP) -> Matrix4
+const v3of = (a) => new V3(a[0], a[1], a[2]);
+const box6 = (b) => [b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z];
+let K = null;   // noyau STTCOMP lié à l'éditeur (créé au démarrage, une fois les prototypes chargés)
 let fleet, gltf, protos = {}, containerProto = null, clips = {};
 let customCos = {};
 const companyOf = (k) => customCos[k] || fleet.companies[k] || fleet.companies.STT;
@@ -1038,16 +1040,10 @@ function optimized(src, cacheKey) {
 const sockCache = new Map();
 function socketLocal(key, port) {
   const k = key + '.' + port;
-  if (sockCache.has(k)) return sockCache.get(k);
-  const root = protos[key], node = root && root.getObjectByName(`SOCKET_${key}_${port}`);
-  if (!node) throw new Error(`Socket ${key}.${port} introuvable`);
-  const m = relMatrix(root, node); sockCache.set(k, m); return m;
+  if (!sockCache.has(k)) sockCache.set(k, toM4(K.socketLocal(key, port)));
+  return sockCache.get(k);
 }
-function mate(Ps, key, port, rollDeg = 0) {
-  return new M4().multiplyMatrices(Ps, RX)
-    .multiply(new M4().makeRotationY(THREE.MathUtils.degToRad(rollDeg)))
-    .multiply(socketLocal(key, port).clone().invert());
-}
+const mate = (Ps, key, port, rollDeg = 0) => toM4(K.mate(Ps.elements, key, port, rollDeg));
 
 // ------------------------------------------------------------------ company decal atlases (drawn in canvas, same layout as decals_<CO>.png)
 const DARK = 'rgb(32,34,38)', LIGHT = 'rgb(236,236,232)';
@@ -1185,26 +1181,10 @@ function applyStyle(obj, style) { obj.traverse((o) => { if (o.isMesh) o.material
 
 // ------------------------------------------------------------------ assembly
 function newCtx() { return { modules: [], containers: [], pwr: [], bays: [], markers: [], shuttles: [] }; }
-function containerMatrix(key, sockG) {
-  const Sb = new M4().multiplyMatrices(Ci, sockG).multiply(C);
-  const p = new V3().setFromMatrixPosition(Sb);
-  const e = Sb.elements, r = new V3(e[8], e[9], e[10]).normalize();
-  const ax = new V3(0, 1, 0);
-  let X, Y, Z;
-  if (key === 'CARGO') { Y = ax; Z = r; } else { Y = r; Z = ax; }
-  X = new V3().crossVectors(Y, Z).normalize();
-  const Mb = new M4().makeBasis(X, Y, Z).setPosition(p);
-  const dirG = r.clone().applyMatrix4(new M4().extractRotation(C));
-  return { M: new M4().multiplyMatrices(C, Mb).multiply(Ci), dir: dirG };
-}
 const contCache = new Map();
-function containerMats(key) {
-  if (contCache.has(key)) return contCache.get(key);
-  const root = protos[key], socks = [];
-  if (root) root.traverse((o) => { if (/^SOCKET_(CRG6_)?CONTAINER_/.test(o.name)) socks.push(o); });
-  socks.sort((a, b) => a.name.localeCompare(b.name));
-  const list = socks.map((s) => ({ slot: s.name.replace(/^SOCKET_(CRG6_)?CONTAINER_/, ''), ...containerMatrix(key, relMatrix(root, s)) }));
-  contCache.set(key, list); return list;
+function containerMats(key) {   // [{slot, M: Matrix4, dir: Vector3}] depuis STTCOMP
+  if (!contCache.has(key)) contCache.set(key, K.containerMats(key).map((c) => ({ slot: c.slot, M: toM4(c.M), dir: v3of(c.dir) })));
+  return contCache.get(key);
 }
 function addContainers(inst, key, brands, ctx) {
   containerMats(key).forEach(({ M, dir }, i) => {
@@ -1464,19 +1444,12 @@ const KEY_INFO = {
 const PALETTE = ['CMD', 'PAX', 'CARGO', 'CRG6', 'TANK', 'PWR', 'PROP', 'NODE6', 'NODE4', 'ELBOW', 'TUNNEL', 'BAY', 'SHUTTLE'];
 const GROUP_START = new Set(['NODE6', 'BAY']);
 const PORT_FR = { FWD: 'avant', AFT: 'arrière', PORT: 'bâbord', STBD: 'tribord', TOP: 'dessus', BOT: 'dessous', SHUTTLE: 'plateforme', PAD: 'patins', DORSAL: 'dorsal' };
-const PORT_PREF = ['AFT', 'PORT', 'STBD', 'TOP', 'BOT', 'FWD', 'DORSAL', 'SHUTTLE', 'PAD'];
+const PORT_PREF = STTCOMP.PORT_PREF;
 const portFr = (p) => PORT_FR[p] || p.toLowerCase();
-const portsCache = new Map();
-function portsOf(key) {
-  if (portsCache.has(key)) return portsCache.get(key);
-  const out = [], pre = `SOCKET_${key}_`;
-  protos[key]?.traverse((o) => { if (o.name.startsWith(pre)) { const p = o.name.slice(pre.length); if (!p.startsWith('CONTAINER')) out.push(p); } });
-  out.sort((a, b) => PORT_PREF.indexOf(a) - PORT_PREF.indexOf(b));
-  portsCache.set(key, out); return out;
-}
-const portKind = (key, port) => ((key === 'BAY' && port === 'SHUTTLE') || (key === 'SHUTTLE' && port === 'PAD')) ? 'pad' : 'ring';
-const massOf = (key) => protos[key]?.userData?.stt_mass_t ?? 50;
-const lenOf = (key) => fleet.modules[key]?.length ?? protos[key]?.userData?.stt_length_m ?? 10;
+const portsOf = (key) => K.portsOf(key);
+const portKind = (key, port) => K.portKind(key, port);
+const massOf = (key) => K.massOf(key);
+const lenOf = (key) => K.lenOf(key);
 const brandKeys = () => Object.keys(fleet.container_brands);
 const randomBrand = () => { const k = brandKeys(); return k[Math.floor(Math.random() * k.length)]; };
 const uid = () => 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1488,79 +1461,20 @@ let edGroup = null, edCtx = newCtx(), edWorld = new Map(), edInst = new Map(), e
 const markers = new THREE.Group(); markers.name = 'markers';
 const dragMarks = new THREE.Group(); dragMarks.name = 'dragMarks';
 
-function blankComp(type = 'ship') {
-  return { id: uid(), name: 'Nouvelle composition', type, company: 'STT', registry: '', parts: [], extra_links: [], docking_ports: [], game: {} };
-}
-const P = (id, c = comp) => c.parts.find((p) => p.id === id);
-const kids = (id, c = comp) => c.parts.filter((p) => p.parent === id);
-function subtree(id, c = comp) { const out = [id]; for (let i = 0; i < out.length; i++) for (const k of kids(out[i], c)) out.push(k.id); return out; }
-function ordered(c = comp) {
-  const out = [], seen = new Set();
-  const visit = (p) => { if (seen.has(p.id)) return; seen.add(p.id); out.push(p); kids(p.id, c).forEach(visit); };
-  c.parts.filter((p) => !p.parent || !P(p.parent, c)).forEach(visit);
-  return out;
-}
-function nextId(key, c = comp) {
-  const pre = key.toLowerCase(), ids = new Set(c.parts.map((p) => p.id)); let n = 1;
-  while (ids.has(pre + n)) n++; return pre + n;
-}
-function usedPorts(excl = null) {
-  const u = new Set();
-  for (const p of comp.parts) {
-    if (excl?.has(p.id) || !p.parent) continue;
-    u.add(p.id + '.' + p.port); u.add(p.parent + '.' + p.pport);
-  }
-  for (const [a, b] of comp.extra_links) {
-    if (excl && (excl.has(a.split('.')[0]) || excl.has(b.split('.')[0]))) continue;
-    u.add(a); u.add(b);
-  }
-  return u;
-}
-function freePortsList(excl = null) {
-  const u = usedPorts(excl), out = [];
-  for (const p of comp.parts) {
-    if (excl?.has(p.id)) continue;
-    for (const port of portsOf(p.key)) if (!u.has(p.id + '.' + port)) out.push({ id: p.id, key: p.key, port, kind: portKind(p.key, port) });
-  }
-  return out;
-}
-function compatible(key, f) {
-  if (comp.type === 'station' && key === 'PROP') return false;
-  return portsOf(key).some((p) => portKind(key, p) === f.kind);
-}
-function childPorts(key, kind) { return portsOf(key).filter((p) => portKind(key, p) === kind); }
-function defaultChildPort(key, parentKey, pport) {
-  const kind = portKind(parentKey, pport), ports = childPorts(key, kind);
-  if (!ports.length) return null;
-  if (kind === 'pad') return ports[0];
-  if (key === 'SHUTTLE') return ports.includes('DORSAL') ? 'DORSAL' : ports[0];
-  if (pport === 'FWD' && ports.includes('AFT')) return 'AFT';
-  return ports.includes('FWD') ? 'FWD' : ports[0];
-}
-function computeWorld(c = comp) {
-  const W = new Map();
-  const visit = (p, M) => {
-    W.set(p.id, M);
-    for (const k of kids(p.id, c)) {
-      try { visit(k, mate(M.clone().multiply(socketLocal(p.key, k.pport)), k.key, k.port, k.roll || 0)); }
-      catch (e) { console.warn(e); }
-    }
-  };
-  c.parts.filter((p) => !p.parent || !P(p.parent, c)).forEach((r, i) => visit(r, new M4().makeTranslation(i * 60, 0, 0)));
-  return W;
-}
-function normalize(c = comp) {
-  for (let n = -1; n !== c.parts.length;) {
-    n = c.parts.length; const ids = new Set(c.parts.map((p) => p.id));
-    c.parts = c.parts.filter((p) => !p.parent || ids.has(p.parent));
-  }
-  const alive = new Set(c.parts.map((p) => p.id));
-  c.extra_links = c.extra_links.filter(([a, b]) => alive.has(a.split('.')[0]) && alive.has(b.split('.')[0]));
-  const saved = comp; comp = c;
-  const u = usedPorts();
-  c.docking_ports = [...new Set(c.docking_ports)].filter((s) => alive.has(s.split('.')[0]) && !u.has(s));
-  comp = saved;
-}
+// graphe : enveloppes autour de STTCOMP, la composition `comp` est passée explicitement
+const blankComp = (type = 'ship') => K.blank(type);
+const P = (id, c = comp) => K.part(c, id);
+const kids = (id, c = comp) => K.kids(c, id);
+const subtree = (id, c = comp) => K.subtree(c, id);
+const ordered = (c = comp) => K.ordered(c);
+const nextId = (key, c = comp) => K.nextId(c, key);
+const usedPorts = (excl = null, c = comp) => K.usedPorts(c, excl);
+const freePortsList = (excl = null, c = comp) => K.freePorts(c, excl);
+const compatible = (key, f) => K.compatible(comp, key, f);
+const childPorts = (key, kind) => K.childPorts(key, kind);
+const defaultChildPort = (key, parentKey, pport) => K.defaultChildPort(key, parentKey, pport);
+const computeWorld = (c = comp) => { const W = new Map(); for (const [id, m] of K.world(c)) W.set(id, toM4(m)); return W; };
+const normalize = (c = comp) => { K.normalize(c); };
 
 // ------------------------------------------------------------------ geometry analysis (OBB, collisions, rules, stats)
 const hullCache = new Map();
@@ -1577,118 +1491,49 @@ function fullBox(key) {   // static hull + animated parts (nozzle, wings, doors)
   const o = optimized(protos[key], key); o.updateMatrixWorld(true);
   const b = new THREE.Box3().setFromObject(o); fullCache.set(key, b); return b;
 }
-function obbFrom(M, box, shrink = 0) {
-  const e = M.elements;
-  const u = [new V3(e[0], e[1], e[2]), new V3(e[4], e[5], e[6]), new V3(e[8], e[9], e[10])];
-  const sc = u.map((v) => v.length()); u.forEach((v) => v.normalize());
-  const s = box.getSize(new V3()), c = box.getCenter(new V3()).applyMatrix4(M);
-  return { c, u, e: [Math.max(0.05, s.x / 2 * sc[0] - shrink), Math.max(0.05, s.y / 2 * sc[1] - shrink), Math.max(0.05, s.z / 2 * sc[2] - shrink)] };
+// geom de STTCOMP (format de modules-geom.json) construit depuis les prototypes three : aucune lecture du JSON, hors ligne identique
+function geomFromProtos() {
+  const r6 = box6, m16 = (m) => m.elements.slice();   // pleine précision : le JSON arrondi à 6 décimales n'est pas lu ici
+  const modules = {};
+  for (const key of Object.keys(protos).sort()) {
+    const root = protos[key], sockets = {}, containers = [], ports = [], cs = [], pre = `SOCKET_${key}_`;
+    root.traverse((o) => {
+      if (/^SOCKET_(CRG6_)?CONTAINER_/.test(o.name)) cs.push(o);
+      else if (o.name.startsWith(pre)) { const p = o.name.slice(pre.length); ports.push(p); sockets[p] = m16(relMatrix(root, o)); }
+    });
+    ports.sort((a, b) => STTCOMP.PORT_PREF.indexOf(a) - STTCOMP.PORT_PREF.indexOf(b));
+    cs.sort((a, b) => a.name.localeCompare(b.name));
+    for (const o of cs) containers.push({ slot: o.name.replace(/^SOCKET_(CRG6_)?CONTAINER_/, ''), m: m16(relMatrix(root, o)) });
+    const m = { mass_t: root.userData?.stt_mass_t ?? 50, length_m: fleet.modules[key]?.length ?? root.userData?.stt_length_m ?? 10, ports, sockets, containers, hull: r6(hullBox(key)), full: r6(fullBox(key)) };
+    const ex = root.getObjectByName('VFX_PROP_MAIN_EXHAUST');
+    if (ex) m.exhaust = m16(relMatrix(root, ex));
+    modules[key] = m;
+  }
+  return { format: 'stt-modules-geom', version: 1, axes: 'gltf', units: 'm', modules, container: { hull: r6(hullBox('__CONTAINER__')) } };
 }
-function obbCorners(o, out) {
-  for (let i = 0; i < 8; i++) {
-    out.push(o.c.clone()
-      .addScaledVector(o.u[0], (i & 1 ? 1 : -1) * o.e[0])
-      .addScaledVector(o.u[1], (i & 2 ? 1 : -1) * o.e[1])
-      .addScaledVector(o.u[2], (i & 4 ? 1 : -1) * o.e[2]));
-  }
-  return out;
-}
-function obbOverlap(A, B) {   // separating-axis test (Ericson, RTCD 4.4)
-  const R = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], AR = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
-  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) { R[i][j] = A.u[i].dot(B.u[j]); AR[i][j] = Math.abs(R[i][j]) + 1e-6; }
-  const tv = B.c.clone().sub(A.c), t = [tv.dot(A.u[0]), tv.dot(A.u[1]), tv.dot(A.u[2])];
-  const a = A.e, b = B.e; let ra, rb;
-  for (let i = 0; i < 3; i++) { ra = a[i]; rb = b[0] * AR[i][0] + b[1] * AR[i][1] + b[2] * AR[i][2]; if (Math.abs(t[i]) > ra + rb) return false; }
-  for (let j = 0; j < 3; j++) { ra = a[0] * AR[0][j] + a[1] * AR[1][j] + a[2] * AR[2][j]; rb = b[j]; if (Math.abs(t[0] * R[0][j] + t[1] * R[1][j] + t[2] * R[2][j]) > ra + rb) return false; }
-  ra = a[1] * AR[2][0] + a[2] * AR[1][0]; rb = b[1] * AR[0][2] + b[2] * AR[0][1]; if (Math.abs(t[2] * R[1][0] - t[1] * R[2][0]) > ra + rb) return false;
-  ra = a[1] * AR[2][1] + a[2] * AR[1][1]; rb = b[0] * AR[0][2] + b[2] * AR[0][0]; if (Math.abs(t[2] * R[1][1] - t[1] * R[2][1]) > ra + rb) return false;
-  ra = a[1] * AR[2][2] + a[2] * AR[1][2]; rb = b[0] * AR[0][1] + b[1] * AR[0][0]; if (Math.abs(t[2] * R[1][2] - t[1] * R[2][2]) > ra + rb) return false;
-  ra = a[0] * AR[2][0] + a[2] * AR[0][0]; rb = b[1] * AR[1][2] + b[2] * AR[1][1]; if (Math.abs(t[0] * R[2][0] - t[2] * R[0][0]) > ra + rb) return false;
-  ra = a[0] * AR[2][1] + a[2] * AR[0][1]; rb = b[0] * AR[1][2] + b[2] * AR[1][0]; if (Math.abs(t[0] * R[2][1] - t[2] * R[0][1]) > ra + rb) return false;
-  ra = a[0] * AR[2][2] + a[2] * AR[0][2]; rb = b[0] * AR[1][1] + b[1] * AR[1][0]; if (Math.abs(t[0] * R[2][2] - t[2] * R[0][2]) > ra + rb) return false;
-  ra = a[0] * AR[1][0] + a[1] * AR[0][0]; rb = b[1] * AR[2][2] + b[2] * AR[2][1]; if (Math.abs(t[1] * R[0][0] - t[0] * R[1][0]) > ra + rb) return false;
-  ra = a[0] * AR[1][1] + a[1] * AR[0][1]; rb = b[0] * AR[2][2] + b[2] * AR[2][0]; if (Math.abs(t[1] * R[0][1] - t[0] * R[1][1]) > ra + rb) return false;
-  ra = a[0] * AR[1][2] + a[1] * AR[0][2]; rb = b[0] * AR[2][1] + b[2] * AR[2][0]; if (Math.abs(t[1] * R[0][2] - t[0] * R[1][2]) > ra + rb) return false;
-  return true;
-}
-function rayOBB(o, d, b) {
-  let tmin = -Infinity, tmax = Infinity; const p = b.c.clone().sub(o);
-  for (let i = 0; i < 3; i++) {
-    const e = b.u[i].dot(p), f = b.u[i].dot(d);
-    if (Math.abs(f) > 1e-9) {
-      let t1 = (e + b.e[i]) / f, t2 = (e - b.e[i]) / f; if (t1 > t2) [t1, t2] = [t2, t1];
-      tmin = Math.max(tmin, t1); tmax = Math.min(tmax, t2); if (tmin > tmax || tmax < 0) return null;
-    } else if (-e - b.e[i] > 0 || -e + b.e[i] < 0) return null;
-  }
-  return tmin > 0 ? tmin : tmax;
-}
-const anyOverlap = (la, lb) => la.some((a) => lb.some((b) => obbOverlap(a, b)));
-function partOBBs(p, M) {
-  const list = [obbFrom(M, hullBox(p.key), 0.35)];
-  if (p.containers) containerMats(p.key).forEach((cm, i) => { if (p.containers[i]) list.push(obbFrom(M.clone().multiply(cm.M), hullBox('__CONTAINER__'), 0.2)); });
-  return list;
-}
-function analyze() {
-  const issues = [], obbs = new Map(), colliding = new Set(), pairs = [];
-  const corners = [];
-  let mass = 0, nCont = 0, pax = 0, tank = 0; const com = new V3();
-  for (const [id, M] of edWorld) {
-    const p = P(id), list = partOBBs(p, M);
-    obbs.set(id, list);
-    const m = massOf(p.key); mass += m; com.addScaledVector(list[0].c, m);
-    for (let i = 1; i < list.length; i++) { nCont++; mass += 6.5; com.addScaledVector(list[i].c, 6.5); }
-    if (p.key === 'PAX') pax += 48; if (p.key === 'SHUTTLE') pax += 8; if (p.key === 'TANK') tank += 840;
-    obbCorners(obbFrom(M, fullBox(p.key)), corners);
-    for (let i = 1; i < list.length; i++) obbCorners(list[i], corners);
-  }
-  if (mass) com.divideScalar(mass);
-  const aabb = new THREE.Box3().setFromPoints(corners);
-  const ids = [...edWorld.keys()];
-  for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
-    const a = P(ids[i]), b = P(ids[j]);
-    if (a.parent === b.id || b.parent === a.id) continue;
-    if (anyOverlap(obbs.get(a.id), obbs.get(b.id))) { pairs.push([a.id, b.id]); colliding.add(a.id); colliding.add(b.id); }
-  }
-  const of = (k) => comp.parts.filter((p) => p.key === k);
-  // main axis: thrust axis of the drive, else the root's axis
-  let axis = new V3(0, 0, 1);
-  const props = of('PROP');
-  if (props.length && edWorld.has(props[0].id)) axis = new V3().setFromMatrixColumn(edWorld.get(props[0].id), 2).normalize();
-  else if (comp.parts.length) axis = new V3().setFromMatrixColumn(edWorld.get(ordered()[0].id), 2).normalize();
-  let lo = Infinity, hi = -Infinity; for (const c of corners) { const d = c.dot(axis); lo = Math.min(lo, d); hi = Math.max(hi, d); }
-  const length = corners.length ? hi - lo : 0;
-  const stats = { parts: comp.parts.length, mass: Math.round(mass), containers: nCont, passengers: pax, tank_m3: tank, length_m: +length.toFixed(1), size_m: aabb.isEmpty() ? [0, 0, 0] : aabb.getSize(new V3()).toArray().map((v) => +v.toFixed(1)) };
-
-  if (!comp.parts.length) {
-    issues.push({ sev: 'info', msg: 'Composition vide : glisse un module depuis la barre du bas.' });
-    return { issues, obbs, colliding, pairs, aabb, stats, com };
-  }
-  if (comp.type === 'station') {
-    for (const p of props) issues.push({ sev: 'err', msg: `Une station ne peut pas avoir de propulsion : retire ${p.id}.`, ids: [p.id] });
-  } else {
-    if (!props.length) issues.push({ sev: 'warn', msg: 'Aucune propulsion : ajoute un module PROP en poupe.' });
-    if (props.length > 1) issues.push({ sev: 'warn', msg: `${props.length} modules de propulsion : un seul est prévu par vaisseau.`, ids: props.map((p) => p.id) });
-    if (!of('CMD').length) issues.push({ sev: 'warn', msg: 'Pas de module de commandement (CMD).' });
-    const ex = protos.PROP.getObjectByName('VFX_PROP_MAIN_EXHAUST');
-    const exRel = ex ? relMatrix(protos.PROP, ex) : new M4().makeTranslation(0, 0, -lenOf('PROP'));
-    for (const p of props) {
-      const W = edWorld.get(p.id); if (!W) continue;
-      const fwd = new V3().setFromMatrixColumn(W, 2).normalize();
-      const o = new V3().setFromMatrixPosition(W.clone().multiply(exRel));
-      let hit = null;
-      for (const [id, list] of obbs) { if (id === p.id) continue; for (const b of list) { const t = rayOBB(o, fwd.clone().negate(), b); if (t !== null && t > 0.2 && t < 400) { hit = id; break; } } if (hit) break; }
-      if (hit) issues.push({ sev: 'err', msg: `Le jet du propulseur ${p.id} frappe ${hit}.`, ids: [p.id, hit] });
-      const p0 = new V3().setFromMatrixPosition(W);
-      const off = com.clone().sub(p0).cross(fwd).length();
-      if (off > 2.5) issues.push({ sev: 'warn', msg: `Poussée décentrée de ${off.toFixed(1)} m par rapport au centre de masse : le vaisseau tournera sur lui-même.`, ids: [p.id] });
-    }
-  }
-  if (!of('PWR').length) issues.push({ sev: 'warn', msg: 'Pas de module d’énergie (PWR).' });
-  pairs.slice(0, 8).forEach(([a, b]) => issues.push({ sev: 'warn', msg: `Chevauchement entre ${a} et ${b}.`, ids: [a, b] }));
-  if (pairs.length > 8) issues.push({ sev: 'warn', msg: `… et ${pairs.length - 8} autres chevauchements.` });
-  if (comp.type === 'station' && !comp.docking_ports.length) issues.push({ sev: 'info', msg: 'Aucun port d’amarrage déclaré : clique un anneau libre pour en créer un.' });
-  if (!issues.some((i) => i.sev === 'err' || i.sev === 'warn')) issues.unshift({ sev: 'ok', msg: comp.type === 'ship' ? 'Vaisseau valide : prêt à l’export.' : 'Station valide : prête à l’export.' });
-  return { issues, obbs, colliding, pairs, aabb, stats, com };
+// textes français du contrôle : le noyau rend des codes, l'éditeur les traduit
+const ISSUE_FR = {
+  empty: () => 'Composition vide : glisse un module depuis la barre du bas.',
+  station_prop: (a) => `Une station ne peut pas avoir de propulsion : retire ${a.id}.`,
+  no_prop: () => 'Aucune propulsion : ajoute un module PROP en poupe.',
+  multi_prop: (a) => `${a.n} modules de propulsion : un seul est prévu par vaisseau.`,
+  no_cmd: () => 'Pas de module de commandement (CMD).',
+  jet_hit: (a) => `Le jet du propulseur ${a.id} frappe ${a.hit}.`,
+  thrust_offset: (a) => `Poussée décentrée de ${a.off.toFixed(1)} m par rapport au centre de masse : le vaisseau tournera sur lui-même.`,
+  no_pwr: () => 'Pas de module d’énergie (PWR).',
+  overlap: (a) => `Chevauchement entre ${a.a} et ${a.b}.`,
+  overlap_more: (a) => `… et ${a.n} autres chevauchements.`,
+  no_dock: () => 'Aucun port d’amarrage déclaré : clique un anneau libre pour en créer un.',
+  valid_ship: () => 'Vaisseau valide : prêt à l’export.',
+  valid_station: () => 'Station valide : prête à l’export.',
+};
+const issueText = (i) => ISSUE_FR[i.code](i.args);
+// analyse : STTCOMP.analyze sur la composition et son monde ; résultat remis en types three (aabb Box3, com Vector3), obbs en tableaux
+function analyze(c = comp, W = c === comp ? edWorld : computeWorld(c)) {
+  const a = K.analyze(c, new Map([...W].map(([id, m]) => [id, m.elements])));
+  const issues = a.issues.map((i) => (i.ids && i.ids.length ? { sev: i.sev, msg: issueText(i), ids: i.ids } : { sev: i.sev, msg: issueText(i) }));
+  const aabb = W.size ? new THREE.Box3(v3of(a.aabb.slice(0, 3)), v3of(a.aabb.slice(3))) : new THREE.Box3();
+  return { issues, obbs: a.obbs, colliding: a.colliding, pairs: a.pairs, aabb, stats: a.stats, com: v3of(a.com) };
 }
 
 // ------------------------------------------------------------------ editor scene: rebuild, markers, selection box
@@ -1790,44 +1635,28 @@ function loadComp(c, { frame = true } = {}) {
   if (frame && mode === 'editor') frameBox(analysis.aabb);
 }
 function addPart(key, cand, port, roll = 0) {
-  if (!cand && comp.parts.length) return null;
-  if (comp.type === 'station' && key === 'PROP') { toast('Une station ne peut pas avoir de propulsion.'); return null; }
-  const p = { id: nextId(key), key, parent: cand ? cand.id : null, pport: cand ? cand.port : null, port: cand ? port : null, roll: cand ? roll : 0, zone: null, door: 'mech', company: null, containers: null };
-  if (cand && comp.type === 'station') p.zone = P(cand.id)?.zone || null;
-  if (key === 'CARGO' || key === 'CRG6') p.containers = containerMats(key).map(() => randomBrand());
   const first = !comp.parts.length;
-  comp.parts.push(p);
-  sel = { t: 'part', id: p.id };
+  const r = K.addPart(comp, key, cand, port, roll);
+  if (!r.ok) { if (r.code === 'station_prop') toast('Une station ne peut pas avoir de propulsion.'); return null; }
+  sel = { t: 'part', id: r.part.id };
   commit();
   if (first) frameBox(analysis.aabb);
-  return p;
+  return r.part;
 }
 function movePart(pid, cand, port, roll) {
-  const p = P(pid); if (!p) return;
-  const sub = new Set(subtree(pid));
-  comp.extra_links = comp.extra_links.filter(([a, b]) => !sub.has(a.split('.')[0]) && !sub.has(b.split('.')[0]));
-  Object.assign(p, { parent: cand.id, pport: cand.port, port, roll });
+  if (!K.movePart(comp, pid, cand, port, roll).ok) return;
   sel = { t: 'part', id: pid }; commit();
 }
 function deletePart(pid) {
-  const sub = new Set(subtree(pid)); const n = sub.size;
-  comp.parts = comp.parts.filter((p) => !sub.has(p.id));
+  const n = K.deletePart(comp, pid).removed;
   sel = null; commit();
   toast(`${n > 1 ? n + ' pièces supprimées' : 'Pièce supprimée'} · Ctrl+Z pour annuler`);
 }
 function replacePart(pid, key) {
-  const p = P(pid); if (!p || p.key === key) return;
-  if (p.parent) {
-    const kind = portKind(P(p.parent).key, p.pport), ports = childPorts(key, kind);
-    if (!ports.length) { toast(`${key} ne peut pas se fixer sur ce port.`); return; }
-    p.port = ports.includes(p.port) ? p.port : defaultChildPort(key, P(p.parent).key, p.pport);
-  }
-  const ok = new Set(portsOf(key)); let removed = 0;
-  for (const k of kids(pid)) if (!ok.has(k.pport) || portKind(key, k.pport) !== portKind(p.key, k.pport)) { const s = new Set(subtree(k.id)); removed += s.size; comp.parts = comp.parts.filter((x) => !s.has(x.id)); }
-  p.key = key;
-  p.containers = key === 'CARGO' || key === 'CRG6' ? containerMats(key).map(() => randomBrand()) : null;
+  const r = K.replacePart(comp, pid, key);
+  if (!r.ok) { if (r.code === 'port_incompatible') toast(`${key} ne peut pas se fixer sur ce port.`); return; }
   commit();
-  if (removed) toast(`${removed} pièce(s) retirée(s) : ports absents sur ${key}.`);
+  if (r.removed) toast(`${r.removed} pièce(s) retirée(s) : ports absents sur ${key}.`);
 }
 
 // ------------------------------------------------------------------ editor UI
@@ -1946,7 +1775,7 @@ function shuttleBtn(p) {
 function selChanged() { updateSelBox(); paintMarkers(); inspectorUI(); treeUI(); hud(); }
 function selectPart(id, frame = false) {
   sel = id ? { t: 'part', id } : null; selChanged();
-  if (frame && id && edWorld.has(id)) frameBox(new THREE.Box3().setFromPoints(obbCorners(analysis.obbs.get(id)[0], [])), true);
+  if (frame && id && edWorld.has(id)) frameBox(new THREE.Box3().setFromPoints(K.obbCorners(analysis.obbs.get(id)[0], []).map(v3of)), true);
 }
 
 $('#insp').addEventListener('click', (e) => {
@@ -2023,7 +1852,7 @@ function finalizeCompany(key, d) {
     livery_hex: h, livery_linear: linC, livery_dark_linear: dark, livery_dark_hex: hex(dark), accent: `rgb(${acc})`, accent_light: `rgb(${accL})`, _v: d._v || 0,
   };
 }
-const coDef = (c) => ({ name: c.name, mark: c.mark, tagline: c.tagline, registry: c.registry, livery_hex: c.livery_hex, emblem: c.emblem });
+const coDef = (c) => K.coDef(c);
 function saveCos() { LS.set('stt.companies.v1', Object.fromEntries(Object.entries(customCos).map(([k, c]) => [k, { ...coDef(c), _v: c._v }]))); }
 function mergeCompanies(obj) {
   if (!obj || typeof obj !== 'object') return;
@@ -2103,37 +1932,10 @@ $('#k-del').addEventListener('click', (e) => {
 
 // ------------------------------------------------------------------ fiche de jeu (Space Travel & Transport, 09c-vaisseaux-modulaires.js)
 // Mêmes règles automatiques que le jeu : palier selon la masse réelle, famille selon le contenu, long-courrier aux paliers III-IV.
-const FAMILIES = { fret: 'Fret', passagers: 'Passagers', vrac: 'Vrac', independant: 'Indépendant', pousseur: 'Pousseur' };
-const ARCH_AUTO = { fret: 'Cargo modulaire', passagers: 'Paquebot modulaire', vrac: 'Citernier modulaire', independant: 'Indépendant modulaire', pousseur: 'Pousseur modulaire' };
-const CREW = { I: 2, II: 4, III: 6, IV: 10 };
-function autoGame(st) {
-  const tier = st.mass < 800 ? 'I' : st.mass < 1300 ? 'II' : st.mass < 2000 ? 'III' : 'IV';
-  const family = st.containers >= 4 ? 'fret' : st.passengers >= 48 ? 'passagers' : st.tank_m3 >= 1680 ? 'vrac' : st.parts <= 4 ? 'pousseur' : 'independant';
-  return { tier, family, ftl: tier === 'III' || tier === 'IV', crew: CREW[tier] };
-}
-function cleanGame(g, c) {
-  const o = {};
-  if (!g || typeof g !== 'object') return o;
-  if (FAMILIES[g.family]) o.family = g.family;
-  if (['I', 'II', 'III', 'IV'].includes(g.tier)) o.tier = g.tier;
-  if (typeof g.ftl === 'boolean') o.ftl = g.ftl;
-  if (+g.crew >= 1) o.crew = Math.min(60, Math.round(+g.crew));
-  if (g.arch && String(g.arch).trim()) o.arch = String(g.arch).trim().slice(0, 40);
-  if (g.description && String(g.description).trim()) o.description = String(g.description).trim().slice(0, 400);
-  const ports = new Set(c?.docking_ports || []);
-  const b = Array.isArray(g.berths) ? g.berths.filter((x) => x && ports.has(x.port) && ['S', 'M', 'L'].includes(x.cls)).map((x) => ({ port: x.port, cls: x.cls })) : [];
-  if (b.length) o.berths = b;
-  return o;
-}
-function resolvedGame(c = comp) {
-  const st = analysis.stats, a = autoGame(st), g = cleanGame(c.game, c);
-  if (c.type === 'station') {
-    const cls = Object.fromEntries((g.berths || []).map((b) => [b.port, b.cls]));
-    return { version: 1, class: 'station', description: g.description || '', berths: c.docking_ports.map((port) => ({ port, cls: cls[port] || 'M' })) };
-  }
-  const family = g.family || a.family, tier = g.tier || a.tier;
-  return { version: 1, class: 'ship', family, tier, ftl: g.ftl ?? (tier === 'III' || tier === 'IV'), crew: g.crew || CREW[tier], arch: g.arch || ARCH_AUTO[family], description: g.description || '' };
-}
+const { FAMILIES, ARCH_AUTO, CREW } = STTCOMP;
+const autoGame = (st) => STTCOMP.autoGame(st);
+const cleanGame = (g, c) => STTCOMP.cleanGame(g, c);
+const resolvedGame = (c = comp) => K.resolvedGame(c, analysis.stats);
 function gameUI() {
   const ship = comp.type === 'ship', g = comp.game || (comp.game = {}), st = analysis.stats, a = autoGame(st);
   $('#g-ship').hidden = !ship; $('#g-arch-f').hidden = !ship;
@@ -2167,7 +1969,7 @@ $('#g-berths').addEventListener('change', (e) => {
   setGame('berths', list.length ? list : '');
 });
 // export pour le jeu : composition validée + fiche résolue (les valeurs « auto » sont figées dans le fichier)
-function gameExportObj() {
+function gameExportObj() {   // les règles de gameExport (codes) sont rendues ici en texte ; toExport garde les marques perso
   const errs = analysis.issues.filter((i) => i.sev === 'err');
   if (!comp.parts.length) return { error: 'Composition vide.' };
   if (errs.length) return { error: 'À corriger avant l’export pour le jeu : ' + errs[0].msg };
@@ -2188,103 +1990,11 @@ $('#f-game').addEventListener('click', exportForGame);
 $('#g-export').addEventListener('click', exportForGame);
 
 // ------------------------------------------------------------------ import / export (stt-composition v1, compatible with fleet.json stations)
-function toExport(c = comp) {
-  const used = new Set([c.company, ...c.parts.map((p) => p.company).filter(Boolean)]);
-  const companies = {};
-  for (const k of used) if (customCos[k]) companies[k] = coDef(customCos[k]);
-  const parts = [], links = [], containers = {};
-  for (const p of ordered(c)) {
-    const o = {};
-    if (p.zone) o.zone = p.zone;
-    if (p.key === 'BAY') o.door = p.door || 'mech';
-    if (p.company) o.company = p.company;
-    parts.push(Object.keys(o).length ? [p.id, p.key, o] : [p.id, p.key]);
-    if (p.parent) links.push([`${p.parent}.${p.pport}`, `${p.id}.${p.port}`, p.roll || 0]);
-    if (p.containers && p.containers.some(Boolean)) containers[p.id] = p.containers.map((b) => b || null);
-  }
-  for (const l of c.extra_links) links.push(l);
-  const out = { format: 'stt-composition', version: 1, generator: 'Chantier naval STT', id: c.id, name: c.name, type: c.type, company: c.company, registry: c.registry || companyOf(c.company).registry };
-  if (Object.keys(companies).length) out.companies = companies;
-  Object.assign(out, { root: parts[0]?.[0] ?? null, parts, links, containers, docking_ports: c.docking_ports.map((port) => ({ port })) });
-  const gs = cleanGame(c.game, c);
-  if (Object.keys(gs).length) out.game = gs;
-  if (c === comp && analysis) out.stats = analysis.stats;
-  return out;
-}
-function fromGraph(o) {
-  const c = blankComp(o.type === 'station' ? 'station' : 'ship');
-  if (o.format === 'stt-composition' && o.id) c.id = String(o.id);
-  c.name = String(o.name || 'Composition importée').slice(0, 60);
-  c.company = customCos[o.company] || fleet.companies[o.company] ? o.company : 'STT';
-  const reg = String(o.registry || '').toUpperCase();
-  c.registry = reg && reg !== companyOf(c.company).registry ? reg.slice(0, 14) : '';
-  const defs = new Map();
-  for (const p of o.parts || []) {
-    const [id, key, opts] = Array.isArray(p) ? p : [p?.id, p?.key, p];
-    if (id != null && protos[key] && !defs.has(String(id))) defs.set(String(id), { key, opts: opts || {} });
-  }
-  let links = (o.links || []).filter((l) => Array.isArray(l) && l.length >= 2);
-  for (const [port, co] of o.shuttles || []) {
-    let n = 1; while (defs.has('shuttle' + n)) n++;
-    defs.set('shuttle' + n, { key: 'SHUTTLE', opts: { company: co } }); links = [...links, [port, `shuttle${n}.PAD`, 0]];
-  }
-  if (!defs.size) return c;
-  const conts = o.containers || {};
-  const known = (k) => !!(customCos[k] || fleet.companies[k]);
-  const mk = (id, parent, pport, port, roll) => {
-    const d = defs.get(id), op = d.opts || {}, n = containerMats(d.key).length;
-    let cs = null;
-    if (n) { cs = Array.from({ length: n }, (_, i) => { const b = Array.isArray(conts[id]) ? conts[id][i] : null; return fleet.container_brands[b] ? b : null; }); }
-    return { id, key: d.key, parent, pport, port, roll: (((+roll || 0) % 360) + 360) % 360, zone: fleet.zones[op.zone] ? op.zone : null, door: op.door === 'field' ? 'field' : 'mech', company: op.company && known(op.company) ? op.company : null, containers: cs };
-  };
-  const rootId = o.root != null && defs.has(String(o.root)) ? String(o.root) : defs.keys().next().value;
-  const placed = new Set([rootId]); c.parts.push(mk(rootId, null, null, null, 0));
-  const valid = (id, port) => portsOf(defs.get(id).key).includes(port);
-  const extra = [];
-  let pending = links.slice(), progress = true;
-  while (pending.length && progress) {
-    progress = false; const next = [];
-    for (const l of pending) {
-      const [pa, pp] = String(l[0]).split('.'), [ca, cp] = String(l[1]).split('.'), r = +l[2] || 0;
-      if (!defs.has(pa) || !defs.has(ca) || !valid(pa, pp) || !valid(ca, cp)) continue;
-      if (placed.has(pa) && !placed.has(ca)) { c.parts.push(mk(ca, pa, pp, cp, r)); placed.add(ca); progress = true; }
-      else if (placed.has(ca) && !placed.has(pa)) { c.parts.push(mk(pa, ca, cp, pp, -r)); placed.add(pa); progress = true; }
-      else if (placed.has(pa) && placed.has(ca)) extra.push([`${pa}.${pp}`, `${ca}.${cp}`, r]);
-      else next.push(l);
-    }
-    pending = next;
-  }
-  const used = new Set(); for (const p of c.parts) if (p.parent) { used.add(p.id + '.' + p.port); used.add(p.parent + '.' + p.pport); }
-  for (const l of extra) if (!used.has(l[0]) && !used.has(l[1])) { c.extra_links.push(l); used.add(l[0]); used.add(l[1]); }
-  c.docking_ports = (o.docking_ports || []).map((d) => (typeof d === 'string' ? d : d?.port)).filter(Boolean);
-  c.game = cleanGame(o.game, c);
-  return c;
-}
-function fromShip(s) {
-  const parts = [], links = [], containers = {}, counts = {};
-  (s.modules || []).forEach((key, i) => {
-    counts[key] = (counts[key] || 0) + 1;
-    const id = key.toLowerCase() + counts[key];
-    if (i) links.push([`${parts[i - 1][0]}.AFT`, `${id}.FWD`, (s.module_roll_deg || [])[i] || 0]);
-    parts.push([id, key]);
-    const cs = (s.containers || {})[`${key}#${counts[key]}`]; if (cs) containers[id] = cs;
-  });
-  return fromGraph({ name: s.name, type: 'ship', company: s.company, registry: s.registry, parts, links, containers });
-}
-const fromStation = (st) => fromGraph({ name: st.name, type: 'station', company: st.company, parts: st.parts, links: st.links, containers: st.containers, docking_ports: st.docking_ports, shuttles: st.shuttles });
-function importObject(o) {
-  const out = [];
-  const take = (x) => {
-    if (!x || typeof x !== 'object') return;
-    if (Array.isArray(x)) { x.forEach(take); return; }
-    if (x.format === 'stt-composition') { mergeCompanies(x.companies); out.push(fromGraph(x)); }
-    else if (Array.isArray(x.parts) && Array.isArray(x.links)) out.push(fromStation(x));
-    else if (Array.isArray(x.modules)) out.push(fromShip(x));
-    else if (x.ships || x.stations || x.compositions) { (x.ships || []).forEach(take); (x.stations || []).forEach(take); (x.compositions || []).forEach(take); }
-  };
-  take(o);
-  return out.filter((c) => c.parts.length);
-}
+const toExport = (c = comp) => K.toExport(c, { companies: customCos, stats: c === comp && analysis ? analysis.stats : undefined });
+const fromGraph = (o) => K.fromGraph(o);
+const fromShip = (s) => K.fromShip(s);
+const fromStation = (st) => K.fromStation(st);
+const importObject = (o) => K.importObject(o);
 function handleImport(o) {
   let list = [];
   try { list = importObject(o); } catch (e) { console.warn(e); }
@@ -2525,8 +2235,8 @@ function onDragMove(e) {
       const ports = childPorts(drag.key, best.kind);
       drag.port = drag.override && ports.includes(drag.override) ? drag.override : defaultChildPort(drag.key, best.key, best.port);
       drag.cand = best; drag.M = mate(best.Ps, drag.key, drag.port, drag.roll);
-      const skip = new Set([best.id, ...(drag.excl || [])]), g = [obbFrom(drag.M, hullBox(drag.key), 0.35)];
-      for (const [id, list] of analysis.obbs) { if (!skip.has(id) && anyOverlap(g, list)) { drag.hit = id; break; } }
+      const skip = new Set([best.id, ...(drag.excl || [])]), g = [K.obb(drag.M.elements, box6(hullBox(drag.key)), 0.35)];
+      for (const [id, list] of analysis.obbs) { if (!skip.has(id) && K.anyOverlap(g, list)) { drag.hit = id; break; } }
       drag.state = drag.hit ? 'warn' : 'ok';
     } else if (!comp.parts.length) {
       drag.M = new M4(); drag.state = 'ok';
@@ -4565,7 +4275,7 @@ window.__stt = {
   dbgDepth: (v) => { gradePass.uniforms.uDbg.value = v; gradePass.enabled = true; },
   dbg: () => ({ focus: gradePass?.uniforms.uFocus.value, near: camera.near, far: camera.far, dof: gradePass?.uniforms.uDof.value, ap: gradePass?.uniforms.uAperture.value, dist: camera.position.distanceTo(controls.target), gradeOn: gradePass?.enabled, res: gradePass?.uniforms.uRes.value.toArray() }),
   fx: () => ({ floods: (ctx.floods || []).map((f) => +f.conf.toFixed(2)), plumes: (ctx.plumes || []).length, rcs: ctx.rcs?.fire.length, nav: ctx.nav?.geometry.attributes.position.count }),
-  partScreen: (id) => { const r = canvas.getBoundingClientRect(); const o = analysis?.obbs.get(id); return o ? { ...toScreen(o[0].c, r), x0: r.left, y0: r.top } : null; },
+  partScreen: (id) => { const r = canvas.getBoundingClientRect(); const o = analysis?.obbs.get(id); return o ? { ...toScreen(v3of(o[0].c), r), x0: r.left, y0: r.top } : null; },
   gameExport: () => gameExportObj(),
   stepShuttles: (sec) => { for (let k = 0; k < sec * 20; k++) { updateShuttles(ctx, 0.05); for (const b of ctx.bays) b.mx.update(0.05); } },
   shuttles: () => (ctx?.shuttles || []).map((s) => ({ pid: s.inst.userData.pid ?? null, mode: s.dock?.mode ?? null, t: +s.t.toFixed(2), T: s.T ?? null, dir: s.dir, visible: s.inst.visible, thr: s.fx?.thr.value ?? 0, pos: new V3().setFromMatrixPosition(s.inst.matrix).toArray().map((v) => +v.toFixed(2)) })),
@@ -4575,33 +4285,10 @@ window.__stt = {
 
 // ------------------------------------------------------------------ sonde de non-régression (?probe) : sans effet hors de cette option
 if (new URLSearchParams(location.search).has('probe')) {
-  // geom au format de modules-geom.json, construit depuis les prototypes three (L2a.3 : sonde ; câblage éditeur en L2a.6)
-  const geomFromProtos = () => {
-    const r6 = (b) => [b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z].map((v) => +v.toFixed(6));
-    const m16 = (m) => m.elements.map((v) => +v.toFixed(6));
-    const modules = {};
-    for (const key of Object.keys(protos).sort()) {
-      const root = protos[key], sockets = {}, containers = [];
-      for (const port of portsOf(key)) sockets[port] = m16(relMatrix(root, root.getObjectByName(`SOCKET_${key}_${port}`)));
-      const cs = [];
-      root.traverse((o) => { if (/^SOCKET_(CRG6_)?CONTAINER_/.test(o.name)) cs.push(o); });
-      cs.sort((a, b) => a.name.localeCompare(b.name));
-      for (const o of cs) containers.push({ slot: o.name.replace(/^SOCKET_(CRG6_)?CONTAINER_/, ''), m: m16(relMatrix(root, o)) });
-      const m = { mass_t: massOf(key), length_m: lenOf(key), ports: portsOf(key), sockets, containers, hull: r6(hullBox(key)), full: r6(fullBox(key)) };
-      const ex = root.getObjectByName('VFX_PROP_MAIN_EXHAUST');
-      if (ex) m.exhaust = m16(relMatrix(root, ex));
-      modules[key] = m;
-    }
-    return { format: 'stt-modules-geom', version: 1, axes: 'gltf', units: 'm', modules, container: { hull: r6(hullBox('__CONTAINER__')) } };
-  };
-  // analyze/computeWorld/freePortsList lisent la composition globale : on la permute le temps de l'appel
-  const withComp = (c, fn) => {
-    const sc = comp, sw = edWorld;
-    try { comp = c; edWorld = computeWorld(c); return fn(c, edWorld); } finally { comp = sc; edWorld = sw; }
-  };
   window.__sttProbe = {
-    importObject, toExport, analyze, freePortsList, computeWorld, geomFromProtos, containerMats, portsOf, withComp,
-    get fleet() { return fleet; },
+    importObject, toExport, analyze, freePortsList, computeWorld, geomFromProtos, containerMats, portsOf,
+    addPart, movePart, deletePart, replacePart, defaultChildPort, compatible, normalize, loadComp,
+    get fleet() { return fleet; }, get comp() { return comp; }, get analysis() { return analysis; },
   };
 }
 
@@ -4620,6 +4307,7 @@ if (new URLSearchParams(location.search).has('probe')) {
       else if (ch.name.startsWith('STT_CARGO_Container')) containerProto = ch;
     }
     clips = Object.fromEntries(gltf.animations.map((a) => [a.name, a]));
+    K = STTCOMP.create({ geom: geomFromProtos(), fleet, knownCompany: (k) => !!(customCos[k] || fleet.companies[k]), companyOf, mergeCompanies, rand: Math.random, uid });
     paletteUI(); startsUI();
     scene.add(markers, selBox);
     const draft = LS.get('stt.draft.v1', null);

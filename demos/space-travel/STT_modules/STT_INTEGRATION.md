@@ -321,6 +321,16 @@ Format exporté (exemple : `viewer/exemple_composition.json`) :
 - `companies` n'est présent que si la composition utilise une compagnie personnalisée. Pour la livrée, appliquer les règles du §6 avec `livery_linear` = conversion sRGB→linéaire de `livery_hex`, et la variante sombre × 0,38.
 - `stats` est informatif, recalculé à chaque export.
 
+### Noyau d'assemblage `STTCOMP` (lot L2a)
+
+Les règles d'assemblage de l'éditeur (repères, ports, graphe de pièces, ajout / déplacement / remplacement / suppression, contrôles OBB / SAT / jet, fiche de jeu, import / export `stt-composition`) vivent dans `demos/space-travel/shared/sttcomp.js` (une globale `STTCOMP`, sans three, sans DOM, sans `Math.random` : aléa et identifiants sont injectés). L'éditeur n'en garde que des **enveloppes** qui conservent leurs noms (`portsOf`, `P`, `kids`, `subtree`, `ordered`, `usedPorts`, `freePortsList`, `compatible`, `computeWorld`, `normalize`, `addPart`, `movePart`, `deletePart`, `replacePart`, `analyze`, `toExport`, `importObject`…) et convertissent aux frontières les matrices en `THREE.Matrix4` et les boîtes en `Box3` :
+- `index.html` charge `<script src="../../shared/sttcomp.js"></script>` avant son module, puis crée au démarrage `K = STTCOMP.create({ geom, fleet, knownCompany, companyOf, mergeCompanies, rand: Math.random, uid })`, une fois les prototypes chargés.
+- `geom` est construit **depuis les prototypes three** par `geomFromProtos()` (sockets, masses, boîtes `hull` / `full`, hublot d'éjection) : l'éditeur ne lit pas `modules-geom.json`, il reste autonome et identique hors ligne.
+- La composition `comp` est passée explicitement au noyau ; `toast`, `commit`, la sélection, le cadrage, le rendu, l'historique et le glisser-déposer restent dans l'éditeur.
+- Le noyau rend des **codes** (`jet_hit`, `overlap`…) ; la table `ISSUE_FR` de l'éditeur les traduit en français (textes inchangés).
+- **Service** : comme l'éditeur charge `../../shared/sttcomp.js`, il se sert désormais depuis la racine `demos/space-travel/` (`python3 -m http.server` dans ce dossier, page `/STT_modules/sources/index.html`). Ouvert depuis `STT_modules/sources/` seul, le script du noyau est introuvable. L'éditeur autonome produit par `build_viewer_standalone.py` (hors dépôt) n'est pas modifié : son intégration du noyau est reportée.
+- **Sonde de non-régression** : `?probe` expose `window.__sttProbe` (enveloppes, `geomFromProtos`) ; `python3 STT_modules/tests/editor_probe.py --check` compare l'éditeur au golden `sources/src/test/unit/fixtures/sttcomp-golden.json` (exports et codes / messages à l'identique, matrices et stats à 1e-6 près) ; sans `?probe`, `__sttProbe` est indéfini.
+
 ---
 
 ## 12. Pistes suivantes
