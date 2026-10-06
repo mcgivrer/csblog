@@ -32,9 +32,12 @@ import argparse
 import hmac
 import secrets
 import hashlib
+import base64
 import json
 import os
+import queue
 import re
+import signal
 import subprocess
 import sys
 import threading
@@ -49,6 +52,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from stt_notices import NoticeEngine
+import stt_runner
 
 VERSION = "1.0.0"
 HERE = Path(__file__).resolve().parent
@@ -966,6 +970,8 @@ class Hub:
         self.payload = b"{}"
         self.digest = None
         self.notices = NoticeEngine()
+        self.runner = None   # RunnerGlue si --runner
+        self.tasks = None    # TaskService (création de tâches), RunnerGlue si --runner
 
     def build(self):
         now = time.time()
@@ -1107,10 +1113,12 @@ class Hub:
         gh = state.get("github") or {}
         self.notices.observe(state["agents"], gh["prs"] if "prs" in gh else None)
         state["notices"], state["notice_seq"] = self.notices.recent(50), self.notices.seq
+        state["runner"] = runner_payload(self.runner)
         body = json.dumps(state, ensure_ascii=False, separators=(",", ":"))
-        # l'horodatage seul ne justifie pas un envoi : on hache sans lui
-        digest = hashlib.sha1(json.dumps({k: v for k, v in state.items() if k not in ("timeline", "generated_at")}, ensure_ascii=False,
-                                         sort_keys=True, default=str).encode("utf-8")).hexdigest()
+        # l'horodatage seul ne justifie pas un envoi : on hache sans lui (ni la durée active des runs, qui change à chaque tick)
+        hashed = {k: v for k, v in state.items() if k not in ("timeline", "generated_at")}
+        hashed["runner"] = dict(state["runner"], runs=[{k: v for k, v in r.items() if k != "active_s"} for r in state["runner"].get("runs", [])])
+        digest = hashlib.sha1(json.dumps(hashed, ensure_ascii=False, sort_keys=True, default=str).encode("utf-8")).hexdigest()
         with self.cond:
             self.payload = body.encode("utf-8")
             if digest != self.digest:
@@ -1495,13 +1503,384 @@ def kanban_summary(path):
 
 
 # ---------------------------------------------------------------------------
+# Lanceur d'agents : colle entre stt_runner.Runner, le Kanban, les notices et HTTP (T1.4)
+# ---------------------------------------------------------------------------
+RUNNER_OFF_REASON = "lanceur désactivé : démarrer le serveur avec --runner"
+BODY_MAX = 512 * 1024
+INPUT_BODY_MAX = 64 * 1024
+RUN_ACTIONS = ("enqueue", "pause", "resume", "stop", "kill", "cancel")
+LIVE_KANBAN = ("running", "waiting")
+ENDED_STATES = ("done", "failed", "stopped", "killed")
+
+
+class HttpError(Exception):
+    def __init__(self, code, message):
+        super().__init__(message)
+        self.code, self.message = code, message
+
+
+def runner_payload(glue):
+    """Contenu de GET /api/runner (et de state.runner)."""
+    if glue is None or glue.runner is None:
+        return {"enabled": False, "reason": RUNNER_OFF_REASON}
+    out = glue.runner.snapshot()
+    out["enabled"] = True
+    return out
+
+
+def local_iso(ts):
+    return time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(ts)) if ts else None
+
+
+def read_plan(path):
+    """Lit plan-status.js avec Node : échelle, ids des lots, lignes des tâches."""
+    code = ("global.window={};require(process.argv[1]);const p=window.PLAN;"
+            "console.log(JSON.stringify({scale:p.scale||{},lots:p.lots.map(l=>l.id),tasks:p.tasks}))")
+    try:
+        r = subprocess.run(["node", "-e", code, path], capture_output=True, text=True, timeout=20, creationflags=NO_WINDOW)
+        if r.returncode != 0:
+            raise KanbanError("lecture de plan-status.js impossible : " + (r.stderr.strip().splitlines() or ["?"])[-1][:200])
+        return json.loads(r.stdout)
+    except (OSError, subprocess.SubprocessError, ValueError) as exc:
+        raise KanbanError(f"lecture de plan-status.js impossible : {exc}")
+
+
+def kanban_row_value(path, ident, key):
+    try:
+        lines = Path(path).read_text(encoding="utf-8").replace("\r\n", "\n").split("\n")
+        return _row_get(lines[_find_row(lines, "tasks", ident)], key)
+    except (OSError, KanbanError):
+        return None
+
+
+def write_atomic(path, text):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8", newline="") as f:
+        f.write(text)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+
+
+class TaskService:
+    """Création de tâches (POST /api/tasks) ; fonctionne aussi sans lanceur (autostart refusé)."""
+    runner = None
+
+    def __init__(self, hub, args):
+        self.hub, self.args = hub, args
+        self.root = args.main_root or args.repo
+        self.state_dir = os.path.join(self.root, ".claude", "stt-runner")
+        self.prompts_dir = os.path.join(os.path.dirname(args.kanban), "prompts")
+        self._validator = stt_runner.Runner(self.state_dir, self.root)  # simple jeu de règles, aucun effet de bord
+        self._create_lock = threading.Lock()
+
+    def create_task(self, body):
+        if not isinstance(body, dict):
+            raise HttpError(400, "objet JSON attendu")
+        lot, agent = body.get("lot"), body.get("agent")
+        model, cx = body.get("model"), body.get("cx")
+        title, prompt = body.get("title"), body.get("prompt")
+        perm = body.get("perm", "acceptEdits")
+        prio = body.get("prio", 2)
+        worktree = body.get("worktree") or None
+        autostart = body.get("autostart", False)
+        if not isinstance(autostart, bool):
+            raise HttpError(400, "autostart : booléen attendu")
+        if not isinstance(title, str) or not title.strip() or len(title) > 200:
+            raise HttpError(400, "title : texte de 1 à 200 caractères")
+        if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 200 * 1024:
+            raise HttpError(400, "prompt : texte Markdown de 1 à 200 Kio")
+        if agent not in ("dev", "archi", "revue"):
+            raise HttpError(400, "agent : dev, archi ou revue")
+        docs = body.get("docs")
+        if docs is not None:
+            ok = (isinstance(docs, list) and len(docs) <= 30 and all(
+                isinstance(d, dict) and isinstance(d.get("f"), str) and d.get("r") in ("lu", "modifié", "créé")
+                and ".." not in d["f"].split("/") and not d["f"].startswith("/") and "\\" not in d["f"] and "\0" not in d["f"]
+                for d in docs))
+            if not ok:
+                raise HttpError(400, "docs : liste de {f, r} (r : lu, modifié ou créé)")
+            docs = [{"f": d["f"], "r": d["r"]} for d in docs]
+        if not isinstance(lot, str) or not re.match(r"^[A-Za-z0-9][A-Za-z0-9._-]*$", lot):
+            raise HttpError(400, "lot invalide")
+        if not isinstance(cx, str):
+            raise HttpError(400, "cx invalide")
+        if autostart and self.runner is None:
+            raise HttpError(409, RUNNER_OFF_REASON)
+        wt = None
+        try:
+            if worktree is not None:
+                if not isinstance(worktree, str):
+                    raise HttpError(400, "worktree invalide")
+                wt = stt_runner.validate_worktree(worktree)
+            # mêmes contrôles que l'enqueue, avant d'écrire quoi que ce soit
+            self._validator._validate("x.0", agent, model, perm, prio,
+                                      wt or stt_runner.WORKTREE_PREFIX + "stt-" + lot, lot, None)
+        except (stt_runner.ValidationError, TypeError) as exc:
+            raise HttpError(400, str(exc))
+        with self._create_lock:
+            try:
+                plan = read_plan(self.args.kanban)
+                if lot not in plan["lots"]:
+                    raise HttpError(400, f"lot inconnu : {lot}")
+                if cx not in plan["scale"]:
+                    raise HttpError(400, "cx : " + ", ".join(plan["scale"]))
+                budget = int(plan["scale"][cx]["tokens"])
+                suffixes = [int(m.group(1)) for t in plan["tasks"]
+                            for m in [re.match(rf"^{re.escape(lot)}\.(\d+)$", str(t.get("id")))] if m]
+                tid = f"{lot}.{max(suffixes or [0]) + 1}"
+                rel = f"stt-agents/data/prompts/{tid}.md"
+                row = {"id": tid, "lot": lot, "title": title.strip(), "agent": agent, "model": model, "status": "todo",
+                       "progress": 0, "budget": budget, "est0": budget, "cx": cx, "prompt": rel}
+                if prio != 2:
+                    row["prio"] = prio
+                if wt:
+                    row["worktree"] = wt
+                if perm != "acceptEdits":
+                    row["perm"] = perm
+                if docs:
+                    row["docs"] = docs
+                if autostart:
+                    row["runner"] = "auto"
+                ppath = os.path.join(self.prompts_dir, tid + ".md")
+                write_atomic(ppath, prompt if prompt.endswith("\n") else prompt + "\n")
+                try:
+                    out = kanban_apply(self.args.kanban, [{"op": "task_add", "task": row}], allow_reserved=True)
+                except Exception:
+                    os.remove(ppath)
+                    raise
+            except KanbanError as exc:
+                raise HttpError(400, str(exc))
+        self.hub.notices.kanban_changes(out.get("changes"))
+        if autostart:
+            try:
+                self.runner.enqueue(tid, agent, model, perm, prio, wt, lot, None, budget)
+            except stt_runner.RunnerError as exc:
+                raise HttpError(409, f"tâche {tid} créée mais non mise en file : {exc}")
+        return {"ok": True, "id": tid, "budget": budget, "prompt": rel}
+
+
+class RunnerGlue(TaskService):
+    """Un Runner + écriture Kanban (file sérialisée, hors du verrou du lanceur) + notices."""
+
+    def __init__(self, hub, args, command=None, **runner_kw):
+        super().__init__(hub, args)
+        self.runner = stt_runner.Runner(self.state_dir, self.root, command=command, on_change=self.on_change,
+                                        tokens_of=self.tokens_of, turn_ended_of=self.turn_ended_of, **runner_kw)
+        self._validator = self.runner
+        self._last = {}            # tâche -> dernier état vu (détecte les vrais changements)
+        self._priming = False
+        self._q = queue.Queue()
+        self._writer = None
+
+    # -- cycle de vie ---------------------------------------------------------
+    def start(self):
+        self._priming = True
+        try:
+            self.runner.load_state()
+        finally:
+            self._priming = False
+        for r in list(self.runner.runs.values()):
+            if r.state == "orphan":
+                self._notices(r)
+            elif r.state == "stopped" and r.note and "disparu" in r.note:
+                self._q.put(self._job(r))
+        self._writer = threading.Thread(target=self._writer_loop, name="stt-kanban-writer", daemon=True)
+        self._writer.start()
+        self.runner.start_thread()
+
+    def shutdown(self):
+        self.runner.shutdown()
+        self._q.put(None)
+        if self._writer:
+            self._writer.join(10)
+
+    # -- transcripts ------------------------------------------------------------
+    def _transcript(self, run):
+        for tr in list(self.hub.claude.files.values()):
+            if tr.is_sub:
+                continue
+            if tr.session_id == run.session or Path(tr.path).stem == run.session:
+                return tr
+        return None
+
+    def tokens_of(self, run):
+        tr = self._transcript(run)
+        if tr is None:
+            return 0
+        t = tr.tokens()
+        return int(t["input"] + t["output"] + t["cache_write"])
+
+    def turn_ended_of(self, run):
+        tr = self._transcript(run)
+        return bool(tr is not None and tr.ended_turn and tr.last_kind == "text")
+
+    # -- crochet on_change : appelé sous le verrou du Runner, donc rapide et sans E/S ------------
+    def on_change(self, run):
+        prev = self._last.get(run.task)
+        self._last[run.task] = run.state
+        if self._priming or prev == run.state:
+            return
+        self._notices(run)
+        self._q.put(self._job(run))
+
+    def _notices(self, run):
+        task, st = run.task, run.state
+        tgt = {"type": "task", "id": task}
+        who = f"{task} ({run.agent} {run.model})"
+        emit = self.hub.notices.emit
+        kr = int(run.started or 0)
+        if st == "starting":
+            emit("runner_started", "runner", "info", "Agent lancé", who, tgt, f"runner_started:{task}:{kr}")
+        elif st == "waiting":
+            emit("runner_waiting", "runner", "attention", "Agent en attente", who, tgt, f"runner_waiting:{task}")
+        elif st == "done":
+            emit("runner_done", "runner", "success", "Agent terminé", who, tgt, f"runner_done:{task}:{kr}")
+        elif st == "failed":
+            emit("runner_failed", "runner", "error", "Agent en échec", f"{who} : {run.note or ''}", tgt, f"runner_failed:{task}:{kr}")
+        elif st in ("stopped", "killed"):
+            emit("runner_" + st, "runner", "info", "Agent arrêté" if st == "stopped" else "Agent tué", who, tgt,
+                 f"runner_{st}:{task}:{kr}:{int(run.ended or 0)}")
+        elif st == "paused" and "budget" in (run.note or ""):
+            emit("runner_budget", "runner", "attention", "Pause budget", f"{who} : {run.note}", tgt, f"runner_budget:{task}:{kr}")
+        elif st == "orphan":
+            emit("runner_orphan", "runner", "attention", "Agent orphelin détecté", f"{who} : seul kill est permis", tgt,
+                 f"runner_orphan:{task}")
+
+    def _job(self, run):
+        st = run.state
+        job = {"task": run.task, "set": {"runState": st}, "add": {}, "unset": [], "status": None, "note": None}
+        s = job["set"]
+        if st == "queued":
+            s["runner"] = "auto"
+        elif st == "starting":
+            s.update(runner="auto", started=local_iso(run.started), session=run.session)
+            if run.agent == "dev" and run.inst:
+                s["inst"] = run.inst
+            job["unset"].append("ended")
+            job["status"] = "doing"
+        elif st in LIVE_KANBAN:
+            job["status"] = "doing"
+        elif st == "paused" and "budget" in (run.note or ""):
+            job["status"], job["note"] = "blocked", run.note
+        elif st == "done":
+            job["status"] = "review"
+            s["reviewer"] = "revue"
+        elif st in ("failed", "killed"):
+            job["status"] = "blocked"
+            job["note"] = run.note or ("tué par l'utilisateur" if st == "killed" else "échec")
+        if st in ENDED_STATES:
+            s["ended"] = local_iso(run.ended or time.time())
+            ms = int(run.active_seconds(self.runner.now()) * 1000)
+            if ms > 0:
+                job["add"]["ms"] = ms
+        return job
+
+    # -- écriture Kanban (un seul fil : les écritures sont ordonnées) -----------------------------
+    ALLOWED_STATUS = {"doing": ("todo", "blocked"), "review": ("doing",), "blocked": ("doing", "todo")}
+
+    def _writer_loop(self):
+        while True:
+            job = self._q.get()
+            if job is None:
+                return
+            batch, stop = [job], False
+            while True:
+                try:
+                    j = self._q.get_nowait()
+                except queue.Empty:
+                    break
+                if j is None:
+                    stop = True
+                    break
+                batch.append(j)
+            by_task = {}
+            for j in batch:
+                by_task.setdefault(j["task"], []).append(j)
+            for task, jobs in by_task.items():
+                try:
+                    self._write(task, jobs)
+                except Exception as exc:  # une écriture ratée ne doit pas tuer le fil
+                    print(f"[runner/kanban] {task} : {exc!r}", file=sys.stderr)
+            if stop:
+                return
+
+    def _write(self, task, jobs):
+        path = self.args.kanban
+        cur = kanban_row_value(path, task, "status")
+        if cur is None:
+            return  # tâche absente du Kanban (lancement direct) : rien à écrire
+        sets, adds, unsets, note, start = {}, {}, [], None, cur
+        for j in jobs:
+            sets.update(j["set"])
+            for k, v in j["add"].items():
+                adds[k] = adds.get(k, 0) + v
+            unsets += j["unset"]
+            if j["status"] and start in self.ALLOWED_STATUS[j["status"]]:
+                start = j["status"]
+            if j["note"]:
+                note = j["note"]
+        if start != cur:
+            sets["status"] = start
+        if start == "blocked" and note:
+            old = kanban_row_value(path, task, "note")
+            old = re.sub(r"^Lanceur \([^)]*\) : [^|]*\| ?", "", old) if isinstance(old, str) else ""
+            sets["note"] = f"Lanceur ({time.strftime('%Y-%m-%d %H:%M')}) : {note}" + (f" | {old}" if old else "")
+        unsets = [k for k in dict.fromkeys(unsets) if k not in sets]
+        op = {"op": "task", "id": task, "set": sets}
+        if adds:
+            op["add"] = adds
+        if unsets:
+            op["unset"] = unsets
+        out = kanban_apply(path, [op], allow_reserved=True)
+        self.hub.notices.kanban_changes(out.get("changes"))
+
+    # -- actions ------------------------------------------------------------------------------------
+    def action(self, task, action, body):
+        r = self.runner
+        run = r.runs.get(task)
+        if run is not None and run.state == "orphan" and action != "kill":
+            raise HttpError(409, f"{task} : processus orphelin (lancé avant un redémarrage du serveur) : seul kill est permis")
+        if action == "enqueue":
+            prio = body.get("prio") if isinstance(body, dict) else None
+            try:
+                if run is not None:
+                    r.enqueue(task, prio=prio)
+                else:
+                    plan = read_plan(self.args.kanban)
+                    row = next((t for t in plan["tasks"] if t.get("id") == task), None)
+                    if row is None:
+                        raise KeyError(task)
+                    if row.get("agent") not in ("dev", "archi", "revue"):
+                        raise HttpError(400, "agent non lançable : " + str(row.get("agent")))
+                    r.enqueue(task, row.get("agent"), row.get("model") or "sonnet", row.get("perm") or "acceptEdits",
+                              prio if prio is not None else row.get("prio", 2), row.get("worktree") or None, row.get("lot"),
+                              None, row.get("budget") or row.get("est0"))
+            except KanbanError as exc:
+                raise HttpError(400, str(exc))
+        else:
+            getattr(r, action)(task)
+        return {"ok": True, "state": r.get(task).state}
+
+    def input(self, task, data):
+        run = self.runner.runs.get(task)
+        if run is not None and run.state == "orphan":
+            raise HttpError(409, f"{task} : processus orphelin : pas de terminal, seul kill est permis")
+        self.runner.input(task, data)
+        return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
 # HTTP
 # ---------------------------------------------------------------------------
 TOKEN_META = '<meta name="stt-token" content="">'
 
 
-def check_control(handler):
-    """Contrôle des routes de pilotage : jeton, Host, Origin obligatoire, Sec-Fetch-Site. Renvoie True si autorisé."""
+def check_control(handler, same_origin_get=False):
+    """Contrôle des routes de pilotage : jeton, Host, Origin obligatoire, Sec-Fetch-Site. Renvoie True si autorisé.
+    `same_origin_get` : pour un GET `fetch` (le navigateur n'envoie pas Origin en même origine), l'absence d'Origin
+    est acceptée si Sec-Fetch-Site vaut same-origin ; une Origin présente doit toujours être valide."""
     hub_token = getattr(handler, "stt_token", "") or ""
     got = handler.headers.get("X-STT-Token") or ""
     if not hub_token or not hmac.compare_digest(got.encode("utf-8"), hub_token.encode("utf-8")):
@@ -1510,9 +1889,13 @@ def check_control(handler):
         return False
     port = handler.server.server_address[1]
     origin = handler.headers.get("Origin")
-    if not origin or origin not in {f"http://{h}:{port}" for h in ("127.0.0.1", "localhost", "[::1]")}:
+    site = (handler.headers.get("Sec-Fetch-Site") or "").lower()
+    if origin:
+        if origin not in {f"http://{h}:{port}" for h in ("127.0.0.1", "localhost", "[::1]")}:
+            return False
+    elif not (same_origin_get and site == "same-origin"):
         return False
-    if (handler.headers.get("Sec-Fetch-Site") or "").lower() == "cross-site":
+    if site == "cross-site":
         return False
     return True
 
@@ -1618,6 +2001,10 @@ def make_handler(hub, allowed_hosts):
                 return self._send(200, body, "application/json; charset=utf-8")
             if path == "/api/stream":
                 return self._stream()
+            if path == "/api/runner":
+                return self._json(200, runner_payload(hub.runner))
+            if path.startswith("/api/runner/") and path.endswith("/tty"):
+                return self._tty(path)
             if path == "/api/kanban":
                 try:
                     out = kanban_summary(hub.args.kanban)
@@ -1636,6 +2023,8 @@ def make_handler(hub, allowed_hosts):
                 if not check_control(self):
                     return self._send(403, b"403", "text/plain; charset=utf-8")
                 return self._send(200, b'{"ok": true}', "application/json; charset=utf-8")
+            if path == "/api/tasks" or path.startswith("/api/runner/"):
+                return self._runner_post(path)
             if path != "/api/kanban":
                 return self._send(404, b"404", "text/plain")
             # l'en-tete personnalise force un preflight CORS : une page web tierce ne peut pas ecrire le Kanban
@@ -1654,6 +2043,130 @@ def make_handler(hub, allowed_hosts):
             except (KanbanError, ValueError, KeyError, IndexError) as exc:
                 out, code = {"ok": False, "error": str(exc)}, 400
             self._send(code, json.dumps(out, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
+
+        def _json(self, code, obj):
+            self._send(code, json.dumps(obj, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
+
+        def _read_json(self, limit, required=True):
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                raise HttpError(400, "Content-Length invalide")
+            if n > limit:
+                raise HttpError(413, f"corps trop gros ({limit // 1024} Kio max)")
+            if n <= 0:
+                if required:
+                    raise HttpError(400, "corps JSON attendu")
+                return {}
+            try:
+                return json.loads(self.rfile.read(n).decode("utf-8"))
+            except ValueError:
+                raise HttpError(400, "JSON invalide")
+
+        def _runner_post(self, path):
+            """POST /api/tasks et /api/runner/<tâche>/<action|input|resize> (jeton + Origin)."""
+            if not check_control(self):
+                return self._send(403, b"403", "text/plain; charset=utf-8")
+            try:
+                if path == "/api/tasks":
+                    return self._json(200, hub.tasks.create_task(self._read_json(BODY_MAX)))
+                if hub.runner is None:
+                    raise HttpError(409, RUNNER_OFF_REASON)
+                parts = [urllib.parse.unquote(x) for x in path.split("/")]
+                if len(parts) != 5 or not stt_runner._TASK_RE.match(parts[3]):
+                    raise HttpError(404, "route inconnue")
+                task, act = parts[3], parts[4]
+                rn = hub.runner.runner
+                if task not in rn.runs and act != "enqueue":
+                    raise HttpError(404, f"tâche inconnue du lanceur : {task}")
+                if act in RUN_ACTIONS:
+                    return self._json(200, hub.runner.action(task, act, self._read_json(BODY_MAX, required=False)))
+                if act == "input":
+                    data = self._read_json(INPUT_BODY_MAX + 1024)
+                    if not isinstance(data, dict) or not isinstance(data.get("data"), str):
+                        raise HttpError(400, "{data: texte} attendu")
+                    return self._json(200, hub.runner.input(task, data["data"]))
+                if act == "resize":
+                    data = self._read_json(BODY_MAX)
+                    if not isinstance(data, dict):
+                        raise HttpError(400, "{cols, rows} attendu")
+                    if rn.runs[task].state == "orphan":
+                        raise HttpError(409, f"{task} : processus orphelin : pas de terminal, seul kill est permis")
+                    rn.resize(task, data.get("cols"), data.get("rows"))
+                    return self._json(200, {"ok": True})
+                raise HttpError(404, "action inconnue")
+            except HttpError as exc:
+                self._json(exc.code, {"ok": False, "error": exc.message})
+            except stt_runner.TransitionError as exc:
+                self._json(409, {"ok": False, "error": str(exc)})
+            except stt_runner.ValidationError as exc:
+                self._json(400, {"ok": False, "error": str(exc)})
+            except KeyError as exc:
+                self._json(404, {"ok": False, "error": f"tâche inconnue : {exc.args[0] if exc.args else ''}"})
+            except stt_runner.RunnerError as exc:
+                self._json(500, {"ok": False, "error": str(exc)})
+
+        def _tty(self, path):
+            """GET /api/runner/<tâche>/tty?since=N : flux SSE du terminal (event: out {seq,b64}, event: state {state})."""
+            if not check_control(self, same_origin_get=True):
+                return self._send(403, b"403", "text/plain; charset=utf-8")
+            parts = [urllib.parse.unquote(x) for x in path.split("/")]
+            if hub.runner is None:
+                return self._json(409, {"ok": False, "error": RUNNER_OFF_REASON})
+            if len(parts) != 5 or parts[3] not in hub.runner.runner.runs:
+                return self._json(404, {"ok": False, "error": "tâche inconnue du lanceur"})
+            task = parts[3]
+            q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+            try:
+                since = int((q.get("since") or ["0"])[0])
+                if since < 0:
+                    raise ValueError
+            except ValueError:
+                return self._json(400, {"ok": False, "error": "since : entier >= 0"})
+            rn = hub.runner.runner
+            if rn.get(task).state == "orphan":
+                return self._json(409, {"ok": False, "error": f"{task} : processus orphelin : pas de terminal, seul kill est permis"})
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.close_connection = True
+            last_state, last_ping, ended = None, time.monotonic(), 0
+            try:
+                self.wfile.write(b"retry: 3000\n\n")
+                while True:
+                    state = rn.get(task).state
+                    seq, data = rn.read_output(task, since)
+                    sent = False
+                    if state != last_state:
+                        last_state = state
+                        self.wfile.write(b"event: state\ndata: " + json.dumps({"state": state}).encode("utf-8") + b"\n\n")
+                        sent = True
+                    for i in range(0, len(data), 16384):
+                        msg = json.dumps({"seq": seq + i, "b64": base64.b64encode(data[i:i + 16384]).decode("ascii")},
+                                         separators=(",", ":"))
+                        self.wfile.write(b"event: out\ndata: " + msg.encode("ascii") + b"\n\n")
+                        sent = True
+                    if data:
+                        since = seq + len(data)
+                    if sent:
+                        self.wfile.flush()
+                        last_ping = time.monotonic()
+                    elif time.monotonic() - last_ping >= 15:
+                        self.wfile.write(b"event: ping\ndata: {}\n\n")
+                        self.wfile.flush()
+                        last_ping = time.monotonic()
+                    if state in ("done", "failed", "stopped", "killed") and not data:
+                        ended += 1
+                        if ended >= 2:  # relecture finale : le lecteur a vidé le pty avant le changement d'état
+                            return
+                    else:
+                        ended = 0
+                    time.sleep(0.05)
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
+                return
 
         def _stream(self):
             self.send_response(200)
@@ -1709,6 +2222,7 @@ def main():
     ap.add_argument("--kanban", help="plan-status.js du Kanban (défaut : %s dans le checkout principal)" % KANBAN_REL)
     ap.add_argument("--kanban-apply", metavar="OPS.json", help="applique des opérations au Kanban (fichier JSON ou - pour stdin) puis quitte ; --dry-run pour contrôler seulement")
     ap.add_argument("--runner", action="store_true", help="active le lanceur d'agents (opt-in ; boucle locale uniquement, hors Windows)")
+    ap.add_argument("--runner-cmd", metavar="JSON", help="avec --runner : commande du lanceur, liste argv JSON (défaut : claude interactif) ; {agent} {model} {session} {perm} {task} {prompt} substitués")
     ap.add_argument("--dry-run", action="store_true", help="avec --kanban-apply : valide sans écrire")
     args = ap.parse_args()
     if args.runner:
@@ -1716,6 +2230,16 @@ def main():
             ap.exit(2, "--runner refusé : --host doit être la boucle locale (127.0.0.1, localhost ou ::1).\n")
         if os.name == "nt":
             ap.exit(2, "--runner refusé : non pris en charge sous Windows.\n")
+    runner_cmd = None
+    if args.runner_cmd:
+        if not args.runner:
+            ap.exit(2, "--runner-cmd exige --runner.\n")
+        try:
+            runner_cmd = json.loads(args.runner_cmd)
+        except ValueError:
+            runner_cmd = None
+        if not (isinstance(runner_cmd, list) and runner_cmd and all(isinstance(x, str) for x in runner_cmd)):
+            ap.exit(2, "--runner-cmd : liste JSON non vide de chaînes attendue.\n")
 
     args.repo = os.path.abspath(os.path.expanduser(args.repo)) if args.repo else detect_repo(HERE)
     if args.repo:  # racine réelle du dépôt (et non un sous-dossier)
@@ -1748,6 +2272,11 @@ def main():
         print(json.dumps(hub.build(), ensure_ascii=False, indent=2))
         return
 
+    hub.tasks = TaskService(hub, args)
+    if args.runner:
+        hub.runner = RunnerGlue(hub, args, command=runner_cmd)
+        hub.tasks = hub.runner
+        hub.runner.start()
     hub.run_loops()
     local = args.host in ("127.0.0.1", "localhost", "::1")
     allowed = {"127.0.0.1", "localhost", "::1"} if local else None
@@ -1761,6 +2290,9 @@ def main():
     print(f"  GitHub  : {args.github or 'désactivé'}{' (jeton)' if hub.gh.token else ''}")
     print(f"  Kanban  : {url}kanban/  ·  données {args.kanban or '?'}  (POST /api/kanban, X-STT-Kanban: 1)")
     print(f"  Documents du Kanban : {', '.join(repr(r) for r in KANBAN_DOC_ROOTS)} (KANBAN_DOC_ROOTS)")
+    if args.runner:
+        print(f"  Lanceur : actif · état {hub.runner.state_dir} · commande {(runner_cmd or stt_runner.RUNNER_COMMAND)[0]}")
+        signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
     if not local:
         print("  ATTENTION : serveur exposé au réseau, les extraits de transcripts sont lisibles par tout le LAN.")
     if args.open:
@@ -1769,6 +2301,9 @@ def main():
         srv.serve_forever()
     except KeyboardInterrupt:
         print("\nArrêt.")
+    finally:
+        if hub.runner is not None:
+            hub.runner.shutdown()
 
 
 if __name__ == "__main__":

@@ -421,6 +421,8 @@ class Runner:
                 old.pid = old.pgid = old.proc_start = None
                 old.note = None
                 old.budget_ack = False
+                old.paused_s = 0.0      # le temps actif (ms Kanban) se mesure par lancement
+                old.paused_at = None
                 self._set_state(old, "queued")
                 return old
             prio = 2 if prio is None else prio
