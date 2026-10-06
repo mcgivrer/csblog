@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 380" font-family="system-ui, sans-serif" font-size="13">
+<title>ADR-001 : carte des zones de risque de rendu de la migration r128 vers r186</title>
+<desc>Trois colonnes par gravité. Élevée : correctifs de shaders par onBeforeCompile (shipwear casse en r157), gestion des couleurs (r152, 314 couleurs hexadécimales), unités des lumières (r155, retrait r165). Moyenne : chunk encodings_fragment renommé (r154), culling des InstancedMesh (r151), taille du HTML (+148 606 octets mesurés), WebGL 1 abandonné (r163), démo sur deux versions. Faible : shaders GLSL1 (défines de compatibilité présents en r186), Clock déprécié (r183), éditeur r169 vers r186.</desc>
+<rect width="960" height="380" fill="#f6f5f0"/>
+<text x="480" y="30" text-anchor="middle" font-size="18" font-weight="700" fill="#141413">Zones de risque de rendu, r128 vers r186 (version d'introduction entre parenthèses)</text>
+<g stroke="#333" stroke-width="2">
+<rect x="20" y="50" width="300" height="310" rx="8" fill="#fbe5ec"/>
+<rect x="330" y="50" width="300" height="310" rx="8" fill="#fdf0d5"/>
+<rect x="640" y="50" width="300" height="310" rx="8" fill="#e4f4e4"/>
+</g>
+<g fill="#141413" font-weight="700" font-size="15" text-anchor="middle">
+<text x="170" y="78">Gravité élevée</text><text x="480" y="78">Gravité moyenne</text><text x="790" y="78">Gravité faible</text>
+</g>
+<g fill="#141413">
+<text x="34" y="112" font-weight="700">Correctifs de shaders (r157)</text>
+<text x="34" y="130">8 onBeforeCompile dans shared/ ;</text>
+<text x="34" y="148">shipwear : RE_Direct( …, geometry, … )</text>
+<text x="34" y="166">n'existe plus : erreur de compilation</text>
+<text x="34" y="204" font-weight="700">Couleurs (r152)</text>
+<text x="34" y="222">hex lus comme sRGB : 314 littéraux,</text>
+<text x="34" y="240">teintes plus sombres et saturées</text>
+<text x="34" y="278" font-weight="700">Lumières (r155, retrait r165)</text>
+<text x="34" y="296">plus de facteur π : 17 lumières ;</text>
+<text x="34" y="314">PointLight en candela, décroissance</text>
+<text x="34" y="332">non reproductible à l'identique</text>
+<text x="344" y="112" font-weight="700">encodings_fragment (r154)</text>
+<text x="344" y="130">renommé colorspace_fragment (shipglass)</text>
+<text x="344" y="164" font-weight="700">InstancedMesh (r151)</text>
+<text x="344" y="182">culling actif : 3 créations à vérifier</text>
+<text x="344" y="216" font-weight="700">Taille du HTML</text>
+<text x="344" y="234">vendor 665 638 → 814 244 octets</text>
+<text x="344" y="268" font-weight="700">WebGL 1 retiré (r163)</text>
+<text x="344" y="286">machines sans WebGL 2 exclues</text>
+<text x="344" y="320" font-weight="700">Démo gelée en r128</text>
+<text x="344" y="338">modules partagés sur deux versions</text>
+<text x="654" y="112" font-weight="700">Shaders GLSL1</text>
+<text x="654" y="130">gl_FragColor, texture2D : défines</text>
+<text x="654" y="148">de compatibilité présents en r186</text>
+<text x="654" y="186" font-weight="700">Clock (déprécié r183)</text>
+<text x="654" y="204">2 usages, avertissement seulement</text>
+<text x="654" y="242" font-weight="700">Éditeur r169 → r186</text>
+<text x="654" y="260">déjà en colorSpace et lumières</text>
+<text x="654" y="278">physiques ; Clock à remplacer</text>
+</g>
+</svg>
