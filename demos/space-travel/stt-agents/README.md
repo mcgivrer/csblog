@@ -7,7 +7,7 @@ Deux fichiers, aucune dépendance (Python 3.8+ standard, page HTML autonome) :
 | Fichier | Rôle |
 |---|---|
 | `stt_agents_server.py` | Collecte (sessions Claude Code + git + GitHub) et sert la page sur `http://127.0.0.1:8765`, avec mises à jour poussées en direct (SSE, ~2 s). |
-| `kanban.html` | Le Kanban des lots (page fixe), servi sur `http://127.0.0.1:8765/kanban/`. Lit `data/plan-status.js` et affiche les documents liés par le serveur (aperçu Markdown, Mermaid, images). |
+| `kanban.html` | Le Kanban des lots (page fixe), servi sur `http://127.0.0.1:8765/kanban/` et intégré au tableau de bord dans l'onglet **Kanban** (iframe ; `?embed=1` masque son titre). Lit `data/plan-status.js` et affiche les documents liés par le serveur (aperçu Markdown, Mermaid, images). |
 | `data/plan-status.js`, `data/prompts/` | Données du Kanban et prompts exécutés par les agents. **Écrits uniquement par le serveur** (voir « Kanban »), toujours dans le checkout principal. |
 | `index.html` | Le tableau de bord. Servi par le serveur : vue complète. Ouvert seul (fichier local ou GitHub Pages) : vue GitHub publique. |
 
@@ -36,6 +36,10 @@ Options utiles :
 | `--once` | Imprimer un instantané JSON et quitter (diagnostic). |
 
 `GITHUB_TOKEN` (facultatif) dans l'environnement relève le quota GitHub de 60 à 5 000 requêtes/heure. Sans jeton, le serveur interroge GitHub toutes les 75 s avec des requêtes conditionnelles (ETag) : les réponses inchangées ne consomment pas de quota.
+
+## Les onglets
+
+Le tableau de bord (`http://127.0.0.1:8765/`) a deux onglets : **Agents** (sessions, agents créés, chronologie, flux, livraisons) et **Kanban**. L'onglet choisi est mémorisé ; `#kanban` dans l'URL ouvre directement le Kanban, et les liens de la barre de navigation (`#feed`…) ramènent à l'onglet Agents. Le Kanban n'est chargé qu'à la première ouverture et demande le serveur local : sans lui (GitHub Pages, fichier local), l'onglet affiche un message. La barre « Agents créés » filtre par état (actif et silencieux cochés par défaut ; terminé, arrêté, erreur décochés).
 
 ## Les trois modes de la page
 

@@ -177,6 +177,14 @@
   .empty{border:1px dashed var(--line);padding:28px;text-align:center;color:var(--muted);font-size:14px;line-height:1.7}
   .empty b{color:var(--ink);font-family:'JetBrains Mono',monospace}
 
+  /* ---------- onglets : Agents | Kanban ---------- */
+  .tabs{display:flex;gap:4px;margin:0 0 18px;border-bottom:1px solid var(--line)}
+  .tabs button{font:13px 'JetBrains Mono',monospace;padding:9px 18px;color:var(--muted);background:none;border:1px solid transparent;border-bottom:0;cursor:pointer;position:relative;top:1px}
+  .tabs button:hover{color:var(--ink)}
+  .tabs button[aria-selected="true"]{color:var(--amber);border-color:var(--line);background:var(--panel)}
+  #tab-kanban[hidden],#tab-agents[hidden]{display:none}
+  #kanbanFrame{display:block;width:100%;min-height:480px;border:1px solid var(--line);background:var(--panel)}
+  #kanbanMsg{padding:24px;border:1px solid var(--line);background:var(--panel);color:var(--muted)}
   /* ---------- arbre agents / sous-agents ---------- */
   .toolbar{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:-4px 0 14px}
   .tree{border:1px solid var(--line);background:var(--panel)}
@@ -308,6 +316,11 @@
     </div>
   </header>
 
+  <div class="tabs" role="tablist" aria-label="Vues">
+    <button type="button" role="tab" id="tabBtnAgents" data-tab="agents" aria-controls="tab-agents" aria-selected="true">Agents</button><button type="button" role="tab" id="tabBtnKanban" data-tab="kanban" aria-controls="tab-kanban" aria-selected="false" tabindex="-1">Kanban</button>
+  </div>
+
+  <div id="tab-agents" role="tabpanel" aria-labelledby="tabBtnAgents">
   <div id="banner"></div>
 
   <div class="kpis" id="kpis"></div>
@@ -349,6 +362,13 @@
     <div class="section-head"><span class="section-num">05</span><h2 class="section-title" id="wtTitle">Worktrees</h2><span class="section-rule"></span><span class="section-aside" id="wtAside"></span></div>
     <div class="box tbl-wrap" id="wtBox"></div>
   </section>
+
+  </div>
+
+  <div id="tab-kanban" role="tabpanel" aria-labelledby="tabBtnKanban" hidden>
+    <div id="kanbanMsg" hidden></div>
+    <iframe id="kanbanFrame" title="Kanban des lots" hidden></iframe>
+  </div>
 
   <footer class="site-footer">
     <div class="src" id="srcFooter"></div>
@@ -931,6 +951,58 @@ function startDemo(reason){
 }
 
 boot();
+})();
+</script>
+<script>
+/* Onglets Agents | Kanban. Le Kanban est la page kanban.html servie par stt_agents_server.py (/kanban/), chargée à la première ouverture. */
+(() => {
+  const $ = id => document.getElementById(id);
+  const tabs = [...document.querySelectorAll('.tabs [data-tab]')];
+  const panel = { agents: $('tab-agents'), kanban: $('tab-kanban') };
+  const frame = $('kanbanFrame'), msg = $('kanbanMsg');
+  const get = () => { try { return localStorage.getItem('stt-agents:tab'); } catch { return null; } };
+  const put = v => { try { localStorage.setItem('stt-agents:tab', v); } catch {} };
+  const AGENT_HASHES = ['agents', 'timeline', 'feed', 'delivery', 'worktrees'];
+  let started = false;
+  function fit(){ if (!panel.kanban.hidden) frame.style.height = Math.max(480, innerHeight - frame.getBoundingClientRect().top - 12) + 'px'; }
+  async function startKanban(){
+    if (started) return; started = true;
+    try {
+      const r = await fetch('kanban/plan-status.js', { method: 'HEAD', cache: 'no-store' });
+      if (!r.ok) throw new Error(r.status);
+      frame.hidden = true; msg.hidden = true;
+      frame.addEventListener('load', () => { frame.hidden = false; fit(); }, { once: true });
+      frame.src = 'kanban/?embed=1';
+    } catch {
+      started = false; frame.hidden = true; msg.hidden = false;
+      msg.innerHTML = 'Le Kanban est servi par <code>stt_agents_server.py</code> (<code>/kanban/</code>) : lancez le serveur local pour l\u2019afficher ici.';
+    }
+  }
+  function show(name, opts = {}){
+    if (!panel[name]) name = 'agents';
+    tabs.forEach(t => { const on = t.dataset.tab === name; t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1; });
+    Object.entries(panel).forEach(([k, p]) => { p.hidden = k !== name; });
+    put(name);
+    if (opts.hash !== false) history.replaceState(null, '', name === 'kanban' ? '#kanban' : location.pathname + location.search);
+    if (name === 'kanban') { startKanban().then(fit); fit(); }
+  }
+  tabs.forEach(t => {
+    t.addEventListener('click', () => show(t.dataset.tab));
+    t.addEventListener('keydown', e => {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      const n = tabs[(tabs.indexOf(t) + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+      n.focus(); show(n.dataset.tab); e.preventDefault();
+    });
+  });
+  // les liens de la barre de navigation (#agents, #feed…) ramènent à l'onglet Agents avant de défiler
+  document.addEventListener('click', e => {
+    const a = e.target.closest('.site-nav a[href^="#"]'); if (!a) return;
+    const id = a.getAttribute('href').slice(1);
+    if (panel.agents.hidden && AGENT_HASHES.includes(id)) { show('agents', { hash: false }); setTimeout(() => { const t = $(id); if (t) t.scrollIntoView(); }, 0); }
+  });
+  addEventListener('hashchange', () => { if (location.hash === '#kanban') show('kanban', { hash: false }); });
+  addEventListener('resize', fit);
+  show(location.hash === '#kanban' ? 'kanban' : get() === 'kanban' ? 'kanban' : 'agents', { hash: location.hash === '#kanban' });
 })();
 </script>
 </body>

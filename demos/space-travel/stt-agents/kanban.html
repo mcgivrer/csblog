@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script>/* Thème posé AVANT le premier rendu (pas de flash) : « dark » par défaut, sinon la préférence enregistrée. */
 (function(){var t='dark';try{var v=localStorage.getItem('kanbanTheme');if(v==='light'||v==='dark')t=v}catch(e){}document.documentElement.setAttribute('data-theme',t)})();</script>
+<script>if(/[?&]embed=1/.test(location.search))document.documentElement.classList.add('embed');</script>
 <title>Tableau des agents</title>
 <!-- Kanban des lots SPEC-010. Page FIXE : seul plan-status.js change, écrit par l'outil stt-agents sur ordre du CP (stt-cp). -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -331,6 +332,8 @@ footer{color:var(--muted-2);font:11px var(--mono);margin-top:40px}
 @media (max-width:760px){.meta{flex-basis:100%;flex-wrap:wrap;justify-content:flex-start;white-space:normal}}
 .kpi.ktm b{font-size:16px;white-space:nowrap}
 @media (max-width:900px){.kpi .small,.kd,.kc{white-space:normal}}
+html.embed .site-header h1,html.embed .site-header .eyebrow{display:none}
+html.embed .wrap{padding-top:8px}
 </style>
 </head>
 <body data-view="board">
