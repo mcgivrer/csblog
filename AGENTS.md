@@ -76,6 +76,10 @@ Each handoff is a short written message with: the task, its inputs (files, spec 
 - The PM tracks cost per task and per lot; if a lot exceeds its budget by more than 30 %, it stops and asks the user.
 - The PM owns the content of the project tracker (for Space Travel: the Kanban, `demos/space-travel/stt-agents/` (page `kanban.html`, données `data/`)) and decides every entry. The PM writes it **through the agent-tracking tool** (`demos/space-travel/stt-agents/stt_agents_server.py`: `POST /api/kanban`, or `--kanban-apply ops.json`), never by hand and never through a developer agent. The tool edits `plan-status.js` **only in the main checkout** (never a worktree copy), validates it with Node and replaces it atomically; the file is not committed from the lot branch. The Kanban supports the profiles `cp`, `archi`, `dev` (instances `inst` 1 to 3) and `revue`. A task delivered by a developer sits in the "En revue" column (`status: "review"`, with `reviewer: "revue"` or `"archi"`) until its review is done.
 
+### Agent launcher (stt-agents)
+
+The server can launch and supervise agents (profiles `stt-dev`, `stt-archi`, `stt-revue`) on demand via `stt_agents_server.py --runner` (opt-in, local loopback only, Linux/macOS). Agents created with the Agent tool by the CP session are **observed but not controllable** by the launcher. The CP cannot launch agents this way (decision 34); it creates tasks as "to do" in the Kanban or asks the maintainer to launch them, and continues to track its own agents via the Agent tool. The launcher writes transitions automatically (todo→doing→review without the CP, staying master of review→done and `used` measurement).
+
 ### Parallel developers
 
 - The PM may run **up to three developer instances at once** to speed a lot up, never more.

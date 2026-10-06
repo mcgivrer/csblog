@@ -113,3 +113,66 @@ Opérations (`{"ops": [...]}`) : `task` (`set`, `add` cumulant `used`/`ms`, `uns
 - **« Aucun dossier ne commence par … »** : les agents ont été lancés depuis un autre chemin que `--repo`. Le message liste les dossiers proches ; relancer avec `--repo` sur le bon clone ou `--match csblog`.
 - **Rien côté GitHub** : vérifier le remote `origin` ou passer `--github mcgivrer/csblog` ; en cas de quota épuisé, le serveur attend la réinitialisation.
 - Le format des transcripts Claude Code n'est pas une API publique : s'il évolue, la lecture se dégrade (champs vides) sans bloquer le tableau de bord. Diagnostic : `python stt_agents_server.py --once`.
+
+## Lanceur d'agents
+
+### Activation
+
+Le serveur peut lancer et piloter des agents Claude Code à la demande (opt-in ; refusé hors 127.0.0.1, localhost, ::1 et sous Windows) :
+
+```bash
+python3 stt_agents_server.py --runner [--runner-cmd '["commande"]']
+```
+
+Par défaut, la commande est `["claude","--agent","stt-{agent}","--model","{model}",…]` (`{agent}`, `{model}`, `{session}`, `{perm}`, `{task}`, `{prompt}` substitués). Le jeton de sécurité est affiché **une seule fois** à la console, puis injecté dans les pages (jamais dans une URL). L'état des agents et les logs des terminaux sont stockés dans `.claude/stt-runner/` du checkout principal.
+
+### Créer une tâche
+
+Bouton « **＋ Nouvelle tâche** » du Kanban (formulaire livré par T1.5) : lot, titre, profil (dev/archi/revue), modèle, complexité, priorité, worktree optionnel, mode de permission, prompt Markdown, « lancer dès que possible ». Les tâches créées sans lanceur restent « à faire » et peuvent être lancées ultérieurement.
+
+### Cycle de vie d'un agent lancé
+
+| État | Sens |
+|---|---|
+| **queued** | En file d'attente (attendant un slot libre) |
+| **starting** | Démarrage du processus (< 60 s) |
+| **running** | En cours, pty actif |
+| **waiting** | Actif mais pty muet ≥ 20 s (fin de tour dans le transcript) ; redevient *running* si nouvel output |
+| **paused** | Suspendu (SIGSTOP du groupe) |
+| **stopping** | Arrêt en cours (SIGTERM, puis SIGKILL après 10 s) |
+| **stopped** | Arrêté (reprend via `--resume`) |
+| **killed** | Processus tué (SIGKILL) |
+| **done** | Terminé avec code 0 |
+| **failed** | Erreur (code non-zéro ou démarrage impossible) |
+| **orphan** | Processus détaché au redémarrage (seul `kill` permis, pas de terminal) |
+
+**Pool et priorités** : 3 DEV, 1 ARCHI, 1 REVUE (4 slots globaux) ; priorité 1–3 (haute–basse). Les états *paused* et *waiting* occupent leur slot. **Pause automatique** si tokens du transcript > 2 × le budget. **Transitions Kanban** écrites automatiquement par le serveur : `todo`→`doing` à *starting* (`+inst`/`+session`/`+runState`), `doing`→`review` à *done*, `doing`→`blocked` à *failed*/*killed*. Le CP seul peut passer `review`→`done`.
+
+### Onglet Agents
+
+Les agents lancés par le serveur affichent un badge « lancé par le serveur », un état en couleur et cinq boutons :
+
+- **Terminal** : dialogue xterm.js (CDN SRI) ou repli `<pre>` sans CDN ; fermeture Ctrl+Alt+W
+- **Pause** / **Reprendre** : SIGSTOP / SIGCONT du groupe
+- **Stopper** : SIGTERM, puis SIGKILL après 10 s
+- **Killer** : SIGKILL immédiat (confirmation requise)
+- **Relancer** : re-queue depuis *stopped*, *killed* ou *failed*
+
+La section « **File du lanceur** » affiche les runs *queued* et ceux *starting* non encore dans les sous-agents. Les sessions créées par l'outil Agent de la session CP sont marquées « observé · non pilotable » si elles ne sont pas lancées par le serveur.
+
+### Permissions
+
+Mode par défaut : **acceptEdits** (décision 33). Modes disponibles : `plan`, `manual`. Les modes `bypassPermissions`, `auto`, `dontAsk` sont refusés par le serveur (validation dans le terminal à la reprise).
+
+### Sécurité et limites
+
+- **Jeton** : généré à chaque démarrage du serveur, mémoire seule, affichage console unique.
+- **Authentification** : `X-STT-Token` en en-tête HTTP, `Origin` (obligatoire, boucle locale), `Host` local, CSP `frame-ancestors 'self'`.
+- **Clés réservées** : POST `/api/kanban` refuse les clés `runner`, `session`, `runState`, `started`, `ended`, `inst` du lanceur.
+- **Orphelins** : groupe de processus + détection PID/heure de départ ; seul `kill` permis, pas d'accès terminal.
+- **Hors périmètre** : Windows (pty), lancement de la session CP elle-même, pilotage des sous-agents de l'outil Agent, accès distant, relance automatique, fusion/commit par le serveur.
+- **Non vérifié à ce jour** : comportement du vrai `claude` sous SIGSTOP/SIGCONT/SIGTERM ; alias `--model haiku` (test prévu en T1.R).
+
+### Notifications (T2)
+
+Toasts en bas à droite, notifications du navigateur (sur accord) et réglages par catégorie (Kanban, lanceur, erreurs) — voir `stt_notices.py` et l'onglet Paramètres.
