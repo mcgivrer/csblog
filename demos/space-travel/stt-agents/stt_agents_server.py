@@ -13,7 +13,7 @@ Trois sources, fusionnées :
 
 1. Sessions Claude Code   ~/.claude/projects/<slug du dépôt>*/*.jsonl
    (+ <session>/subagents/*.jsonl) : outil en cours, rôle PM / Architecte /
-   Développeur, todo, sous-agents, tokens, attente d'une réponse ou d'une
+   Développeur, todo, agents créés (identifiant, état, arrêt), tokens, attente d'une réponse ou d'une
    validation. Lecture incrémentale (seules les nouvelles lignes sont lues).
 2. Git local              git worktree list + status + avance/retard sur main.
 3. GitHub (public)        PR, événements, déploiements (ETag : les réponses 304
@@ -60,6 +60,8 @@ SPARK_MIN = 30           # sparkline des cartes : 30 dernières minutes
 LONG_TOOLS = {"Bash", "BashOutput", "WebFetch", "WebSearch", "Monitor"}
 ASK_TOOLS = {"AskUserQuestion": "Te pose une question", "ExitPlanMode": "Attend la validation du plan"}
 SPAWN_TOOLS = {"Task", "Agent"}
+SILENT_S = 5 * 60        # agent lancé sans aucune sortie depuis ce délai => « silencieux » (à arrêter)
+AGENT_ENDED = ("done", "error", "stopped")  # cycle de vie d'un agent : running -> done | error | stopped
 
 NO_WINDOW = 0x08000000 if os.name == "nt" else 0  # pas de console qui clignote sous Windows
 
@@ -315,6 +317,10 @@ class Transcript:
             self.title = e.get("customTitle") or e.get("title")
             return
         msg = e.get("message") or {}
+        if t == "queue-operation" and e.get("operation") == "enqueue" and isinstance(e.get("content"), str):
+            if "<task-notification>" in e["content"]:  # fin d'un agent (completed / failed / killed)
+                self._agent_notification(e["content"], ts)
+            return
         if t == "user":
             self._user(e, msg, ts)
         elif t == "assistant":
@@ -335,15 +341,26 @@ class Transcript:
                     self.errors += 1
                 if tid in self.spawns:
                     sp = self.spawns[tid]
-                    sp["status"] = "error" if b.get("is_error") else "done"
-                    sp["ended"] = ts
-                    self.add_event(ts, "spawn_end", f"Sous-agent terminé · {sp['description']}")
+                    txt = block_text(b.get("content"))
+                    m = re.search(r"agentId:\s*([0-9a-zA-Z]+)", txt)
+                    if m:
+                        sp["agent_id"] = m.group(1)
+                    if b.get("is_error"):
+                        sp["status"], sp["ended"] = "error", ts
+                        self.add_event(ts, "spawn_end", f"Agent en erreur · {sp['description']}")
+                    elif m and re.search(r"launched|background", txt, re.I):
+                        sp["background"] = True  # arrière-plan : reste actif jusqu'à sa notification de fin ou son arrêt
+                    else:
+                        sp["status"], sp["ended"] = "done", ts
+                        self.add_event(ts, "spawn_end", f"Agent terminé · {sp['description']}")
                 if tid in self.task_by_tool:
                     m = re.search(r"#(\d+)", block_text(b.get("content")))
                     if m:
                         self.task_by_tool[tid]["id"] = m.group(1)
             elif bt == "text":
                 txt = b.get("text") or ""
+                if "<task-notification>" in txt:
+                    self._agent_notification(txt, ts)
                 if e.get("isMeta") or is_noise_prompt(txt):
                     continue
                 if "[Request interrupted" in txt:
@@ -355,7 +372,7 @@ class Transcript:
                     self.add_event(ts, "compact", "Contexte compacté")
                     continue
                 for tid in list(self.pending):  # une nouvelle consigne clôt les outils restés sans réponse
-                    if tid in self.spawns and self.spawns[tid]["status"] == "running":
+                    if tid in self.spawns and self.spawns[tid]["status"] == "running" and not self.spawns[tid].get("background"):
                         self.spawns[tid]["status"] = "done"
                     self.pending.pop(tid, None)
                 self.first_prompt = self.first_prompt or txt
@@ -364,6 +381,33 @@ class Transcript:
                 if len(txt.strip()) >= 60:  # nouvelle demande => nouveau cycle PM→Livré
                     self.phase_start = len(self.roles)
                 self.add_event(ts, "prompt", first_line(txt))
+
+    def _spawn_by_agent_id(self, agent_id):
+        for sp in self.spawns.values():
+            if agent_id and sp.get("agent_id") == agent_id:
+                return sp
+        return None
+
+    def _end_agent(self, sp, status, ts, label):
+        if sp["status"] == "running":
+            sp["status"], sp["ended"] = status, ts
+            self.add_event(ts, "spawn_end", f"{label} · {sp['description']}")
+
+    def _agent_notification(self, txt, ts):
+        """<task-notification> : fin réelle d'un agent (completed / failed / killed)."""
+        for blk in re.findall(r"<task-notification>(.*?)</task-notification>", txt, re.S):
+            m_id = re.search(r"<task-id>\s*([^<\s]+)", blk)
+            m_st = re.search(r"<status>\s*([^<\s]+)", blk)
+            sp = self._spawn_by_agent_id(m_id.group(1)) if m_id else None
+            if not sp or not m_st:
+                continue
+            st = m_st.group(1).lower()
+            if st in ("killed", "stopped"):
+                self._end_agent(sp, "stopped", ts, "Agent arrêté")
+            elif st in ("failed", "error"):
+                self._end_agent(sp, "error", ts, "Agent en erreur")
+            elif st == "completed":
+                self._end_agent(sp, "done", ts, "Agent terminé")
 
     def _assistant(self, msg, ts):
         model = msg.get("model")
@@ -421,18 +465,28 @@ class Transcript:
                                 task["activeForm"] = inp.get("activeForm", task["activeForm"])
                             break
                     self.tasks_ts = ts or time.time()
+                elif name == "TaskStop":
+                    sp = self._spawn_by_agent_id(str(inp.get("task_id") or inp.get("shell_id") or ""))
+                    if sp:
+                        self._end_agent(sp, "stopped", ts, "Agent arrêté")
+                elif name == "SendMessage":
+                    sp = self._spawn_by_agent_id(str(inp.get("to") or ""))
+                    if sp:
+                        sp["messages"] = sp.get("messages", 0) + 1
+                        self.add_event(ts, "tool", f"Message à l'agent · {sp['description']}")
                 elif name in SPAWN_TOOLS:
                     kind = inp.get("subagent_type") or "general-purpose"
                     desc = inp.get("description") or ""
                     sp = {
                         "id": tid, "description": desc, "type": kind, "role": role_from_agent(kind, desc),
                         "prompt": inp.get("prompt") or "", "started": ts, "ended": None, "status": "running",
+                        "agent_id": None, "name": inp.get("name") or "", "background": False, "messages": 0,
                     }
                     self.spawns[tid] = sp
                     self.spawn_order.append(tid)
                     if sp["role"] in ("PM", "ARCH", "DEV"):
                         self.roles.append((ts, sp["role"], "subagent"))
-                    self.add_event(ts, "spawn", f"Lance un sous-agent · {desc or kind}")
+                    self.add_event(ts, "spawn", f"Crée un agent · {desc or kind}")
 
     # -- dérivés -----------------------------------------------------------
     def activity(self):
@@ -488,15 +542,15 @@ class Transcript:
         """Retourne (code, libellé, depuis)."""
         last = self.activity()
         age = now - last
-        sub_live = [s for s in subs if now - s.activity() < ACTIVE_S and s.status_hint != "done"]
+        sub_live = [s for s in subs if now - s.activity() < ACTIVE_S and s.status_hint not in AGENT_ENDED]
         pend = sorted(self.pending.values(), key=lambda p: p["ts"] or 0)
         asks = [p for p in pend if p["name"] in ASK_TOOLS]
         if asks:
             return "waiting", ASK_TOOLS[asks[-1]["name"]], asks[-1]["ts"]
-        for s in subs:  # un sous-agent bloqué sur une validation bloque la session
+        for s in subs:  # un agent bloqué sur une validation bloque la session
             code, label, since = s.state(now, [])
-            if code == "permission" and s.status_hint != "done":
-                return "permission", "Sous-agent : " + label[0].lower() + label[1:], since
+            if code == "permission" and s.status_hint not in AGENT_ENDED:
+                return "permission", "Agent : " + label[0].lower() + label[1:], since
         tools = [p for p in pend if p["name"] not in SPAWN_TOOLS]
         if tools:
             p = tools[-1]
@@ -513,9 +567,9 @@ class Transcript:
             return "permission", "Attend ta validation", p["ts"]
         if any(p["name"] in SPAWN_TOOLS for p in pend):
             if sub_live or age < ACTIVE_S:
-                return "running", "Sous-agents au travail", last
+                return "running", "Agents au travail", last
             if age < WAITING_MAX_S:
-                return "running", "Sous-agent silencieux", last
+                return "running", "Agent silencieux (à arrêter ?)", last
             return "idle", "Inactif", last
         if self.last_kind in ("prompt", "tool_result"):
             if age < 300:
@@ -532,7 +586,7 @@ class Transcript:
                 return "waiting", "Attend ta réponse", last
         return "idle", "Inactif", last
 
-    status_hint = None  # renseigné pour les sous-agents liés à un appel Task terminé
+    status_hint = None  # cycle de vie (running / done / error / stopped) de l'agent lié à un appel Agent
 
 
 # ---------------------------------------------------------------------------
@@ -601,7 +655,7 @@ class ClaudeCollector:
         self.status.update(ok=True, dirs=[d.name for d in dirs], sessions=len(self.mains), error=hint)
 
     def subagents_of(self, main):
-        """Associe chaque appel Task/Agent à son transcript de sous-agent."""
+        """Associe chaque agent créé (appel Task/Agent) à son transcript."""
         files = [s for s in self.subs.values() if getattr(s, "parent", None) == main.path]
         by_prompt = {}
         for s in files:
@@ -846,14 +900,20 @@ class Hub:
                 label = "Livré"
             subs = []
             for sp, s in pairs:
-                st_code, st_label = ("done" if sp["status"] != "error" else "error"), ""
+                st_code, st_label = (sp["status"] if sp["status"] in ("error", "stopped") else "done"), ""
                 if sp["status"] == "running":
                     if s is not None:
                         st_code, st_label, _ = s.state(now, [])
                     else:
                         st_code, st_label = "running", "En cours"
                 tok = s.tokens() if s else None
+                act = s.activity() if s else (sp["started"] or 0)
+                silent = sp["status"] == "running" and bool(act) and now - act > SILENT_S
+                lifecycle = {"running": "silencieux" if silent else "actif", "done": "rapport rendu",
+                             "stopped": "arrêté", "error": "erreur"}[sp["status"]]
                 subs.append({
+                    "agent_id": sp.get("agent_id"), "name": sp.get("name") or None, "lifecycle": lifecycle, "silent": silent,
+                    "background": bool(sp.get("background")), "messages": sp.get("messages", 0),
                     "id": sp["id"], "description": sp["description"], "type": sp["type"],
                     "role": sp["role"] or (s.current_role() if s else None), "status": sp["status"],
                     "state": st_code, "state_label": st_label, "started": iso(sp["started"]), "ended": iso(sp["ended"]),
@@ -861,11 +921,14 @@ class Hub:
                     "last_text": shorten(plain(s.last_text), 200) if s and s.last_text else None,
                     "tokens_out": tok["output"] if tok else None, "last_activity": iso(s.activity()) if s else None,
                 })
+            registry = {k: sum(1 for x in subs if x["lifecycle"] == v) for k, v in
+                        (("actifs", "actif"), ("silencieux", "silencieux"), ("termines", "rapport rendu"),
+                         ("arretes", "arrêté"), ("erreurs", "erreur"))}
             cur = None
             if tr.pending:
                 p = sorted(tr.pending.values(), key=lambda x: x["ts"] or 0)[-1]
                 cur = {"tool": tool_label(p["name"]), "summary": p["summary"], "since": iso(p["ts"])}
-                if p["name"] in SPAWN_TOOLS:  # on montre plutôt ce que fait le sous-agent
+                if p["name"] in SPAWN_TOOLS:  # on montre plutôt ce que fait l'agent
                     live = [(sp, s) for sp, s in pairs if s is not None and sp["status"] == "running" and s.last_tool]
                     if live:
                         sp, s = max(live, key=lambda x: x[1].activity())
@@ -881,7 +944,7 @@ class Hub:
                 "role": tr.current_role(), "roles_seen": tr.roles_seen(), "phase": phase,
                 "current": cur, "last_text": shorten(plain(tr.last_text), 320) if tr.last_text else None,
                 "last_prompt": shorten(tr.last_prompt, 200) if tr.last_prompt else None,
-                "todos": tr.todo_list()[:30], "subagents": subs, "tokens": tr.tokens(), "errors": tr.errors,
+                "todos": tr.todo_list()[:30], "subagents": subs, "registry": registry, "tokens": tr.tokens(), "errors": tr.errors,
                 "spark": tr.counts(now, sp_start, 60, SPARK_MIN),
                 "git": {k: wt[k] for k in ("ahead", "behind", "dirty", "files", "head", "last_commit")} if wt else None,
                 "pr": pr,

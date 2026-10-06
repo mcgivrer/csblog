@@ -38,7 +38,7 @@ Options utiles :
 
 | Mode | Quand | Ce qu'on voit |
 |---|---|---|
-| **LIVE** | page servie par `stt_agents_server.py` | Tout : sessions, sous-agents, outil en cours, todo, rôle, attente, worktrees, GitHub. |
+| **LIVE** | page servie par `stt_agents_server.py` | Tout : sessions, agents (identifiant, état, arrêt), outil en cours, todo, rôle, attente, worktrees, GitHub. |
 | **GITHUB** | `index.html` ouvert seul, ou publié sur GitHub Pages (`…/demos/space-travel/tools/agents-dashboard/`) | Branches, PR, push, déploiement Pages. Un agent n'apparaît qu'à ses push : pas d'activité entre deux push. |
 | **DÉMO** | aucune source joignable, ou `?demo` dans l'URL | Données **fictives**, signalées par un bandeau rouge. Sert d'aperçu. |
 
