@@ -320,6 +320,7 @@
       </div>
     </div>
     <div class="toolbar"><div class="chips" id="filters" role="group" aria-label="Filtrer les agents"></div><span class="section-aside" id="treeAside"></span></div>
+    <div class="toolbar"><span class="section-aside">Agents créés</span><div class="chips" id="subfilters" role="group" aria-label="Filtrer les agents créés par état"></div></div>
     <div id="agentGrid"></div>
   </section>
 
@@ -494,6 +495,20 @@ function renderFilters(agents){
   const n = g => g === 'all' ? agents.length : agents.filter(a => GROUP(a.state) === g).length;
   $('#filters').innerHTML = defs.filter(([g]) => g === 'all' || n(g) || g === filter)
     .map(([g, l]) => `<button type="button" class="chip ${filter === g ? 'on' : ''}" data-f="${g}" aria-pressed="${filter === g}">${l}<span class="n">${n(g)}</span></button>`).join('');
+  renderSubFilters(agents);
+}
+
+// Filtre des agents créés (sous les sessions) : par défaut seuls les actifs sont montrés ; « rapport rendu », « arrêté » et « erreur » sont décochés.
+const SUBF = [['actif','Actif'], ['silencieux','Silencieux'], ['rapport rendu','Terminé'], ['arrêté','Arrêté'], ['erreur','Erreur']];
+let subFilter = new Set(store.get('subfilter', ['actif', 'silencieux']));
+const lifeOf = x => x.lifecycle || (x.status === 'running' ? 'actif' : x.status === 'error' ? 'erreur' : x.status === 'stopped' ? 'arrêté' : 'rapport rendu');
+const visibleSubs = a => (a.subagents || []).filter(x => subFilter.has(lifeOf(x)));
+function renderSubFilters(agents){
+  const all = agents.flatMap(a => a.subagents || []);
+  $('#subfilters').innerHTML = SUBF.map(([k, l]) => {
+    const on = subFilter.has(k), c = all.filter(x => lifeOf(x) === k).length;
+    return `<button type="button" class="chip ${on ? 'on' : ''}" data-sf="${k}" role="checkbox" aria-checked="${on}">${on ? '☑' : '☐'} ${l}<span class="n">${c}</span></button>`;
+  }).join('');
 }
 
 const ORDER = {you:0, run:1, review:2, done:3, idle:4};
@@ -504,7 +519,7 @@ function renderAgents(agents){
   g.className = view === 'tree' ? 'tree' : 'grid';
   document.querySelectorAll('#views [data-v]').forEach(b => { b.classList.toggle('on', b.dataset.v === view); b.setAttribute('aria-pressed', b.dataset.v === view); });
   const nSubs = agents.reduce((n, a) => n + (a.subagents || []).length, 0), nRun = agents.reduce((n, a) => n + (a.subagents || []).filter(x => x.status === 'running').length, 0);
-  $('#treeAside').textContent = mode === 'github' ? 'agents : serveur local requis' : `${agents.length} session${agents.length > 1 ? 's' : ''} · ${nSubs} agent${nSubs > 1 ? 's' : ''} créé${nSubs > 1 ? 's' : ''} (${nRun} actif${nRun > 1 ? 's' : ''})`;
+  $('#treeAside').textContent = mode === 'github' ? 'agents : serveur local requis' : `${agents.length} session${agents.length > 1 ? 's' : ''} · ${nSubs} agent${nSubs > 1 ? 's' : ''} créé${nSubs > 1 ? 's' : ''} (${nRun} actif${nRun > 1 ? 's' : ''}) · ${agents.reduce((n, a) => n + visibleSubs(a).length, 0)} affiché${agents.reduce((n, a) => n + visibleSubs(a).length, 0) > 1 ? 's' : ''}`;
   if (!list.length) {
     g.className = 'grid';
     g.innerHTML = `<div class="empty">${agents.length ? 'Aucun agent dans ce filtre.' : mode === 'github'
@@ -542,7 +557,7 @@ function detailBlock(x){
 }
 function treeNode(a){
   const [cls, short] = STATE[a.state] || STATE.idle;
-  const subs = (a.subagents || []);
+  const subs = visibleSubs(a);
   const key = 'n:' + a.id;
   let h = `<details data-k="${esc(key)}" ${openDetails.has(key) ? 'open' : ''}><summary class="node main ${cls}" title="Cliquer pour le détail">
     <span class="g">${subs.length ? '▾' : '●'}</span><span class="pill ${cls}"><i></i>${esc(short)}</span>${role(a.role) || '<span class="role-x"></span>'}
@@ -590,7 +605,7 @@ function agentCard(a){
       body += `<div class="todo"><span class="bar" role="progressbar" aria-valuenow="${done}" aria-valuemax="${todos.length}"><span style="width:${(done / todos.length * 100).toFixed(0)}%"></span></span><span>${done}/${todos.length}</span><span class="cur">${esc(cur ? (cur.activeForm || cur.content) : done === todos.length ? 'Tout est coché' : '')}</span></div>
         <details class="more" data-k="todo:${key}" ${openDetails.has('todo:' + a.id) ? 'open' : ''}><summary>liste des tâches</summary><ul class="todolist">${todos.map(t => `<li class="${esc(t.status)}">${esc(t.content)}</li>`).join('')}</ul></details>`;
     }
-    const subs = (a.subagents || []);
+    const subs = visibleSubs(a);
     if (subs.length) {
       const shown = [...subs.filter(s => s.status === 'running'), ...subs.filter(s => s.status !== 'running').reverse()];
       body += `<ul class="subs">${shown.map(s => {
@@ -768,6 +783,11 @@ paintAlertsBtn();
 
 // --- interactions
 $('#views').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (!b) return; view = b.dataset.v; store.set('view', view); render(); });
+$('#subfilters').addEventListener('click', e => {
+  const b = e.target.closest('[data-sf]'); if (!b) return;
+  subFilter.has(b.dataset.sf) ? subFilter.delete(b.dataset.sf) : subFilter.add(b.dataset.sf);
+  store.set('subfilter', [...subFilter]); render();
+});
 $('#filters').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; filter = b.dataset.f; store.set('filter', filter); render(); });
 document.addEventListener('toggle', e => { const d = e.target; if (d.matches && d.matches('details[data-k]')) d.open ? openDetails.add(d.dataset.k) : openDetails.delete(d.dataset.k); }, true);
 let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => S && renderTimeline(agentsView()), 150); });
