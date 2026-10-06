@@ -227,6 +227,38 @@
   .toast .t-close:hover{color:var(--amber);border-color:var(--line)}
   @keyframes toastIn{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:none}}
   @media (prefers-reduced-motion:reduce){.toast{animation:none}}
+
+  /* ---------- lanceur : contrôles et terminal (T1.6) ---------- */
+  .rctl{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font:11.5px 'JetBrains Mono',monospace}
+  .rctl.tree{padding:6px 14px;border-bottom:1px solid #1a2844;background:var(--panel-2)}
+  article.agent>.rctl{margin-top:8px}
+  .rbadge{padding:2px 7px;border:1px solid var(--amber-dim);color:var(--amber);font-size:10.5px;letter-spacing:.04em;text-transform:uppercase}
+  .rst{padding:2px 7px;border:1px solid var(--line);color:var(--muted);font-size:11px}
+  .rst.rs-running,.rst.rs-starting{color:var(--st-run);border-color:var(--st-run)} .rst.rs-waiting,.rst.rs-paused,.rst.rs-queued{color:var(--amber);border-color:var(--amber-dim)}
+  .rst.rs-failed,.rst.rs-killed,.rst.rs-orphan{color:var(--st-perm);border-color:var(--st-perm)}
+  .rnote{color:var(--muted-2);font:11px 'JetBrains Mono',monospace}
+  .rb{font:11.5px 'JetBrains Mono',monospace;padding:4px 9px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;min-height:26px}
+  .rb:hover:not(:disabled){border-color:var(--amber);color:var(--amber)}
+  .rb.danger:hover:not(:disabled){border-color:var(--st-perm);color:var(--st-perm)}
+  .rb:disabled{opacity:.4;cursor:not-allowed}
+  .rb.busy{opacity:.7;cursor:progress;animation:blink 1s infinite}
+  .runner-off{margin:8px 0 0;font:11.5px 'JetBrains Mono',monospace;color:var(--muted-2)}
+  table.rq{width:100%;border-collapse:collapse;font-size:12.5px} table.rq th{text-align:left;font:10.5px 'JetBrains Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2);padding:6px 10px;border-bottom:1px solid var(--line)} table.rq td{padding:6px 10px;border-bottom:1px solid var(--line)}
+  #runnerQueue{margin-top:24px}
+  #ttyDlg{width:min(1100px,94vw);height:min(720px,88vh);padding:0;border:1px solid var(--line);background:var(--panel);color:var(--ink);box-shadow:0 12px 48px rgba(0,0,0,.55)}
+  #ttyDlg[open]{display:flex;flex-direction:column}
+  #ttyDlg::backdrop{background:rgba(5,9,18,.6)}
+  .tty-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel-2)}
+  .tty-head h3{margin:0;font:700 12px 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--amber)}
+  .tty-ctl{margin-left:auto}
+  .tty-conn{font:11px 'JetBrains Mono',monospace;color:var(--muted-2)}
+  #ttyBody{flex:1;min-height:0;padding:8px;display:flex;flex-direction:column;background:var(--panel)}
+  #ttyBody .xterm{flex:1;min-height:0}
+  #ttyBody pre{flex:1;min-height:0;margin:0;overflow:auto;padding:8px;border:1px solid var(--line);font:12.5px/1.45 'JetBrains Mono',monospace;white-space:pre-wrap;word-break:break-all}
+  #ttyForm{display:flex;gap:8px;align-items:center;margin-top:8px} #ttyForm label{font:11px 'JetBrains Mono',monospace;color:var(--muted)}
+  #ttyForm input{flex:1;font:13px 'JetBrains Mono',monospace;padding:5px 8px;background:var(--bg);color:var(--ink);border:1px solid var(--line)}
+  .tty-help{padding:4px 12px 8px;font-size:12px;color:var(--muted)} .tty-help summary{cursor:pointer;font:11px 'JetBrains Mono',monospace} .tty-help p{margin:6px 0 0}
+  .tty-help kbd{font:11px 'JetBrains Mono',monospace;border:1px solid var(--line);padding:0 4px}
   .agent.hl,.node.hl,details.hl>summary{outline:2px solid var(--amber);outline-offset:2px}
   #alertsPop{position:fixed;z-index:1100;width:300px;max-width:calc(100vw - 20px);background:var(--panel);border:1px solid var(--line);padding:12px 14px;box-shadow:0 8px 28px rgba(0,0,0,.4);font-size:13px}
   #alertsPop[hidden]{display:none}
@@ -367,6 +399,12 @@
 
 <div id="toasts" role="log" aria-live="polite" aria-label="Notifications"></div>
 <div id="alertsPop" role="dialog" aria-label="Réglages des alertes" hidden></div>
+<dialog id="ttyDlg" aria-labelledby="ttyTitle">
+  <div class="tty-head"><h3 id="ttyTitle">Terminal</h3><span class="rst" id="ttyState"></span><span class="tty-conn" id="ttyConn" role="status"></span><span class="tty-ctl rctl" id="ttyCtl"></span>
+    <button type="button" class="rb" id="ttyClose" aria-label="Fermer le terminal (le run continue)">Fermer</button></div>
+  <div id="ttyBody"></div>
+  <details class="tty-help"><summary>Aide</summary><p>Le terminal se ferme avec <b>Fermer</b> ou <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>W</kbd> ; <kbd>Échap</kbd> est envoyé au programme quand le focus est dans le terminal (ailleurs, il ferme le dialogue). Fermer ne stoppe pas le run.</p></details>
+</dialog>
 
 <div class="wrap">
   <header class="site-header">
@@ -406,6 +444,9 @@
     <div class="toolbar"><span class="section-aside">Agents créés</span><div class="chips" id="subfilters" role="group" aria-label="Filtrer les agents créés par état"></div></div>
     <div id="agentGrid"></div>
   </section>
+
+  <section id="runnerQueue" hidden aria-label="File du lanceur"></section>
+  <p id="runnerOff" class="runner-off" hidden></p>
 
 
 
@@ -542,7 +583,7 @@ function agentsView(){
 function render(){
   if (!S) return;
   const agents = agentsView();
-  renderBanner(); renderHeader(); renderKpis(agents); renderFilters(agents); renderAgents(agents);
+  renderBanner(); renderHeader(); renderKpis(agents); renderFilters(agents); renderAgents(agents); renderQueue(agents); paintTty();
   renderTimeline(agents); renderFeed(); renderPRs(); renderWorktrees(); renderFooter(); notify(agents);
   firstRender = false;
 }
@@ -651,7 +692,7 @@ function detailBlock(x){
   const todos = x.todos || [];
   return `<div class="detail"><div><h4>Dernières actions</h4>${rec.length ? `<ol>${rec.map(r => `<li><span class="t">${hhmm(r.ts, true)}</span><span title="${esc(r.text)}"><span class="kind ${esc(r.kind)}" style="font:10px 'JetBrains Mono',monospace;color:var(--muted-2);margin-right:6px;text-transform:uppercase">${esc(KIND[r.kind] || r.kind)}</span>${esc(r.text)}</span></li>`).join('')}</ol>` : '<p style="color:var(--muted-2)">Aucune action enregistrée.</p>'}</div>
     <div>${x.last_text ? `<h4>Dernier message</h4><p>${esc(x.last_text)}</p>` : ''}${todos.length ? `<h4>Tâches</h4><ul class="todolist">${todos.map(t => `<li class="${esc(t.status)}">${esc(t.content)}</li>`).join('')}</ul>` : ''}
-    <h4>Identité</h4><p style="color:var(--muted);font:11.5px 'JetBrains Mono',monospace">${esc([x.type && x.type !== '?' ? 'type ' + x.type : '', x.agent_id ? 'agent ' + x.agent_id : '', x.bg ? 'arrière-plan' : '', x.model ? modelShort(x.model) : '', x.started ? 'lancé ' + hhmm(x.started, true) : ''].filter(Boolean).join(' · ') || '—')}</p></div></div>`;
+    <h4>Identité</h4><p style="color:var(--muted);font:11.5px 'JetBrains Mono',monospace">${esc([x.type && x.type !== '?' ? 'type ' + x.type : '', x.agent_id ? 'agent ' + x.agent_id : '', x.bg ? 'arrière-plan' : '', x.model ? modelShort(x.model) : '', x.started ? 'lancé ' + hhmm(x.started, true) : '', observedNote(x)].filter(Boolean).join(' · ') || '—')}</p></div></div>`;
 }
 function treeNode(a){
   const [cls, short] = STATE[a.state] || STATE.idle;
@@ -660,7 +701,7 @@ function treeNode(a){
   let h = `<details data-k="${esc(key)}" ${openDetails.has(key) ? 'open' : ''}><summary class="node main ${cls}" title="Cliquer pour le détail">
     <span class="g">${subs.length ? '▾' : '●'}</span><span class="pill ${cls}"><i></i>${esc(short)}</span>${role(a.role) || '<span class="role-x"></span>'}
     <span class="nm"><b>${esc(a.branch && a.branch !== (S.repo?.main || MAIN) ? shortBranch(a.branch) : (a.branch || 'session'))}</b><small>${esc(a.state_label)}${a.title ? ' — ' + esc(a.title) : ''}</small></span>
-    ${actCell(a)}${timeCell(a)}${a.kind === 'branch' ? '<span class="st"></span>' : statCell(a)}${spark(a.spark) || '<span class="sp-x"></span>'}</summary>${a.kind === 'branch' ? '' : detailBlock(a)}</details>`;
+    ${actCell(a)}${timeCell(a)}${a.kind === 'branch' ? '<span class="st"></span>' : statCell(a)}${spark(a.spark) || '<span class="sp-x"></span>'}</summary>${a.kind === 'branch' ? '' : detailBlock(a)}</details>${runCtl(a, 'tree')}`;
   subs.forEach((x, i) => {
     const [c2, s2] = STATE[x.state] || STATE.idle, k2 = 's:' + a.id + ':' + x.id;
     const meta = [x.type && x.type !== '?' && x.type !== 'general-purpose' ? x.type : '', x.bg ? 'arrière-plan' : '', x.has_transcript === false ? 'transcript introuvable' : ''].filter(Boolean).join(' · ');
@@ -671,6 +712,227 @@ function treeNode(a){
   });
   return h;
 }
+
+// ------------------------------------------------------------------ lanceur : contrôles des agents lancés (T1.6)
+const RUN_LBL = {queued:'en file', starting:'démarrage', running:'en cours', waiting:'attend', paused:'en pause', stopping:'arrêt en cours', stopped:'arrêté', killed:'tué', done:'terminé', failed:'échec', orphan:'orphelin'};
+const RUN_ALIVE = ['starting','running','waiting','paused','stopping','orphan'];
+// Règles des boutons (contrat T1 § 7) : orphelin => Killer seul.
+function runRules(run){
+  const s = run && run.state, orphan = !!run && (s === 'orphan' || run.controllable === false);
+  const ok = (...l) => !orphan && l.includes(s);
+  return {
+    terminal: ok('starting','running','waiting','paused'), pause: ok('running','waiting'), resume: ok('paused'),
+    stop: ok('running','waiting','paused'), kill: !!run && (RUN_ALIVE.includes(s) || orphan), retry: ok('stopped','killed','failed'), cancel: ok('queued'), orphan
+  };
+}
+window.sttRunRules = runRules;
+const runnerOn = () => !!(S && mode === 'live' && S.runner && S.runner.enabled);
+const runOf = a => runnerOn() && a && a.kind !== 'branch' ? (S.runner.runs || []).find(r => r.session === a.id) || null : null;
+const runPending = new Map(); // tâche -> action en cours
+const RA = {terminal:['Terminal', '⌨', 'Ouvrir le terminal'], pause:['Pause', '⏸', 'Mettre en pause'], resume:['Reprendre', '▶', 'Reprendre'], stop:['Stopper', '⏹', 'Arrêter proprement'], kill:['Killer', '✖', 'Tuer immédiatement'], retry:['Relancer', '↻', 'Relancer'], cancel:['Annuler', '×', 'Annuler la mise en file']};
+function rbtn(act, run){
+  const r = runRules(run), pend = runPending.get(run.task) === act, busy = runPending.has(run.task);
+  const [lbl, ico, tip] = RA[act], icon = act === 'terminal';
+  return `<button type="button" class="rb${act === 'kill' ? ' danger' : ''}${pend ? ' busy' : ''}" data-ra="${act}" data-task="${esc(run.task)}" ${r[act] && !busy ? '' : 'disabled'} ${pend ? 'aria-busy="true"' : ''} aria-label="${esc(tip + ' · ' + run.task)}" title="${esc(tip)}"><span aria-hidden="true">${ico}</span>${icon ? '' : ' ' + lbl}</button>`;
+}
+function runBar(run, acts){
+  const r = runRules(run);
+  return `<span class="rbadge" title="Ce run a été lancé par le serveur local">lancé par le serveur</span><span class="rst rs-${esc(run.state)}" data-rstate>${esc(RUN_LBL[run.state] || run.state)}</span>${r.orphan ? '<span class="rnote">orphelin : kill seul</span>' : ''}${acts.map(a => rbtn(a, run)).join('')}`;
+}
+const CARD_ACTS = ['terminal','pause','resume','stop','kill','retry'];
+const runCtl = (a, cls = '') => { const run = runOf(a); return run ? `<div class="rctl ${cls}" role="group" aria-label="Contrôles du run ${esc(run.task)}" data-task="${esc(run.task)}">${runBar(run, CARD_ACTS)}</div>` : ''; };
+const observedNote = x => runnerOn() && x.kind !== 'branch' && !runOf(x) ? 'observé · non pilotable' : '';
+
+function renderQueue(agents){
+  const box = $('#runnerQueue'), off = $('#runnerOff');
+  const on = runnerOn();
+  off.hidden = !(S && mode === 'live' && S.runner && !S.runner.enabled);
+  off.textContent = 'lanceur désactivé : relancer stt_agents_server.py avec --runner';
+  const ids = new Set(agents.map(a => a.id));
+  const rows = on ? (S.runner.runs || []).filter(r => r.state === 'queued' || (RUN_ALIVE.includes(r.state) && !ids.has(r.session))).sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99)) : [];
+  box.hidden = !rows.length;
+  if (!rows.length) { box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="section-head"><span class="section-num">··</span><h2 class="section-title">File du lanceur</h2><span class="section-rule"></span><span class="section-aside">${rows.length} run${rows.length > 1 ? 's' : ''}</span></div>
+    <div class="box tbl-wrap"><table class="rq"><thead><tr><th>Tâche</th><th>Profil</th><th>Rang</th><th>Priorité</th><th>État</th><th>Actions</th></tr></thead><tbody>${rows.map(r =>
+      `<tr data-task="${esc(r.task)}"><td><b>${esc(r.task)}</b></td><td>${esc(r.agent || '')}${r.model ? ' · ' + esc(r.model) : ''}</td><td>${r.state === 'queued' && r.rank != null ? '#' + esc(r.rank) : '—'}</td><td>${esc(r.prio ?? '—')}</td>
+      <td><span class="rst rs-${esc(r.state)}">${esc(RUN_LBL[r.state] || r.state)}</span></td><td><div class="rctl">${r.state === 'queued' ? rbtn('cancel', r) : runBar(r, CARD_ACTS)}</div></td></tr>`).join('')}</tbody></table></div>`;
+}
+
+let tokenCache = null;
+const tok = () => tokenCache ??= (document.querySelector('meta[name="stt-token"]')?.content || '');
+async function rapi(task, act, body){
+  const r = await fetch(`api/runner/${encodeURIComponent(task)}/${act}`, {method:'POST', headers:{'Content-Type':'application/json', 'X-STT-Token':tok()}, body:JSON.stringify(body || {})});
+  let j = null; try { j = await r.json(); } catch {}
+  if (!r.ok) throw new Error((j && j.error) || ('HTTP ' + r.status));
+  return j || {};
+}
+function runToast(sev, title, body){ showToast({severity:sev, cat:'runner', kind:'runner-ui', ts:new Date().toISOString(), title, body}); }
+const API_ACT = {retry:'enqueue'};
+function focusKey(){ const e = document.activeElement; return e && e.dataset && e.dataset.ra && !e.closest('#ttyDlg') ? e.dataset.ra + '|' + e.dataset.task : null; }
+function restoreFocus(k){ if (!k) return; const [a, t] = k.split('|'); const b = [...document.querySelectorAll('button[data-ra]')].find(x => x.dataset.ra === a && x.dataset.task === t && !x.closest('#ttyDlg') && !x.disabled); if (b) b.focus(); }
+async function runAction(task, act){
+  if (runPending.has(task)) return;
+  if (act === 'kill' && !confirm(`Killer le run ${task} ? Le processus est tué immédiatement (SIGKILL), sans arrêt propre.`)) return;
+  runPending.set(task, act); repaintRuns();
+  try {
+    const out = await rapi(task, API_ACT[act] || act);
+    const run = S && S.runner && (S.runner.runs || []).find(x => x.task === task);
+    if (run && out.state) run.state = out.state;
+  } catch (e) {
+    runToast('error', `${RA[act][0]} · ${task}`, e.message);
+  } finally { runPending.delete(task); repaintRuns(); }
+}
+function repaintRuns(){ if (S) { const k = focusKey(); renderAgents(agentsView()); renderQueue(agentsView()); restoreFocus(k); } paintTty(); }
+document.addEventListener('click', e => {
+  const b = e.target.closest('button[data-ra]'); if (!b || b.disabled) return;
+  const task = b.dataset.task, act = b.dataset.ra;
+  if (act === 'terminal') openTty(task, b); else runAction(task, act);
+});
+
+// ---- terminal (dialogue plein écran partiel ; xterm.js 5 + addon fit, repli <pre> sans CDN)
+const XT = {
+  js:['https://cdnjs.cloudflare.com/ajax/libs/xterm/5.5.0/xterm.js', 'sha384-M169f14mRZOXm3hD/v2Ti0ThIT/RnAQagXA9nlE15yHAtrW19gdePJh/HaTzUOe/'],
+  css:['https://cdnjs.cloudflare.com/ajax/libs/xterm/5.5.0/xterm.min.css', 'sha384-PeNPV+nPJpP/217k5ixNFwzAOwAqvSXPFyA7ouS19oSSVCmMWtBoKpO43UrUmA0k'],
+  fit:['https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js', 'sha384-iF+jqbuti4XlB64clWgFWYEscb+UnSRv3VgVikGYZu+otNFnSHr7y7NcKfBnGizn']
+};
+let xtLoad = null;
+function loadXterm(){
+  if (xtLoad) return xtLoad;
+  const add = (tag, [url, sri], attrs) => new Promise((ok, ko) => { const el = document.createElement(tag); Object.assign(el, attrs); el.integrity = sri; el.crossOrigin = 'anonymous'; el.onload = ok; el.onerror = () => ko(new Error(url)); document.head.appendChild(el); });
+  xtLoad = Promise.race([
+    Promise.all([add('link', XT.css, {rel:'stylesheet', href:XT.css[0]}), add('script', XT.js, {src:XT.js[0]})]).then(() => add('script', XT.fit, {src:XT.fit[0]})).then(() => { if (!window.Terminal || !window.FitAddon) throw new Error('xterm absent'); return true; }),
+    new Promise((_, ko) => setTimeout(() => ko(new Error('délai CDN')), 8000))
+  ]).catch(() => { xtLoad = Promise.resolve(false); return false; });
+  return xtLoad;
+}
+const tty = {task:null, gen:0, since:0, term:null, fit:null, state:null, ac:null, opener:null, pre:null, dec:null, inBuf:'', inT:0, inQ:Promise.resolve(), rzT:0, ro:null};
+const dlg = $('#ttyDlg');
+const TERMINAL_STATES = ['done','failed','stopped','killed'];
+function xtTheme(){
+  const cs = getComputedStyle(document.documentElement), v = n => cs.getPropertyValue(n).trim();
+  const light = document.documentElement.getAttribute('data-theme') === 'light';
+  return {background:v('--panel') || '#0f1a30', foreground:v('--ink') || '#e8edf5', cursor:v('--amber') || '#ffb454', cursorAccent:v('--panel'), selectionBackground:light ? 'rgba(57,135,229,.30)' : 'rgba(94,234,212,.28)',
+    black:light ? '#1a2336' : '#0b1220', red:v('--st-perm'), green:v('--st-done'), yellow:v('--amber'), blue:v('--r-arch'), magenta:v('--r-dev'), cyan:light ? '#0d7c70' : v('--cyan'), white:v('--muted')};
+}
+new MutationObserver(() => { if (tty.term) tty.term.options.theme = xtTheme(); }).observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
+const ttyRun = () => S && S.runner && (S.runner.runs || []).find(r => r.task === tty.task) || null;
+function paintTty(){
+  if (!dlg.open || !tty.task) return;
+  const run = ttyRun() || {task:tty.task, state:tty.state || '?', controllable:true};
+  // l'état poussé par le flux du terminal est plus frais que l'état global : on le préfère s'il est terminal
+  const shown = Object.assign({}, run, tty.state && TERMINAL_STATES.includes(tty.state) ? {state:tty.state} : {});
+  $('#ttyTitle').textContent = 'Terminal · ' + tty.task;
+  const el = $('#ttyState'); el.className = 'rst rs-' + shown.state; el.textContent = RUN_LBL[shown.state] || shown.state;
+  const ctl = $('#ttyCtl'), fa = document.activeElement && ctl.contains(document.activeElement) ? document.activeElement.dataset.ra : null;
+  ctl.innerHTML = ['pause','resume','stop','kill','retry'].map(a => rbtn(a, shown)).join('');
+  if (fa) { const b = ctl.querySelector(`button[data-ra="${fa}"]`); if (b && !b.disabled) b.focus(); else $('#ttyClose').focus(); }
+}
+function ttyConnLabel(t){ $('#ttyConn').textContent = t || ''; }
+function ttyWrite(bytes){
+  if (tty.term) { tty.term.write(bytes); return; }
+  if (!tty.pre) return;
+  const txt = tty.dec.decode(bytes, {stream:true}).replace(/\x1b\][^\x07\x1b]*(\x07|\x1b\\)/g, '').replace(/\x1b\[[0-9;?]*[ -\/]*[@-~]/g, '').replace(/\x1b[()][A-Za-z0-9]/g, '').replace(/\r\n/g, '\n').replace(/[^\n\t\x20-￿]/g, '');
+  const near = tty.pre.scrollTop + tty.pre.clientHeight >= tty.pre.scrollHeight - 8;
+  tty.pre.textContent = (tty.pre.textContent + txt).slice(-200000);
+  if (near) tty.pre.scrollTop = tty.pre.scrollHeight;
+}
+function ttySend(data){
+  tty.inBuf += data;
+  if (tty.inT) return;
+  tty.inT = setTimeout(() => {
+    tty.inT = 0;
+    const task = tty.task; let buf = tty.inBuf; tty.inBuf = '';
+    while (buf) { const part = buf.slice(0, 16000); buf = buf.slice(16000); tty.inQ = tty.inQ.then(() => rapi(task, 'input', {data:part})).catch(e => ttyConnLabel('saisie refusée : ' + e.message)); }
+  }, 15);
+}
+function ttyResize(){
+  if (!tty.term) return;
+  try { tty.fit.fit(); } catch {}
+  clearTimeout(tty.rzT);
+  tty.rzT = setTimeout(() => { if (tty.term && tty.task) rapi(tty.task, 'resize', {cols:tty.term.cols, rows:tty.term.rows}).catch(() => {}); }, 200);
+}
+function sseEvents(buf, cb){
+  let i; while ((i = buf.indexOf('\n\n')) >= 0) {
+    const blk = buf.slice(0, i); buf = buf.slice(i + 2);
+    let ev = 'message', data = '';
+    blk.split('\n').forEach(l => { if (l.startsWith('event:')) ev = l.slice(6).trim(); else if (l.startsWith('data:')) data += l.slice(5).replace(/^ /, ''); });
+    cb(ev, data);
+  }
+  return buf;
+}
+async function ttyStream(gen){
+  let delay = 500;
+  while (gen === tty.gen) {
+    const ac = tty.ac = new AbortController();
+    let final = false, fatal = null;
+    try {
+      const r = await fetch(`api/runner/${encodeURIComponent(tty.task)}/tty?since=${tty.since}`, {headers:{'X-STT-Token':tok()}, signal:ac.signal, cache:'no-store'});
+      if (!r.ok) { let m = ''; try { m = (await r.json()).error || ''; } catch {} if (r.status === 404 || r.status === 409) fatal = m || ('HTTP ' + r.status); else throw new Error('HTTP ' + r.status); }
+      else {
+        ttyConnLabel('connecté'); delay = 500;
+        const rd = r.body.getReader(), td = new TextDecoder(); let buf = '';
+        for (;;) {
+          const {done, value} = await rd.read(); if (done) break;
+          buf = sseEvents(buf + td.decode(value, {stream:true}).replace(/\r\n/g, '\n'), (ev, data) => {
+            let j = null; try { j = JSON.parse(data); } catch { return; }
+            if (ev === 'out') {
+              const bin = atob(j.b64), bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+              const end = j.seq + bytes.length; if (end <= tty.since) return;
+              ttyWrite(j.seq < tty.since ? bytes.subarray(tty.since - j.seq) : bytes); tty.since = end;
+            } else if (ev === 'state') { tty.state = j.state; if (TERMINAL_STATES.includes(j.state)) final = true; paintTty(); }
+          });
+        }
+      }
+    } catch (e) { if (gen !== tty.gen) return; }
+    if (gen !== tty.gen) return;
+    if (fatal) { ttyConnLabel(fatal); return; }
+    if (final) { ttyConnLabel('flux terminé'); return; }
+    ttyConnLabel('reconnexion…');
+    await new Promise(ok => setTimeout(ok, delay)); delay = Math.min(delay * 2, 4000);
+  }
+}
+async function openTty(task, opener){
+  if (dlg.open) ttyClose(true);
+  Object.assign(tty, {task, since:0, state:ttyRun()?.state || null, opener:opener || null, inBuf:'', term:null, fit:null, pre:null});
+  const gen = ++tty.gen, body = $('#ttyBody');
+  body.innerHTML = ''; ttyConnLabel('chargement…');
+  dlg.dataset.mode = ''; dlg.showModal(); paintTty();
+  const xt = await loadXterm();
+  if (gen !== tty.gen) return;
+  if (xt) {
+    dlg.dataset.mode = 'xterm';
+    const t = tty.term = new window.Terminal({cursorBlink:true, fontFamily:"'JetBrains Mono',ui-monospace,monospace", fontSize:13, theme:xtTheme(), scrollback:5000});
+    tty.fit = new window.FitAddon.FitAddon(); t.loadAddon(tty.fit);
+    t.open(body);
+    t.attachCustomKeyEventHandler(ev => !(ev.ctrlKey && ev.altKey && ev.code === 'KeyW'));
+    t.onData(ttySend); t.onResize(() => ttyResize());
+    tty.ro = new ResizeObserver(() => ttyResize()); tty.ro.observe(body);
+    ttyResize(); t.focus();
+  } else {
+    dlg.dataset.mode = 'pre';
+    tty.dec = new TextDecoder();
+    body.innerHTML = '<pre id="ttyPre" tabindex="0" aria-label="Sortie du terminal (lecture seule)"></pre><form id="ttyForm"><label for="ttyIn">Saisie</label><input id="ttyIn" type="text" autocomplete="off" spellcheck="false" placeholder="Texte envoyé au programme, puis Entrée"><button type="submit" class="rb">Envoyer</button></form>';
+    tty.pre = $('#ttyPre');
+    $('#ttyForm').addEventListener('submit', e => { e.preventDefault(); const i = $('#ttyIn'); ttySend(i.value + '\n'); i.value = ''; });
+    $('#ttyIn').focus();
+  }
+  ttyStream(gen);
+}
+function ttyClose(quiet){
+  tty.gen++; try { tty.ac && tty.ac.abort(); } catch {}
+  clearTimeout(tty.rzT); clearTimeout(tty.inT); tty.inT = 0; tty.inBuf = '';
+  if (tty.ro) { tty.ro.disconnect(); tty.ro = null; }
+  if (tty.term) { try { tty.term.dispose(); } catch {} tty.term = null; }
+  tty.pre = null; $('#ttyBody').innerHTML = '';
+  const o = tty.opener; tty.task = null;
+  if (dlg.open) dlg.close();
+  if (!quiet && o && o.isConnected) o.focus();
+}
+dlg.addEventListener('cancel', e => { e.preventDefault(); if (!$('#ttyBody').contains(document.activeElement)) ttyClose(); });
+document.addEventListener('keydown', e => { if (dlg.open && e.ctrlKey && e.altKey && e.code === 'KeyW') { e.preventDefault(); ttyClose(); } }, true);
+$('#ttyClose').addEventListener('click', () => ttyClose());
+dlg.addEventListener('close', () => { if (tty.task) ttyClose(true); });
+if (P.get('debug') === '1') window.sttTty = tty;
 
 function steps(phase){
   return `<ol class="steps" aria-label="Étape du flux PM → Archi → Dév">${STEPS.map(([l, who], i) =>
@@ -724,7 +986,8 @@ function agentCard(a){
     <h3>${title}<small>${esc(a.state_label)}${a.title && a.kind !== 'branch' ? ' — ' + esc(a.title) : a.kind === 'branch' ? ' — ' + esc(a.title) : ''}</small></h3>
     ${steps(a.phase ?? -1)}
     ${body}
-    <div class="agent-foot">${gitb}${pr}${tok}${a.errors ? `<span title="résultats d'outils en erreur">${a.errors} err.</span>` : ''}${spark(a.spark)}</div>
+    ${runCtl(a)}
+    <div class="agent-foot">${gitb}${pr}${tok}${observedNote(a) ? `<span class="rnote">${observedNote(a)}</span>` : ''}${a.errors ? `<span title="résultats d'outils en erreur">${a.errors} err.</span>` : ''}${spark(a.spark)}</div>
   </article>`;
 }
 
@@ -926,7 +1189,7 @@ function showToast(n){
   arm();
 }
 addEventListener('keydown', e => {
-  if (e.key !== 'Escape') return;
+  if (e.key !== 'Escape' || $('#ttyDlg').open) return;
   if (!$('#alertsPop').hidden) { closePop(); return; }
   const last = toastsEl.lastElementChild; if (last) closeToast(last);
 });
