@@ -218,6 +218,7 @@ class FileLockTests(unittest.TestCase):
         import stt_agents_server as m
         m.kanban_apply(self.plan, [{'op': 'journal', 'text': 'x'}])
         lock = m.plan_lock_path(self.plan)
+        self.assertEqual(os.path.basename(lock), '.plan.lock')
         self.assertEqual(os.stat(lock).st_mode & 0o777, 0o600)
         fd = os.open(lock, os.O_RDWR)
         fcntl.flock(fd, fcntl.LOCK_EX)
@@ -231,6 +232,76 @@ class FileLockTests(unittest.TestCase):
             m.PLAN_LOCK_TIMEOUT = old
             os.close(fd)
         m.kanban_apply(self.plan, [{'op': 'journal', 'text': 'z'}])
+
+    def test_lock_in_private_dir(self):
+        import tempfile as _t
+        import stt_agents_server as m
+        ld = os.path.join(self.tmp, 'priv')
+        m.kanban_apply(self.plan, [{'op': 'journal', 'text': 'x'}], lock_dir=ld)
+        self.assertEqual(os.stat(ld).st_mode & 0o777, 0o700)
+        self.assertEqual(os.stat(os.path.join(ld, 'plan.lock')).st_mode & 0o777, 0o600)
+        self.assertEqual([n for n in os.listdir(_t.gettempdir()) if n.startswith('stt-plan-locks')], [])
+
+    def test_server_lock_in_runner_dir(self):
+        s = Server(runner=True)
+        try:
+            s.create(autostart=False)
+            lock = Path(s.repo, '.claude/stt-runner/plan.lock')
+            self.assertTrue(lock.is_file())
+            self.assertEqual(lock.stat().st_mode & 0o777, 0o600)
+        finally:
+            s.end_all()
+            s.close()
+
+    def test_lax_dir_refused(self):
+        import stt_agents_server as m
+        ld = os.path.join(self.tmp, 'lax')
+        os.mkdir(ld)
+        os.chmod(ld, 0o777)
+        with self.assertRaises(m.KanbanError) as cm:
+            m.kanban_apply(self.plan, [{'op': 'journal', 'text': 'x'}], lock_dir=ld)
+        self.assertIn('refusé', str(cm.exception))
+        self.assertNotIn('x', [j['text'] for j in self.read()['journal']])
+
+    def test_foreign_owner_refused(self):
+        import stt_agents_server as m
+        from unittest import mock
+        ld = os.path.join(self.tmp, 'foreign')
+        os.mkdir(ld, 0o700)
+        real = os.lstat(ld)
+        fake = os.stat_result((real.st_mode, real.st_ino, real.st_dev, real.st_nlink, os.getuid() + 1,
+                               real.st_gid, real.st_size, 0, 0, 0))
+        with mock.patch.object(m.os, 'lstat', return_value=fake):
+            with self.assertRaises(m.KanbanError) as cm:
+                m.kanban_apply(self.plan, [{'op': 'journal', 'text': 'x'}], lock_dir=ld)
+        self.assertIn('propriétaire', str(cm.exception))
+
+    def test_symlink_dir_and_file_refused(self):
+        import stt_agents_server as m
+        real = os.path.join(self.tmp, 'real')
+        os.mkdir(real, 0o700)
+        link = os.path.join(self.tmp, 'linkdir')
+        os.symlink(real, link)
+        with self.assertRaises(m.KanbanError):
+            m.kanban_apply(self.plan, [{'op': 'journal', 'text': 'x'}], lock_dir=link)
+        ld = os.path.join(self.tmp, 'ok')
+        os.mkdir(ld, 0o700)
+        target = os.path.join(self.tmp, 'target')
+        Path(target).write_text('')
+        os.symlink(target, os.path.join(ld, 'plan.lock'))
+        with self.assertRaises(m.KanbanError):
+            m.kanban_apply(self.plan, [{'op': 'journal', 'text': 'x'}], lock_dir=ld)
+
+    def test_readonly_dir_clear_error(self):
+        import stt_agents_server as m
+        if os.getuid() == 0:
+            self.skipTest('root ignore les droits')
+        ld = os.path.join(self.tmp, 'ro')
+        os.mkdir(ld, 0o500)
+        self.addCleanup(os.chmod, ld, 0o700)
+        with self.assertRaises(m.KanbanError) as cm:
+            m.kanban_apply(self.plan, [{'op': 'journal', 'text': 'x'}], lock_dir=ld)
+        self.assertIn('verrou', str(cm.exception))
 
 
 class ValidateBaseTests(unittest.TestCase):

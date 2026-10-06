@@ -42,8 +42,8 @@ import queue
 import re
 import signal
 import subprocess
+import stat
 import sys
-import tempfile
 import threading
 import time
 import urllib.error
@@ -1478,33 +1478,70 @@ def _validate_node(path):
 PLAN_LOCK_TIMEOUT = 10.0
 
 
-def plan_lock_path(path):
-    """Fichier de verrou du plan : hors du dépôt (jamais suivi), le même pour tous les processus
-    (dérivé du chemin réel du plan), dans un dossier 0700 propre à l'utilisateur."""
-    d = os.path.join(tempfile.gettempdir(), "stt-plan-locks-%s" % (os.getuid() if hasattr(os, "getuid") else "u"))
-    os.makedirs(d, mode=0o700, exist_ok=True)
-    return os.path.join(d, hashlib.sha1(os.path.realpath(path).encode("utf-8")).hexdigest() + ".lock")
+DEFAULT_LOCK_DIR = None      # dossier privé du lanceur (<checkout principal>/.claude/stt-runner), posé au démarrage
+
+
+def _uid():
+    return os.getuid() if hasattr(os, "getuid") else None
+
+
+def ensure_lock_dir(d):
+    """Dossier du verrou : créé en 0o700 s'il manque ; sinon REFUSÉ (jamais corrigé en silence) si lien
+    symbolique, autre propriétaire ou droits plus larges que 0o700."""
+    try:
+        st = os.lstat(d)
+    except FileNotFoundError:
+        try:
+            os.makedirs(d, mode=0o700, exist_ok=True)
+            st = os.lstat(d)
+        except OSError as exc:
+            raise KanbanError(f"dossier du verrou du plan impossible à créer ({d}) : {exc}")
+    except OSError as exc:
+        raise KanbanError(f"dossier du verrou du plan inaccessible ({d}) : {exc}")
+    if stat.S_ISLNK(st.st_mode) or not stat.S_ISDIR(st.st_mode):
+        raise KanbanError(f"dossier du verrou du plan refusé : {d} n'est pas un vrai dossier (lien symbolique ?)")
+    if _uid() is not None and (st.st_uid != _uid() or st.st_mode & 0o077):
+        raise KanbanError(f"dossier du verrou du plan refusé : {d} doit appartenir à l'utilisateur courant en mode 0700 "
+                          f"(propriétaire {st.st_uid}, mode {st.st_mode & 0o777:o})")
+
+
+def plan_lock_path(path, lock_dir=None):
+    """Verrou du plan : <lock_dir>/plan.lock (indépendant du plan), sinon <dossier du plan>/.plan.lock."""
+    lock_dir = lock_dir or DEFAULT_LOCK_DIR
+    if lock_dir:
+        return os.path.join(lock_dir, "plan.lock")
+    return os.path.join(os.path.dirname(os.path.abspath(path)), ".plan.lock")
 
 
 @contextlib.contextmanager
-def _plan_file_lock(path, timeout=None):
+def _plan_file_lock(path, timeout=None, lock_dir=None):
     """Verrou de fichier exclusif (fcntl.flock) entre PROCESSUS : serveur et --kanban-apply du CP.
-    Fichier de verrou 0600 (voir plan_lock_path), pris autour du cycle lecture → écriture."""
+    Jamais de passage sans verrou : toute anomalie lève KanbanError."""
     if fcntl is None:
         yield
         return
     timeout = PLAN_LOCK_TIMEOUT if timeout is None else timeout
-    fd = os.open(plan_lock_path(path), os.O_RDWR | os.O_CREAT, 0o600)
+    lp = plan_lock_path(path, lock_dir)
+    ensure_lock_dir(os.path.dirname(lp))
     try:
+        fd = os.open(lp, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    except OSError as exc:
+        raise KanbanError(f"verrou du plan impossible à ouvrir ({lp}) : {exc}")
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode) or (_uid() is not None and st.st_uid != _uid()):
+            raise KanbanError(f"verrou du plan refusé : {lp} n'est pas un fichier ordinaire de l'utilisateur courant")
         end = time.monotonic() + timeout
         while True:
             try:
                 fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 break
-            except OSError:
+            except BlockingIOError:
                 if time.monotonic() >= end:
                     raise KanbanError(f"plan-status.js verrouillé par un autre processus depuis plus de {timeout:g} s : réessayez")
                 time.sleep(0.02)
+            except OSError as exc:
+                raise KanbanError(f"verrou du plan impossible ({lp}) : {exc}")
         try:
             yield
         finally:
@@ -1513,13 +1550,13 @@ def _plan_file_lock(path, timeout=None):
         os.close(fd)
 
 
-def kanban_apply(path, ops, dry_run=False, allow_reserved=False):
+def kanban_apply(path, ops, dry_run=False, allow_reserved=False, lock_dir=None):
     """Applique une liste d'opérations ; tout ou rien. Renvoie le compte rendu."""
     if not path or not os.path.isfile(path):
         raise KanbanError(f"plan-status.js introuvable : {path}")
     if not isinstance(ops, list) or not ops:
         raise KanbanError("ops : liste non vide attendue")
-    with KANBAN_LOCK, _plan_file_lock(path):
+    with KANBAN_LOCK, _plan_file_lock(path, lock_dir=lock_dir):
         text = Path(path).read_text(encoding="utf-8")
         eol = "\r\n" if "\r\n" in text else "\n"
         lines = text.replace("\r\n", "\n").split("\n")
@@ -2396,6 +2433,7 @@ def detect_github(repo):
 
 
 def main():
+    global DEFAULT_LOCK_DIR
     ap = argparse.ArgumentParser(description="Tableau de bord temps réel des agents Claude Code (STT).")
     ap.add_argument("--repo", help="racine du dépôt observé (défaut : dépôt contenant ce script)")
     ap.add_argument("--claude-dir", default=os.environ.get("CLAUDE_CONFIG_DIR") or "~/.claude", help="dossier de config Claude Code (défaut ~/.claude)")
@@ -2436,6 +2474,7 @@ def main():
         args.repo = detect_repo(args.repo) or args.repo
     args.kanban = find_kanban(args.repo, args.kanban)
     args.main_root = main_checkout(args.repo)
+    DEFAULT_LOCK_DIR = os.path.join(args.main_root or args.repo, ".claude", "stt-runner") if (args.main_root or args.repo) else None
     if args.kanban_apply:
         sys.stdout.reconfigure(encoding="utf-8") if hasattr(sys.stdout, "reconfigure") else None
         try:
