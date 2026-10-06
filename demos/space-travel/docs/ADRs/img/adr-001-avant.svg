@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" font-family="system-ui, sans-serif" font-size="13">
+<title>ADR-001 : organisation actuelle de demos/space-travel</title>
+<desc>Carte des dossiers actuels (jeu sources, démo observation-des-etoiles avec moteur figé v2.15, presentation, éditeur STT_modules, shared) et des flux de build vers les fichiers publiés par GitHub Pages. Les couplages gênants sont en pointillés rouges.</desc>
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#333"/></marker>
+<marker id="r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#b3261e"/></marker>
+</defs>
+<rect width="960" height="540" fill="#f6f5f0"/>
+<text x="480" y="32" text-anchor="middle" font-size="19" font-weight="700" fill="#141413">Avant : 4 produits, 4 builds, 1 dossier shared/ à plat</text>
+<g stroke-width="1.5">
+<rect x="20" y="60" width="200" height="110" rx="10" fill="#ececec" stroke="#666" stroke-dasharray="6 4"/>
+<rect x="250" y="60" width="220" height="110" rx="10" fill="#fdf0d5" stroke="#9a6a00"/>
+<rect x="500" y="60" width="440" height="110" rx="10" fill="#e3effa" stroke="#1f5f99"/>
+<rect x="20" y="230" width="290" height="130" rx="10" fill="#e4f4e4" stroke="#2e7d32"/>
+<rect x="335" y="230" width="290" height="130" rx="10" fill="#efe6f8" stroke="#6a3d9a"/>
+<rect x="650" y="230" width="290" height="130" rx="10" fill="#fbe5ec" stroke="#a3305a"/>
+<rect x="20" y="420" width="920" height="100" rx="10" fill="#ffffff" stroke="#333"/>
+</g>
+<g fill="#141413">
+<text x="120" y="84" text-anchor="middle" font-weight="700">Projet Blender</text>
+<text x="120" y="104" text-anchor="middle">(hors dépôt)</text>
+<text x="120" y="128" text-anchor="middle">viewer/index.html</text>
+<text x="120" y="148" text-anchor="middle">build_viewer_standalone.py</text>
+<text x="360" y="84" text-anchor="middle" font-weight="700">STT_modules/ (éditeur)</text>
+<text x="360" y="106" text-anchor="middle">index.html 4 611 l, three r169</text>
+<text x="360" y="126" text-anchor="middle">build_game_pack.py + Document.txt</text>
+<text x="360" y="146" text-anchor="middle">(copie identique), zip 8,8 Mo</text>
+<text x="720" y="84" text-anchor="middle" font-weight="700">shared/ : 12 modules, 4 309 l</text>
+<text x="720" y="108" text-anchor="middle">planets · stars · asteroids · cosmos</text>
+<text x="720" y="128" text-anchor="middle">shipdrive · shipglass · shipwear · smallcraft</text>
+<text x="720" y="148" text-anchor="middle">warpring · hitex · postfx · starmap</text>
+<text x="165" y="254" text-anchor="middle" font-weight="700">sources/ (jeu, stt_)</text>
+<text x="165" y="278" text-anchor="middle">ORDER.txt : 80 modules dont 11 shared</text>
+<text x="165" y="298" text-anchor="middle">build.py, vendor r128, minify.js</text>
+<text x="165" y="318" text-anchor="middle">203 fichiers suivis</text>
+<text x="165" y="340" text-anchor="middle">target/*.html suivis (12,5 Mo)</text>
+<text x="480" y="254" text-anchor="middle" font-weight="700">observation-des-etoiles/ (ode_)</text>
+<text x="480" y="278" text-anchor="middle">engine/game.html v2.15 figé 6,9 Mo</text>
+<text x="480" y="298" text-anchor="middle">liste de modules écrite 3 fois</text>
+<text x="480" y="318" text-anchor="middle">46 tests Node, 40 captures</text>
+<text x="480" y="340" text-anchor="middle">versions en double (racine)</text>
+<text x="795" y="254" text-anchor="middle" font-weight="700">presentation/</text>
+<text x="795" y="278" text-anchor="middle">build.py, 4 pages dist/</text>
+<text x="795" y="298" text-anchor="middle">emprunte vendor, minify.js</text>
+<text x="795" y="318" text-anchor="middle">et node_modules de sources/</text>
+<text x="795" y="340" text-anchor="middle">test de parité sur le jeu construit</text>
+<text x="480" y="444" text-anchor="middle" font-weight="700">GitHub Pages (main, racine du dépôt) : URLs publiées</text>
+<text x="480" y="468" text-anchor="middle">sources/target/space-travel.min.html · space-travel.min.html (ancien) · Voyage Spatial.html</text>
+<text x="480" y="490" text-anchor="middle">observation-des-etoiles-v7.19.x(.min).html, à la racine ET dans observation-des-etoiles/</text>
+<text x="480" y="510" text-anchor="middle">presentation/ (redirection vers dist/presentation.min.html) · stt-agents/index.html</text>
+</g>
+<g stroke="#333" stroke-width="1.6" fill="none" marker-end="url(#a)">
+<path d="M560 170L190 228"/><path d="M720 170L480 228"/><path d="M860 170L795 228"/>
+<path d="M220 115L248 115"/><path d="M330 170L200 228"/>
+<path d="M165 360L165 418"/><path d="M480 360L480 418"/><path d="M795 360L795 418"/>
+</g>
+<g stroke="#b3261e" stroke-width="1.8" fill="none" stroke-dasharray="6 4" marker-end="url(#r)">
+<path d="M310 265L333 265"/><path d="M310 330C470 395 560 395 648 330"/><path d="M60 170L80 228"/>
+</g>
+<g fill="#b3261e" font-size="12" font-weight="600">
+<text x="322" y="222" text-anchor="middle">copie figée</text>
+<text x="480" y="405" text-anchor="middle">couplage caché</text>
+<text x="24" y="200">pack .glb</text>
+</g>
+</svg>

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 300" font-family="system-ui, sans-serif" font-size="13">
+<title>ADR-001 : frise des phases de migration</title>
+<desc>Six phases réversibles, de M0 à M5, avec leur contenu, leur taille Kanban et la vérification commune : sorties identiques octet pour octet et URLs publiées toujours servies.</desc>
+<rect width="960" height="300" fill="#f6f5f0"/>
+<text x="480" y="32" text-anchor="middle" font-size="19" font-weight="700" fill="#141413">Migration en 6 phases réversibles (≈ 410 k tokens)</text>
+<line x1="80" y1="100" x2="880" y2="100" stroke="#333" stroke-width="3"/>
+<g stroke="#333" stroke-width="2">
+<circle cx="80" cy="100" r="22" fill="#ececec"/><circle cx="240" cy="100" r="22" fill="#fdf0d5"/><circle cx="400" cy="100" r="22" fill="#e3effa"/>
+<circle cx="560" cy="100" r="22" fill="#e3effa"/><circle cx="720" cy="100" r="22" fill="#e4f4e4"/><circle cx="880" cy="100" r="22" fill="#fbe5ec"/>
+</g>
+<g fill="#141413" text-anchor="middle">
+<g font-weight="700" font-size="15"><text x="80" y="105">M0</text><text x="240" y="105">M1</text><text x="400" y="105">M2</text><text x="560" y="105">M3</text><text x="720" y="105">M4</text><text x="880" y="105">M5</text></g>
+<g font-weight="700"><text x="80" y="62">XS</text><text x="240" y="62">S</text><text x="400" y="62">M</text><text x="560" y="62">M</text><text x="720" y="62">L</text><text x="880" y="62">S</text></g>
+<text x="80" y="150" font-weight="700">Référence</text><text x="80" y="170">empreintes des</text><text x="80" y="188">sorties, URLs</text>
+<text x="240" y="150" font-weight="700">Nettoyage</text><text x="240" y="170">doublons exacts,</text><text x="240" y="188">stubs, zip</text>
+<text x="400" y="150" font-weight="700">Outils</text><text x="400" y="170">tools/build,</text><text x="400" y="188">ORDER démo</text>
+<text x="560" y="150" font-weight="700">Paquets</text><text x="560" y="170">shared/ vers</text><text x="560" y="188">packages/</text>
+<text x="720" y="150" font-weight="700">Applications</text><text x="720" y="170">apps/, public/,</text><text x="720" y="188">redirections</text>
+<text x="880" y="150" font-weight="700">Docs</text><text x="880" y="170">dédoublonnage,</text><text x="880" y="188">portail</text>
+</g>
+<rect x="80" y="220" width="800" height="56" rx="10" fill="#ffffff" stroke="#555" stroke-width="1.5"/>
+<text x="480" y="244" text-anchor="middle" fill="#141413" font-weight="700">À chaque phase : un commit annulable par git revert, builds identiques octet pour octet,</text>
+<text x="480" y="264" text-anchor="middle" fill="#141413">tests du jeu, de la démo et de la présentation verts, toutes les URLs publiées répondent</text>
+</svg>
