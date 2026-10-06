@@ -67,6 +67,18 @@ Le bouton **Alertes** active une notification du navigateur quand un agent passe
 
 Le serveur n'écoute que sur `127.0.0.1` et refuse les requêtes dont l'en-tête `Host` n'est pas local (protection DNS rebinding) ; il n'envoie pas d'en-têtes CORS, donc un site tiers ne peut pas lire `/api/state`. La page affiche des extraits de transcripts (consignes, fichiers modifiés) : `--host 0.0.0.0` les rend lisibles par tout le réseau local.
 
+## Kanban (écriture pilotée par le CP)
+
+L'outil est aussi l'**unique écrivain** du Kanban (`demos/space-travel/kanban/plan-status.js`, toujours dans le checkout principal, jamais un worktree). Le chef de projet (`stt-cp`) lui envoie des opérations ; le fichier est édité ligne à ligne, validé avec Node, puis remplacé atomiquement (tout ou rien).
+
+```bash
+python3 stt_agents_server.py --kanban-apply ops.json            # sans serveur ; --dry-run pour contrôler seulement
+curl -s -X POST http://127.0.0.1:8765/api/kanban -H 'X-STT-Kanban: 1' -H 'Content-Type: application/json' -d @ops.json
+curl -s http://127.0.0.1:8765/api/kanban                          # résumé : tâches, lots, journal
+```
+
+Opérations (`{"ops": [...]}`) : `task` (`set`, `add` cumulant `used`/`ms`, `unset`), `task_add`, `lot`, `decision`, `decision_set`, `journal`, `top` (`currentLot`, `updated`, `docRoots`), `history_snapshot` (estimation et consommation calculées). `updated` est posé automatiquement et ne recule jamais. L'en-tête `X-STT-Kanban: 1` est obligatoire : il bloque l'écriture depuis une page web tierce. `--kanban CHEMIN` remplace le chemin par défaut.
+
 ## Dépannage
 
 - **« Aucun dossier ne commence par … »** : les agents ont été lancés depuis un autre chemin que `--repo`. Le message liste les dossiers proches ; relancer avec `--repo` sur le bon clone ou `--match csblog`.

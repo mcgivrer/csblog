@@ -1022,6 +1022,284 @@ class Hub:
 
 
 # ---------------------------------------------------------------------------
+# Kanban : écriture de plan-status.js sur ordre du chef de projet (stt-cp)
+# ---------------------------------------------------------------------------
+# Le CP ne modifie plus le fichier à la main ni par un agent DEV : il envoie des opérations à cet outil
+# (POST /api/kanban, ou --kanban-apply fichier.json). Le fichier est édité ligne à ligne (une tâche = une
+# ligne), validé avec Node, puis remplacé atomiquement. Toujours dans le checkout PRINCIPAL, jamais un worktree.
+KANBAN_REL = "demos/space-travel/kanban/plan-status.js"
+KANBAN_LOCK = threading.Lock()
+KANBAN_SECTIONS = ("lots", "tasks", "decisions", "journal")
+KANBAN_TOP = ("updated", "spec", "currentLot", "docRoots")
+
+
+class KanbanError(Exception):
+    pass
+
+
+def find_kanban(repo, explicit=None):
+    """Chemin de plan-status.js : --kanban, sinon le checkout principal (premier worktree de git)."""
+    if explicit:
+        return os.path.abspath(os.path.expanduser(explicit))
+    root = repo
+    out = git(["worktree", "list", "--porcelain"], repo) if repo else None
+    if out:
+        m = re.search(r"^worktree (.+)$", out, re.M)
+        if m:
+            root = m.group(1).strip()
+    return os.path.join(root, *KANBAN_REL.split("/")) if root else None
+
+
+def _js(v):
+    return json.dumps(v, ensure_ascii=False)
+
+
+def _scan_obj(line):
+    """Champs de premier niveau d'un objet JS sur une ligne : [(clé, début clé, début valeur, fin valeur)], indice de '}'."""
+    start = line.index("{")
+    close = line.rindex("}")
+    i, out = start + 1, []
+    while i < close:
+        while i < close and line[i] in " ,\t":
+            i += 1
+        if i >= close:
+            break
+        ks = i
+        if line[i] in "\"'":
+            q = line[i]
+            i += 1
+            while line[i] != q:
+                i += 2 if line[i] == "\\" else 1
+            key = line[ks + 1:i]
+            i += 1
+        else:
+            while line[i] != ":":
+                i += 1
+            key = line[ks:i].strip()
+        while line[i] != ":":
+            i += 1
+        i += 1
+        while line[i] == " ":
+            i += 1
+        vs, depth = i, 0
+        while i < close:
+            c = line[i]
+            if c in "\"'":
+                q = c
+                i += 1
+                while line[i] != q:
+                    i += 2 if line[i] == "\\" else 1
+            elif c in "[{(":
+                depth += 1
+            elif c in "]})":
+                depth -= 1
+            elif c == "," and depth == 0:
+                break
+            i += 1
+        out.append((key, ks, vs, len(line[:i].rstrip())))
+    return out, close
+
+
+def _row_get(line, key):
+    fields, _ = _scan_obj(line)
+    for k, _ks, vs, ve in fields:
+        if k == key:
+            raw = line[vs:ve]
+            try:
+                return json.loads(raw)
+            except ValueError:
+                return raw
+    return None
+
+
+def _row_set(line, key, value):
+    fields, close = _scan_obj(line)
+    lit = _js(value)
+    for k, _ks, vs, ve in fields:
+        if k == key:
+            return line[:vs] + lit + line[ve:]
+    return line[:close].rstrip() + f", {key}: {lit} " + line[close:]
+
+
+def _row_unset(line, key):
+    fields, _ = _scan_obj(line)
+    for n, (k, ks, _vs, ve) in enumerate(fields):
+        if k == key:
+            if n < len(fields) - 1:
+                return line[:ks] + line[fields[n + 1][1]:]
+            prev_end = fields[n - 1][3] if n else ks
+            return line[:prev_end] + line[ve:]
+    return line
+
+
+def _section(lines, name):
+    """(première ligne de données, ligne de fermeture) d'une section `name: [ … ]` du fichier."""
+    for i, ln in enumerate(lines):
+        if re.match(rf"^  {name}: \[\s*$", ln):
+            for j in range(i + 1, len(lines)):
+                if re.match(r"^  \],?\s*$", lines[j]):
+                    return i + 1, j
+    raise KanbanError(f"section « {name} » introuvable dans plan-status.js")
+
+
+def _find_row(lines, section, ident):
+    a, b = _section(lines, section)
+    key = "n" if section == "decisions" else "id"
+    for i in range(a, b):
+        if lines[i].lstrip().startswith("{") and _row_get(lines[i], key) == ident:
+            return i
+    raise KanbanError(f"{section} : « {ident} » introuvable")
+
+
+def _render_row(d):
+    return "    { " + ", ".join(f"{k}: {_js(v)}" for k, v in d.items()) + " }"
+
+
+def _with_comma(lines, idx):
+    """Assure la virgule finale de la ligne idx (avant l'ajout d'une ligne suivante)."""
+    if not lines[idx].rstrip().endswith(","):
+        lines[idx] = lines[idx].rstrip() + ","
+
+
+def _num(v):
+    return v if isinstance(v, (int, float)) else 0
+
+
+def _apply_op(lines, op, now, log):
+    kind = op.get("op")
+    if kind in ("task", "lot", "decision_set"):
+        section = {"task": "tasks", "lot": "lots", "decision_set": "decisions"}[kind]
+        idx = _find_row(lines, section, op.get("n") if kind == "decision_set" else op.get("id"))
+        ln, before = lines[idx], {}
+        sets = dict(op.get("set") or {})
+        if kind == "task" and "updated" not in sets:
+            sets["updated"] = now
+        for k, v in sets.items():
+            before[k] = _row_get(ln, k)
+            ln = _row_set(ln, k, v)
+        for k, v in (op.get("add") or {}).items():  # cumul : used, ms (None compté 0)
+            before[k] = _row_get(ln, k)
+            ln = _row_set(ln, k, _num(before[k]) + _num(v))
+        for k in op.get("unset") or []:
+            before[k] = _row_get(ln, k)
+            ln = _row_unset(ln, k)
+        lines[idx] = ln
+        log.append({"op": kind, "id": op.get("id", op.get("n")), "avant": before})
+    elif kind == "task_add":
+        task = op.get("task") or {}
+        if not task.get("id") or not task.get("lot"):
+            raise KanbanError("task_add : id et lot obligatoires")
+        a, b = _section(lines, "tasks")
+        if any(lines[i].lstrip().startswith("{") and _row_get(lines[i], "id") == task["id"] for i in range(a, b)):
+            raise KanbanError(f"task_add : « {task['id']} » existe déjà")
+        task.setdefault("updated", now)
+        last = max([i for i in range(a, b) if lines[i].lstrip().startswith("{") and _row_get(lines[i], "lot") == task["lot"]] or [b - 1])
+        _with_comma(lines, last)
+        lines.insert(last + 1, _render_row(task) + ("," if last + 1 < b else ""))
+        log.append({"op": "task_add", "id": task["id"]})
+    elif kind == "decision":
+        a, b = _section(lines, "decisions")
+        n = op.get("n")
+        if not isinstance(n, int) or not op.get("subject"):
+            raise KanbanError("decision : n (entier) et subject obligatoires")
+        _with_comma(lines, b - 1)
+        lines.insert(b, _render_row({"n": n, "subject": op["subject"], "status": op.get("status", "à valider")}))
+        log.append({"op": "decision", "n": n})
+    elif kind == "journal":
+        if not op.get("text"):
+            raise KanbanError("journal : text obligatoire")
+        a, b = _section(lines, "journal")
+        _with_comma(lines, b - 1)
+        lines.insert(b, _render_row({"at": op.get("at") or now[:10], "text": op["text"]}))
+        log.append({"op": "journal"})
+    elif kind == "top":
+        for k, v in (op.get("set") or {}).items():
+            if k not in KANBAN_TOP:
+                raise KanbanError(f"top : clé « {k} » non modifiable ({', '.join(KANBAN_TOP)})")
+            for i, ln in enumerate(lines):
+                if re.match(rf"^  {k}:", ln):
+                    lines[i] = f"  {k}: {_js(v)}," if ln.rstrip().endswith(",") else f"  {k}: {_js(v)}"
+                    break
+            else:
+                raise KanbanError(f"top : « {k} » introuvable")
+        log.append({"op": "top", "set": list((op.get('set') or {}).keys())})
+    elif kind == "history_snapshot":
+        la, lb = _section(lines, "lots")
+        ta, tb = _section(lines, "tasks")
+        est = sum(_num(_row_get(lines[i], "budget")) for i in range(la, lb) if lines[i].lstrip().startswith("{"))
+        used = sum(_num(_row_get(lines[i], "used")) for i in range(ta, tb) if lines[i].lstrip().startswith("{"))
+        snap = "{ " + f'at:"{op.get("at") or now}", est:{op.get("est", est)}, used:{op.get("used", used)}' + " }"
+        for i, ln in enumerate(lines):
+            if re.match(r"^  history: \[", ln):
+                m = re.match(r"^(  history: \[.*?)\s*\](,?)\s*$", ln)
+                if not m:
+                    raise KanbanError("history : format inattendu")
+                lines[i] = f"{m.group(1)}, {snap} ]{m.group(2)}"
+                break
+        else:
+            raise KanbanError("history introuvable")
+        log.append({"op": "history_snapshot", "est": est, "used": used})
+    else:
+        raise KanbanError(f"opération inconnue : {kind!r}")
+
+
+def _validate_node(path):
+    """Charge le fichier avec Node (même contrôle que la règle du CP) ; renvoie (tâches, lots, journal)."""
+    code = "global.window={};require(process.argv[1]);const p=window.PLAN;console.log([p.tasks.length,p.lots.length,p.journal.length].join(','))"
+    try:
+        r = subprocess.run(["node", "-e", code, path], capture_output=True, text=True, timeout=20, creationflags=NO_WINDOW)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise KanbanError(f"validation Node impossible : {exc}")
+    if r.returncode != 0:
+        raise KanbanError("plan-status.js invalide après modification : " + (r.stderr.strip().splitlines() or ["?"])[-1][:200])
+    return [int(x) for x in r.stdout.strip().split(",")]
+
+
+def kanban_apply(path, ops, dry_run=False):
+    """Applique une liste d'opérations ; tout ou rien. Renvoie le compte rendu."""
+    if not path or not os.path.isfile(path):
+        raise KanbanError(f"plan-status.js introuvable : {path}")
+    if not isinstance(ops, list) or not ops:
+        raise KanbanError("ops : liste non vide attendue")
+    with KANBAN_LOCK:
+        text = Path(path).read_text(encoding="utf-8")
+        eol = "\r\n" if "\r\n" in text else "\n"
+        lines = text.replace("\r\n", "\n").split("\n")
+        now = time.strftime("%Y-%m-%d %H:%M")
+        m = re.search(r'^  updated: "(\d{4}-\d\d-\d\d \d\d:\d\d)"', text, re.M)
+        if m and m.group(1) > now:  # le fichier peut déjà porter une date plus tardive : l'horodatage ne recule jamais
+            now = m.group(1)
+        log = []
+        for op in ops:
+            if not isinstance(op, dict):
+                raise KanbanError("chaque opération est un objet JSON")
+            _apply_op(lines, op, now, log)
+        if not any(o.get("op") == "top" and "updated" in (o.get("set") or {}) for o in ops):
+            _apply_op(lines, {"op": "top", "set": {"updated": now}}, now, [])
+        tmp = path + ".tmp"
+        Path(tmp).write_text(eol.join(lines), encoding="utf-8", newline="")
+        try:
+            counts = _validate_node(tmp)
+            if dry_run:
+                os.remove(tmp)
+            else:
+                os.replace(tmp, path)
+        except Exception:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+            raise
+        return {"ok": True, "path": path, "dry_run": dry_run, "tasks": counts[0], "lots": counts[1],
+                "journal": counts[2], "changes": log}
+
+
+def kanban_summary(path):
+    if not path or not os.path.isfile(path):
+        return {"ok": False, "path": path, "error": "plan-status.js introuvable"}
+    counts = _validate_node(path)
+    return {"ok": True, "path": path, "tasks": counts[0], "lots": counts[1], "journal": counts[2]}
+
+
+# ---------------------------------------------------------------------------
 # HTTP
 # ---------------------------------------------------------------------------
 def make_handler(hub, allowed_hosts):
@@ -1063,9 +1341,36 @@ def make_handler(hub, allowed_hosts):
                 return self._send(200, body, "application/json; charset=utf-8")
             if path == "/api/stream":
                 return self._stream()
+            if path == "/api/kanban":
+                try:
+                    out = kanban_summary(hub.args.kanban)
+                except KanbanError as exc:
+                    out = {"ok": False, "path": hub.args.kanban, "error": str(exc)}
+                return self._send(200, json.dumps(out, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
             if path == "/favicon.ico":
                 return self._send(204, b"", "image/x-icon")
             return self._send(404, b"404", "text/plain")
+
+        def do_POST(self):
+            if not self._host_ok():
+                return self._send(403, b"Host refuse", "text/plain; charset=utf-8")
+            path = self.path.split("?", 1)[0]
+            if path != "/api/kanban":
+                return self._send(404, b"404", "text/plain")
+            # l'en-tete personnalise force un preflight CORS : une page web tierce ne peut pas ecrire le Kanban
+            if self.headers.get("X-STT-Kanban") != "1":
+                return self._send(403, "en-tete X-STT-Kanban: 1 requis".encode("utf-8"), "text/plain; charset=utf-8")
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+                if not 0 < n <= 512 * 1024:
+                    raise KanbanError("corps JSON absent ou trop gros (512 Ko max)")
+                data = json.loads(self.rfile.read(n).decode("utf-8"))
+                ops = data.get("ops") if isinstance(data, dict) else data
+                out = kanban_apply(hub.args.kanban, ops, dry_run=bool(isinstance(data, dict) and data.get("dry_run")))
+                code = 200
+            except (KanbanError, ValueError, KeyError, IndexError) as exc:
+                out, code = {"ok": False, "error": str(exc)}, 400
+            self._send(code, json.dumps(out, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
 
         def _stream(self):
             self.send_response(200)
@@ -1117,11 +1422,27 @@ def main():
     ap.add_argument("--open", action="store_true", help="ouvre le tableau de bord dans le navigateur")
     ap.add_argument("--once", action="store_true", help="imprime un instantané JSON puis quitte")
     ap.add_argument("--verbose", action="store_true")
+    ap.add_argument("--kanban", help="plan-status.js du Kanban (défaut : %s dans le checkout principal)" % KANBAN_REL)
+    ap.add_argument("--kanban-apply", metavar="OPS.json", help="applique des opérations au Kanban (fichier JSON ou - pour stdin) puis quitte ; --dry-run pour contrôler seulement")
+    ap.add_argument("--dry-run", action="store_true", help="avec --kanban-apply : valide sans écrire")
     args = ap.parse_args()
 
     args.repo = os.path.abspath(os.path.expanduser(args.repo)) if args.repo else detect_repo(HERE)
     if args.repo:  # racine réelle du dépôt (et non un sous-dossier)
         args.repo = detect_repo(args.repo) or args.repo
+    args.kanban = find_kanban(args.repo, args.kanban)
+    if args.kanban_apply:
+        sys.stdout.reconfigure(encoding="utf-8") if hasattr(sys.stdout, "reconfigure") else None
+        try:
+            raw = sys.stdin.read() if args.kanban_apply == "-" else Path(args.kanban_apply).read_text(encoding="utf-8")
+            data = json.loads(raw)
+            out = kanban_apply(args.kanban, data.get("ops") if isinstance(data, dict) else data,
+                               dry_run=args.dry_run or bool(isinstance(data, dict) and data.get("dry_run")))
+        except (KanbanError, ValueError, OSError) as exc:
+            print(json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False))
+            sys.exit(1)
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+        return
     if not args.github and not args.no_github:
         args.github = detect_github(args.repo)
     hub = Hub(args)
@@ -1144,6 +1465,7 @@ def main():
     print(f"  dépôt   : {args.repo or '?'}")
     print(f"  sessions: {hub.claude.projects}  (préfixe {hub.claude.prefix})")
     print(f"  GitHub  : {args.github or 'désactivé'}{' (jeton)' if hub.gh.token else ''}")
+    print(f"  Kanban  : {args.kanban or '?'}  (POST /api/kanban, X-STT-Kanban: 1)")
     if not local:
         print("  ATTENTION : serveur exposé au réseau, les extraits de transcripts sont lisibles par tout le LAN.")
     if args.open:
