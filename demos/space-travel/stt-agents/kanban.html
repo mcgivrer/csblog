@@ -335,6 +335,8 @@ footer{color:var(--muted-2);font:11px var(--mono);margin-top:40px}
 #reload .pg{position:absolute;left:0;bottom:0;height:3px;width:0;background:var(--cyan);opacity:0;pointer-events:none}
 #reload .pg.on{opacity:1}
 #reload .pg.fade{opacity:0;transition:opacity .3s}
+#newBtn{background:var(--green);border-color:var(--green);color:var(--on-accent);font-weight:700}
+#newBtn:hover{filter:brightness(1.12)}
 .badge.cx{font-weight:700;letter-spacing:.04em;text-transform:none}
 .cx-XS{color:var(--cx-XS)}.cx-S{color:var(--cx-S)}.cx-M{color:var(--cx-M)}.cx-L{color:var(--cx-L)}.cx-XL{color:var(--cx-XL)}
 .row .x{font-weight:700}
@@ -391,6 +393,8 @@ html.embed-kpis .kpi .kc{display:none}
 html.embed-kpis .kcs{display:inline;font:9px var(--mono);color:var(--muted);margin:0 auto 0 8px;white-space:nowrap;text-transform:none;letter-spacing:0;overflow:hidden;text-overflow:ellipsis;min-width:0}
 html.embed-kpis .tm{height:54px!important;min-height:0}
 html.embed-board #kpis{display:none}
+.badge.goagent{font:inherit;cursor:pointer;background:transparent;text-decoration:none}
+.badge.goagent:hover,.badge.goagent:focus-visible{text-decoration:underline;box-shadow:0 0 0 1px currentColor}
 html.embed,html.embed body{overflow:hidden}
 /* cadre du tableau : hauteur = contenu (pas d'ascenseur interne) ; la barre haute suit le défilement de la page hôte (--sy) ;
    un dialogue ouvert fait passer le cadre en plein écran (classe ov) : le contenu reste à sa place grâce à --ox/--oy/--ow */
@@ -978,6 +982,12 @@ html.embed-board #topbar>.meta span{display:none}
   function saveOpen(){ try { localStorage.setItem('kanbanOpen', JSON.stringify(open)); } catch(e){} }
   const isOpen = (t) => typeof open[t.id] === 'boolean' ? open[t.id] : t.status !== 'done';
   const DOC_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 1.5h6l3 3v10h-9z M9.5 1.5v3h3 M5.5 8h5 M5.5 11h5"/></svg>';
+  // Tag de profil (« DEV · 1 · haiku »). Sur une tâche EN COURS il devient un bouton : ouvre l'onglet Agents sur l'agent qui la traite.
+  function agentTag(t){
+    const cls = 'badge ' + clsOf(agOf(t)) + (instOf(t) ? ' i' + instOf(t) : ''), txt = esc(badgeText(t)) + (t.model ? ' · ' + esc(t.model) : '');
+    if(t.status !== 'doing') return '<span class="' + cls + '">' + txt + '</span>';
+    return '<button type="button" class="' + cls + ' goagent" data-goagent="' + esc(t.id) + '" data-session="' + esc(t.session || '') + '" title="Voir l’agent qui traite cette tâche" aria-label="Ouvrir l’onglet Agents sur l’agent de la tâche ' + esc(t.id) + '">' + txt + '</button>';
+  }
   function modBadge(t){
     const n = (Array.isArray(t.docs) ? t.docs : []).filter(d => d && (d.r === 'modifié' || d.r === 'créé')).length;
     if(!n) return '';
@@ -1007,8 +1017,7 @@ html.embed-board #topbar>.meta span{display:none}
     const u = used(t), b = num(t.budget), p = Math.max(0, Math.min(100, num(t.progress)));
     const o = isOpen(t);
     const tg = '<button class="tg" data-toggle="' + esc(t.id) + '" aria-expanded="' + o + '" aria-label="' + (o ? 'Replier' : 'Déplier') + ' la tâche ' + esc(t.id) + '">' + (o ? '▾' : '▸') + '</button>';
-    return '<article class="card' + (o ? '' : ' folded') + '" data-id="' + esc(t.id) + '" data-s="' + esc(t.status) + '"><div class="top"><span class="lead">' + tg + modBadge(t) + '<span class="id">' + esc(t.id) + '</span></span><span class="bdg">' + cxBadge(t) + '<span class="badge ' + clsOf(agOf(t)) + (instOf(t) ? ' i' + instOf(t) : '') + '">' + esc(badgeText(t)) +
-      (t.model ? ' · ' + esc(t.model) : '') + '</span>' + revBadge(t) + '</span></div>' + titleHtml(t) + '<div class="body">' +
+    return '<article class="card' + (o ? '' : ' folded') + '" data-id="' + esc(t.id) + '" data-s="' + esc(t.status) + '"><div class="top"><span class="lead">' + tg + modBadge(t) + '<span class="id">' + esc(t.id) + '</span></span><span class="bdg">' + cxBadge(t) + agentTag(t) + revBadge(t) + '</span></div>' + titleHtml(t) + '<div class="body">' +
       '<div class="row"><span>Avancement</span><span>' + p + ' %</span></div>' + bar(p, 100, 'cy') +
       '<div class="row"><span>Tokens</span><span>' + (t.est ? '≈ ' : '') + (t.used == null ? 'n/m' : tok(u)) + (b ? ' / ' + tok(b) : '') + '</span></div>' + (b ? bar(u, b) : '') + cxLine(t) + timeRows(t) +
       (t.updated ? '<div class="row"><span>Mis à jour</span><span>' + esc(t.updated) + '</span></div>' : '') +
@@ -1026,6 +1035,11 @@ html.embed-board #topbar>.meta span{display:none}
       open[id] = o; saveOpen(); card.classList.toggle('folded', !o);
       g.setAttribute('aria-expanded', o); g.textContent = o ? '▾' : '▸';
       g.setAttribute('aria-label', (o ? 'Replier' : 'Déplier') + ' la tâche ' + id); syncFold(); return; }
+    const ga = e.target.closest('[data-goagent]');
+    if(ga){ const m = { type:'stt-goto-agent', task:ga.dataset.goagent, session:ga.dataset.session || '' };
+      if(window.parent !== window) parent.postMessage(m, location.origin);   // intégré : la page hôte ouvre l'onglet Agents
+      else location.href = '/#agent=' + encodeURIComponent(m.task) + (m.session ? '&session=' + encodeURIComponent(m.session) : '');
+      return; }
     const so = e.target.closest('[data-sort]');
     if(so){ doneSort = doneSort === so.dataset.sort ? 'plan' : so.dataset.sort; try { localStorage.setItem('kanbanDoneSort', doneSort); } catch(err){}
       render(); const nb = document.querySelector('[data-sort="' + so.dataset.sort + '"]'); if(nb) nb.focus(); return; }

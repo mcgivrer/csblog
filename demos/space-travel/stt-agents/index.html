@@ -345,6 +345,9 @@
   .feed li:last-child{border-bottom:none}
   .feed li.fresh{animation:fresh 2.4s ease-out}
   @keyframes fresh{from{background:rgba(94,234,212,.10)}to{background:transparent}}
+  @keyframes agflash{0%,55%{box-shadow:0 0 0 2px var(--amber),0 0 14px var(--amber)}100%{box-shadow:0 0 0 0 transparent}}
+  .agent-flash{animation:agflash 2.4s ease-out}
+  @media (prefers-reduced-motion:reduce){.agent-flash{animation:none;outline:2px solid var(--amber)}}
   .feed .t{font:11.5px 'JetBrains Mono',monospace;color:var(--cyan)}
   .feed .who{font:11.5px 'JetBrains Mono',monospace;color:var(--ink);white-space:nowrap;display:flex;gap:6px;align-items:center}
   .feed .msg{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1216,6 +1219,35 @@ function handleNotices(st){
   fresh.forEach(present);
 }
 if (P.get('debug') === '1') window.sttNotify = {push:present, settings:() => cfg};
+// --- depuis le Kanban : ouvrir l'onglet Agents sur l'agent qui traite une tâche en cours
+function focusAgentFor(task, session){
+  const agents = agentsView(), esc2 = task.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), re = new RegExp('(^|[^A-Za-z0-9.])' + esc2 + '($|[^A-Za-z0-9])');
+  let key = null, parent = null;
+  if (session) { const a = agents.find(x => x.id === session); if (a) key = parent = 'n:' + a.id; }   // tâche lancée par le serveur : session = carte
+  if (!key) for (const a of agents) { const x = (a.subagents || []).find(s => s.status === 'running' && re.test(s.description || '')); if (x) { key = 's:' + a.id + ':' + x.id; parent = 'n:' + a.id; break; } }
+  if (!key) { present({ id: 'goto-' + task + '-' + Date.now(), ts: new Date().toISOString(), kind: 'agent_notfound', cat: 'agents', severity: 'info', title: 'Agent introuvable', body: 'Aucun agent actif ne traite ' + task + ' (le suivi se fait par l’identifiant dans la description de l’agent).', target: {type: 'task', id: task}, key: 'goto:' + task }); return false; }
+  if (filter !== 'all') { filter = 'all'; store.set('filter', 'all'); }
+  ['actif', 'silencieux'].forEach(k => subFilter.add(k)); store.set('subfilter', [...subFilter]);
+  render();
+  requestAnimationFrame(() => {
+    const find = k => document.querySelector('[data-k="' + CSS.escape(k) + '"], [data-id="' + CSS.escape(k) + '"]');
+    const el = find(key) || find(parent); if (!el) return;
+    if (el.tagName === 'DETAILS') el.open = true;
+    const t = el.querySelector && el.querySelector('summary') || el;
+    t.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    t.classList.remove('agent-flash'); void t.offsetWidth; t.classList.add('agent-flash'); setTimeout(() => t.classList.remove('agent-flash'), 2600);
+  });
+  return true;
+}
+window.sttFocusAgent = focusAgentFor;
+// Kanban ouvert seul : lien /#agent=<tâche>[&session=<id>]
+function hashFocus(){
+  const m = /^#agent=([^&]+)(?:&session=(.+))?$/.exec(location.hash); if (!m) return;
+  const task = decodeURIComponent(m[1]), ses = m[2] ? decodeURIComponent(m[2]) : '';
+  if (window.sttShowTab) window.sttShowTab('agents', { hash: false });
+  let n = 0; const tm = setInterval(() => { if ((S && focusAgentFor(task, ses)) || ++n > 40) { clearInterval(tm); history.replaceState(null, '', location.pathname + location.search); } }, 250);
+}
+addEventListener('hashchange', hashFocus); hashFocus();
 
 // popover de réglages
 const btnA = $('#btnAlerts'), pop = $('#alertsPop');
@@ -1441,6 +1473,7 @@ boot();
     if (name === 'kanban') { startKanban().then(fit); fit(); }
     dispatchEvent(new CustomEvent('stt-tab', { detail: name }));   // la page redessine ce qui dépend de la largeur (chronologie)
   }
+  window.sttShowTab = show;
   tabs.forEach(t => {
     t.addEventListener('click', () => show(t.dataset.tab));
     t.addEventListener('keydown', e => {
@@ -1477,6 +1510,9 @@ boot();
     if (d.type === 'stt-embed-height') {
       if (d.embed === 'kpis') slotK.style.height = Math.max(60, Math.min(260, d.h + 2)) + 'px';
       else { slotB.style.height = Math.max(320, d.h) + 'px'; syncScroll(); }
+    } else if (d.type === 'stt-goto-agent') {
+      if (window.sttShowTab) window.sttShowTab('agents');
+      if (window.sttFocusAgent) window.sttFocusAgent(String(d.task || ''), String(d.session || ''));
     } else if (d.type === 'stt-embed-overlay') {
       const kp = d.embed === 'kpis', frm = kp ? kpi : board, slot = kp ? slotK : slotB;
       if (kp) kpi.classList.toggle('ov', !!d.on);               // indicateurs : cadre dévoilé (infobulles) tant que le pointeur est dessus
