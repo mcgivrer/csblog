@@ -16,11 +16,13 @@ Le moteur allégé est le module partagé [`../shared/cosmos.js`](../shared/cosm
 | P3 | direction photo « Cinéma » `src/photo.js` (4 looks, profondeur de champ, flare anamorphique, bloom, grain, bandes, CRT) | ✅ |
 | P4 | lecteur de slides `dist/presentation.html` (gabarit + 3 slides, calques, look IMAX, export de clips, qualité automatique) | ✅ |
 | P5 | finition et publication : version compacte, page d'entrée et aperçu de partage, repli sans WebGL, écran noir | ✅ (en ligne après fusion) |
-| P6 | présentation du jeu : 18 slides (but, univers, métier, campagne, moteur), illustrations, schémas, vue présentateur | ✅ |
+| P6 | présentation du jeu : 21 slides (but, univers, métier, campagne, moteur), illustrations, schémas, vue présentateur | ✅ |
+| P7 | ambiances de l'image de fond, une par slide : Nolan IMAX, Nolan 35 mm, noir & blanc, sépia, Technicolor, Super 8, CRT, VHS, vision nocturne | ✅ |
 
 Spécifications : [`docs/SPEC-P1-cosmos.md`](docs/SPEC-P1-cosmos.md), [`docs/SPEC-P2-realisateur.md`](docs/SPEC-P2-realisateur.md),
 [`docs/SPEC-P3-photo.md`](docs/SPEC-P3-photo.md), [`docs/SPEC-P4-lecteur.md`](docs/SPEC-P4-lecteur.md),
-[`docs/SPEC-P5-publication.md`](docs/SPEC-P5-publication.md), [`docs/SPEC-P6-presentation_du_jeu.md`](docs/SPEC-P6-presentation_du_jeu.md).
+[`docs/SPEC-P5-publication.md`](docs/SPEC-P5-publication.md), [`docs/SPEC-P6-presentation_du_jeu.md`](docs/SPEC-P6-presentation_du_jeu.md),
+[`docs/SPEC-P7-ambiances.md`](docs/SPEC-P7-ambiances.md).
 Contenu des slides (texte, illustrations, notes de l'orateur) : [`docs/BROUILLON-slides-jeu.md`](docs/BROUILLON-slides-jeu.md).
 
 ## Construire et tester
@@ -96,7 +98,8 @@ de champ sur les plans à premier plan (lune, ceinture, anneaux, nébuleuse), av
 ## Lecteur de slides
 
 `dist/presentation.html` : un seul fichier, à ouvrir dans le navigateur (ou à publier tel quel). Le fond est la cinématique
-temps réel, filmée au look **Nolan IMAX** (bandes 1.90) ; le texte des slides est en HTML par-dessus, à la charte McGivrer.
+temps réel, filmée au look **Nolan IMAX** (bandes 1.90) ; chaque slide peut changer d'**ambiance** (filtre de l'image de
+fond : noir & blanc, sépia, CRT…), appliquée sur la coupe. Le texte des slides est en HTML par-dessus, à la charte McGivrer.
 Chaque changement de slide fait couper le réalisateur (sauf si le plan a moins de 2,5 s) ; le sujet se place dans le
 tiers opposé au texte. Quand le texte compte, un **calque** en transparence (image floutée et assombrie, rendue par la
 direction photo) passe derrière le texte ou l'illustration.
@@ -113,9 +116,10 @@ direction photo) passe derrière le texte ou l'illustration.
 | `S` | vue présentateur : notes, slide suivante, minuteur (fenêtre séparée, ou incrustée si le navigateur la refuse) |
 | `N` | système suivant |
 | `P` | effets de la direction photo (comparaison) |
+| `A` | ambiance imposée à toutes les slides, en boucle, puis retour à celle de chaque slide |
 | `?` | aide · `Échap` : fermer, annuler un export |
 
-Paramètres : `#3` (slide), `?seed=` (univers), `?rz=` (montage reproductible), `?look=auto|denis|kodak|kubrick`,
+Paramètres : `#3` (slide), `?seed=` (univers), `?rz=` (montage reproductible), `?look=` (une ambiance pour toutes les slides),
 `?crt=0..1`, `?quality=fixed`, `?webgl=0` (repli sans fond animé). Sans WebGL, les slides restent lisibles et
 navigables sur un fond fixe à la charte.
 
@@ -140,12 +144,14 @@ Dans `src/html/presentation.template.html`, puis `python3 build/build.py compile
 | `data-plan` | `etoile`, `croissant`, `nebuleuse`, `survol`, `terminateur`, `limbe`, `anneaux`, `lune`, `eclipse`, `ceinture` | plan joué à l'arrivée sur la slide |
 | `data-systeme` | `suivant` | fondu au noir vers le système suivant |
 | `data-titre-court` | texte | titre de la bande du bas |
+| `data-ambiance` | `imax`, `nolan35`, `nb`, `sepia`, `technicolor`, `super8`, `crt`, `vhs`, `nuit`, `denis`, `kodak`, `kubrick` | filtre de l'image de fond, appliqué sur la coupe ; les bandes suivent le format |
 | `.calque` + `data-calque` | `leger`, `normal`, `fort` | calque en transparence derrière le bloc |
 | `.anim` | — | apparition en cascade après la coupe |
 | `<aside class="notes">` | texte | notes de l'orateur, affichées dans la vue présentateur |
 | `<img src="media/…">` | chemin relatif à `presentation/` (ou `../docs/…`) | illustration, intégrée au fichier publié par `build.py` |
 
-Sur `<main id="deck">` : `data-titre`, `data-look` (`imax` par défaut), `data-systemes` (systèmes filmés en boucle).
+Sur `<main id="deck">` : `data-titre`, `data-look` (ambiance par défaut, `imax` ; `auto` : une par système), `data-systemes`
+(systèmes filmés en boucle).
 
 ### Export de clips
 

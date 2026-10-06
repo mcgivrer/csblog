@@ -6,7 +6,10 @@ lot P6).
 **Décisions** : 18 slides (les 13 ★, les 4 intercalaires et la slide 16 « station », demandée avec le chapitre
 campagne) ; la campagne en chapitre, avec les maquettes ; illustrations dans les calques, intégrées au fichier ; la
 présentation du jeu remplace les 3 slides de démonstration (même adresse, même page Claude) ; vue présentateur (touche
-`S`) avec les notes ci-dessous. Slides écartées : 6 (soleils), 10 (navette), 20 (le moteur se filme lui-même).
+`S`) avec les notes ci-dessous. Slides d'abord écartées : 6 (soleils), 10 (navette), 20 (le moteur se filme lui-même).
+
+**Ajout du 06/10/2026** : les slides 6, 10 et 20 sont intégrées ; la présentation suit désormais la version complète
+(21 slides, ≈ 20 à 25 min).
 
 ## Cadre
 
@@ -377,17 +380,17 @@ du dépôt.
 | Slide | Fichier | Origine | État |
 |---|---|---|---|
 | 5 | `media/illustrations/planete-*.webp` (6) | rendus du shader de planètes du jeu (v2.17) | prêts |
-| 6 | `../docs/illustrations/solare-flares-and-eclipse-1.jpeg` | captures de la démo « Observation des étoiles » | dans le dépôt |
+| 6 | `media/illustrations/soleil-*.jpg` (3) | vignettes recadrées (sans l'interface) des planches `solare-flares-and-eclipse-2.jpeg` de la démo « Observation des étoiles » | prêtes |
 | 8 | `media/illustrations/stt217-selection-vaisseau.jpg` | capture du jeu v2.17 | prête |
 | 9 | `media/illustrations/stt217-approche-orbite.jpg` (+ `stt217-port-anneau.jpg`) | captures du jeu v2.17 | prêtes |
 | 10 | `media/illustrations/stt217-navette-pile.jpg` | capture du jeu v2.17 | prête |
 | 11 | `media/illustrations/stt217-supraluminique.jpg` | capture du jeu v2.17, interface complète | prête |
-| 15 | `../docs/specs/img/spec010/chantier.svg` | maquette SPEC-010 | dans le dépôt |
+| 15 | `media/illustrations/stt-editeur-meridian.jpg` (à la place de la maquette `chantier.svg`) | capture de l'éditeur STT Modules (chantier naval STT), STT Meridian | prête |
 | 16 | `../docs/specs/img/spec010/station-site.svg` (ou `technologie.svg`) | maquettes SPEC-010 | dans le dépôt |
 | 9 | schéma D1 : déroulé d'une mission | à dessiner en SVG, à la charte | à faire |
 | 18 | schéma D2 : tranches de profondeur | à dessiner en SVG | à faire |
 | 19 | schéma D3 : du code au fichier unique | à dessiner en SVG | à faire |
-| 20 | schéma du lecteur | slide de démonstration actuelle | à adapter |
+| 20 | schéma D4 : chaîne de la présentation | dessiné en SVG, à la charte | fait |
 
 Les images seront intégrées au fichier publié (data URI, environ 0,9 Mo de plus) : la page reste autonome, sur GitHub
 Pages comme en page Claude.

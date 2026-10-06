@@ -101,3 +101,15 @@ comparable avec et sans effets (pas de surexposition) ; planche avant/après.
   aux ouvertures, ouvertures dans les bornes) ; sans effet, écart moyen de 0,17 niveau avec l'image du jeu ; noir
   complet entre deux systèmes ; bandes noires ; carte de flou du plan `lune` (2,8 % de pixels nets, la lune ; 97 % de
   flou marqué) ; luminance avec/sans effets de 0,76 à 1,24 ; planches `photo-planche.jpg` et `photo-looks.jpg`.
+
+### Correctif de stabilité (07/10/2026)
+
+- Constat de l'auteur : le disque des étoiles « se rétrécit par à-coups », l'image « tressaute par moments ».
+- Cause mesurée (sonde image par image, plan d'étoile de la slide 1) : la cible de rendu de la scène avait la profondeur
+  16 bits par défaut de three r128 ; quand l'étoile est au fond d'une tranche (près de son plan lointain, la précision
+  y est de l'ordre de 4·10⁷ m), sa couronne et son halo se battaient avec le limbe de la photosphère : un liseré
+  clair apparaissait d'un coup puis s'effaçait, toutes les 0,4 à 0,6 s (rayon du disque saturé + 3,5 px, puis retour).
+- Correctif : profondeur 24 bits (`stencilBuffer: true` → `DEPTH24_STENCIL8`, même mémoire que 16 bits + stencil) ;
+  le rayon du disque croît désormais continûment (48,9 → 50,9 px sur 70 images, sans saut).
+- Exposition : les cibles de mesure (16 × 16, 1 × 1) ne sont plus réallouées quand la résolution change ; l'iris ne
+  saute plus à chaque changement de qualité.

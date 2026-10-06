@@ -129,6 +129,16 @@
   .feuille{ display:flex; flex-wrap:wrap; gap:6px; }
   .feuille span{ font-family:var(--mono); font-size:clamp(10.5px, .85vw, 13.5px); border:1px solid var(--line); padding:.35em .65em; color:var(--texte); }
   .feuille .fin{ border-color:var(--amber); color:var(--amber); }
+  .vignettes{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:clamp(6px, .8vw, 12px); margin:0 0 clamp(10px, 1.6vh, 18px); }
+  .vignettes figure{ display:flex; flex-direction:column; gap:6px; min-width:0; }
+  .vignettes img{ display:block; width:100%; height:auto; aspect-ratio:12 / 5; object-fit:cover; border:1px solid var(--line); background:var(--bg); }
+  .vignettes figcaption{ font-size:clamp(9.5px, .75vw, 12.5px); line-height:1.4; }
+  .etapes{ list-style:none; display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:clamp(8px, 1vw, 16px); margin:0 0 clamp(12px, 2vh, 22px); padding:0; }
+  .etapes li{ border-top:1px solid var(--line); padding-top:.5em; font-size:clamp(11px, .9vw, 15px); line-height:1.4; color:var(--texte); min-width:0; }
+  .etapes b{ display:block; font-family:var(--mono); font-weight:700; color:var(--amber); margin-bottom:.2em; }
+  body.etroit .vignettes, body.etroit .etapes{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
+  .etapes li{ padding-left:0; margin:0; } .etapes li::before{ content:none; }
+  .calque img.capture{ width:auto; max-width:100%; }   /* le cadre épouse l'image (plus de bande vide à droite) */
 
   /* ---------- calque : le flou et l'assombrissement sont rendus par la direction photo ---------- */
   .calque{ position:relative; padding:clamp(18px, 2.4vw, 42px); border:1px solid rgba(37,55,92,.9); }
@@ -226,16 +236,19 @@
                                         survol, terminateur, limbe, anneaux, lune, eclipse, ceinture
     data-systeme="suivant"              fondu au noir vers le système suivant (slide de chapitre)
     data-titre-court="…"                titre affiché dans la bande du bas (sinon le premier titre de la slide)
+    data-ambiance="…"                   filtre de l'image de fond, appliqué sur la coupe (sinon data-look du deck) :
+                                        imax, nolan35, nb (noir & blanc), sepia, technicolor, super8, crt, vhs, nuit
+                                        (vision nocturne), denis, kodak, kubrick ; les bandes suivent le format
   Calque en transparence derrière le texte ou une illustration : class="calque" data-calque="leger|normal|fort".
   Éléments qui apparaissent en cascade : class="anim". Notes de l'orateur (vue présentateur, touche S) :
   <aside class="notes">…</aside>. Images : src="media/…" ou src="../docs/…" (chemins relatifs à presentation/), intégrées au
   fichier publié par build.py. Curseur de titre : <span class="insecable">dernier mot<span class="curseur"></span></span>.
-  Sur <main id="deck"> : data-titre (titre du deck), data-look (imax par défaut ; auto, denis, kodak, kubrick),
+  Sur <main id="deck"> : data-titre (titre du deck), data-look (ambiance par défaut, imax ; auto : une par système),
   data-systemes (nombre de systèmes filmés en boucle).
 -->
 <main id="deck" data-titre="Voyage Spatial" data-look="imax" data-systemes="6">
 
-  <section class="slide layout-titre" data-cote="gauche" data-titre-court="Ouverture">
+  <section class="slide layout-titre" data-ambiance="imax" data-cote="gauche" data-titre-court="Ouverture">
     <div class="bloc">
       <p class="eyebrow anim">csblog · simulation spatiale</p>
       <h1 class="anim">Voyage <span class="insecable">Spatial<span class="curseur"></span></span></h1>
@@ -245,7 +258,7 @@
     <aside class="notes">Tout ce qui défile derrière est calculé en temps réel par le moteur du jeu, avec la même graine qu'une partie : aucune vidéo, aucun vaisseau dans le décor.</aside>
   </section>
 
-  <section class="slide layout-contenu" data-cote="gauche" data-plan="survol" data-titre-court="Le principe">
+  <section class="slide layout-contenu" data-ambiance="imax" data-cote="gauche" data-plan="survol" data-titre-court="Le principe">
     <div class="calque" data-calque="normal">
       <p class="eyebrow anim">00 · le principe</p>
       <h2 class="anim">Piloter un cargo, livrer, prospérer</h2>
@@ -264,7 +277,7 @@
     <aside class="notes">Depuis la v2.18, deux modes. Partie libre : tous les vaisseaux, sans sauvegarde. Campagne : départ sur le Courlis avec 4 000 CR, et la partie est sauvegardée. Principe de conception : piloter reste le plaisir central.</aside>
   </section>
 
-  <section class="slide layout-chapitre" data-cote="gauche" data-systeme="suivant" data-titre-court="L’univers">
+  <section class="slide layout-chapitre" data-ambiance="nolan35" data-cote="gauche" data-systeme="suivant" data-titre-court="L’univers">
     <div class="bloc">
       <p class="num-chapitre anim">01</p>
       <h2 class="anim">Un univers à l’échelle réelle</h2>
@@ -273,7 +286,7 @@
     <aside class="notes">Fondu au noir : le réalisateur passe au système suivant.</aside>
   </section>
 
-  <section class="slide layout-contenu" data-cote="droite" data-plan="nebuleuse" data-titre-court="Une graine, un univers">
+  <section class="slide layout-contenu" data-ambiance="technicolor" data-cote="droite" data-plan="nebuleuse" data-titre-court="Une graine, un univers">
     <div class="calque" data-calque="leger">
       <p class="eyebrow anim">01 · l'univers</p>
       <h2 class="anim">Tout naît d'une seule graine</h2>
@@ -288,7 +301,7 @@
     <aside class="notes">Générateur xmur3 + mulberry32, une graine dérivée par usage (étoile, système, lunes…). Jusqu'à quatre systèmes construits à la fois.</aside>
   </section>
 
-  <section class="slide layout-illustration" data-cote="droite" data-plan="limbe" data-titre-court="Les planètes">
+  <section class="slide layout-illustration" data-ambiance="imax" data-cote="droite" data-plan="limbe" data-titre-court="Les planètes">
     <figure class="calque" data-calque="normal">
       <p class="eyebrow anim">01 · les planètes</p>
       <h2 class="anim">Six natures de planètes</h2>
@@ -304,8 +317,26 @@
     </figure>
     <aside class="notes">Le monde volcanique n'a pas d'atmosphère : ses coulées de lave sont émissives et restent visibles côté nuit. Les géantes gazeuses portent les anneaux et accueillent la tour d'amarrage.</aside>
   </section>
+  <section class="slide layout-illustration" data-ambiance="nb" data-cote="gauche" data-plan="eclipse" data-titre-court="Les soleils">
+    <figure class="calque" data-calque="normal">
+      <p class="eyebrow anim">01 · les soleils</p>
+      <h2 class="anim">Des soleils de cinéma</h2>
+      <div class="vignettes anim">
+        <figure><img src="media/illustrations/soleil-taches.jpg" alt="Photosphère d’une étoile G0, taches solaires" width="480" height="200"><figcaption>Taches et granulation</figcaption></figure>
+        <figure><img src="media/illustrations/soleil-eruption.jpg" alt="Protubérance arrachée au-dessus du limbe" width="480" height="200"><figcaption>Éruption au limbe</figcaption></figure>
+        <figure><img src="media/illustrations/soleil-eclipse.jpg" alt="Éclipse totale par une lune, sa planète à côté" width="480" height="200"><figcaption>Éclipse totale par une lune</figcaption></figure>
+      </div>
+      <ul>
+        <li class="anim">Photosphère animée : granulation, facules, taches qui défilent avec la rotation.</li>
+        <li class="anim">Couronne, protubérances et éruptions, jusqu'à l'éjection de masse coronale.</li>
+        <li class="anim">Éclipses : derrière une planète, son atmosphère s'allume ; dans l'ombre d'une lune, l'éclipse est totale, comme sur Terre.</li>
+      </ul>
+      <p class="mention anim">Captures · démo « Observation des étoiles »</p>
+    </figure>
+    <aside class="notes">Le rendu des soleils vient de stars.js, un module partagé entre le jeu, la démo « Observation des étoiles » et cette présentation. Les étoiles sont à leur taille réelle : une lune peut paraître juste un peu plus grande que son étoile, d'où les éclipses totales. Pendant une éclipse, le halo s'éteint, la couronne se renforce et l'éclat se concentre sur le dernier croissant. Les naines rouges sont les plus actives. Le fond de cette slide demande un plan d'éclipse : la planète passe devant son étoile.</aside>
+  </section>
 
-  <section class="slide layout-chapitre" data-cote="gauche" data-systeme="suivant" data-titre-court="Le métier">
+  <section class="slide layout-chapitre" data-ambiance="nolan35" data-cote="gauche" data-systeme="suivant" data-titre-court="Le métier">
     <div class="bloc">
       <p class="num-chapitre anim">02</p>
       <h2 class="anim">Le métier de transporteur</h2>
@@ -314,13 +345,13 @@
     <aside class="notes">Fondu au noir vers un nouveau système.</aside>
   </section>
 
-  <section class="slide layout-illustration" data-cote="gauche" data-plan="anneaux" data-titre-court="La flotte">
+  <section class="slide layout-illustration" data-ambiance="imax" data-cote="gauche" data-plan="anneaux" data-titre-court="La flotte">
     <figure class="calque" data-calque="normal">
       <p class="eyebrow anim">02 · la flotte</p>
       <h2 class="anim">Dix vaisseaux générés</h2>
       <img class="capture anim" src="media/illustrations/stt217-selection-vaisseau.jpg" alt="Hangar du jeu : la Banquise, citernier à glace" width="1280" height="720">
       <ul>
-        <li class="anim">Du pousseur Mistral (61 m) au cargo-poutre Longue-Échine (237 m).</li>
+        <li class="anim">Du pousseur Mistral (61&nbsp;m) au cargo-poutre Longue-Échine (237&nbsp;m).</li>
         <li class="anim">Construits en chaîne : proue, habitat, section moteur de 2 à 6 tuyères.</li>
         <li class="anim">Quatre long-courriers : anneaux de distorsion et générateur de saut.</li>
       </ul>
@@ -328,7 +359,7 @@
     <aside class="notes">En campagne, on part du Courlis, un vaisseau modulaire de palier I (4 conteneurs), qu'on agrandit au chantier naval.</aside>
   </section>
 
-  <section class="slide layout-illustration" data-cote="droite" data-plan="croissant" data-titre-court="Une mission">
+  <section class="slide layout-illustration" data-ambiance="imax" data-cote="droite" data-plan="croissant" data-titre-court="Une mission">
     <figure class="calque" data-calque="fort">
       <p class="eyebrow anim">02 · une mission</p>
       <h2 class="anim">De l'offre à la prime</h2>
@@ -339,7 +370,26 @@
     <aside class="notes">Les 71 et 142 s viennent du chronométrage du lot L0 (Courlis et e18). Le transfert passe en temps accéléré ; l'approche finale se pilote, dans un couloir de portiques ; la navette fait l'aller-retour vers la pile de conteneurs du port.</aside>
   </section>
 
-  <section class="slide layout-illustration" data-cote="droite" data-plan="etoile" data-titre-court="Le voyage">
+  <section class="slide layout-illustration" data-ambiance="super8" data-cote="gauche" data-plan="survol" data-titre-court="La navette">
+    <figure class="calque" data-calque="normal">
+      <p class="eyebrow anim">02 · la navette</p>
+      <h2 class="anim">La navette de baie</h2>
+      <img class="capture anim" src="media/illustrations/stt217-navette-pile.jpg" alt="La navette dans la baie ventrale d'un porte-conteneurs, devant la pile de conteneurs" width="960" height="540">
+      <ol class="etapes anim">
+        <li><b>01</b>Sortie de baie</li>
+        <li><b>02</b>Prise d'un conteneur ISO 20' sur la pile</li>
+        <li><b>03</b>Livraison au port</li>
+        <li><b>04</b>Retour en baie</li>
+      </ol>
+      <div class="chiffres anim">
+        <div><b>97 s</b><span>aller-retour</span></div>
+        <div><b>≤ 8 m/s</b><span>le long de la coque</span></div>
+      </div>
+    </figure>
+    <aside class="notes">La navette équipe les porte-conteneurs, qui n'ont ni module d'amarrage ni bras de chargement. Elle prend directement le conteneur extérieur de la pile. Tout le trajet près du vaisseau est calculé dans son repère, alors qu'il file à environ 8 km/s en orbite. Chaque mouvement part de l'arrêt et s'y arrête : 2,5 m/s en sortie et en entrée de baie, 8 m/s le long de la coque. Le logement vidé reste vide pendant l'escale.</aside>
+  </section>
+
+  <section class="slide layout-illustration" data-ambiance="kubrick" data-cote="droite" data-plan="etoile" data-titre-court="Le voyage">
     <figure class="calque" data-calque="normal">
       <p class="eyebrow anim">02 · le voyage</p>
       <h2 class="anim">Distorsion et saut</h2>
@@ -353,7 +403,7 @@
     <aside class="notes">La capture montre aussi l'interface complète : plan de vol, objet le plus proche, radio, propulsion. Bon moment pour montrer à quoi ressemble une partie.</aside>
   </section>
 
-  <section class="slide layout-contenu" data-cote="gauche" data-plan="terminateur" data-titre-court="La radio">
+  <section class="slide layout-contenu" data-ambiance="crt" data-cote="gauche" data-plan="terminateur" data-titre-court="La radio">
     <div class="calque" data-calque="normal">
       <p class="eyebrow anim">02 · la radio</p>
       <h2 class="anim">Une IA locale écrit la radio</h2>
@@ -371,7 +421,7 @@
     <aside class="notes">Les répliques écrites restent la source de vérité ; l'IA ne fait que les reformuler, en tâche de fond. L'icône cerveau du panneau radio montre l'état réel de l'IA.</aside>
   </section>
 
-  <section class="slide layout-chapitre" data-cote="gauche" data-systeme="suivant" data-titre-court="La campagne">
+  <section class="slide layout-chapitre" data-ambiance="nolan35" data-cote="gauche" data-systeme="suivant" data-titre-court="La campagne">
     <div class="bloc">
       <p class="num-chapitre anim">03</p>
       <h2 class="anim">De l’indépendant à la compagnie</h2>
@@ -380,7 +430,7 @@
     <aside class="notes">Fondu au noir vers un nouveau système.</aside>
   </section>
 
-  <section class="slide layout-contenu" data-cote="centre" data-plan="nebuleuse" data-titre-court="Cinq actes">
+  <section class="slide layout-contenu" data-ambiance="sepia" data-cote="centre" data-plan="nebuleuse" data-titre-court="Cinq actes">
     <div class="calque" data-calque="fort">
       <p class="eyebrow anim">03 · la campagne</p>
       <h2 class="anim">Cinq actes, sans victoire imposée</h2>
@@ -399,22 +449,22 @@
     <aside class="notes">La v2.18 livre le socle : choix Campagne ou Partie libre, départ sur le Courlis, sauvegarde. Les heures sont des cibles d'équilibrage, à calibrer en jeu. Des objectifs de compagnie servent de jalons : flotte de 6, 1 M CR de valeur…</aside>
   </section>
 
-  <section class="slide layout-illustration" data-cote="gauche" data-plan="anneaux" data-titre-court="Le chantier naval">
+  <section class="slide layout-illustration" data-ambiance="imax" data-cote="gauche" data-plan="anneaux" data-titre-court="Le chantier naval">
     <figure class="calque" data-calque="normal">
       <p class="eyebrow anim">03 · le chantier naval</p>
       <h2 class="anim">Ce qu'on assemble est ce qu'on pilote</h2>
-      <img class="capture anim" src="../docs/specs/img/spec010/chantier.svg" alt="Maquette du chantier naval : modules, fiche avant et après, devis" width="1200" height="720">
+      <img class="capture anim" src="media/illustrations/stt-editeur-meridian.jpg" alt="Éditeur STT Modules : le STT Meridian assemblé en six modules, 108,1 m, 1 191 t, avec la barre des modules" width="1280" height="720">
       <ul>
         <li class="anim">La masse pèse sur l'accélération et sur le carburant.</li>
         <li class="anim">Le palier fixe l'équipage et le poste d'amarrage ; le palier III ouvre le saut.</li>
         <li class="anim">Flotte hybride : on pilote l'amiral, les autres suivent des ordres, à 65 % du rendement d'un vaisseau piloté.</li>
       </ul>
-      <p class="mention anim">Maquette · lot L2 (v2.20)</p>
+      <p class="mention anim">Éditeur STT Modules · base du chantier naval, lot L2 (v2.20)</p>
     </figure>
-    <aside class="notes">Le chantier reprend l'éditeur de vaisseaux STT Modules : glisser-déposer des modules, fantôme aimanté, fiche avant et après, devis des travaux. Un vaisseau piloté rapporte toujours plus que le même vaisseau automatisé.</aside>
+    <aside class="notes">Capture de l'éditeur STT Modules, base du futur chantier naval : le STT Meridian, six modules, 108,1 m, 1 191 t. On glisse un module depuis la barre du bas, un fantôme s'aimante au port libre le plus proche. Ses créations entrent déjà dans le jeu : export « Pour le jeu », puis import au hangar. Le chantier y ajoutera la fiche avant et après et le devis des travaux. Un vaisseau piloté rapporte toujours plus que le même vaisseau automatisé.</aside>
   </section>
 
-  <section class="slide layout-illustration" data-cote="droite" data-plan="limbe" data-titre-court="La station">
+  <section class="slide layout-illustration" data-ambiance="nuit" data-cote="droite" data-plan="limbe" data-titre-court="La station">
     <figure class="calque" data-calque="normal">
       <p class="eyebrow anim">03 · la station</p>
       <h2 class="anim">Recherche, puis une station</h2>
@@ -429,7 +479,7 @@
     <aside class="notes">Chaque planète reçoit un profil économique déterministe (eau, denrées, minerais, rares, carburant, population) tiré de ce que le générateur produit déjà. Seuls les sites qui passent les trois seuils de SPEC-010 sont proposés.</aside>
   </section>
 
-  <section class="slide layout-chapitre" data-cote="gauche" data-systeme="suivant" data-titre-court="Le moteur">
+  <section class="slide layout-chapitre" data-ambiance="nolan35" data-cote="gauche" data-systeme="suivant" data-titre-court="Le moteur">
     <div class="bloc">
       <p class="num-chapitre anim">04</p>
       <h2 class="anim">Le moteur</h2>
@@ -438,7 +488,7 @@
     <aside class="notes">Fondu au noir vers un nouveau système.</aside>
   </section>
 
-  <section class="slide layout-illustration" data-cote="gauche" data-plan="anneaux" data-titre-court="Le rendu">
+  <section class="slide layout-illustration" data-ambiance="denis" data-cote="gauche" data-plan="anneaux" data-titre-court="Le rendu">
     <figure class="calque" data-calque="fort">
       <p class="eyebrow anim">04 · le rendu</p>
       <h2 class="anim">Du mètre à la galaxie</h2>
@@ -452,7 +502,7 @@
     <aside class="notes">C'est la réponse au manque de précision des nombres flottants 32 bits du GPU à ces échelles. Les tranches vides sont sautées. Le fond de cette présentation utilise exactement le même rendu.</aside>
   </section>
 
-  <section class="slide layout-illustration" data-cote="droite" data-plan="survol" data-titre-court="La fabrication">
+  <section class="slide layout-illustration" data-ambiance="kodak" data-cote="droite" data-plan="survol" data-titre-court="La fabrication">
     <figure class="calque" data-calque="normal">
       <p class="eyebrow anim">04 · la fabrication</p>
       <h2 class="anim">Un jeu, un fichier</h2>
@@ -466,7 +516,21 @@
     <aside class="notes">La nouvelle couche de simulation de campagne (sim/) n'utilise ni three.js ni le DOM : elle se teste sous Node. Le développement suit un mode agentique documenté (chef de projet, architecte, développeur), visible sur le Kanban du dépôt.</aside>
   </section>
 
-  <section class="slide layout-contenu" data-cote="centre" data-plan="croissant" data-titre-court="À vous de piloter">
+  <section class="slide layout-illustration" data-ambiance="vhs" data-cote="gauche" data-plan="lune" data-titre-court="Le moteur filmé">
+    <figure class="calque" data-calque="fort">
+      <p class="eyebrow anim">04 · cette présentation</p>
+      <h2 class="anim">Le moteur se filme <span class="insecable">lui-même</span></h2>
+      <svg class="schema anim" viewBox="0 0 600 176" role="img" aria-label="Chaîne de la présentation : moteur allégé, réalisateur, direction photo, puis le lecteur, vers l’écran ou un clip"><defs><marker id="fl4" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#a97a3d"/></marker></defs><g font-family="JetBrains Mono, ui-monospace, monospace" text-anchor="middle"><rect x="2" y="6" width="176" height="60" stroke="#25375c" fill="rgba(15,26,48,.55)"/><text x="90.0" y="32.0" font-size="16" font-weight="700" fill="#e8edf5">Moteur allégé</text><text x="90.0" y="52.0" font-size="12.5" fill="#5eead4">univers du jeu</text><rect x="212" y="6" width="176" height="60" stroke="#25375c" fill="rgba(15,26,48,.55)"/><text x="300.0" y="32.0" font-size="16" font-weight="700" fill="#e8edf5">Réalisateur</text><text x="300.0" y="52.0" font-size="12.5" fill="#5eead4">10 plans · montage</text><rect x="422" y="6" width="176" height="60" stroke="#25375c" fill="rgba(15,26,48,.55)"/><text x="510.0" y="32.0" font-size="16" font-weight="700" fill="#e8edf5">Direction photo</text><text x="510.0" y="52.0" font-size="12.5" fill="#5eead4">flou · flare · grain</text><rect x="2" y="112" width="176" height="60" stroke="#ffb454" fill="rgba(255,180,84,.08)"/><text x="90.0" y="138.0" font-size="16" font-weight="700" fill="#e8edf5">Écran</text><text x="90.0" y="158.0" font-size="12.5" fill="#5eead4">bandes 1.90 · calques</text><rect x="212" y="112" width="176" height="60" stroke="#25375c" fill="rgba(15,26,48,.55)"/><text x="300.0" y="138.0" font-size="16" font-weight="700" fill="#e8edf5">Lecteur</text><text x="300.0" y="158.0" font-size="12.5" fill="#5eead4">slides · notes (S)</text><rect x="422" y="112" width="176" height="60" stroke="#ffb454" fill="rgba(255,180,84,.08)"/><text x="510.0" y="138.0" font-size="16" font-weight="700" fill="#e8edf5">Clip</text><text x="510.0" y="158.0" font-size="12.5" fill="#5eead4">WebM · 30 i/s (E)</text><path d="M178 36 H208" stroke="#a97a3d" stroke-width="1.5" fill="none" marker-end="url(#fl4)"/><path d="M388 36 H418" stroke="#a97a3d" stroke-width="1.5" fill="none" marker-end="url(#fl4)"/><path d="M510.0 66 V89 H300.0 V108" stroke="#a97a3d" stroke-width="1.5" fill="none" marker-end="url(#fl4)"/><path d="M212 142 H182" stroke="#a97a3d" stroke-width="1.5" fill="none" marker-end="url(#fl4)"/><path d="M388 142 H418" stroke="#a97a3d" stroke-width="1.5" fill="none" marker-end="url(#fl4)"/></g></svg>
+      <ul>
+        <li class="anim">Aucun vaisseau dans le fond : seulement l'espace, ses étoiles et ses planètes.</li>
+        <li class="anim">Dix types de plans ; à chaque slide, une coupe, et le sujet à l'opposé du texte.</li>
+        <li class="anim">Une ambiance par slide : Nolan IMAX, 35 mm, noir &amp; blanc, sépia, Super 8, CRT, VHS…</li>
+      </ul>
+    </figure>
+    <aside class="notes">Cette présentation est une page HTML autonome : le moteur du jeu, allégé, tourne derrière les slides depuis le début. Le réalisateur choisit les plans (approche de l'étoile, croissant, lune devant sa planète, anneaux…) ; la direction photo applique flou, bloom, flare anamorphique et grain, en 17 à 27 passes par image, avec une résolution qui s'adapte à la machine. La touche E exporte un clip du fond, image par image. Chaque slide a son ambiance (ici, VHS : le caméscope), appliquée sur la coupe ; la touche A en impose une à toutes les slides.</aside>
+  </section>
+
+  <section class="slide layout-contenu" data-ambiance="imax" data-cote="centre" data-plan="croissant" data-titre-court="À vous de piloter">
     <div class="calque" data-calque="leger">
       <p class="eyebrow anim">fin</p>
       <h2 class="anim">À vous de piloter</h2>
@@ -519,6 +583,7 @@
     <dt>S</dt><dd>vue présentateur : notes, slide suivante, minuteur</dd>
     <dt>N</dt><dd>système suivant</dd>
     <dt>P</dt><dd>effets de la direction photo</dd>
+    <dt>A</dt><dd>ambiance de l'image : forcée pour toutes les slides, en boucle, puis celle de chaque slide</dd>
     <dt>Échap</dt><dd>fermer ce panneau, annuler un export</dd>
   </dl>
 </div>

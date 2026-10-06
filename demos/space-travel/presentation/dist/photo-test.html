@@ -623,11 +623,12 @@ function icosphere(level){
   }
   return { V, F };
 }
-/* roche : forme globale bosselée, ellipsoïde, cratères à rebord, stries */
+/* roche : forme globale bosselée, ellipsoïde (sauf opts.round : lunes), cratères à rebord, stries */
 function rockGeometry(seed, level, opts){
   opts = opts || {};
   const r = prng(seed), { V, F } = icosphere(level);
-  const sx = .75 + .5*r(), sy = .65 + .45*r(), sz = .8 + .5*r();
+  let sx = .75 + .5*r(), sy = .65 + .45*r(), sz = .8 + .5*r();
+  if(opts.round) sx = sy = sz = 1;   // lune ronde : l'aplatissement est réservé aux astéroïdes (tirages conservés : mêmes cratères)
   const craters = [];
   const nc = opts.craters !== undefined ? opts.craters : 9 + Math.floor(r()*9);
   for(let i=0;i<nc;i++){ const z = r()*2-1, a = r()*6.283, s = Math.sqrt(1-z*z); craters.push({ d:[Math.cos(a)*s, z, Math.sin(a)*s], rad: .12 + .38*Math.pow(r(), 2), depth: .06 + .1*r() }); }
@@ -757,7 +758,7 @@ AST.init = function(seedStr){
   const t0 = performance.now();
   AST.geos = [];
   for(let i=0;i<5;i++) AST.geos.push(rockGeometry((s + i*7919) >>> 0, 3, { lobe: i === 3 }));
-  AST.moonGeo = rockGeometry((s + 424242) >>> 0, 4, { amp: .18, craters: 26 });
+  AST.moonGeo = rockGeometry((s + 424242) >>> 0, 4, { amp: .18, craters: 26, round: true });
   AST.fam = Object.keys(FAMILIES);
   AST.mats = {};
   AST.fam.forEach((k, i) => { const tex = makeTextures(FAMILIES[k], (s + i*104729) >>> 0, 512); AST.mats[k] = makeMaterial(FAMILIES[k], tex); });
@@ -1968,6 +1969,12 @@ RZ.create = function(W, camera, opts){
   const systems = opts.systemsList || W.pickSystems(opts.systems || 6, opts.radius || 2, opts.center);
   D.systems = systems;
   const S = { plan: [], i: -1, t: 0, shot: null, black: 0, autoSide: 1, cluster: null, exit: null };
+  /* contre-éclairage faible du plan « lune » : lumière froide venue du côté opposé à l'étoile (un peu au-dessus du plan
+     de l'orbite, pour le relief), ≈ 10 % du soleil ; la face nuit de la lune reste lisible (cratères), sans paraître de jour.
+     Éteint dans les autres plans. */
+  const FILL = .17, fill = new THREE.DirectionalLight(0xa7b8d8, 0);
+  if(W.sysScene){ W.sysScene.add(fill); W.sysScene.add(fill.target); }
+  D.fill = fill;
 
   /* ---------- sujets ---------- */
   const pScore = p => (p.ring ? 3 : 0) + Math.min(p.moonPivots.length, 3)*1.2 + (p.kind.gas ? .8 : 0) + (p.isHabitable ? 2 : 0) + (p.hasAtmosphere ? .4 : 0);
@@ -2067,22 +2074,39 @@ RZ.create = function(W, camera, opts){
     return { subject: p.properName, pos, look: () => P.clone(), up: () => nr.clone().multiplyScalar(Math.sign(elev)), fov: () => fov,
       focus: k => pos(k).distanceTo(P), near: k => Math.max(1, pos(k).distanceTo(P) - p.ringOuter) };
   };
-  /* plan « lune » faisable ? lune côté jour (pleine phase), caméra au-delà de la lune, lune ≈ 0,6 fois la planète,
-     focale ≤ 300 mm ; sinon (lune trop lointaine pour une planète tellurique) le type n'est pas proposé */
+  /* plan « lune » faisable ? la lune devant sa planète, l'étoile dans le dos autant que possible : caméra au-delà de la
+     lune (à s, lune ≈ kz fois la planète), focale ≤ 300 mm ; angle de phase (lune → caméra, lune → étoile) visé ≤ 60°.
+     Repère : u (planète → lune), l (vers l'étoile, ⊥ u), e = R/dm, φ = angle (u, lune → étoile). La caméra dans la direction
+     u + ρ·e·l montre la lune à ρ rayons du centre de la planète, côté opposé à l'étoile (ρ > 0 : vers le terminateur, la phase
+     baisse de atan(ρ·e) ; ρ < 0 : devant le limbe éclairé, elle monte d'autant) ; |ρ| ≤ 1,3, la lune reste sur le disque ou
+     à cheval sur le limbe. Lune carbonée exclue (albédo ~2 % : noire même pleine) ; retenue : la meilleure phase. Une lune
+     filmée côté nuit reste lisible : contre-éclairage faible (voir D.update) ; aucune lune → false (type non proposé) */
+  const PHASE = 60*DEG, RHO = 1.3;
   function moonPlan(p, kz){
-    const P = p.position, R = p.radius, L = litOf(p); let m = null, best = -2;
-    p.moonPivots.forEach(pv => { const mm = pv.children[0]; if(!mm) return; const d = wpos(mm).sub(P).normalize().dot(L); if(d > best){ best = d; m = mm; } });
-    if(!m) return null;
-    const M0 = wpos(m), dm = M0.distanceTo(P), rm = m.scale.x, c0 = dm/Math.max(kz*R - rm, .05*R), Dc = dm + c0*rm;
-    const fov = 2*Math.asin(R/Dc)/DEG/.48;
-    return focalOf(fov) <= 300 ? { m, dm, rm, Dc, dir: M0.sub(P).normalize() } : null;
+    const P = p.position, R = p.radius, A = window.__AST; let best = false;
+    p.moonPivots.forEach(pv => { const m = pv.children[0]; if(!m || (A && A.mats && m.material === A.mats.carbonaceous)) return;
+      const M = wpos(m), u = M.clone().sub(P), dm = u.length(), rm = m.scale.x, s = dm*rm/Math.max(kz*R - rm, .05*R), Dc = dm + s;
+      u.normalize();
+      const L = M.clone().negate().normalize(), phi = u.angleTo(L), ab = phi - Math.atan(RHO*R/dm);
+      if(focalOf(2*Math.asin(R/Dc)/DEG/.48) > 300) return;
+      if(!best || ab < best.ab) best = { m, dm, rm, s, Dc, u, L, phi, ab };
+    });
+    return best;
   }
   B.lune = function(r, p){
-    const P = p.position, R = p.radius, N = W.leg.orbitN, mp = moonPlan(p, lerp(.5, .7, r())) || moonPlan(p, .7); if(!mp) return null;
-    const { m, dm, rm, Dc, dir } = mp, w = perp(dir, N.clone().add(new V3(r() - .5, r() - .5, r() - .5).multiplyScalar(.6)));
-    const fov = 2*Math.asin(R/Dc)/DEG/lerp(.42, .55, r()), thp = Math.asin(R/Dc), xs = thp*(Dc - dm)*Dc/dm;
-    const x0 = -lerp(.75, .95, r())*xs, x1 = lerp(.75, .95, r())*xs;   /* la lune traverse le disque de sa planète */
-    const pos = k => P.clone().addScaledVector(dir, Dc).addScaledVector(w, lerp(x0, x1, smooth(k)));
+    const P = p.position, R = p.radius, N = W.leg.orbitN, kz = lerp(.5, .7, r());
+    const mp = moonPlan(p, kz) || moonPlan(p, .7); if(!mp) return null;
+    const { m, dm, rm, s, Dc, u, L, phi } = mp, e = R/dm, l = perp(u, L), t = new V3().crossVectors(u, l);
+    /* centre du trajet : la lune devant le limbe éclairé (ρ = -0,35 à -0,7) tant que la phase reste ≤ 60°, sinon vers le
+       terminateur juste ce qu'il faut (au plus ρ = 1,3 : lune côté nuit, lisible grâce au contre-éclairage) */
+    const rl = -lerp(.35, .7, r()), rc = Math.min(RHO, Math.max(rl, phi - PHASE >= Math.PI/2 - 1e-3 ? RHO : Math.tan(phi - PHASE)/e));
+    const psi = lerp(-.35, .35, r()), sg = r() < .5 ? -1 : 1, x0 = -lerp(.75, .95, r()), x1 = lerp(.75, .95, r());
+    let w = t.clone().multiplyScalar(sg*Math.cos(psi)).addScaledVector(l, Math.sin(psi));
+    const vAt = x => u.clone().addScaledVector(l, rc*e).addScaledVector(w, x*e).normalize();
+    if(Math.max(vAt(x0).angleTo(L), vAt(x1).angleTo(L)) > Math.max(PHASE, phi - Math.atan(rc*e))) w = t.clone().multiplyScalar(sg);   /* travelling en travers de l'étoile : phase constante */
+    const fov = Math.max(2*Math.asin(R/Dc)/DEG/lerp(.42, .55, r()), fovOf(300)), q = new THREE.Quaternion();
+    /* la lune traverse le disque de sa planète ; la caméra suit la lune sur son orbite (le cadrage ne dérive pas) */
+    const pos = k => { const M = wpos(m); q.setFromUnitVectors(u, M.clone().sub(P).normalize()); return M.addScaledVector(vAt(lerp(x0, x1, smooth(k))).applyQuaternion(q), s); };
     return { subject: p.properName, moon: m, pos, look: () => P.clone(), up: () => N, fov: () => fov,
       focus: k => pos(k).distanceTo(P), near: k => pos(k).distanceTo(wpos(m)) - rm, rack: [.35, .62] };
   };
@@ -2209,6 +2233,8 @@ RZ.create = function(W, camera, opts){
     }
     applyCamera(k);
     const s2 = S.shot, near = s2.near ? s2.near(k) : null, far = s2.focus(k);
+    fill.intensity = s2.moon ? FILL : 0;
+    if(s2.moon){ const M = wpos(s2.moon); fill.position.copy(M).normalize().addScaledVector(W.leg.orbitN, .45); fill.target.position.set(0, 0, 0); fill.target.updateMatrixWorld(); }
     let focus = far, rack = 0;
     if(near !== null && s2.rack){ rack = smoother((k - s2.rack[0])/(s2.rack[1] - s2.rack[0])); focus = Math.exp(lerp(Math.log(Math.max(near, 1)), Math.log(Math.max(far, 1)), rack)); }
     _v.set(0, 0, 0).project(camera);
@@ -2232,7 +2258,9 @@ RZ.create = function(W, camera, opts){
    adaptation d'exposition, étalonnage, aberration, vignettage, grain, bandes, fondu, CRT de transition.
    Un « directeur photo » choisit un look par système et règle chaque plan d'après les métadonnées du réalisateur.
    Lot P4 : calques derrière le texte des slides (PH.setVeil), réglages de qualité (PH.quality), grain et CRT réglables.
-   Voir docs/SPEC-P3-photo.md et docs/SPEC-P4-lecteur.md.
+   Lot P7 : ambiances (Nolan 35 mm, noir & blanc, sépia, Technicolor, Super 8, CRT, VHS, vision nocturne), choisies par
+   slide, appliquées sur la coupe (PH.queueLook) ; les bandes glissent d'un format à l'autre.
+   Voir docs/SPEC-P3-photo.md, docs/SPEC-P4-lecteur.md et docs/SPEC-P7-ambiances.md.
    ===================================================================== */
 (function(){
 'use strict';
@@ -2255,7 +2283,31 @@ const LOOKS = {
   kodak:   { label: 'Kodak 2383', w: .24, letter: 2.39, bloom: .5, halation: .42, streak: .55, streakTint: [1.0, .7, .4], ghost: .4, grain: .062, vignette: .42, aberr: .0018,
              grade: { sat: 1.04, contrast: 1.2, gamma: 1.04, lift: [.006, 0, -.01], gain: [1.08, 1.0, .9], shadows: [.12, .1, .08], highlights: [1.0, .78, .52], split: .18 } },
   kubrick: { label: 'Kubrick 2001', w: .18, letter: 2.20, bloom: .32, halation: .06, streak: 0, streakTint: [.6, .75, 1.0], ghost: .45, grain: .018, vignette: .2, aberr: .001,
-             grade: { sat: .9, contrast: 1.05, gamma: 1.0, lift: [0, .002, .01], gain: [.98, 1.0, 1.04], shadows: [.08, .1, .14], highlights: [.95, .97, 1.0], split: .08 } }
+             grade: { sat: .9, contrast: 1.05, gamma: 1.0, lift: [0, .002, .01], gain: [.98, 1.0, 1.04], shadows: [.08, .1, .14], highlights: [.95, .97, 1.0], split: .08 } },
+  /* ambiances (lot P7) : poids 0, jamais tirées au hasard ; champs optionnels : mono (monochrome) et tone/toneHi (virage
+     des ombres et des hautes lumières), dye (séparation trichrome), expo, grainSize (px), weave (flottement du film),
+     flicker (pompage), gate (fenêtre arrondie), dust (poussières), scratch (rayure), crt (écran cathodique permanent),
+     vhs (bavure, tracking, commutation des têtes), tube (intensificateur) ; letter 0 : plein cadre */
+  nolan35: { label: 'Nolan 35 mm', w: 0, letter: 2.39, bloom: .5, halation: .26, streak: .95, streakTint: [.45, .62, 1.0], ghost: .4, grain: .05, grainSize: 1.3, vignette: .4, aberr: .0022,
+             grade: { sat: .9, contrast: 1.14, gamma: 1.0, lift: [.004, .002, .008], gain: [1.06, 1.0, .92], shadows: [.04, .1, .13], highlights: [1.0, .8, .58], split: .2 } },
+  nb:      { label: 'Noir & blanc', w: 0, letter: 1.90, bloom: .42, halation: .1, streak: .5, streakTint: [1, 1, 1], ghost: .3, grain: .06, grainSize: 1.25, vignette: .38, aberr: .0012,
+             mono: 1, tone: [1, 1, 1], toneHi: [1, 1, 1],
+             grade: { sat: 1, contrast: 1.32, gamma: .96, lift: [0, 0, 0], gain: [1.04, 1.04, 1.04], shadows: [0, 0, 0], highlights: [1, 1, 1], split: 0 } },
+  sepia:   { label: 'Sépia', w: 0, letter: 1.85, bloom: .38, halation: .18, streak: .25, streakTint: [1, .85, .6], ghost: .2, grain: .07, grainSize: 1.6, vignette: .62, aberr: .0012,
+             mono: 1, tone: [1.04, .76, .5], toneHi: [1.05, .97, .84], flicker: .035, weave: .0007, dust: .6, scratch: .7,
+             grade: { sat: 1, contrast: 1.12, gamma: 1.05, lift: [.05, .05, .05], gain: [1, 1, 1], shadows: [0, 0, 0], highlights: [1, 1, 1], split: 0 } },
+  technicolor: { label: 'Technicolor', w: 0, letter: 1.85, bloom: .48, halation: .22, streak: .45, streakTint: [1.0, .8, .55], ghost: .35, grain: .035, vignette: .3, aberr: .0014, dye: .4,
+             grade: { sat: 1.3, contrast: 1.16, gamma: 1.02, lift: [0, .004, .016], gain: [1.08, 1.0, .95], shadows: [.02, .05, .14], highlights: [1.0, .9, .74], split: .12 } },
+  super8:  { label: 'Super 8', w: 0, letter: 0, bloom: .55, halation: .4, streak: .2, streakTint: [1, .8, .55], ghost: .25, grain: .11, grainSize: 2.2, vignette: .7, aberr: .0032,
+             weave: .002, flicker: .05, gate: 1, dust: 1,
+             grade: { sat: .82, contrast: .96, gamma: 1.06, lift: [.06, .04, .02], gain: [1.1, 1.0, .82], shadows: [.1, .06, .02], highlights: [1.0, .85, .6], split: .25 } },
+  crt:     { label: 'CRT', w: 0, letter: 0, crt: .85, bloom: .7, halation: .05, streak: 0, streakTint: [.6, .8, 1], ghost: 0, grain: .02, vignette: .3, aberr: .0016,
+             grade: { sat: 1.1, contrast: 1.12, gamma: 1.0, lift: [0, .006, .004], gain: [.96, 1.04, 1.0], shadows: [0, .05, .04], highlights: [.95, 1.0, .98], split: .1 } },
+  vhs:     { label: 'VHS', w: 0, letter: 0, vhs: 1, bloom: .5, halation: .12, streak: .2, streakTint: [1, .9, .8], ghost: .1, grain: .05, grainSize: 1.5, vignette: .25, aberr: .0045,
+             grade: { sat: .85, contrast: .92, gamma: 1.08, lift: [.03, .02, .04], gain: [1.04, 1.0, 1.02], shadows: [.03, 0, .06], highlights: [1.0, .95, .92], split: .15 } },
+  nuit:    { label: 'Vision nocturne', w: 0, letter: 0, expo: 1.8, mono: 1, tone: [.16, .95, .3], toneHi: [.55, 1.12, .5], tube: .92, bloom: .9, halation: 0, streak: 0,
+             streakTint: [1, 1, 1], ghost: 0, grain: .17, grainSize: 1.2, vignette: .2, aberr: 0,
+             grade: { sat: 1, contrast: 1.18, gamma: .82, lift: [.02, .02, .02], gain: [1, 1, 1], shadows: [0, 0, 0], highlights: [1, 1, 1], split: 0 } }
 };
 PHO.LOOKS = LOOKS;
 /* ouverture (profondeur de champ) et flare selon le type de plan du réalisateur. Le sujet mis au point reste net en
@@ -2327,6 +2379,7 @@ uniform vec4 uVeil[3]; uniform float uVeilK[3]; uniform int uNv; uniform float u
 uniform vec2 uRes; uniform float uTime, uOn, uDof, uBloom, uHal, uStreak, uGhost, uAberr, uVig, uGrain, uBar, uFade, uCRT, uCrtOpen, uKey, uDebug, uWipe;
 uniform vec3 uStreakTint; uniform vec3 uStar;
 uniform float uSat, uContrast, uGamma, uSplit; uniform vec3 uLift, uGain, uShadows, uHigh;
+uniform float uMono, uDye, uExpo, uGrainSize, uWeave, uFlicker, uGate, uDust, uScratch, uVhs, uTube; uniform vec3 uTone, uToneHi;
 float hash(vec2 p){ p = fract(p*vec2(443.897, 441.423)); p += dot(p, p.yx + 19.19); return fract((p.x + p.y)*p.x); }
 vec3 dofAt(vec2 p){
   vec3 s = texture2D(tScene, p).rgb;
@@ -2345,16 +2398,31 @@ vec3 grade(vec3 c){
   c = mix(c, c*uHigh*1.25, smoothstep(.45, 1.0, l)*uSplit);
   return c;
 }
+/* ambiance : séparation trichrome, étalonnage, monochrome viré (ombres → hautes lumières) */
+vec3 look(vec3 c){
+  c = max(c, 0.0);
+  if(uDye > .001){ vec3 t = vec3(c.r - (c.g + c.b)*.5, c.g - (c.r + c.b)*.5, c.b - (c.r + c.g)*.5); c = max(c + t*uDye, 0.0); }
+  c = grade(c);
+  if(uMono > .001){ float l = luma(c); c = mix(c, l*mix(uTone, uToneHi, smoothstep(.0, .9, l)), uMono); }
+  return c;
+}
 void main(){
   vec2 uv = vUv;
   if(uOn < .5 || vUv.x < uWipe){ gl_FragColor = vec4(texture2D(tScene, uv).rgb*(1.0 - uFade)*(abs(vUv.x - uWipe)*uRes.x < 1.0 ? 0.0 : 1.0), 1.0); return; }
   if(uDebug > .5){ vec4 k = texture2D(tCoc, uv); gl_FragColor = vec4(k.r*(1.0 - k.g), k.r*k.g, texture2D(tScene, uv).g*.25, 1.0); return; }
+  float fr = floor(uTime*18.0);                                                         /* cadence « film » : 18 images/s */
+  if(uWeave > .001) uv += (vec2(hash(vec2(fr, 1.7)), hash(vec2(fr, 9.3))) - .5)*uWeave*vec2(.6, 1.0);   /* flottement */
+  if(uVhs > .001){ float tf = floor(uTime*30.0), hs = smoothstep(.045, .0, vUv.y);        /* lignes instables, commutation des têtes */
+    uv.x += ((hash(vec2(floor(vUv.y*uRes.y*.5), tf)) - .5)*.0012 + hs*(hash(vec2(tf, 3.1)) - .2)*.03)*uVhs; }
   vec2 cq = uv - .5;
   if(uCRT > .001){ uv = .5 + cq*(1.0 + dot(cq, cq)*.32*uCRT); cq = uv - .5;
     if(any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))){ gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); return; } }
   float aspect = uRes.x/uRes.y;
   vec2 off = cq*uAberr*(1.0 + 4.0*dot(cq, cq)) + vec2(uCRT*.0025, 0.0);
   vec3 col = vec3(dofAt(uv + off).r, dofAt(uv).g, dofAt(uv - off).b);
+  if(uVhs > .001){ vec2 px = vec2(1.0/uRes.x, 0.0);                                    /* luminance molle, chrominance qui bave */
+    vec3 sm = (dofAt(uv - 2.0*px) + dofAt(uv - 5.0*px) + dofAt(uv - 9.0*px) + col)*.25, soft = (dofAt(uv - 1.5*px) + dofAt(uv + 1.5*px))*.5;
+    col = mix(col, vec3(luma(mix(col, soft, .6))) + (sm - luma(sm))*1.15, uVhs); }
   vec3 b1 = texture2D(tB1, uv).rgb;
   col += (b1*.16 + texture2D(tB2, uv).rgb*.22 + texture2D(tB3, uv).rgb*.28 + texture2D(tB4, uv).rgb*.34)*uBloom;
   col += b1*uHal*vec3(1.0, .32, .12);
@@ -2370,18 +2438,29 @@ void main(){
     }
   }
   float e = clamp(sqrt(uKey/max(upk(texture2D(tAdapt, vec2(.5))), 1e-3)), .85, 1.2);   /* iris : demi-correction, bornée */
-  col *= e;
-  col = grade(col);
+  col *= e*uExpo;
+  col = look(col);
+  if(uFlicker > .001) col *= 1.0 + (hash(vec2(fr, 5.1)) - .5)*2.0*uFlicker;
   col *= 1.0 - uVig*smoothstep(.3, .95, length(cq*vec2(aspect/1.55, 1.0))*1.2);
+  if(uTube > .001) col *= 1.0 - uTube*smoothstep(.86, 1.02, length(cq/vec2(.53, .64)));       /* oculaire de l'intensificateur */
   /* calques : derrière le texte d'une slide, l'image floutée, exposée, étalonnée, assombrie vers la couleur de panneau */
+  float vq = 0.0;                                                                         /* présence d'un calque (texte) */
   if(uNv > 0 && uVeilF > .001){
     vec2 px = vUv*uRes; float vm = 0.0, vl = 0.0;
     for(int i = 0; i < 3; i++){ if(i >= uNv) break; vec4 r = uVeil[i]*vec4(uRes, uRes); vec2 d = max(r.xy - px, px - r.zw);
       float m = 1.0 - clamp(max(d.x, d.y) + .5, 0.0, 1.0); if(m > vm){ vm = m; vl = uVeilK[i]; } }
-    if(vm > 0.0){ vec3 v = grade(texture2D(tVeil, uv).rgb*e); col = mix(col, mix(v, uPanel, vl), vm*uVeilF); }
+    if(vm > 0.0){ vec3 v = look(texture2D(tVeil, uv).rgb*e*uExpo); col = mix(col, mix(v, uPanel, vl), vm*uVeilF); vq = vm*uVeilF; }
   }
   float l = luma(col);
-  col += (hash(uv*uRes + fract(uTime*7.31)*91.7) - .5)*uGrain*(1.0 - .55*l)*(.4 + .6*smoothstep(.0, .25, l));
+  col += (hash(floor(uv*uRes/max(uGrainSize, 1.0)) + fract(uTime*7.31)*91.7) - .5)*uGrain*(1.0 - .55*l)*(.4 + .6*smoothstep(.0, .25, l))
+    *mix(vec3(1.0), (uTone + uToneHi)*.5, uMono);                                       /* grain viré avec l'image monochrome */
+  if(uDust > .001){ float h = hash(floor(vUv*uRes/3.0) + fr*17.13);                     /* poussières : points clairs ou sombres */
+    col = mix(col, vec3(h > 1.0 - .0004*uDust ? .85 : .03), step(1.0 - .0009*uDust, h)*.8*(1.0 - .85*vq)); }
+  if(uScratch > .001){ float sk = floor(uTime*1.3), lx = hash(vec2(sk, 2.2)) + .002*sin(uTime*9.0);    /* rayure verticale */
+    col *= 1.0 - step(.45, hash(vec2(sk, 7.7)))*uScratch*.35*smoothstep(1.2, 0.0, abs(vUv.x - lx)*uRes.x)*(1.0 - .85*vq); }
+  if(uVhs > .001){ float d = abs(vUv.y - fract(.3 - uTime*.05));                            /* bande de tracking qui remonte */
+    float nz = step(.82, hash(vec2(floor(vUv.x*uRes.x/4.0), floor(vUv.y*uRes.y*.5)) + fract(uTime*13.0)));
+    col += nz*((1.0 - smoothstep(.0, .018, d))*.35 + smoothstep(.045, .0, vUv.y)*.12)*uVhs*(1.0 - .85*vq); }   /* discret sous le texte */
   if(uCRT > .001){
     float sl = .82 + .18*sin(uv.y*uRes.y*3.14159);
     float m = mod(gl_FragCoord.x, 3.0); vec3 mask = m < 1.0 ? vec3(1.0, .82, .82) : m < 2.0 ? vec3(.82, 1.0, .82) : vec3(.82, .82, 1.0);
@@ -2390,6 +2469,8 @@ void main(){
     col = mix(col, crt, uCRT);
     if(uCrtOpen < 1.0){ float hh = .5*uCrtOpen + .003; col *= step(abs(cq.y), hh)*(1.0 + 2.5*(1.0 - uCrtOpen)); }   /* mise sous tension : une ligne qui s'ouvre */
   }
+  if(uGate > .001){ float r = .06*uRes.y*uGate; vec2 p = abs(vUv - .5)*uRes - (uRes*.5 - vec2(r + .012*uRes.y*uGate));   /* fenêtre de projection */
+    col *= 1.0 - smoothstep(-6.0, 2.0, length(max(p, 0.0)) - r); }
   float bar = step(uv.y, uBar) + step(1.0 - uBar, uv.y);
   col *= (1.0 - clamp(bar, 0.0, 1.0))*(1.0 - uFade);
   gl_FragColor = vec4(col, 1.0);
@@ -2399,7 +2480,7 @@ void main(){
 PHO.create = function(renderer, opts){
   opts = opts || {};
   const SEED = String(opts.seed !== undefined ? opts.seed : Math.floor(Math.random()*1e9));
-  const PH = { enabled: true, debug: null, wipe: 0, seed: SEED, grainScale: 1, crtChance: opts.crtChance !== undefined ? opts.crtChance : .15,
+  const PH = { enabled: true, debug: null, wipe: 0, seed: SEED, grainScale: 1, aspect: 16/9, crtChance: opts.crtChance !== undefined ? opts.crtChance : .15,
     quality: { msaa: opts.msaa !== false, dof: true, flare: true }, state: { seq: -1, shot: -1, look: null, lookName: null, aperture: 0, flare: 1, crt: 0 } };
   let forcedLook = opts.look && opts.look !== 'auto' ? opts.look : null, forcedBar = undefined, crtUntil = -1, crtStart = -1, time = 0;
   const gl2 = renderer.capabilities.isWebGL2;
@@ -2408,12 +2489,18 @@ PHO.create = function(renderer, opts){
   const T = {}, size = { w: 0, h: 0 };
   const mk = (w, h, o) => new THREE.WebGLRenderTarget(Math.max(1, w), Math.max(1, h), Object.assign({ minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat,
     type: THREE.UnsignedByteType, depthBuffer: false, stencilBuffer: false }, o || {}));
+  /* exposition : cibles indépendantes de la taille, gardées d'une allocation à l'autre (pas de saut d'exposition quand la
+     qualité automatique change la résolution) */
+  const near = { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter };
+  const TA = { lum: mk(16, 16, near), ad0: mk(1, 1, near), ad1: mk(1, 1, near) };
   function alloc(w, h){
-    Object.values(T).forEach(t => t.dispose());
+    Object.keys(T).forEach(k => { if(!TA[k]) T[k].dispose(); });
     const h2 = [w >> 1, h >> 1], h4 = [w >> 2, h >> 2], h8 = [w >> 3, h >> 3], h16 = [w >> 4, h >> 4], h32 = [w >> 5, h >> 5];
     msaaOn = !!(gl2 && THREE.WebGLMultisampleRenderTarget && PH.quality.msaa);
-    if(msaaOn){ T.scene = new THREE.WebGLMultisampleRenderTarget(w, h, { format: THREE.RGBAFormat, depthBuffer: true, stencilBuffer: false }); T.scene.samples = 4; }
-    else T.scene = mk(w, h, { depthBuffer: true });
+    /* profondeur 24 bits (DEPTH24_STENCIL8) : avec la profondeur 16 bits par défaut de three r128, un astre au fond d'une
+       tranche (près de son plan lointain) se battait avec sa couronne et son halo (liseré qui scintillait au limbe) */
+    if(msaaOn){ T.scene = new THREE.WebGLMultisampleRenderTarget(w, h, { format: THREE.RGBAFormat, depthBuffer: true, stencilBuffer: true }); T.scene.samples = 4; }
+    else T.scene = mk(w, h, { depthBuffer: true, stencilBuffer: true });
     T.scene.texture.encoding = THREE.sRGBEncoding;        /* matériaux de three : ACES + sRGB, comme à l'écran */
     T.coc = mk(...h2); T.prep = mk(...h2); T.dofA = mk(...h2); T.tmp2 = mk(...h2);
     T.dofB = mk(...h4); T.tmp4 = mk(...h4); T.cf = mk(...h4);
@@ -2421,9 +2508,8 @@ PHO.create = function(renderer, opts){
     T.t1 = mk(...h4); T.t2 = mk(...h8); T.t3 = mk(...h16); T.t4 = mk(...h32);
     T.sA = mk(...h4); T.sB = mk(...h4);
     T.v2 = mk(...h2); T.v4 = mk(...h4); T.tv = mk(...h4);
-    const near = { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter };
-    T.lum = mk(16, 16, near); T.ad0 = mk(1, 1, near); T.ad1 = mk(1, 1, near);
-    size.w = w; size.h = h; adaptInit = false;
+    Object.assign(T, TA);
+    size.w = w; size.h = h;
   }
   let adaptInit = false, adaptPing = 0, msaaOn = false;
 
@@ -2448,7 +2534,8 @@ PHO.create = function(renderer, opts){
     uniforms: U({ tVeil: null, uVeil: Array.from({ length: 3 }, () => new THREE.Vector4()), uVeilK: [0, 0, 0], uNv: 0, uVeilF: 0, uPanel: new V3(.043, .071, .125),
       tScene: null, tCoc: null, tCf: null, tDofA: null, tDofB: null, tB1: null, tB2: null, tB3: null, tB4: null, tStreak: null, tAdapt: null,
       uRes: new THREE.Vector2(), uTime: 0, uOn: 1, uDof: 0, uBloom: 0, uHal: 0, uStreak: 0, uGhost: 0, uAberr: 0, uVig: 0, uGrain: 0, uBar: 0, uFade: 0, uCRT: 0, uKey: .14, uDebug: 0, uWipe: 0,
-      uStreakTint: new V3(1, 1, 1), uStar: new V3(), uCrtOpen: 1, uSat: 1, uContrast: 1, uGamma: 1, uSplit: 0, uLift: new V3(), uGain: new V3(1, 1, 1), uShadows: new V3(), uHigh: new V3(1, 1, 1) }) });
+      uStreakTint: new V3(1, 1, 1), uStar: new V3(), uCrtOpen: 1, uSat: 1, uContrast: 1, uGamma: 1, uSplit: 0, uLift: new V3(), uGain: new V3(1, 1, 1), uShadows: new V3(), uHigh: new V3(1, 1, 1),
+      uMono: 0, uDye: 0, uExpo: 1, uGrainSize: 1, uWeave: 0, uFlicker: 0, uGate: 0, uDust: 0, uScratch: 0, uVhs: 0, uTube: 0, uTone: new V3(1, 1, 1), uToneHi: new V3(1, 1, 1) }) });
   PH.passes = 0;
   function pass(mat, target, set){
     if(set) Object.keys(set).forEach(k => { const v = set[k]; if(v && v.isVector2) mat.uniforms[k].value.copy(v); else mat.uniforms[k].value = v; });
@@ -2464,14 +2551,19 @@ PHO.create = function(renderer, opts){
   function chooseLook(seq){
     if(forcedLook) return forcedLook;
     const r = rngOf(SEED + ':look:' + seq), prev = PH.state.lookName;
-    const list = Object.keys(LOOKS).filter(k => k !== prev);
+    const list = Object.keys(LOOKS).filter(k => k !== prev && LOOKS[k].w > 0);
     let s = 0; list.forEach(k => s += LOOKS[k].w); let x = r()*s;
     for(const k of list){ x -= LOOKS[k].w; if(x <= 0) return k; }
     return list[list.length - 1];
   }
   let newShot = false;            /* nouveau plan : l'exposition est réglée d'emblée (pas d'iris visible sur une coupe) */
+  let queued;                     /* ambiance en attente : appliquée sur la prochaine coupe (nouveau plan ou nouveau système) */
   function direct(meta){
     const st = PH.state;
+    if(queued !== undefined && (meta.seq !== st.seq || meta.shot !== st.shot || meta.seq !== st.seqShot)){
+      forcedLook = queued; queued = undefined; st.pending = false;
+      if(meta.seq === st.seq && forcedLook){ st.lookName = forcedLook; st.look = LOOKS[forcedLook]; }
+    }
     if(meta.seq !== st.seq){
       st.seq = meta.seq; st.lookName = chooseLook(meta.seq); st.look = LOOKS[st.lookName];
       const r = rngOf(SEED + ':crt:' + meta.seq);
@@ -2483,7 +2575,12 @@ PHO.create = function(renderer, opts){
       st.aperture = lerp(cfg.ap[0], cfg.ap[1], r()); st.flare = cfg.flare*lerp(.85, 1.1, r());
     }
   }
-  PH.setLook = name => { forcedLook = name && name !== 'auto' ? name : null; PH.state.seq = -1; };
+  PH.setLook = name => { forcedLook = name && name !== 'auto' && LOOKS[name] ? name : null; queued = undefined; PH.state.pending = false;
+    if(forcedLook){ PH.state.lookName = forcedLook; PH.state.look = LOOKS[forcedLook]; } else PH.state.seq = -1; };   /* tout de suite, sans coupe */
+  /* ambiance pour la prochaine coupe (sans effet si c'est déjà la bonne) ; PH.state.pending tant qu'elle attend */
+  PH.queueLook = name => { const n = name && name !== 'auto' && LOOKS[name] ? name : null;
+    if(n === forcedLook && n === PH.state.lookName){ queued = undefined; PH.state.pending = false; return false; }
+    queued = n; PH.state.pending = true; return true; };
   PH.setLetterbox = ratio => { forcedBar = ratio; };
   PH.forceCRT = (dur) => { crtStart = time; crtUntil = time + (dur || 1.6); };
   /* calques : [{ x0, y0, x1, y1, k }] en coordonnées d'image (0..1, y vers le haut), k = assombrissement ; fondu 0..1 */
@@ -2506,6 +2603,10 @@ PHO.create = function(renderer, opts){
     st.crtOpen = crtOn ? smooth(ct/.3) : 1;
     st.fade = (meta.fade || 0)*(crtOn ? 1 - smooth(ct/.12) : 1);      /* la mise sous tension tient lieu de fondu d'ouverture */
     st.letter = forcedBar === null ? 0 : (forcedBar || L.letter);
+    /* bandes : fraction de la hauteur, qui glisse d'un format à l'autre (≈ 0,4 s) */
+    const bf = st.letter ? Math.max(0, (1 - PH.aspect/st.letter)/2) : 0;
+    st.barF = st.barF === undefined || !(dt > 0) ? bf : st.barF + (bf - st.barF)*(1 - Math.exp(-dt*9));   /* dt nul : sans glissement */
+    if(Math.abs(st.barF - bf) < 1e-4) st.barF = bf;
     return st;
   };
 
@@ -2516,6 +2617,7 @@ PHO.create = function(renderer, opts){
     renderer.getDrawingBufferSize(_buf);
     const w = _buf.x | 0, h = _buf.y | 0;
     if(w !== size.w || h !== size.h || msaaOn !== !!(gl2 && THREE.WebGLMultisampleRenderTarget && PH.quality.msaa)) alloc(w, h);
+    PH.aspect = w/h;
     meta = meta || DEF_META;
     const st = PH.update(meta, dt), L = st.look;
     /* 1) le monde, à l'identique de l'écran */
@@ -2586,14 +2688,18 @@ PHO.create = function(renderer, opts){
     C.tB1.value = tex(T.b1); C.tB2.value = tex(T.b2); C.tB3.value = tex(T.b3); C.tB4.value = tex(T.b4); C.tAdapt.value = tex(next);
     C.uBloom.value = L.bloom; C.uHal.value = L.halation; C.uGhost.value = st.ghost; C.uStreakTint.value.set(...L.streakTint);
     C.uStar.value.set(star.ndc[0], star.ndc[1], 0); C.uAberr.value = L.aberr; C.uVig.value = L.vignette; C.uGrain.value = L.grain*PH.grainScale;
-    C.uBar.value = bar ? Math.max(0, (1 - (w/h)/bar)/2) : 0;
+    C.uBar.value = st.barF || 0;
     C.uSat.value = g.sat; C.uContrast.value = g.contrast; C.uGamma.value = g.gamma; C.uSplit.value = g.split;
     C.uLift.value.set(...g.lift); C.uGain.value.set(...g.gain); C.uShadows.value.set(...g.shadows); C.uHigh.value.set(...g.highlights);
-    C.uCRT.value = st.crt; C.uCrtOpen.value = st.crtOpen;
+    C.uCRT.value = Math.max(st.crt, L.crt || 0); C.uCrtOpen.value = st.crtOpen;
+    C.uMono.value = L.mono || 0; C.uDye.value = L.dye || 0; C.uExpo.value = L.expo || 1; C.uGrainSize.value = L.grainSize || 1;
+    C.uWeave.value = L.weave || 0; C.uFlicker.value = L.flicker || 0; C.uGate.value = L.gate || 0; C.uDust.value = L.dust || 0;
+    C.uScratch.value = L.scratch || 0; C.uVhs.value = L.vhs || 0; C.uTube.value = L.tube || 0;
+    C.uTone.value.set(...(L.tone || [1, 1, 1])); C.uToneHi.value.set(...(L.toneHi || L.tone || [1, 1, 1]));
     st.bar = C.uBar.value; st.dof = C.uDof.value ? K : 0;
     pass(M.comp, null);
   };
-  PH.dispose = function(){ Object.values(T).forEach(t => t.dispose()); Object.values(M).forEach(m => m.dispose()); quad.geometry.dispose(); };
+  PH.dispose = function(){ Object.values(T).forEach(t => t.dispose()); Object.values(TA).forEach(t => t.dispose()); Object.values(M).forEach(m => m.dispose()); quad.geometry.dispose(); };
   return PH;
 };
 })();

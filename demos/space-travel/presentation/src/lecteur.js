@@ -2,7 +2,9 @@
    LECTEUR DE SLIDES (lots P4, P5) — fond cinématique temps réel, slides en HTML par-dessus
    Moteur (__COSMOS) → réalisateur (__REALISATEUR) → direction photo (__PHOTO, look IMAX) → écran ;
    qualité automatique (__QUALITE), export de clips (__CLIP). Voir docs/SPEC-P4-lecteur.md.
-   ?seed=XXX univers · ?rz=YYY réalisateur · ?look=… · ?crt=0..1 · ?quality=fixed (tests) · ?webgl=0 · #n : slide n
+   Lot P7 : une ambiance par slide (data-ambiance), appliquée sur la coupe ; touche A : ambiance forcée, en boucle.
+   ?seed=XXX univers · ?rz=YYY réalisateur · ?look=… (une ambiance pour toutes les slides) · ?crt=0..1 · ?quality=fixed (tests)
+   · ?webgl=0 · #n : slide n
    Sans WebGL : slides sur un fond fixe à la charte (moteur remplacé par des bouchons inertes).
    Exposé pour les tests : window.__TEST = { W, D, PH, Q, CL, L, camera, renderer, ready }
    ===================================================================== */
@@ -22,7 +24,8 @@ function inert(){
   const noop = () => {}, meta = { fade: 0, t: 0 };
   return { renderer: null, camera: { aspect: 1, updateProjectionMatrix: noop }, W: { update: noop },
     D: { meta, framing: 'auto', seq: 0, update: () => meta, cut: noop, nextSystem: noop, play: () => false, setFraming(f){ this.framing = f || 'auto'; } },
-    PH: { enabled: false, state: { letter: 0 }, quality: {}, grainScale: 1, crtChance: 0, setVeil: noop, setLetterbox: noop, update: noop, render: noop },
+    PH: { enabled: false, state: { letter: 0, pending: false }, quality: {}, grainScale: 1, crtChance: 0, setVeil: noop, setLetterbox: noop, update: noop, render: noop,
+      setLook: noop, queueLook: () => false },
     Q: { locked: null, scale: 1, resize: noop, frame: noop, lock: noop, unlock: noop },
     CL: { supported: false, offline: false, live: { supported: false }, ready: Promise.resolve() } };
 }
@@ -50,7 +53,11 @@ if(GL){
   canvas.addEventListener('webglcontextrestored', () => location.reload(), false);
 }
 
-const L = { idx: -1, n: slides.length, slides, clock: 0, ui: 0, showAt: 0, cuts: 0 };   /* clock : simulation ; ui : temps réel (texte, calques) */
+const L = { idx: -1, n: slides.length, slides, clock: 0, ui: 0, showAt: 0, cuts: 0, ambForce: null, ambCut: false };   /* clock : simulation ; ui : temps réel (texte, calques) */
+/* ambiances (lot P7) : celle de la slide (data-ambiance), sinon celle du deck ; ?look=… ou la touche A l'imposent partout */
+const AMBS = ['imax', 'nolan35', 'nb', 'sepia', 'technicolor', 'super8', 'crt', 'vhs', 'nuit', 'denis', 'kodak', 'kubrick'];
+const ambOf = i => L.ambForce || P.get('look') || (slides[i] && slides[i].dataset.ambiance) || deck.dataset.look || 'imax';
+L.ambOf = ambOf;
 const LEVEL = { leger: .38, normal: .55, fort: .72 };
 const SIDE = { gauche: 'left', droite: 'right', centre: 'center' };
 const MIN_SHOT = 2.5;                    /* pas de coupe si le plan a moins de 2,5 s (pas de rafale de coupes) */
@@ -61,9 +68,10 @@ function layout(){
   const r = window.innerWidth/window.innerHeight, n = r < 1.2;
   if(n !== narrow){ narrow = n; document.body.classList.toggle('etroit', n); if(!rec.active) PH.setLetterbox(n ? null : undefined); }
   if(!Q.locked){ camera.aspect = r; camera.updateProjectionMatrix(); }
+  PH.aspect = r;
 }
 function bars(){
-  const letter = PH.state.letter || 0, f = letter ? Math.max(0, (1 - (window.innerWidth/window.innerHeight)/letter)/2) : 0;
+  const letter = PH.state.letter || 0, f = PH.state.barF !== undefined ? PH.state.barF : letter ? Math.max(0, (1 - (window.innerWidth/window.innerHeight)/letter)/2) : 0;
   const px = Math.round(f*window.innerHeight);
   if(px !== barPx){ barPx = px; document.documentElement.style.setProperty('--bar', px + 'px'); document.body.classList.toggle('barres-texte', px >= 22); }
 }
@@ -80,11 +88,15 @@ function go(i, opts){
   L.idx = i; const s = slides[i];
   s.classList.add('active');
   D.setFraming(SIDE[s.dataset.cote] || 'auto');
+  if(opts.initial) PH.setLook(ambOf(i)); else PH.queueLook(ambOf(i));   /* l'ambiance change sur la coupe */
+  const k0 = L.cuts;
   if(!opts.initial){                                       /* la slide pilote le réalisateur */
     if(s.dataset.systeme === 'suivant') D.nextSystem();
     else if(s.dataset.plan && D.meta.type !== s.dataset.plan){ if(D.play(s.dataset.plan)) L.cuts++; else maybeCut(); }
     else maybeCut();
   }
+  /* pas de coupe (plan de moins de 2,5 s) : l'ambiance attend la coupe, faite dès que le plan atteint 2,5 s */
+  L.ambCut = !opts.initial && s.dataset.systeme !== 'suivant' && L.cuts === k0 && !!PH.state.pending;
   L.showAt = L.ui + (opts.initial ? 1.4 : .35);            /* le texte arrive juste après la coupe, même si la machine rend lentement */
   try{ history.replaceState(null, '', '#' + (i + 1)); }catch(e){}
   $('hud-slide').textContent = (deck.dataset.titre || '') + ' // ' + pad(i + 1) + ' — ' + titleOf(s);
@@ -239,6 +251,7 @@ function onKey(e){
   else if(/^[eE]$/.test(k)){ if($('b-clip').hidden) toast('Export de clip indisponible ici'); else togglePanel('panneau-clip'); }
   else if(/^[nN]$/.test(k)) D.nextSystem();
   else if(/^[pP]$/.test(k)) PH.enabled = !PH.enabled;
+  else if(/^[aA]$/.test(k)) cycleAmbiance();
   else if(/^[sS]$/.test(k)) L.togglePresenter();
   else if(k === '?') togglePanel('aide');
 }
@@ -254,6 +267,13 @@ document.addEventListener('touchend', e => {
 let idle = null;
 document.addEventListener('mousemove', () => { document.body.classList.add('souris'); clearTimeout(idle); idle = setTimeout(() => document.body.classList.remove('souris'), 2500); });
 const fmtLook = () => (PH.state.look ? PH.state.look.label : '');
+/* touche A : ambiance imposée à toutes les slides, en boucle, puis retour à celle de chaque slide ; tout de suite, sans coupe */
+function cycleAmbiance(){
+  if(!GL) return toast('Ambiances indisponibles sans WebGL');
+  const j = L.ambForce ? AMBS.indexOf(L.ambForce) : -1; L.ambForce = j + 1 < AMBS.length ? AMBS[j + 1] : null;
+  PH.setLook(ambOf(L.idx)); L.ambCut = false;
+  toast('Ambiance : ' + (L.ambForce ? __PHOTO.LOOKS[L.ambForce].label : 'celle de chaque slide (' + __PHOTO.LOOKS[ambOf(L.idx)].label + ')'));
+}
 let hudT = 0;
 function hud(dt){
   hudT += dt; if(hudT < .25) return; hudT = 0;
@@ -328,6 +348,11 @@ function frame(){
   const dt = Math.min(raw, rec.active ? .5 : .1);          /* temps réel : la simulation suit l'horloge du clip */
   L.clock += dt; const uiDt = Math.min(raw, 1); L.ui += uiDt;
   D.update(dt);
+  if(L.ambCut){                                            /* ambiance en attente : coupe dès que le plan a 2,5 s */
+    const m = D.meta;
+    if(!PH.state.pending) L.ambCut = false;
+    else if(!rec.active && m.type && m.t >= MIN_SHOT && m.fade < .5){ D.cut(); L.cuts++; L.ambCut = false; }
+  }
   W.update(dt, camera, renderer);
   const s = slides[L.idx];
   if(s && !s.classList.contains('visible') && L.ui >= L.showAt) s.classList.add('visible');

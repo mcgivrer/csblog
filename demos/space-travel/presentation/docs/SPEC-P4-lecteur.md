@@ -128,3 +128,10 @@ puis, en temps réel, export d'un clip (durée et taille vérifiées par `ffprob
   (0,48 sans calque) ; écran haut ; qualité (1 → 0,61 à 20 i/s, paliers à 50 %, remontée à 0,80 à 60 i/s) ; clip image
   par image vérifié par `ffprobe` (75 images, 2,5 s exactes, 640 × 360) ; repli temps réel lisible ; annulation.
   Le navigateur de test (swiftshader) rend environ 2 images/s : la cadence du repli temps réel n'y est pas représentative.
+
+### Correctif de stabilité (07/10/2026)
+
+- La qualité automatique n'applique plus un changement de résolution ou de palier au milieu d'un plan : il attend la
+  prochaine coupe (ou un noir), où il ne se voit pas ; au plus 1,5 s pour une baisse (aucune attente sous 30 i/s),
+  3 s pour une hausse. Les mouvements de caméra ont été mesurés sur les 21 slides (5 040 images) : aucun à-coup.
+- Ambiances : le flottement du film est réduit (Super 8 : 0,2 % de l'image, sépia : 0,07 %).

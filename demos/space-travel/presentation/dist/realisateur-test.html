@@ -625,11 +625,12 @@ function icosphere(level){
   }
   return { V, F };
 }
-/* roche : forme globale bosselée, ellipsoïde, cratères à rebord, stries */
+/* roche : forme globale bosselée, ellipsoïde (sauf opts.round : lunes), cratères à rebord, stries */
 function rockGeometry(seed, level, opts){
   opts = opts || {};
   const r = prng(seed), { V, F } = icosphere(level);
-  const sx = .75 + .5*r(), sy = .65 + .45*r(), sz = .8 + .5*r();
+  let sx = .75 + .5*r(), sy = .65 + .45*r(), sz = .8 + .5*r();
+  if(opts.round) sx = sy = sz = 1;   // lune ronde : l'aplatissement est réservé aux astéroïdes (tirages conservés : mêmes cratères)
   const craters = [];
   const nc = opts.craters !== undefined ? opts.craters : 9 + Math.floor(r()*9);
   for(let i=0;i<nc;i++){ const z = r()*2-1, a = r()*6.283, s = Math.sqrt(1-z*z); craters.push({ d:[Math.cos(a)*s, z, Math.sin(a)*s], rad: .12 + .38*Math.pow(r(), 2), depth: .06 + .1*r() }); }
@@ -759,7 +760,7 @@ AST.init = function(seedStr){
   const t0 = performance.now();
   AST.geos = [];
   for(let i=0;i<5;i++) AST.geos.push(rockGeometry((s + i*7919) >>> 0, 3, { lobe: i === 3 }));
-  AST.moonGeo = rockGeometry((s + 424242) >>> 0, 4, { amp: .18, craters: 26 });
+  AST.moonGeo = rockGeometry((s + 424242) >>> 0, 4, { amp: .18, craters: 26, round: true });
   AST.fam = Object.keys(FAMILIES);
   AST.mats = {};
   AST.fam.forEach((k, i) => { const tex = makeTextures(FAMILIES[k], (s + i*104729) >>> 0, 512); AST.mats[k] = makeMaterial(FAMILIES[k], tex); });
@@ -1970,6 +1971,12 @@ RZ.create = function(W, camera, opts){
   const systems = opts.systemsList || W.pickSystems(opts.systems || 6, opts.radius || 2, opts.center);
   D.systems = systems;
   const S = { plan: [], i: -1, t: 0, shot: null, black: 0, autoSide: 1, cluster: null, exit: null };
+  /* contre-éclairage faible du plan « lune » : lumière froide venue du côté opposé à l'étoile (un peu au-dessus du plan
+     de l'orbite, pour le relief), ≈ 10 % du soleil ; la face nuit de la lune reste lisible (cratères), sans paraître de jour.
+     Éteint dans les autres plans. */
+  const FILL = .17, fill = new THREE.DirectionalLight(0xa7b8d8, 0);
+  if(W.sysScene){ W.sysScene.add(fill); W.sysScene.add(fill.target); }
+  D.fill = fill;
 
   /* ---------- sujets ---------- */
   const pScore = p => (p.ring ? 3 : 0) + Math.min(p.moonPivots.length, 3)*1.2 + (p.kind.gas ? .8 : 0) + (p.isHabitable ? 2 : 0) + (p.hasAtmosphere ? .4 : 0);
@@ -2069,22 +2076,39 @@ RZ.create = function(W, camera, opts){
     return { subject: p.properName, pos, look: () => P.clone(), up: () => nr.clone().multiplyScalar(Math.sign(elev)), fov: () => fov,
       focus: k => pos(k).distanceTo(P), near: k => Math.max(1, pos(k).distanceTo(P) - p.ringOuter) };
   };
-  /* plan « lune » faisable ? lune côté jour (pleine phase), caméra au-delà de la lune, lune ≈ 0,6 fois la planète,
-     focale ≤ 300 mm ; sinon (lune trop lointaine pour une planète tellurique) le type n'est pas proposé */
+  /* plan « lune » faisable ? la lune devant sa planète, l'étoile dans le dos autant que possible : caméra au-delà de la
+     lune (à s, lune ≈ kz fois la planète), focale ≤ 300 mm ; angle de phase (lune → caméra, lune → étoile) visé ≤ 60°.
+     Repère : u (planète → lune), l (vers l'étoile, ⊥ u), e = R/dm, φ = angle (u, lune → étoile). La caméra dans la direction
+     u + ρ·e·l montre la lune à ρ rayons du centre de la planète, côté opposé à l'étoile (ρ > 0 : vers le terminateur, la phase
+     baisse de atan(ρ·e) ; ρ < 0 : devant le limbe éclairé, elle monte d'autant) ; |ρ| ≤ 1,3, la lune reste sur le disque ou
+     à cheval sur le limbe. Lune carbonée exclue (albédo ~2 % : noire même pleine) ; retenue : la meilleure phase. Une lune
+     filmée côté nuit reste lisible : contre-éclairage faible (voir D.update) ; aucune lune → false (type non proposé) */
+  const PHASE = 60*DEG, RHO = 1.3;
   function moonPlan(p, kz){
-    const P = p.position, R = p.radius, L = litOf(p); let m = null, best = -2;
-    p.moonPivots.forEach(pv => { const mm = pv.children[0]; if(!mm) return; const d = wpos(mm).sub(P).normalize().dot(L); if(d > best){ best = d; m = mm; } });
-    if(!m) return null;
-    const M0 = wpos(m), dm = M0.distanceTo(P), rm = m.scale.x, c0 = dm/Math.max(kz*R - rm, .05*R), Dc = dm + c0*rm;
-    const fov = 2*Math.asin(R/Dc)/DEG/.48;
-    return focalOf(fov) <= 300 ? { m, dm, rm, Dc, dir: M0.sub(P).normalize() } : null;
+    const P = p.position, R = p.radius, A = window.__AST; let best = false;
+    p.moonPivots.forEach(pv => { const m = pv.children[0]; if(!m || (A && A.mats && m.material === A.mats.carbonaceous)) return;
+      const M = wpos(m), u = M.clone().sub(P), dm = u.length(), rm = m.scale.x, s = dm*rm/Math.max(kz*R - rm, .05*R), Dc = dm + s;
+      u.normalize();
+      const L = M.clone().negate().normalize(), phi = u.angleTo(L), ab = phi - Math.atan(RHO*R/dm);
+      if(focalOf(2*Math.asin(R/Dc)/DEG/.48) > 300) return;
+      if(!best || ab < best.ab) best = { m, dm, rm, s, Dc, u, L, phi, ab };
+    });
+    return best;
   }
   B.lune = function(r, p){
-    const P = p.position, R = p.radius, N = W.leg.orbitN, mp = moonPlan(p, lerp(.5, .7, r())) || moonPlan(p, .7); if(!mp) return null;
-    const { m, dm, rm, Dc, dir } = mp, w = perp(dir, N.clone().add(new V3(r() - .5, r() - .5, r() - .5).multiplyScalar(.6)));
-    const fov = 2*Math.asin(R/Dc)/DEG/lerp(.42, .55, r()), thp = Math.asin(R/Dc), xs = thp*(Dc - dm)*Dc/dm;
-    const x0 = -lerp(.75, .95, r())*xs, x1 = lerp(.75, .95, r())*xs;   /* la lune traverse le disque de sa planète */
-    const pos = k => P.clone().addScaledVector(dir, Dc).addScaledVector(w, lerp(x0, x1, smooth(k)));
+    const P = p.position, R = p.radius, N = W.leg.orbitN, kz = lerp(.5, .7, r());
+    const mp = moonPlan(p, kz) || moonPlan(p, .7); if(!mp) return null;
+    const { m, dm, rm, s, Dc, u, L, phi } = mp, e = R/dm, l = perp(u, L), t = new V3().crossVectors(u, l);
+    /* centre du trajet : la lune devant le limbe éclairé (ρ = -0,35 à -0,7) tant que la phase reste ≤ 60°, sinon vers le
+       terminateur juste ce qu'il faut (au plus ρ = 1,3 : lune côté nuit, lisible grâce au contre-éclairage) */
+    const rl = -lerp(.35, .7, r()), rc = Math.min(RHO, Math.max(rl, phi - PHASE >= Math.PI/2 - 1e-3 ? RHO : Math.tan(phi - PHASE)/e));
+    const psi = lerp(-.35, .35, r()), sg = r() < .5 ? -1 : 1, x0 = -lerp(.75, .95, r()), x1 = lerp(.75, .95, r());
+    let w = t.clone().multiplyScalar(sg*Math.cos(psi)).addScaledVector(l, Math.sin(psi));
+    const vAt = x => u.clone().addScaledVector(l, rc*e).addScaledVector(w, x*e).normalize();
+    if(Math.max(vAt(x0).angleTo(L), vAt(x1).angleTo(L)) > Math.max(PHASE, phi - Math.atan(rc*e))) w = t.clone().multiplyScalar(sg);   /* travelling en travers de l'étoile : phase constante */
+    const fov = Math.max(2*Math.asin(R/Dc)/DEG/lerp(.42, .55, r()), fovOf(300)), q = new THREE.Quaternion();
+    /* la lune traverse le disque de sa planète ; la caméra suit la lune sur son orbite (le cadrage ne dérive pas) */
+    const pos = k => { const M = wpos(m); q.setFromUnitVectors(u, M.clone().sub(P).normalize()); return M.addScaledVector(vAt(lerp(x0, x1, smooth(k))).applyQuaternion(q), s); };
     return { subject: p.properName, moon: m, pos, look: () => P.clone(), up: () => N, fov: () => fov,
       focus: k => pos(k).distanceTo(P), near: k => pos(k).distanceTo(wpos(m)) - rm, rack: [.35, .62] };
   };
@@ -2211,6 +2235,8 @@ RZ.create = function(W, camera, opts){
     }
     applyCamera(k);
     const s2 = S.shot, near = s2.near ? s2.near(k) : null, far = s2.focus(k);
+    fill.intensity = s2.moon ? FILL : 0;
+    if(s2.moon){ const M = wpos(s2.moon); fill.position.copy(M).normalize().addScaledVector(W.leg.orbitN, .45); fill.target.position.set(0, 0, 0); fill.target.updateMatrixWorld(); }
     let focus = far, rack = 0;
     if(near !== null && s2.rack){ rack = smoother((k - s2.rack[0])/(s2.rack[1] - s2.rack[0])); focus = Math.exp(lerp(Math.log(Math.max(near, 1)), Math.log(Math.max(far, 1)), rack)); }
     _v.set(0, 0, 0).project(camera);

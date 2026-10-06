@@ -7,6 +7,8 @@ Lots P4 à P6 — lecteur de slides et présentation du jeu (dist/presentation.h
 2. Qualité automatique en temps virtuel : baisse de résolution, paliers, puis remontée.
 3. Temps réel : export d'un clip webm (durée et taille vérifiées par ffprobe s'il est présent), état rétabli.
 4. Toutes les slides en 1280 × 720 : aucun texte ne déborde de l'image ; captures (dist/shots/lecteur-*.png, lecteur-planche.jpg).
+5. Ambiances (lot P7) : celle de chaque slide après la coupe ; sans coupe possible (plan < 2,5 s), elle attend la coupe ;
+   touche A : ambiance imposée tout de suite, en boucle, puis retour à celle de la slide.
 Usage : python3 tests/lecteur_test.py dist/presentation.html
 """
 import os, re, sys, io, json, base64, shutil, subprocess
@@ -111,6 +113,9 @@ with sync_playwright() as pw:
     s2 = pg.evaluate(STATE); side2 = SIDE.get(pg.evaluate(DOMSLIDE, 2)["cote"], "auto")
     check("pas de coupe si le plan a moins de 2,5 s", s2["idx"] == 2 and s2["cuts"] == k1 and s2["framing"] == side2, f"coupes {k1} → {s2['cuts']}, plan à {s1['t']:.1f} s")
     pg.evaluate("() => __step(100, 1000/30)")
+    s3 = pg.evaluate(STATE); want3 = pg.evaluate("() => __TEST.L.ambOf(2)")
+    check("ambiance : elle attend la coupe, faite dès que le plan a 2,5 s", want3 == s1["look"] or (s2["look"] == s1["look"] and s3["look"] == want3 and s3["cuts"] > k1),
+          f"{s1['look']} → {s2['look']} (sans coupe) → {s3['look']} (coupes {k1} → {s3['cuts']}), voulue {want3}")
     pg.keyboard.press("Home"); pg.evaluate("() => __step(2, 1000/30)"); h0 = pg.evaluate(STATE)
     pg.keyboard.press("End"); pg.evaluate("() => __step(2, 1000/30)"); h1 = pg.evaluate(STATE)
     check("Début / Fin", h0["idx"] == 0 and h1["idx"] == N_SL - 1, (h0["idx"], h1["idx"]))
@@ -172,7 +177,7 @@ with sync_playwright() as pw:
     check("qualité : baisse de résolution à 20 i/s", slow["scale"] < q0 - .1, f"{q0} → {slow['scale']:.2f} ({slow['w']}×{slow['h']})")
     slow2 = pg.evaluate(QRUN, [400, 50])
     check("qualité : paliers après 50 % (sans MSAA, sans profondeur de champ)", slow2["tier"] == 2 and not slow2["msaa"] and not slow2["dof"] and abs(slow2["scale"] - .5) < 1e-6, slow2)
-    fast = pg.evaluate(QRUN, [2400, 1000/60])
+    fast = pg.evaluate(QRUN, [3600, 1000/60])        # hausses appliquées sur les coupes (au plus 3 s d'attente)
     check("qualité : paliers rétablis puis résolution remontée à 60 i/s", fast["tier"] == 0 and fast["msaa"] and fast["scale"] > slow2["scale"] + .1, fast)
     check("aucune erreur (qualité)", not errors, "; ".join(errors[:3]))
     pg.close()
@@ -209,14 +214,23 @@ with sync_playwright() as pw:
 
     # --- 4) toutes les slides : débordement et captures
     pg, errors = open_page(br, "&quality=fixed", vp=(1280, 720))
-    caps, over = [], []
+    caps, over, ambs = [], [], []
     for i in range(N_SL):
         if i: pg.keyboard.press("ArrowRight")
         pg.evaluate("() => __step(80, 1000/30)"); pg.evaluate(RENDER); pg.evaluate(RENDER); pg.wait_for_timeout(1300)
         o = pg.evaluate(OVER)
         if o["over"] > 1: over.append(o)
+        ambs.append(pg.evaluate("() => ({ i: __TEST.L.idx + 1, look: __TEST.PH.state.lookName, want: __TEST.L.ambOf(__TEST.L.idx) })"))
         p = os.path.join(shots, f"{PRE}{i + 1:02d}.png"); pg.screenshot(path=p); caps.append(p)
     check(f"1280 × 720 : aucun texte ne déborde de l'image ({N_SL} slides)", not over, over[:3])
+    bad = [a for a in ambs if a["look"] != a["want"]]
+    check(f"ambiance de chaque slide appliquée ({len(set(a['want'] for a in ambs))} ambiances)", not bad, bad[:3])
+    pg.keyboard.press("a"); pg.evaluate("() => __step(1, 1000/30)"); pg.keyboard.press("a"); pg.evaluate("() => __step(1, 1000/30)")
+    ka = pg.evaluate("() => ({ look: __TEST.PH.state.lookName, force: __TEST.L.ambForce, toast: document.getElementById('toast').textContent })")
+    for _ in range(11): pg.keyboard.press("a")
+    pg.evaluate("() => __step(1, 1000/30)")
+    kb = pg.evaluate("() => ({ look: __TEST.PH.state.lookName, force: __TEST.L.ambForce, want: __TEST.L.ambOf(__TEST.L.idx) })")
+    check("touche A : ambiance imposée tout de suite, puis retour à celle de la slide", ka["look"] == "nolan35" == ka["force"] and "Nolan 35" in ka["toast"] and kb["force"] is None and kb["look"] == kb["want"], (ka, kb))
     check("aucune erreur (tour des slides)", not errors, "; ".join(errors[:3]))
     pg.close()
     pg, errors = open_page(br, "&quality=fixed", "#2", vp=(540, 960))

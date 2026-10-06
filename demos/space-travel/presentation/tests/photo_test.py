@@ -6,6 +6,8 @@ Lot P3 — direction photo « Cinéma ».
 2. Rendus : sans effet = image du jeu (même image que W.render à l'écran) ; noir complet pendant le noir entre deux
    systèmes ; bandes du look noires ; carte de flou non nulle sur un plan à premier plan ; luminance moyenne
    comparable avec et sans effets ; mise sous tension du CRT ; planche avant/après (dist/shots/photo-planche.jpg).
+3. Ambiances (lot P7), toutes sur un même plan (dist/shots/photo-looks.jpg) : noir & blanc sans couleur, sépia chaud,
+   vision nocturne verte, coins noirs du CRT et de la fenêtre Super 8, bandes du format (Nolan 35 mm : 2.39).
 Usage : python3 tests/photo_test.py dist/photo-test.html
 """
 import os, re, sys, base64, io
@@ -53,10 +55,11 @@ BLACK = r"""(ms) => { const T = __TEST, D = T.D; D.nextSystem(); let n = 0; whil
   return { fade: D.meta.fade, url: T.renderer.domElement.toDataURL('image/png') }; }"""
 PLAY = r"""(args) => { const [type, ms] = args, D = __TEST.D; if(!D.play(type)) return false; let n = 0;
   while(n < 30*20 && !(D.meta.type === type && D.meta.k >= .22)){ window.__step(1, ms); n++; } return D.meta.type === type; }"""
+NEXT_SYS = r"""(ms) => { const D = __TEST.D, s0 = D.seq; D.nextSystem(); let n = 0; while(n < 30*10 && !(D.seq > s0 && D.meta.fade < .05)){ window.__step(1, ms); n++; } return D.seq; }"""
 COC = r"""() => { const T = __TEST, PH = T.PH; PH.debug = 'coc'; PH.render(T.W, T.camera, T.D.meta, 0); const u = T.renderer.domElement.toDataURL('image/png');
   PH.debug = null; return { url: u, dof: PH.state.dof, focus: T.D.meta.focus, near: T.D.meta.near }; }"""
 LOOKS = r"""() => { const T = __TEST, PH = T.PH, out = [];
-  for(const k of Object.keys(__PHOTO.LOOKS)){ PH.setLook(k); PH.render(T.W, T.camera, T.D.meta, 0); out.push({ look: __PHOTO.LOOKS[k].label, url: T.renderer.domElement.toDataURL('image/png') }); }
+  for(const k of Object.keys(__PHOTO.LOOKS)){ PH.setLook(k); PH.render(T.W, T.camera, T.D.meta, 0); out.push({ key: k, look: __PHOTO.LOOKS[k].label, bar: PH.state.barF, url: T.renderer.domElement.toDataURL('image/png') }); }
   PH.setLook('auto'); return { type: T.D.meta.label, out }; }"""
 CRT = r"""(ms) => { const T = __TEST, PH = T.PH, cv = T.renderer.domElement; PH.forceCRT(1.6);
   PH.render(T.W, T.camera, T.D.meta, 1/30); const a = cv.toDataURL('image/png');
@@ -113,6 +116,9 @@ with sync_playwright() as pw:
     bk = pg.evaluate(BLACK, MS); im = img(bk["url"])
     check("noir complet pendant le noir entre deux systèmes", bk["fade"] >= 1 and max(im.convert("L").getextrema()) <= 2, f"fondu {bk['fade']}, max {im.convert('L').getextrema()}")
     pg.evaluate(MID, MS)
+    for _ in range(6):     # « lune » n'est proposée que si une lune peut être filmée éclairée (un système sur trois environ)
+        if pg.evaluate(PLAY, ["lune", MS]): break
+        pg.evaluate(NEXT_SYS, MS)
     coc = None
     for t in ("lune", "ceinture", "anneaux", "nebuleuse", "etoile", "croissant", "eclipse", "limbe", "terminateur", "survol"):
         if t in have and t not in ("lune", "ceinture"): continue
@@ -160,12 +166,27 @@ for i, t in enumerate(tiles):
     dr.text((x + TW + 8, y + TH - 18), f"{t['label']}{' — ' + t['look'] if t['look'] else ''}{extra}", fill=(255, 180, 84), font=font)
     dr.line([x + TW, y, x + TW, y + TH], fill=(0, 0, 0), width=2)
 sheet.save(os.path.join(shots, "photo-planche.jpg"), quality=86)
-if looks_strip:      # les quatre looks sur un même plan
-    ls = Image.new("RGB", (2*TW*2, 2*TH*2), "black"); dl = ImageDraw.Draw(ls)
+amb = {}
+if looks_strip:      # tous les looks et ambiances sur un même plan
+    n = len(looks_strip["out"]); cols = 4; rws = (n + cols - 1)//cols
+    ls = Image.new("RGB", (cols*TW, rws*TH), "black"); dl = ImageDraw.Draw(ls)
     for i, o in enumerate(looks_strip["out"]):
-        x, y = (i % 2)*2*TW, (i//2)*2*TH; ls.paste(img(o["url"]).resize((2*TW, 2*TH)), (x, y))
-        dl.text((x + 10, y + 2*TH - 24), f"{looks_strip['type']} — {o['look']}", fill=(255, 180, 84), font=font)
+        im = img(o["url"]); x, y = (i % cols)*TW, (i//cols)*TH; ls.paste(im.resize((TW, TH)), (x, y))
+        dl.rectangle([x, y + TH - 22, x + TW, y + TH], fill=(0, 0, 0)); dl.text((x + 8, y + TH - 18), f"{looks_strip['type']} — {o['look']}", fill=(255, 180, 84), font=font)
+        hb = int((o["bar"] or 0)*im.height); core = im.crop((int(im.width*.08), hb + int(im.height*.08), int(im.width*.92), im.height - hb - int(im.height*.08)))
+        m = ImageStat.Stat(core).mean; hsv = ImageStat.Stat(core.convert("HSV")).mean
+        corner = max(im.crop((0, 0, 6, 6)).convert("L").getextrema()[1], im.crop((im.width - 6, im.height - 6, im.width, im.height)).convert("L").getextrema()[1])
+        amb[o["key"]] = {"rgb": [round(v, 1) for v in m], "sat": round(hsv[1], 1), "bar": round(o["bar"] or 0, 4), "coin": corner}
     ls.save(os.path.join(shots, "photo-looks.jpg"), quality=86)
+    print("    ambiances : " + ", ".join(f"{k} {v}" for k, v in amb.items()))
+    a = lambda k: amb.get(k, {"rgb": [0, 0, 0], "sat": 255, "bar": 0, "coin": 255})
+    check("12 looks et ambiances rendus sur un même plan", len(amb) == 12, list(amb))
+    check("noir & blanc : sans couleur", a("nb")["sat"] < 3, a("nb"))
+    check("sépia : virage chaud (R > V > B)", a("sepia")["rgb"][0] > a("sepia")["rgb"][1] > a("sepia")["rgb"][2] and a("sepia")["sat"] > 15, a("sepia"))
+    check("vision nocturne : verte", a("nuit")["rgb"][1] > 1.4*max(a("nuit")["rgb"][0], a("nuit")["rgb"][2]), a("nuit"))
+    check("CRT et Super 8 : coins noirs (écran bombé, fenêtre de projection)", a("crt")["coin"] <= 3 and a("super8")["coin"] <= 3, (a("crt")["coin"], a("super8")["coin"]))
+    check("Nolan 35 mm : bandes au format 2.39", abs(a("nolan35")["bar"] - (1 - (16/9)/2.39)/2) < .01, a("nolan35")["bar"])
+    check("plein cadre : CRT, Super 8, VHS, vision nocturne sans bandes", all(a(k)["bar"] == 0 for k in ("crt", "super8", "vhs", "nuit")), [a(k)["bar"] for k in ("crt", "super8", "vhs", "nuit")])
 print("    rapports de luminance (avec/sans) : " + ", ".join(f"{t}/{l} {v}" for t, l, v in ratios))
 check("bandes du look noires", not barBad, barBad)
 check("luminance moyenne comparable avec et sans effets (0,65 à 1,4)", ratios and all(.65 <= v <= 1.4 for _, _, v in ratios), [r_ for r_ in ratios if not .65 <= r_[2] <= 1.4])

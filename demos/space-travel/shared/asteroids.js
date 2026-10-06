@@ -44,11 +44,12 @@ function icosphere(level){
   }
   return { V, F };
 }
-/* roche : forme globale bosselée, ellipsoïde, cratères à rebord, stries */
+/* roche : forme globale bosselée, ellipsoïde (sauf opts.round : lunes), cratères à rebord, stries */
 function rockGeometry(seed, level, opts){
   opts = opts || {};
   const r = prng(seed), { V, F } = icosphere(level);
-  const sx = .75 + .5*r(), sy = .65 + .45*r(), sz = .8 + .5*r();
+  let sx = .75 + .5*r(), sy = .65 + .45*r(), sz = .8 + .5*r();
+  if(opts.round) sx = sy = sz = 1;   // lune ronde : l'aplatissement est réservé aux astéroïdes (tirages conservés : mêmes cratères)
   const craters = [];
   const nc = opts.craters !== undefined ? opts.craters : 9 + Math.floor(r()*9);
   for(let i=0;i<nc;i++){ const z = r()*2-1, a = r()*6.283, s = Math.sqrt(1-z*z); craters.push({ d:[Math.cos(a)*s, z, Math.sin(a)*s], rad: .12 + .38*Math.pow(r(), 2), depth: .06 + .1*r() }); }
@@ -178,7 +179,7 @@ AST.init = function(seedStr){
   const t0 = performance.now();
   AST.geos = [];
   for(let i=0;i<5;i++) AST.geos.push(rockGeometry((s + i*7919) >>> 0, 3, { lobe: i === 3 }));
-  AST.moonGeo = rockGeometry((s + 424242) >>> 0, 4, { amp: .18, craters: 26 });
+  AST.moonGeo = rockGeometry((s + 424242) >>> 0, 4, { amp: .18, craters: 26, round: true });
   AST.fam = Object.keys(FAMILIES);
   AST.mats = {};
   AST.fam.forEach((k, i) => { const tex = makeTextures(FAMILIES[k], (s + i*104729) >>> 0, 512); AST.mats[k] = makeMaterial(FAMILIES[k], tex); });

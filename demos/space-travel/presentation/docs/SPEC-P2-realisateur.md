@@ -43,7 +43,7 @@ Le réalisateur reste propre au produit (dans `presentation/src/`) : il n'est pa
 | `terminateur` | planète habitée : lumières des villes, ligne de l'aube | orbite lente vers la nuit | 35–50 |
 | `limbe` | horizon en rase-mottes, l'étoile qui se lève | glissé vers l'étoile (lever de soleil) | 24–28 |
 | `anneaux` | plan rasant sur les anneaux, la géante au fond | travelling tangent | 28–35 |
-| `lune` | lune devant sa planète (compression au téléobjectif : la lune paraît 0,5 à 0,7 fois la planète), bascule de point ; lune trop lointaine : la lune au premier plan | travelling latéral, la lune traverse le disque | adaptée, ≤ 300 |
+| `lune` | lune éclairée devant le limbe éclairé de sa planète, l'étoile dans le dos (phase ≤ 60°, cf. § 3) ; compression au téléobjectif : la lune paraît 0,5 à 0,7 fois la planète ; bascule de point | travelling latéral, la lune traverse le disque ; la caméra suit la lune sur son orbite | adaptée, ≤ 300 |
 | `eclipse` | l'étoile derrière la planète : couronne, anneau d'atmosphère, « bague de diamant » à la fin | glissé latéral | selon la taille apparente |
 | `ceinture` | amas d'astéroïdes, fragments au premier plan, bascule de point | passage entre les roches | 28–50 |
 
@@ -95,3 +95,21 @@ journal, puis une capture au milieu de chaque plan (planche dans `dist/shots/`).
 - Test `tests/realisateur_test.py` : 3 systèmes, ~5 900 images en temps virtuel, 19 contrôles verts — dont caméra
   jamais dans un astre (marge minimale 2 % sur le plan `limbe`, par construction), vitesse angulaire maximale
   0,17 rad/s hors coupes, focales 26 à 97 mm sur le tirage du test, les dix types joués à la demande.
+- 06/10/2026, plan `lune` éclairé. Constat : caméra dans l'axe planète → lune où que soit la lune sur son orbite, lune
+  carbonée (albédo ~2 %) possible : lune souvent filmée côté nuit ou noire (slide 20 : disque sombre, liseré au limbe).
+  Correctif : `moonPlan` écarte les lunes carbonées et ne retient qu'une lune dont l'angle de phase (lune → caméra,
+  lune → étoile) peut rester ≤ 60°, l'étoile dans le dos ; sinon `false` (type non proposé, `D.play('lune')` retombe sur
+  la coupe ordinaire). La caméra, au-delà de la lune, s'écarte de l'axe pour poser la lune devant le limbe éclairé de la
+  planète (vers le terminateur seulement si les 60° l'exigent) et suit la lune sur son orbite ; taille 0,5–0,7, focale
+  ≤ 300 mm, tiers, bascule de point et durées inchangés. Mesure (18 univers × 6 systèmes, 3 tirages par planète) :
+  phase à mi-plan médiane 84° → 50° (telluriques 36°, géantes 54°), maximum 172° → 60° ; plan proposé dans 96 → 35
+  systèmes sur 108 (la moitié des lunes sont côté nuit de leur planète, un quart sont carbonées) ; univers COSMOS 6/6 →
+  3/6, la slide 20 (système Volna Shakti 539) retombe sur une coupe ordinaire. `tests/photo_test.py` cherche un
+  système où la lune est proposée pour la carte de flou.
+- 06/10/2026 (suite), contre-éclairage, à la demande de l'auteur : plutôt qu'écarter les lunes filmées côté nuit, un
+  contre-éclairage faible les rend lisibles. `moonPlan` ne rejette plus une lune sur son angle de phase (restent écartées
+  les lunes carbonées et les compositions au-delà de 300 mm) et garde la meilleure phase ; `B.lune` pousse la lune vers
+  le terminateur au plus (ρ = 1,3) quand 60° ne sont pas tenables. Pendant le plan `lune`, une lumière directionnelle
+  froide (`0xa7b8d8`, intensité 0,17, ≈ 10 % du soleil) vient du côté opposé à l'étoile, un peu au-dessus du plan de
+  l'orbite pour le relief : la face nuit montre ses cratères sans paraître de jour ; éteinte dans les autres plans. La
+  slide 20 retrouve sa lune (système Nova-Xing 467 avec `seed=COSMOS-TEST` : phase 139°, surface lisible).
