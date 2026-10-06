@@ -355,8 +355,7 @@
   </header>
 
   <div class="tabs" role="tablist" aria-label="Vues">
-    <button type="button" role="tab" id="tabBtnAgents" data-tab="agents" aria-controls="tab-agents" aria-selected="true">Agents</button><button type="button" role="tab" id="tabBtnKanban" data-tab="kanban" aria-controls="tab-kanban" aria-selected="false" tabindex="-1">Kanban</button>
-    <nav class="site-nav" aria-label="Sections"><a href="#timeline">Chronologie</a><a href="#feed">Flux</a><a href="#delivery">Livraisons</a></nav>
+    <button type="button" role="tab" id="tabBtnAgents" data-tab="agents" aria-controls="tab-agents" aria-selected="true">Agents</button><button type="button" role="tab" id="tabBtnTimeline" data-tab="timeline" aria-controls="tab-timeline" aria-selected="false" tabindex="-1">Chronologie</button><button type="button" role="tab" id="tabBtnFeed" data-tab="feed" aria-controls="tab-feed" aria-selected="false" tabindex="-1">Flux</button><button type="button" role="tab" id="tabBtnDelivery" data-tab="delivery" aria-controls="tab-delivery" aria-selected="false" tabindex="-1">Livraisons</button><button type="button" role="tab" id="tabBtnKanban" data-tab="kanban" aria-controls="tab-kanban" aria-selected="false" tabindex="-1">Kanban</button>
     <div class="status"><span class="conn" id="conn">connexion…</span><span id="srcLine"></span></div>
   </div>
 
@@ -377,6 +376,16 @@
     <div id="agentGrid"></div>
   </section>
 
+
+
+  <section id="worktrees">
+    <div class="section-head"><span class="section-num">05</span><h2 class="section-title" id="wtTitle">Worktrees</h2><span class="section-rule"></span><span class="section-aside" id="wtAside"></span></div>
+    <div class="box tbl-wrap" id="wtBox"></div>
+  </section>
+
+  </div>
+
+  <div id="tab-timeline" role="tabpanel" aria-labelledby="tabBtnTimeline" hidden>
   <section id="timeline">
     <div class="section-head">
       <span class="section-num">02</span><h2 class="section-title">Chronologie · 6 h</h2><span class="section-rule"></span>
@@ -386,23 +395,20 @@
       <div class="tl-legend"><span><i style="background:var(--cyan)"></i>actions de l'agent (intensité / 5 min)</span><span><i style="background:var(--amber)"></i>PR ouverte</span><span><i style="background:var(--st-done)"></i>PR mergée</span></div>
     </div>
   </section>
+  </div>
 
-  <div class="two">
+  <div id="tab-feed" role="tabpanel" aria-labelledby="tabBtnFeed" hidden>
     <section id="feed">
       <div class="section-head"><span class="section-num">03</span><h2 class="section-title">Flux en direct</h2><span class="section-rule"></span></div>
       <div class="box"><ul class="feed" id="feedList" aria-live="polite"></ul></div>
     </section>
+  </div>
+
+  <div id="tab-delivery" role="tabpanel" aria-labelledby="tabBtnDelivery" hidden>
     <section id="delivery">
       <div class="section-head"><span class="section-num">04</span><h2 class="section-title">Livraisons GitHub</h2><span class="section-rule"></span></div>
       <div class="box"><div class="box-head"><span id="ghHead">pull requests</span><span id="pagesState"></span></div><ul class="prs" id="prList"></ul></div>
     </section>
-  </div>
-
-  <section id="worktrees">
-    <div class="section-head"><span class="section-num">05</span><h2 class="section-title" id="wtTitle">Worktrees</h2><span class="section-rule"></span><span class="section-aside" id="wtAside"></span></div>
-    <div class="box tbl-wrap" id="wtBox"></div>
-  </section>
-
   </div>
 
   <div id="tab-kanban" role="tabpanel" aria-labelledby="tabBtnKanban" hidden>
@@ -852,6 +858,7 @@ $('#subfilters').addEventListener('click', e => {
 $('#filters').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; filter = b.dataset.f; store.set('filter', filter); render(); });
 document.addEventListener('toggle', e => { const d = e.target; if (d.matches && d.matches('details[data-k]')) d.open ? openDetails.add(d.dataset.k) : openDetails.delete(d.dataset.k); }, true);
 let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => S && renderTimeline(agentsView()), 150); });
+addEventListener('stt-tab', e => { if (e.detail === 'timeline' && S) requestAnimationFrame(() => renderTimeline(agentsView())); });
 setInterval(() => { // horloges relatives sans re-rendu complet
   document.querySelectorAll('[data-since]').forEach(el => { el.textContent = ago(el.dataset.since, el.dataset.prefix ?? ''); });
   if (S) renderHeader();
@@ -995,15 +1002,14 @@ boot();
 })();
 </script>
 <script>
-/* Onglets Agents | Kanban. Le Kanban est la page kanban.html servie par stt_agents_server.py (/kanban/), chargée à la première ouverture. */
+/* Onglets Agents | Chronologie | Flux | Livraisons | Kanban. Le Kanban est la page kanban.html servie par stt_agents_server.py (/kanban/), chargée à la première ouverture. */
 (() => {
   const $ = id => document.getElementById(id);
   const tabs = [...document.querySelectorAll('.tabs [data-tab]')];
-  const panel = { agents: $('tab-agents'), kanban: $('tab-kanban') };
+  const panel = Object.fromEntries(tabs.map(t => [t.dataset.tab, $('tab-' + t.dataset.tab)]));
   const frame = $('kanbanFrame'), msg = $('kanbanMsg');
   const get = () => { try { return localStorage.getItem('stt-agents:tab'); } catch { return null; } };
   const put = v => { try { localStorage.setItem('stt-agents:tab', v); } catch {} };
-  const AGENT_HASHES = ['agents', 'timeline', 'feed', 'delivery', 'worktrees'];
   let started = false;
   function fit(){ if (window.sttSyncKanbanScroll) window.sttSyncKanbanScroll(); }
   async function startKanban(){
@@ -1024,8 +1030,9 @@ boot();
     tabs.forEach(t => { const on = t.dataset.tab === name; t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1; });
     Object.entries(panel).forEach(([k, p]) => { p.hidden = k !== name; });
     put(name);
-    if (opts.hash !== false) history.replaceState(null, '', name === 'kanban' ? '#kanban' : location.pathname + location.search);
+    if (opts.hash !== false) history.replaceState(null, '', name === 'agents' ? location.pathname + location.search : '#' + name);
     if (name === 'kanban') { startKanban().then(fit); fit(); }
+    dispatchEvent(new CustomEvent('stt-tab', { detail: name }));   // la page redessine ce qui dépend de la largeur (chronologie)
   }
   tabs.forEach(t => {
     t.addEventListener('click', () => show(t.dataset.tab));
@@ -1035,15 +1042,10 @@ boot();
       n.focus(); show(n.dataset.tab); e.preventDefault();
     });
   });
-  // les liens de la barre de navigation (#agents, #feed…) ramènent à l'onglet Agents avant de défiler
-  document.addEventListener('click', e => {
-    const a = e.target.closest('.site-nav a[href^="#"]'); if (!a) return;
-    const id = a.getAttribute('href').slice(1);
-    if (panel.agents.hidden && AGENT_HASHES.includes(id)) { show('agents', { hash: false }); setTimeout(() => { const t = $(id); if (t) t.scrollIntoView(); }, 0); }
-  });
-  addEventListener('hashchange', () => { if (location.hash === '#kanban') show('kanban', { hash: false }); });
+  addEventListener('hashchange', () => { const n = location.hash.slice(1); if (panel[n]) show(n, { hash: false }); });
   addEventListener('resize', fit);
-  show(location.hash === '#kanban' ? 'kanban' : get() === 'kanban' ? 'kanban' : 'agents', { hash: location.hash === '#kanban' });
+  const h0 = location.hash.slice(1);
+  show(panel[h0] ? h0 : panel[get()] ? get() : 'agents', { hash: !!panel[h0] });
 })();
 </script>
 <script>

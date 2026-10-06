@@ -346,11 +346,15 @@ html.embed .site-header h1,html.embed .site-header .eyebrow,html.embed .site-hea
 html.embed .wrap{padding:0;max-width:none}
 html.embed .site-header{border:0;background:none;padding:0 2px 6px;margin:0}
 html.embed .site-header::before,html.embed .site-header::after{display:none}
-html.embed-kpis body{background:transparent}
+/* cadre des indicateurs dévoilé au-dessus de la page : fond réellement transparent (un color-scheme différent de la page hôte rend le fond du cadre opaque) */
+html.embed-kpis,html.embed-kpis body{background:transparent!important;color-scheme:normal!important}
 html.embed-kpis .wrap>:not(#kpis){display:none!important}
 html.embed-kpis .kpis{margin:0}
 html.embed-kpis .kpi{padding:4px 8px 5px;gap:2px}
 html.embed-kpis .kpi .kc{display:none}
+.kcs{display:none}
+.kt .kh .lb{flex:none}
+html.embed-kpis .kcs{display:inline;font:9px var(--mono);color:var(--muted);margin:0 auto 0 8px;white-space:nowrap;text-transform:none;letter-spacing:0;overflow:hidden;text-overflow:ellipsis;min-width:0}
 html.embed-kpis .tm{height:54px!important;min-height:0}
 html.embed-board #kpis{display:none}
 html.embed,html.embed body{overflow:hidden}
@@ -562,7 +566,7 @@ html.embed-board #topbar>.meta span{display:none}
     else delta = 'estim. ' + tok(totBudget) + ' (inchangée)';
     const hist = (Array.isArray(P.history) ? P.history : []).filter(h => h && isFinite(h.est) && isFinite(h.used)).map(h => ({ at:h.at, est:+h.est, used:+h.used })).concat([{ at:'maintenant', est:totBudget, used:totUsed }]);
     const btip = 'Consommé ' + tok(totUsed) + ' · estimation courante ' + tok(totBudget) + ' (repère plein) · estimation initiale ' + tok(ini) + ' (zone hachurée)';
-    return '<div class="kpi kt"><div class="kh"><span class="lb">Tokens consommés</span><span class="kctl"><span class="seg" role="group" aria-label="Devise">' +
+    return '<div class="kpi kt"><div class="kh"><span class="lb">Tokens consommés</span>' + (pricing() ? '<span class="kcs" title="Coût selon l’hypothèse API (sans remise de cache) : consommé / estimé">≈ ' + money(cU) + ' / ' + money(cE) + '</span>' : '') + '<span class="kctl"><span class="seg" role="group" aria-label="Devise">' +
       ['$', '€'].map(c => '<button type="button" data-cur="' + c + '" aria-pressed="' + (CUR === c) + '">' + c + '</button>').join('') +
       '</span><button type="button" class="ib" id="hypBtn" aria-label="Hypothèses de coût" title="Hypothèses de coût">i</button></span></div>' +
       '<div class="kv"><b>' + tok(totUsed) + '</b><span class="rt" style="color:' + (ratio > 1 ? 'var(--red)' : 'var(--muted)') + '" title="consommé / estimation courante">' + fr(100 * ratio, 0) + ' % de l\'estim.</span>' + (hist.length > 1 ? spark(hist) : '') + '</div>' +
