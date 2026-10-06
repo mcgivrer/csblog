@@ -478,7 +478,6 @@ function renderKpis(agents){
   const merged = prs.filter(p => p.merged && ms(p.merged_at) > day);
   const tokens = live ? agents.reduce((n, a) => n + (a.tokens?.output || 0), 0) : null;
   const silent = live ? agents.reduce((n, a) => n + (a.subagents || []).filter(s => s.silent).length, 0) : 0;
-  const silent = live ? agents.reduce((n, a) => n + (a.subagents || []).filter(x => x.silent).length, 0) : 0;
   const tile = (k, v, h, cls = '') => `<div class="kpi ${cls}"><div class="k">${k}</div><div class="v">${v}</div><div class="h">${h}</div></div>`;
   $('#kpis').innerHTML = [
     tile('Agents en action', live ? cnt('run') : '—', live ? (agents.filter(a => GROUP(a.state) === 'run').map(a => shortBranch(a.branch) || 'session').slice(0, 3).join(' · ') || 'aucun agent actif') : 'serveur local requis', live ? '' : 'na'),
@@ -505,7 +504,7 @@ function renderAgents(agents){
   g.className = view === 'tree' ? 'tree' : 'grid';
   document.querySelectorAll('#views [data-v]').forEach(b => { b.classList.toggle('on', b.dataset.v === view); b.setAttribute('aria-pressed', b.dataset.v === view); });
   const nSubs = agents.reduce((n, a) => n + (a.subagents || []).length, 0), nRun = agents.reduce((n, a) => n + (a.subagents || []).filter(x => x.status === 'running').length, 0);
-  $('#treeAside').textContent = mode === 'github' ? 'agents : serveur local requis' : `${agents.length} agent${agents.length > 1 ? 's' : ''} · ${nSubs} sous-agent${nSubs > 1 ? 's' : ''} (${nRun} actif${nRun > 1 ? 's' : ''})`;
+  $('#treeAside').textContent = mode === 'github' ? 'agents : serveur local requis' : `${agents.length} session${agents.length > 1 ? 's' : ''} · ${nSubs} agent${nSubs > 1 ? 's' : ''} créé${nSubs > 1 ? 's' : ''} (${nRun} actif${nRun > 1 ? 's' : ''})`;
   if (!list.length) {
     g.className = 'grid';
     g.innerHTML = `<div class="empty">${agents.length ? 'Aucun agent dans ce filtre.' : mode === 'github'
