@@ -8,6 +8,7 @@ This directory holds **two related but independently-built projects**, both ship
 
 1. **`sources/`** — the main game, *Space Travel & Transport* (current spec: v2.17). Player-piloted/autopiloted cargo ship, procedural universe.
 2. **`observation-des-etoiles/`** — a standalone cinematic demo ("infinite" auto-directed camera, no player input) built on top of a **frozen snapshot of an older engine build (v2.15)**. It does not consume `sources/`; it embeds its own copy of the engine and layers demo-only JS on top.
+3. **`presentation/`** (in progress, lot P1 done) — an HTML slide player whose background is a real-time cinematic of the universe only (no ship, station, port or shuttle), built on `shared/cosmos.js`. `python3 build/build.py` (compile then test) → `dist/*.html`; see `presentation/README.md` and `presentation/docs/`.
 
 The root-level `README.md` in this directory describes an older layout (`space-travel.html`, `selftest.sh`, `screenshots.sh`, `spec-pack.py` at the top level) that no longer exists — that logic now lives under `sources/`. Don't trust that README for current file paths.
 
@@ -50,6 +51,7 @@ Eleven modules are **single-source** in `demos/space-travel/shared/` and consume
 - The game reads them through `shared/x.js` lines in `ORDER.txt`; the demo through `../../shared/x.js` in `build/build.py` and `build/build_min.js`.
 - Game-specific behaviour does **not** go into a shared module. The game extends it from its own files loaded around it: `09b-baies-ventrales.js` extends `__SHIPGLASS.BELLY`; `20e2-carte-hote.js` sets `window.__STARMAP_HOST` (translation, no camera buttons, jump refusal messages) before `shared/starmap.js`. A new shared module that needs per-product behaviour should take a host object the same way, with the demo's behaviour as default.
 - A change in `shared/` changes the demo's output: rebuild it, and release it (version bump, tag `ode_`) when its behaviour changes. Until then the committed demo HTML lags the source.
+- `shared/cosmos.js` (`window.__COSMOS.create(opts)`) is a twelfth module, consumed only by `presentation/` for now: the universe without any ship (galactic layer, systems at real scale, depth-sliced rendering), needing only THREE and `planets.js`, `stars.js`, `asteroids.js`. It **reproduces the game's draws** (modules 02–04, 07, 11, 12, 14, 16 and the system part of 20c): if you change how the game generates stars, systems, rings or moons, change `cosmos.js` the same way — `presentation/tests/cosmos_test.py` checks parity with `REAL.systemInfo` on the built game.
 
 ## Dependencies and tracked build output
 

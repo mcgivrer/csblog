@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  Voyage Spatial — présentation à fond cinématique (lot P4 : lecteur de slides).
+  Fond : cinématique temps réel du moteur (shared/cosmos.js), réalisateur (src/realisateur.js), direction photo (src/photo.js).
+  Page générée par presentation/build/build.py : pour écrire ses slides, éditer src/html/presentation.template.html.
+  MIT License — Copyright (c) 2026 Frédéric Delorme
+-->
+<title>Voyage Spatial — présentation</title>
+<meta name="description" content="Voyage Spatial : un univers procédural, filmé en temps réel par son propre moteur. Présentation à fond cinématique.">
+<meta name="theme-color" content="#0b1220">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Voyage Spatial — présentation">
+<meta property="og:description" content="Un univers procédural, filmé en temps réel par son propre moteur.">
+<meta property="og:image" content="https://mcgivrer.github.io/csblog/demos/space-travel/presentation/media/apercu.jpg">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:url" content="https://mcgivrer.github.io/csblog/demos/space-travel/presentation/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230b1220'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%23ffb454'/%3E%3Cellipse cx='16' cy='16' rx='13' ry='4.2' fill='none' stroke='%235eead4' stroke-width='2' transform='rotate(-20 16 16)'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ---------- charte McGivrer (web, sombre) ---------- */
+  :root{
+    --bg:#0b1220; --panel:#0f1a30; --line:#25375c; --ink:#e8edf5; --muted:#8ea0c4; --muted-2:#5d6f92;
+    --amber:#ffb454; --amber-dim:#a97a3d; --cyan:#5eead4; --texte:#c9d3e6; --rouge:#ff6b6b;
+    --mono:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans:'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --bar:0px; --marge:clamp(18px, 4.2vh, 60px);
+  }
+  *{ box-sizing:border-box; }
+  html, body{ margin:0; height:100%; background:#000; overflow:hidden; color:var(--ink); font-family:var(--sans); }
+  body:not(.souris){ cursor:none; }
+  canvas#scene{ position:fixed; inset:0; width:100vw; height:100vh; display:block; background:#000; }
+  body.rec canvas#scene{ object-fit:contain; }
+
+  /* ---------- cadre : l'image entre les bandes ---------- */
+  #cadre{ position:fixed; left:0; right:0; top:var(--bar); bottom:var(--bar); pointer-events:none; }
+  #deck{ position:absolute; inset:0; }
+  .slide{
+    position:absolute; inset:0; padding:var(--marge) calc(var(--marge)*1.5);
+    display:grid; grid-template-columns:repeat(12, minmax(0, 1fr)); column-gap:clamp(12px, 1.6vw, 28px); align-items:center;
+    visibility:hidden; opacity:0; transition:opacity .3s ease, visibility 0s linear .3s;
+  }
+  .slide.active{ visibility:visible; opacity:1; transition:opacity .3s ease; }
+  .slide > *{ grid-row:1; min-width:0; position:relative; }     /* au-dessus du voile de lecture (::before) */
+  /* côté du texte : le réalisateur cadre le sujet dans le tiers opposé */
+  .slide[data-cote="gauche"] > *{ grid-column:1 / span 5; }
+  .slide[data-cote="droite"] > *{ grid-column:8 / span 5; }
+  .slide[data-cote="centre"] > *{ grid-column:3 / span 8; text-align:center; }
+  .layout-titre[data-cote="gauche"] > *{ grid-column:1 / span 7; }
+  .layout-titre[data-cote="droite"] > *{ grid-column:6 / span 7; }
+  .layout-illustration[data-cote="gauche"] > *{ grid-column:1 / span 6; }
+  .layout-illustration[data-cote="droite"] > *{ grid-column:7 / span 6; }
+  .slide > .notes{ grid-column:auto !important; }
+  .layout-chapitre > *{ align-self:end; margin-bottom:6%; }
+
+  /* voile de lecture sans calque (titre, chapitre) : dégradé du côté du texte */
+  .layout-titre::before, .layout-chapitre::before{
+    content:""; position:absolute; inset:0; pointer-events:none; opacity:0; transition:opacity .9s ease;
+    background:linear-gradient(90deg, rgba(4,7,14,.62), rgba(4,7,14,.25) 38%, rgba(4,7,14,0) 62%);
+  }
+  .layout-titre[data-cote="droite"]::before, .layout-chapitre[data-cote="droite"]::before{ background:linear-gradient(270deg, rgba(4,7,14,.62), rgba(4,7,14,.25) 38%, rgba(4,7,14,0) 62%); }
+  .layout-titre[data-cote="centre"]::before, .layout-chapitre[data-cote="centre"]::before{ background:radial-gradient(ellipse at center, rgba(4,7,14,.55), rgba(4,7,14,0) 65%); }
+  .slide.visible::before{ opacity:1; }
+
+  /* apparition en cascade, après la coupe */
+  .anim{ opacity:0; transform:translateY(14px); transition:opacity .8s cubic-bezier(.2,.7,.2,1), transform .8s cubic-bezier(.2,.7,.2,1); }
+  .slide.visible .anim{ opacity:1; transform:none; }
+  .slide.visible .anim:nth-child(2){ transition-delay:.09s; } .slide.visible .anim:nth-child(3){ transition-delay:.18s; }
+  .slide.visible .anim:nth-child(4){ transition-delay:.27s; } .slide.visible .anim:nth-child(5){ transition-delay:.36s; }
+  .slide.visible li.anim:nth-child(1){ transition-delay:.2s; } .slide.visible li.anim:nth-child(2){ transition-delay:.3s; }
+  .slide.visible li.anim:nth-child(3){ transition-delay:.4s; } .slide.visible li.anim:nth-child(4){ transition-delay:.5s; }
+
+  /* ---------- typographie ---------- */
+  .eyebrow{ font-family:var(--mono); font-size:clamp(11px, .95vw, 15px); color:var(--amber); letter-spacing:.08em; margin:0 0 clamp(10px, 1.4vh, 18px); }
+  .eyebrow::before{ content:"// "; color:var(--muted-2); }
+  h1{ font-family:var(--mono); font-weight:800; font-size:clamp(34px, 5.6vw, 100px); line-height:1.02; letter-spacing:-.01em; margin:0 0 clamp(12px, 2vh, 26px);
+    text-shadow:0 2px 28px rgba(0,0,0,.55); }
+  h2{ font-family:var(--mono); font-weight:700; font-size:clamp(22px, 2.7vw, 46px); line-height:1.12; margin:0 0 clamp(12px, 2.2vh, 28px); }
+  .insecable{ white-space:nowrap; }          /* le curseur ne passe jamais seul à la ligne */
+  .curseur{ display:inline-block; width:.42ch; height:.86em; margin-left:.12em; background:var(--amber); vertical-align:-.06em; animation:clignote 1s steps(1) infinite; }
+  @keyframes clignote{ 50%{ opacity:0; } }
+  .sous-titre{ font-size:clamp(16px, 1.65vw, 28px); line-height:1.45; color:var(--texte); max-width:30ch; margin:0 0 clamp(14px, 2.4vh, 30px); text-shadow:0 1px 18px rgba(0,0,0,.6); }
+  .layout-titre[data-cote="centre"] .sous-titre{ margin-left:auto; margin-right:auto; }
+  .meta{ font-family:var(--mono); font-size:clamp(11px, .95vw, 15px); color:var(--cyan); letter-spacing:.06em; margin:0; }
+  .slide ul{ list-style:none; margin:0 0 clamp(14px, 2.4vh, 28px); padding:0; }
+  .slide li{ position:relative; padding-left:1.4em; font-size:clamp(14px, 1.25vw, 21px); line-height:1.55; color:var(--texte); margin:0 0 .7em; }
+  .slide li::before{ content:"▸"; position:absolute; left:0; color:var(--amber); font-family:var(--mono); }
+  .slide li b{ color:var(--ink); font-weight:600; }
+  .chiffres{ display:flex; gap:clamp(14px, 2vw, 34px); border-top:1px solid var(--line); padding-top:clamp(12px, 2vh, 22px); }
+  .chiffres div{ display:flex; flex-direction:column; gap:4px; }
+  .chiffres b{ font-family:var(--mono); font-weight:800; font-size:clamp(20px, 2.2vw, 38px); color:var(--cyan); line-height:1; }
+  .chiffres span{ font-family:var(--mono); font-size:clamp(9.5px, .75vw, 12.5px); letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
+  figure{ margin:0; }
+  figure svg{ display:block; width:100%; height:auto; margin:0 0 clamp(10px, 1.6vh, 18px); }
+  figcaption{ font-family:var(--mono); font-size:clamp(10.5px, .85vw, 14px); line-height:1.6; color:var(--muted); }
+  .num-chapitre{ font-family:var(--mono); font-size:clamp(12px, 1vw, 16px); color:var(--amber-dim); letter-spacing:.12em; margin:0 0 10px; }
+  .layout-chapitre h2{ font-size:clamp(28px, 4vw, 64px); text-shadow:0 2px 24px rgba(0,0,0,.55); }
+  .slide[data-cote="centre"] .calque{ text-align:left; }
+  .slide .notes{ display:none; }                                   /* notes de l'orateur : vue présentateur (S) */
+  .slide a{ pointer-events:auto; color:var(--cyan); text-decoration:none; border-bottom:1px solid rgba(94,234,212,.35); }
+  .slide a:hover{ border-bottom-color:var(--cyan); }
+  /* illustrations dans les calques (intégrées au fichier publié par build.py) */
+  .calque img.capture{ display:block; width:100%; height:auto; max-height:34vh; object-fit:contain; object-position:left center;
+    border:1px solid var(--line); background:var(--bg); margin:0 0 clamp(10px, 1.6vh, 18px); }
+  .calque img.capture.basse{ max-height:24vh; width:auto; max-width:100%; }
+  svg.schema{ display:block; width:100%; height:auto; max-height:26vh; margin:0 0 clamp(10px, 1.6vh, 18px); }
+  .planetes{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:clamp(8px, 1.2vw, 18px) clamp(8px, 1vw, 16px); margin:0 0 clamp(10px, 1.6vh, 18px); }
+  .planetes figure{ display:flex; flex-direction:column; align-items:center; text-align:center; gap:4px; }
+  .planetes img{ width:min(100%, 15vh); height:auto; aspect-ratio:1; }
+  .planetes figcaption{ font-size:clamp(9.5px, .75vw, 12.5px); line-height:1.4; }
+  .planetes figcaption b{ display:block; font-family:var(--mono); color:var(--ink); font-size:1.1em; }
+  .encart{ font-family:var(--mono); font-size:clamp(11px, .9vw, 14.5px); line-height:1.6; color:var(--cyan); margin:0; }
+  .mention{ font-family:var(--mono); font-size:clamp(9.5px, .75vw, 12px); letter-spacing:.12em; text-transform:uppercase; color:var(--amber-dim); margin:0; }
+  .radio{ font-family:var(--mono); font-size:clamp(12px, 1vw, 16px); line-height:1.6; border-left:2px solid var(--cyan); background:rgba(94,234,212,.05);
+    padding:.6em .9em; margin:0 0 clamp(12px, 2vh, 22px); }
+  .radio p{ margin:0; color:var(--texte); } .radio .ind{ color:var(--cyan); } .radio .ctl{ color:var(--amber); }
+  .slide table{ width:100%; border-collapse:collapse; font-size:clamp(12.5px, 1.05vw, 18px); margin:0 0 clamp(12px, 2vh, 22px); }
+  .slide th, .slide td{ text-align:left; padding:.5em .7em; border-bottom:1px solid var(--line); vertical-align:top; }
+  .slide th{ font-family:var(--mono); font-weight:400; font-size:.72em; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+  .slide td{ color:var(--texte); } .slide td:first-child{ font-family:var(--mono); color:var(--amber); white-space:nowrap; }
+  .slide td:nth-child(2){ font-family:var(--mono); color:var(--cyan); white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .liens{ display:grid; grid-template-columns:auto 1fr; gap:.5em 1.2em; margin:0 0 clamp(16px, 3vh, 32px); font-size:clamp(13px, 1.1vw, 18px); color:var(--texte); }
+  .liens dt{ font-family:var(--mono); color:var(--amber); } .liens dd{ margin:0; min-width:0; overflow-wrap:anywhere; }
+  .feuille{ display:flex; flex-wrap:wrap; gap:6px; }
+  .feuille span{ font-family:var(--mono); font-size:clamp(10.5px, .85vw, 13.5px); border:1px solid var(--line); padding:.35em .65em; color:var(--texte); }
+  .feuille .fin{ border-color:var(--amber); color:var(--amber); }
+
+  /* ---------- calque : le flou et l'assombrissement sont rendus par la direction photo ---------- */
+  .calque{ position:relative; padding:clamp(18px, 2.4vw, 42px); border:1px solid rgba(37,55,92,.9); }
+  .calque::before, .calque::after{ content:""; position:absolute; width:12px; height:12px; border:1.5px solid var(--amber); }
+  .calque::before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }
+  .calque::after{ bottom:-1px; right:-1px; border-left:none; border-top:none; }
+  body:not(.voile-gl) .calque{ background:rgba(11,18,32,.76); -webkit-backdrop-filter:blur(12px) saturate(1.1); backdrop-filter:blur(12px) saturate(1.1); }
+  body:not(.voile-gl) .calque[data-calque="leger"]{ background:rgba(11,18,32,.55); }
+  body:not(.voile-gl) .calque[data-calque="fort"]{ background:rgba(11,18,32,.86); }
+
+  /* ---------- bandes : informations de tournage en haut, slide et progression en bas ---------- */
+  .barre{ position:fixed; left:0; right:0; display:flex; justify-content:space-between; align-items:center; gap:16px;
+    padding:0 calc(var(--marge)*1.5); font-family:var(--mono); font-size:10.5px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--muted-2); pointer-events:none; white-space:nowrap; transition:opacity .4s; }
+  .barre > *{ overflow:hidden; text-overflow:ellipsis; }
+  #barre-haut{ top:0; height:max(var(--bar), 30px); }
+  #barre-bas{ bottom:0; height:max(var(--bar), 30px); }
+  body:not(.barres-texte) .barre{ text-shadow:0 1px 6px rgba(0,0,0,.9); color:var(--muted); }
+  body:not(.barres-texte) #barre-haut{ top:var(--bar); } body:not(.barres-texte) #barre-bas{ bottom:var(--bar); }
+  .direct{ color:var(--cyan); } .direct::before{ content:"●"; margin-right:6px; animation:clignote 1.8s steps(1) infinite; }
+  .barre .ambre{ color:var(--amber); }
+  #progression{ position:fixed; left:0; bottom:var(--bar); height:1px; width:0; background:var(--amber); transition:width .6s cubic-bezier(.2,.7,.2,1); pointer-events:none; }
+  body.sans-ui .barre, body.sans-ui #progression, body.sans-ui #commandes{ opacity:0; }
+
+  /* ---------- commandes, panneaux ---------- */
+  #commandes{ position:fixed; top:calc(var(--bar) + 12px); right:12px; display:flex; gap:6px; opacity:0; transition:opacity .3s; }
+  body.souris #commandes{ opacity:1; }
+  button, select{ font-family:var(--mono); font-size:12px; color:var(--ink); background:rgba(11,18,32,.78); border:1px solid var(--line); padding:7px 10px; cursor:pointer; border-radius:0; }
+  button:hover{ border-color:var(--amber); color:var(--amber); }
+  button:focus-visible, select:focus-visible, input:focus-visible{ outline:2px solid var(--amber); outline-offset:1px; }
+  button.primaire{ background:var(--amber); color:var(--bg); border-color:var(--amber); font-weight:700; }
+  button.primaire:hover{ background:#ffc576; color:var(--bg); }
+  .panneau{ position:fixed; top:calc(var(--bar) + 56px); right:12px; width:min(380px, calc(100vw - 24px)); padding:20px 22px; background:rgba(11,18,32,.94);
+    border:1px solid var(--line); font-size:13px; color:var(--muted); line-height:1.6; }
+  .panneau::before, .panneau::after{ content:""; position:absolute; width:12px; height:12px; border:1.5px solid var(--amber); }
+  .panneau::before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }
+  .panneau::after{ bottom:-1px; right:-1px; border-left:none; border-top:none; }
+  .panneau[hidden]{ display:none; }
+  .panneau h3{ font-family:var(--mono); font-size:15px; color:var(--ink); margin:0 0 14px; }
+  .panneau label{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin:0 0 10px; font-family:var(--mono); font-size:12px; color:var(--muted); }
+  .panneau .note{ font-size:12px; color:var(--muted-2); margin:10px 0 14px; }
+  .panneau .actions{ display:flex; gap:8px; justify-content:flex-end; }
+  .panneau dl{ display:grid; grid-template-columns:auto 1fr; gap:6px 14px; margin:0; font-size:12.5px; }
+  .panneau dt{ font-family:var(--mono); color:var(--amber); } .panneau dd{ margin:0; }
+  #rec{ position:fixed; top:calc(var(--bar) + 12px); left:12px; font-family:var(--mono); font-size:12px; letter-spacing:.1em; color:var(--ink);
+    background:rgba(11,18,32,.85); border:1px solid var(--line); padding:6px 10px; display:none; }
+  #rec::before{ content:"●"; color:var(--rouge); margin-right:8px; animation:clignote 1s steps(1) infinite; }
+  body.rec #rec{ display:block; } body.rec #cadre, body.rec .barre, body.rec #progression, body.rec #commandes{ visibility:hidden; }
+  #toast{ position:fixed; left:50%; bottom:calc(var(--bar) + 18px); transform:translateX(-50%); font-family:var(--mono); font-size:12px; color:var(--ink);
+    background:rgba(11,18,32,.92); border:1px solid var(--line); padding:8px 14px; opacity:0; transition:opacity .4s; pointer-events:none; max-width:calc(100vw - 24px); }
+  #toast.vu{ opacity:1; }
+  #presentateur{ top:auto; right:auto; left:12px; bottom:calc(var(--bar) + 12px); width:min(520px, calc(100vw - 24px)); max-height:calc(100vh - 2*var(--bar) - 24px); overflow:auto; }
+  #presentateur .p-tete{ display:flex; justify-content:space-between; font-family:var(--mono); font-size:12px; letter-spacing:.08em; margin:0 0 8px; }
+  #presentateur .p-num{ color:var(--amber); } #presentateur .p-temps{ color:var(--cyan); font-variant-numeric:tabular-nums; }
+  #presentateur .p-notes{ color:var(--texte); font-size:15px; line-height:1.6; margin:0 0 10px; }
+  #presentateur .p-suivante{ font-family:var(--mono); font-size:12px; color:var(--muted); margin:0 0 12px; }
+  body.rec #presentateur{ visibility:hidden; }
+
+  /* ---------- écran noir (B ou .) ---------- */
+  #noir{ position:fixed; inset:0; background:#000; opacity:0; pointer-events:none; transition:opacity .5s ease; }
+  body.noir #noir{ opacity:1; pointer-events:auto; }
+
+  /* ---------- sans WebGL : fond fixe à la charte (trame, lueurs) ---------- */
+  body.sans-webgl{ background:
+    linear-gradient(rgba(37,55,92,.22) 1px, transparent 1px) 0 0 / 44px 44px,
+    linear-gradient(90deg, rgba(37,55,92,.22) 1px, transparent 1px) 0 0 / 44px 44px,
+    radial-gradient(ellipse at 72% 38%, rgba(94,234,212,.10), transparent 55%),
+    radial-gradient(ellipse at 18% 82%, rgba(255,180,84,.08), transparent 50%),
+    linear-gradient(#0b1220, #05080f); }
+  body.sans-webgl canvas#scene{ display:none; }
+  body.sans-webgl .direct::before{ content:none; }
+
+  /* ---------- écran haut ou étroit : pas de bandes, texte empilé en bas ---------- */
+  body.etroit .slide{ align-items:end; padding:16px 16px 44px; }
+  body.etroit .slide > *{ grid-column:1 / -1 !important; text-align:left; }
+  body.etroit .calque{ padding:16px; }
+  body.etroit .chiffres{ flex-wrap:wrap; }
+
+  @media (prefers-reduced-motion: reduce){
+    .anim, .slide, .layout-titre::before, .layout-chapitre::before, #progression{ transition:none !important; }
+    .curseur, .direct::before, #rec::before{ animation:none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="scene" aria-hidden="true"></canvas>
+
+<div id="cadre">
+<!--
+  ===== GABARIT : ÉCRIRE SES SLIDES =====
+  Une slide = une <section class="slide …"> dans <main id="deck">. Mises en page : layout-titre, layout-contenu,
+  layout-illustration, layout-chapitre.
+    data-cote="gauche|droite|centre"  côté du texte ; le réalisateur cadre le sujet dans le tiers opposé
+    data-plan="…"                       coupe vers ce type de plan à l'arrivée sur la slide : etoile, croissant, nebuleuse,
+                                        survol, terminateur, limbe, anneaux, lune, eclipse, ceinture
+    data-systeme="suivant"              fondu au noir vers le système suivant (slide de chapitre)
+    data-titre-court="…"                titre affiché dans la bande du bas (sinon le premier titre de la slide)
+  Calque en transparence derrière le texte ou une illustration : class="calque" data-calque="leger|normal|fort".
+  Éléments qui apparaissent en cascade : class="anim". Notes de l'orateur (vue présentateur, touche S) :
+  <aside class="notes">…</aside>. Images : src="media/…" ou src="../docs/…" (chemins relatifs à presentation/), intégrées au
+  fichier publié par build.py. Curseur de titre : <span class="insecable">dernier mot<span class="curseur"></span></span>.
+  Sur <main id="deck"> : data-titre (titre du deck), data-look (imax par défaut ; auto, denis, kodak, kubrick),
+  data-systemes (nombre de systèmes filmés en boucle).
+-->
+<main id="deck" data-titre="Voyage Spatial" data-look="imax" data-systemes="6">
+
+  <section class="slide layout-titre" data-cote="gauche" data-titre-court="Ouverture">
+    <div class="bloc">
+      <p class="eyebrow anim">csblog · simulation spatiale</p>
+      <h1 class="anim">Voyage <span class="insecable">Spatial<span class="curseur"></span></span></h1>
+      <p class="sous-titre anim">Transporteur de fret dans un univers procédural à l'échelle réelle, jouable dans un onglet de navigateur.</p>
+      <p class="meta anim">Space Travel &amp; Transport · v2.18 · Frédéric Delorme</p>
+    </div>
+    <aside class="notes">Tout ce qui défile derrière est calculé en temps réel par le moteur du jeu, avec la même graine qu'une partie : aucune vidéo, aucun vaisseau dans le décor.</aside>
+  </section>
+
+  <section class="slide layout-contenu" data-cote="gauche" data-plan="survol" data-titre-court="Le principe">
+    <div class="calque" data-calque="normal">
+      <p class="eyebrow anim">00 · le principe</p>
+      <h2 class="anim">Piloter un cargo, livrer, prospérer</h2>
+      <ul>
+        <li class="anim"><b>Accepter une mission</b> au port : fret, passagers ou eau, avec une prime et un niveau de risque.</li>
+        <li class="anim"><b>Voler jusqu'à destination</b> : transfert accéléré, approche finale au manche, mise en orbite.</li>
+        <li class="anim"><b>Livrer</b> par la navette de la baie et encaisser la prime.</li>
+        <li class="anim"><b>Réinvestir</b> : carburant, propulseurs, générateur de saut, nouveau vaisseau.</li>
+      </ul>
+      <div class="chiffres anim">
+        <div><b>1</b><span>fichier HTML</span></div>
+        <div><b>4</b><span>langues</span></div>
+        <div><b>1</b><span>graine = 1 univers</span></div>
+      </div>
+    </div>
+    <aside class="notes">Depuis la v2.18, deux modes. Partie libre : tous les vaisseaux, sans sauvegarde. Campagne : départ sur le Courlis avec 4 000 CR, et la partie est sauvegardée. Principe de conception : piloter reste le plaisir central.</aside>
+  </section>
+
+  <section class="slide layout-chapitre" data-cote="gauche" data-systeme="suivant" data-titre-court="L’univers">
+    <div class="bloc">
+      <p class="num-chapitre anim">01</p>
+      <h2 class="anim">Un univers à l’échelle réelle</h2>
+      <p class="sous-titre anim">Tout naît d’une graine.</p>
+    </div>
+    <aside class="notes">Fondu au noir : le réalisateur passe au système suivant.</aside>
+  </section>
+
+  <section class="slide layout-contenu" data-cote="droite" data-plan="nebuleuse" data-titre-court="Une graine, un univers">
+    <div class="calque" data-calque="leger">
+      <p class="eyebrow anim">01 · l'univers</p>
+      <h2 class="anim">Tout naît d'une seule graine</h2>
+      <ul>
+        <li class="anim">Le champ d'étoiles est généré par cellules, à mesure qu'on avance : jamais tout l'univers en mémoire.</li>
+        <li class="anim">Les étoiles suivent la physique : classe spectrale, couleur du corps noir, magnitude apparente.</li>
+        <li class="anim">Chaque système est réalisé en mètres réels : zone habitable, lunes, anneaux, ceintures, ports.</li>
+        <li class="anim">Même graine, même univers : noms, planètes et ports se retrouvent à l'identique.</li>
+      </ul>
+      <p class="encart anim">Le décor derrière ce texte est calculé en direct par le moteur du jeu.</p>
+    </div>
+    <aside class="notes">Générateur xmur3 + mulberry32, une graine dérivée par usage (étoile, système, lunes…). Jusqu'à quatre systèmes construits à la fois.</aside>
+  </section>
+
+  <section class="slide layout-illustration" data-cote="droite" data-plan="limbe" data-titre-court="Les planètes">
+    <figure class="calque" data-calque="normal">
+      <p class="eyebrow anim">01 · les planètes</p>
+      <h2 class="anim">Six natures de planètes</h2>
+      <div class="planetes anim">
+        <figure><img src="media/illustrations/planete-oceanique.webp" alt="Planète océanique" width="400" height="400"><figcaption><b>Océanique</b>surface immergée, habitable</figcaption></figure>
+        <figure><img src="media/illustrations/planete-continentale.webp" alt="Planète continentale" width="400" height="400"><figcaption><b>Continentale</b>terres et océans, habitable</figcaption></figure>
+        <figure><img src="media/illustrations/planete-desertique.webp" alt="Planète désertique" width="400" height="400"><figcaption><b>Désertique</b>aride, atmosphère ténue</figcaption></figure>
+        <figure><img src="media/illustrations/planete-glacee.webp" alt="Planète glacée" width="400" height="400"><figcaption><b>Glacée</b>calottes et banquises</figcaption></figure>
+        <figure><img src="media/illustrations/planete-volcanique.webp" alt="Planète volcanique" width="400" height="400"><figcaption><b>Volcanique</b>coulées de lave</figcaption></figure>
+        <figure><img src="media/illustrations/planete-geante-gazeuse.webp" alt="Planète géante gazeuse" width="400" height="400"><figcaption><b>Géante gazeuse</b>bandes, parfois des anneaux</figcaption></figure>
+      </div>
+      <figcaption class="anim">Surfaces procédurales, trois couches de nuages, atmosphère, aurores et villes de nuit. Rendus réels du shader du jeu.</figcaption>
+    </figure>
+    <aside class="notes">Le monde volcanique n'a pas d'atmosphère : ses coulées de lave sont émissives et restent visibles côté nuit. Les géantes gazeuses portent les anneaux et accueillent la tour d'amarrage.</aside>
+  </section>
+
+  <section class="slide layout-chapitre" data-cote="gauche" data-systeme="suivant" data-titre-court="Le métier">
+    <div class="bloc">
+      <p class="num-chapitre anim">02</p>
+      <h2 class="anim">Le métier de transporteur</h2>
+      <p class="sous-titre anim">Une mission, de l’offre à la prime.</p>
+    </div>
+    <aside class="notes">Fondu au noir vers un nouveau système.</aside>
+  </section>
+
+  <section class="slide layout-illustration" data-cote="gauche" data-plan="anneaux" data-titre-court="La flotte">
+    <figure class="calque" data-calque="normal">
+      <p class="eyebrow anim">02 · la flotte</p>
+      <h2 class="anim">Dix vaisseaux générés</h2>
+      <img class="capture anim" src="media/illustrations/stt217-selection-vaisseau.jpg" alt="Hangar du jeu : la Banquise, citernier à glace" width="1280" height="720">
+      <ul>
+        <li class="anim">Du pousseur Mistral (61 m) au cargo-poutre Longue-Échine (237 m).</li>
+        <li class="anim">Construits en chaîne : proue, habitat, section moteur de 2 à 6 tuyères.</li>
+        <li class="anim">Quatre long-courriers : anneaux de distorsion et générateur de saut.</li>
+      </ul>
+    </figure>
+    <aside class="notes">En campagne, on part du Courlis, un vaisseau modulaire de palier I (4 conteneurs), qu'on agrandit au chantier naval.</aside>
+  </section>
+
+  <section class="slide layout-illustration" data-cote="droite" data-plan="croissant" data-titre-court="Une mission">
+    <figure class="calque" data-calque="fort">
+      <p class="eyebrow anim">02 · une mission</p>
+      <h2 class="anim">De l'offre à la prime</h2>
+      <svg class="schema anim" viewBox="0 0 600 176" role="img" aria-label="Déroulé d’une mission : missions, transfert, approche, orbite, navette, prime"><defs><marker id="fl1" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#a97a3d"/></marker></defs><g font-family="JetBrains Mono, ui-monospace, monospace" text-anchor="middle"><rect x="2" y="6" width="176" height="60" stroke="#25375c" fill="rgba(15,26,48,.55)"/><text x="90.0" y="32.0" font-size="16" font-weight="700" fill="#e8edf5">Missions</text><text x="90.0" y="52.0" font-size="12.5" fill="#5eead4">tableau du port</text><rect x="212" y="6" width="176" height="60" stroke="#25375c" fill="rgba(15,26,48,.55)"/><text x="300.0" y="32.0" font-size="16" font-weight="700" fill="#e8edf5">Transfert</text><text x="300.0" y="52.0" font-size="12.5" fill="#5eead4">auto · × 300 à × 900</text><rect x="422" y="6" width="176" height="60" stroke="#25375c" fill="rgba(15,26,48,.55)"/><text x="510.0" y="32.0" font-size="16" font-weight="700" fill="#e8edf5">Approche</text><text x="510.0" y="52.0" font-size="12.5" fill="#5eead4">au manche, portiques</text><rect x="2" y="112" width="176" height="60" stroke="#25375c" fill="rgba(15,26,48,.55)"/><text x="90.0" y="138.0" font-size="16" font-weight="700" fill="#e8edf5">Orbite</text><text x="90.0" y="158.0" font-size="12.5" fill="#5eead4">≈ 8 km/s</text><rect x="212" y="112" width="176" height="60" stroke="#25375c" fill="rgba(15,26,48,.55)"/><text x="300.0" y="138.0" font-size="16" font-weight="700" fill="#e8edf5">Navette</text><text x="300.0" y="158.0" font-size="12.5" fill="#5eead4">≈ 97 s aller-retour</text><rect x="422" y="112" width="176" height="60" stroke="#ffb454" fill="rgba(255,180,84,.08)"/><text x="510.0" y="138.0" font-size="16" font-weight="700" fill="#e8edf5">Prime</text><text x="510.0" y="158.0" font-size="12.5" fill="#5eead4">livraison payée</text><path d="M178 36 H208" stroke="#a97a3d" stroke-width="1.5" fill="none" marker-end="url(#fl1)"/><path d="M388 36 H418" stroke="#a97a3d" stroke-width="1.5" fill="none" marker-end="url(#fl1)"/><path d="M510.0 66 V89 H90.0 V108" stroke="#a97a3d" stroke-width="1.5" fill="none" marker-end="url(#fl1)"/><path d="M178 142 H208" stroke="#a97a3d" stroke-width="1.5" fill="none" marker-end="url(#fl1)"/><path d="M388 142 H418" stroke="#a97a3d" stroke-width="1.5" fill="none" marker-end="url(#fl1)"/></g></svg>
+      <img class="capture basse anim" src="media/illustrations/stt217-approche-orbite.jpg" alt="Approche finale d'un cargo au-dessus d'une planète" width="640" height="400">
+      <figcaption class="anim">Cinq natures de fret : la couleur du conteneur dit la nature. Une mission locale dure de 71 à 142 s.</figcaption>
+    </figure>
+    <aside class="notes">Les 71 et 142 s viennent du chronométrage du lot L0 (Courlis et e18). Le transfert passe en temps accéléré ; l'approche finale se pilote, dans un couloir de portiques ; la navette fait l'aller-retour vers la pile de conteneurs du port.</aside>
+  </section>
+
+  <section class="slide layout-illustration" data-cote="droite" data-plan="etoile" data-titre-court="Le voyage">
+    <figure class="calque" data-calque="normal">
+      <p class="eyebrow anim">02 · le voyage</p>
+      <h2 class="anim">Distorsion et saut</h2>
+      <img class="capture anim" src="media/illustrations/stt217-supraluminique.jpg" alt="La Belle-Étoile en distorsion, avec l'interface complète du jeu" width="1280" height="720">
+      <ul>
+        <li class="anim">Carburant consommé en Δv réel, plein payé au port.</li>
+        <li class="anim">Distorsion : croisière de × 5 à × 10 selon la masse en charge.</li>
+        <li class="anim">Saut quantique vers une étoile choisie sur la carte (touche M).</li>
+      </ul>
+    </figure>
+    <aside class="notes">La capture montre aussi l'interface complète : plan de vol, objet le plus proche, radio, propulsion. Bon moment pour montrer à quoi ressemble une partie.</aside>
+  </section>
+
+  <section class="slide layout-contenu" data-cote="gauche" data-plan="terminateur" data-titre-court="La radio">
+    <div class="calque" data-calque="normal">
+      <p class="eyebrow anim">02 · la radio</p>
+      <h2 class="anim">Une IA locale écrit la radio</h2>
+      <div class="radio anim">
+        <p><span class="ind">[MIR-47]</span> Navette 2 larguée, cap sur le port.</p>
+        <p><span class="ctl">[Contrôle]</span> Autorisation accordée, trajectoire propre.</p>
+      </div>
+      <ul>
+        <li class="anim">Gemini Nano, intégré à Chrome, réécrit les répliques sur la machine du joueur, sans réseau.</li>
+        <li class="anim">Deux personnages, deux tons : le capitaine et la tour de contrôle.</li>
+        <li class="anim">Pas d'IA, ou plus de 2 s d'attente : le jeu reprend ses répliques écrites, sans rupture.</li>
+        <li class="anim"><b>Le jeu décide, le LLM raconte</b> : chances, prix et résultats restent calculés par le jeu.</li>
+      </ul>
+    </div>
+    <aside class="notes">Les répliques écrites restent la source de vérité ; l'IA ne fait que les reformuler, en tâche de fond. L'icône cerveau du panneau radio montre l'état réel de l'IA.</aside>
+  </section>
+
+  <section class="slide layout-chapitre" data-cote="gauche" data-systeme="suivant" data-titre-court="La campagne">
+    <div class="bloc">
+      <p class="num-chapitre anim">03</p>
+      <h2 class="anim">De l’indépendant à la compagnie</h2>
+      <p class="sous-titre anim">La campagne, de la v2.18 à la v3.0.</p>
+    </div>
+    <aside class="notes">Fondu au noir vers un nouveau système.</aside>
+  </section>
+
+  <section class="slide layout-contenu" data-cote="centre" data-plan="nebuleuse" data-titre-court="Cinq actes">
+    <div class="calque" data-calque="fort">
+      <p class="eyebrow anim">03 · la campagne</p>
+      <h2 class="anim">Cinq actes, sans victoire imposée</h2>
+      <table class="anim">
+        <thead><tr><th>Acte</th><th>Vers</th><th>Ce qui s'ouvre</th></tr></thead>
+        <tbody>
+          <tr><td>I · Indépendant</td><td>0 h</td><td>un vaisseau, missions locales, chantier naval</td></tr>
+          <tr><td>II · Armateur</td><td>1 h 45</td><td>deuxième vaisseau, premier capitaine, missions entre systèmes</td></tr>
+          <tr><td>III · Compagnie</td><td>4 h</td><td>trois vaisseaux, sigle et livrée, choix d'un site</td></tr>
+          <tr><td>IV · Base</td><td>6 h</td><td>station fondée, laboratoire, chantier à domicile</td></tr>
+          <tr><td>V · Expansion</td><td>9 h</td><td>industrie, deuxième station, contrats stratégiques</td></tr>
+        </tbody>
+      </table>
+      <p class="encart anim">Trois boucles imbriquées : la mission (5 à 10 min), la flotte (30 à 60 min), la compagnie (des heures).</p>
+    </div>
+    <aside class="notes">La v2.18 livre le socle : choix Campagne ou Partie libre, départ sur le Courlis, sauvegarde. Les heures sont des cibles d'équilibrage, à calibrer en jeu. Des objectifs de compagnie servent de jalons : flotte de 6, 1 M CR de valeur…</aside>
+  </section>
+
+  <section class="slide layout-illustration" data-cote="gauche" data-plan="anneaux" data-titre-court="Le chantier naval">
+    <figure class="calque" data-calque="normal">
+      <p class="eyebrow anim">03 · le chantier naval</p>
+      <h2 class="anim">Ce qu'on assemble est ce qu'on pilote</h2>
+      <img class="capture anim" src="../docs/specs/img/spec010/chantier.svg" alt="Maquette du chantier naval : modules, fiche avant et après, devis" width="1200" height="720">
+      <ul>
+        <li class="anim">La masse pèse sur l'accélération et sur le carburant.</li>
+        <li class="anim">Le palier fixe l'équipage et le poste d'amarrage ; le palier III ouvre le saut.</li>
+        <li class="anim">Flotte hybride : on pilote l'amiral, les autres suivent des ordres, à 65 % du rendement d'un vaisseau piloté.</li>
+      </ul>
+      <p class="mention anim">Maquette · lot L2 (v2.20)</p>
+    </figure>
+    <aside class="notes">Le chantier reprend l'éditeur de vaisseaux STT Modules : glisser-déposer des modules, fantôme aimanté, fiche avant et après, devis des travaux. Un vaisseau piloté rapporte toujours plus que le même vaisseau automatisé.</aside>
+  </section>
+
+  <section class="slide layout-illustration" data-cote="droite" data-plan="limbe" data-titre-court="La station">
+    <figure class="calque" data-calque="normal">
+      <p class="eyebrow anim">03 · la station</p>
+      <h2 class="anim">Recherche, puis une station</h2>
+      <img class="capture anim" src="../docs/specs/img/spec010/station-site.svg" alt="Maquette du choix du site de la station parmi trois planètes" width="1200" height="720">
+      <ul>
+        <li class="anim">Six branches de quatre paliers : Voyage, Transport, Énergie, Sécurité, Industrie, Organisation.</li>
+        <li class="anim">Les missions rapportent des points de recherche ; les technologies ouvrent des missions plus complexes.</li>
+        <li class="anim">Trois vaisseaux et l'Ingénierie orbitale : on fonde sa station sur un site choisi parmi 3 à 5 planètes notées, et sa flotte la construit.</li>
+      </ul>
+      <p class="mention anim">Maquettes · lots L4 et L5 (v2.22, v2.23)</p>
+    </figure>
+    <aside class="notes">Chaque planète reçoit un profil économique déterministe (eau, denrées, minerais, rares, carburant, population) tiré de ce que le générateur produit déjà. Seuls les sites qui passent les trois seuils de SPEC-010 sont proposés.</aside>
+  </section>
+
+  <section class="slide layout-chapitre" data-cote="gauche" data-systeme="suivant" data-titre-court="Le moteur">
+    <div class="bloc">
+      <p class="num-chapitre anim">04</p>
+      <h2 class="anim">Le moteur</h2>
+      <p class="sous-titre anim">Du mètre à la galaxie, dans un seul fichier.</p>
+    </div>
+    <aside class="notes">Fondu au noir vers un nouveau système.</aside>
+  </section>
+
+  <section class="slide layout-illustration" data-cote="gauche" data-plan="anneaux" data-titre-court="Le rendu">
+    <figure class="calque" data-calque="fort">
+      <p class="eyebrow anim">04 · le rendu</p>
+      <h2 class="anim">Du mètre à la galaxie</h2>
+      <svg class="schema anim" viewBox="0 0 600 182" role="img" aria-label="Six tranches de profondeur de 0,2 m à 10¹⁹ m, et la couche galactique"><defs><marker id="fl2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#a97a3d"/></marker></defs><g font-family="JetBrains Mono, ui-monospace, monospace" text-anchor="middle"><text x="300" y="16" font-size="12" fill="#8ea0c4">couche système · en mètres · origine flottante</text><rect x="9.0" y="28" width="95.33333333333333" height="44" fill="rgba(94,234,212,.10)" stroke="#5eead4"/><text x="56.666666666666664" y="48" font-size="15" font-weight="700" fill="#e8edf5">1</text><text x="56.666666666666664" y="64" font-size="11.5" fill="#5eead4">coque</text><rect x="106.33333333333333" y="28" width="95.33333333333333" height="44" fill="rgba(94,234,212,.10)" stroke="#5eead4"/><text x="154.0" y="48" font-size="15" font-weight="700" fill="#e8edf5">2</text><text x="154.0" y="64" font-size="11.5" fill="#5eead4">ports</text><rect x="203.66666666666666" y="28" width="95.33333333333333" height="44" fill="rgba(94,234,212,.10)" stroke="#5eead4"/><text x="251.33333333333331" y="48" font-size="15" font-weight="700" fill="#e8edf5">3</text><text x="251.33333333333331" y="64" font-size="11.5" fill="#5eead4">planètes</text><rect x="301.0" y="28" width="95.33333333333333" height="44" fill="rgba(94,234,212,.10)" stroke="#5eead4"/><text x="348.6666666666667" y="48" font-size="15" font-weight="700" fill="#e8edf5">4</text><text x="348.6666666666667" y="64" font-size="11.5" fill="#5eead4">orbites</text><rect x="398.3333333333333" y="28" width="95.33333333333333" height="44" fill="rgba(94,234,212,.10)" stroke="#5eead4"/><text x="446.0" y="48" font-size="15" font-weight="700" fill="#e8edf5">5</text><text x="446.0" y="64" font-size="11.5" fill="#5eead4">confins</text><rect x="495.66666666666663" y="28" width="95.33333333333333" height="44" fill="rgba(94,234,212,.10)" stroke="#5eead4"/><text x="543.3333333333333" y="48" font-size="15" font-weight="700" fill="#e8edf5">6</text><text x="543.3333333333333" y="64" font-size="11.5" fill="#5eead4">au-delà</text><path d="M8.0 72 V81" stroke="#a97a3d"/><text x="8.0" y="92" font-size="11" fill="#8ea0c4" text-anchor="start">0,2 m</text><path d="M105.33333333333333 72 V95" stroke="#a97a3d"/><text x="105.33333333333333" y="106" font-size="11" fill="#8ea0c4" text-anchor="middle">400 m</text><path d="M202.66666666666666 72 V81" stroke="#a97a3d"/><text x="202.66666666666666" y="92" font-size="11" fill="#8ea0c4" text-anchor="middle">800 km</text><path d="M300.0 72 V95" stroke="#a97a3d"/><text x="300.0" y="106" font-size="11" fill="#8ea0c4" text-anchor="middle">1,6 M km</text><path d="M397.3333333333333 72 V81" stroke="#a97a3d"/><text x="397.3333333333333" y="92" font-size="11" fill="#8ea0c4" text-anchor="middle">3,2·10¹² m</text><path d="M494.66666666666663 72 V95" stroke="#a97a3d"/><text x="494.66666666666663" y="106" font-size="11" fill="#8ea0c4" text-anchor="middle">6,4·10¹⁵ m</text><path d="M592.0 72 V81" stroke="#a97a3d"/><text x="592.0" y="92" font-size="11" fill="#8ea0c4" text-anchor="end">1,3·10¹⁹ m</text><path d="M8 116 H592" stroke="#a97a3d" stroke-width="1.5" fill="none" marker-end="url(#fl2)"/><text x="300" y="132" font-size="11" fill="#a97a3d">× 2 000 par tranche · rendues de la plus lointaine à la plus proche</text><rect x="8" y="144" width="584" height="34" fill="rgba(255,180,84,.06)" stroke="#a97a3d"/><text x="300" y="166" font-size="12.5" fill="#ffb454">couche galactique · étoiles et nébuleuses · 1 unité = 1/38 parsec</text></g></svg>
+      <ul>
+        <li class="anim">Deux couches de rendu : la galaxie, puis le système en mètres.</li>
+        <li class="anim">Origine flottante : la précision reste au centimètre près du vaisseau, même à 10¹¹ m de son étoile.</li>
+        <li class="anim">Six tranches de profondeur, rendues de la plus lointaine à la plus proche.</li>
+      </ul>
+    </figure>
+    <aside class="notes">C'est la réponse au manque de précision des nombres flottants 32 bits du GPU à ces échelles. Les tranches vides sont sautées. Le fond de cette présentation utilise exactement le même rendu.</aside>
+  </section>
+
+  <section class="slide layout-illustration" data-cote="droite" data-plan="survol" data-titre-court="La fabrication">
+    <figure class="calque" data-calque="normal">
+      <p class="eyebrow anim">04 · la fabrication</p>
+      <h2 class="anim">Un jeu, un fichier</h2>
+      <svg class="schema anim" viewBox="0 0 600 178" role="img" aria-label="Fabrication : modules, données et three.js assemblés par build.py en un seul fichier testé"><defs><marker id="fl3" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#a97a3d"/></marker></defs><g font-family="JetBrains Mono, ui-monospace, monospace" text-anchor="middle"><rect x="2" y="4" width="190" height="50" stroke="#25375c" fill="rgba(15,26,48,.55)"/><text x="97.0" y="25.0" font-size="16" font-weight="700" fill="#e8edf5">70 modules JS</text><text x="97.0" y="45.0" font-size="12.5" fill="#5eead4">ordre fixé (ORDER.txt)</text><rect x="2" y="64" width="190" height="50" stroke="#25375c" fill="rgba(15,26,48,.55)"/><text x="97.0" y="85.0" font-size="16" font-weight="700" fill="#e8edf5">Données JSON</text><text x="97.0" y="105.0" font-size="12.5" fill="#5eead4">économie, flotte</text><rect x="2" y="124" width="190" height="50" stroke="#25375c" fill="rgba(15,26,48,.55)"/><text x="97.0" y="145.0" font-size="16" font-weight="700" fill="#e8edf5">three.js r128</text><text x="97.0" y="165.0" font-size="12.5" fill="#5eead4">rendu WebGL</text><rect x="232" y="64" width="136" height="50" stroke="#25375c" fill="rgba(15,26,48,.55)"/><text x="300.0" y="85.0" font-size="16" font-weight="700" fill="#e8edf5">build.py</text><text x="300.0" y="105.0" font-size="12.5" fill="#5eead4">assemblage</text><rect x="408" y="34" width="190" height="50" stroke="#ffb454" fill="rgba(255,180,84,.08)"/><text x="503.0" y="55.0" font-size="16" font-weight="700" fill="#e8edf5">space-travel.html</text><text x="503.0" y="75.0" font-size="12.5" fill="#5eead4">un fichier, ≈ 6 Mo</text><rect x="408" y="104" width="190" height="50" stroke="#25375c" fill="rgba(15,26,48,.55)"/><text x="503.0" y="125.0" font-size="16" font-weight="700" fill="#e8edf5">547 contrôles</text><text x="503.0" y="145.0" font-size="12.5" fill="#5eead4">Playwright et Node</text><path d="M192 29 H212 V89 H228" stroke="#a97a3d" stroke-width="1.5" fill="none" marker-end="url(#fl3)"/><path d="M192 89 H228" stroke="#a97a3d" stroke-width="1.5" fill="none" marker-end="url(#fl3)"/><path d="M192 149 H212 V89" stroke="#a97a3d" stroke-width="1.5" fill="none"/><path d="M368 80 H386 V59 H404" stroke="#a97a3d" stroke-width="1.5" fill="none" marker-end="url(#fl3)"/><path d="M368 98 H386 V129 H404" stroke="#a97a3d" stroke-width="1.5" fill="none" marker-end="url(#fl3)"/></g></svg>
+      <ul>
+        <li class="anim">Aucun serveur, aucune installation : on ouvre le fichier et on joue.</li>
+        <li class="anim">Des modules partagés entre le jeu, la démo « Observation des étoiles » et cette présentation.</li>
+        <li class="anim">547 contrôles automatisés à chaque version.</li>
+      </ul>
+    </figure>
+    <aside class="notes">La nouvelle couche de simulation de campagne (sim/) n'utilise ni three.js ni le DOM : elle se teste sous Node. Le développement suit un mode agentique documenté (chef de projet, architecte, développeur), visible sur le Kanban du dépôt.</aside>
+  </section>
+
+  <section class="slide layout-contenu" data-cote="centre" data-plan="croissant" data-titre-court="À vous de piloter">
+    <div class="calque" data-calque="leger">
+      <p class="eyebrow anim">fin</p>
+      <h2 class="anim">À vous de piloter</h2>
+      <dl class="liens anim">
+        <dt>Jouer</dt><dd><a href="https://mcgivrer.github.io/csblog/demos/space-travel/sources/target/space-travel.min.html" target="_blank" rel="noopener">mcgivrer.github.io/csblog/demos/space-travel/sources/target/space-travel.min.html</a></dd>
+        <dt>Sources</dt><dd><a href="https://github.com/mcgivrer/csblog" target="_blank" rel="noopener">github.com/mcgivrer/csblog</a>, dossier demos/space-travel · licence MIT</dd>
+      </dl>
+      <p class="eyebrow anim">feuille de route</p>
+      <div class="feuille anim"><span>v2.19 Console</span><span>v2.20 Chantier</span><span>v2.21 Flotte et équipages</span><span>v2.22 Technologies</span><span>v2.23 Station</span><span>v2.24 Marché et missions</span><span class="fin">v3.0</span></div>
+    </div>
+    <aside class="notes">Le jeu tourne dans le navigateur, sans installation, au clavier ou au tactile. Questions bienvenues.</aside>
+  </section>
+
+</main>
+</div>
+
+<div id="barre-haut" class="barre"><span class="direct" id="hud-systeme">En direct</span><span id="hud-plan"></span></div>
+<div id="barre-bas" class="barre"><span id="hud-slide"></span><span id="hud-num" class="ambre"></span></div>
+<div id="progression"></div>
+<div id="noir" aria-hidden="true"></div>
+
+<div id="commandes">
+  <button type="button" id="b-prec" aria-label="Slide précédente">←</button>
+  <button type="button" id="b-suiv" aria-label="Slide suivante">→</button>
+  <button type="button" id="b-clip" aria-label="Exporter un clip">● clip</button>
+  <button type="button" id="b-plein" aria-label="Plein écran">⛶</button>
+  <button type="button" id="b-aide" aria-label="Aide">?</button>
+</div>
+
+<div id="panneau-clip" class="panneau" hidden role="dialog" aria-label="Exporter un clip">
+  <h3>Exporter un clip du fond</h3>
+  <label>Plan <select id="c-plan"></select></label>
+  <label>Format <select id="c-format"><option value="720">1280 × 720</option><option value="1080">1920 × 1080</option></select></label>
+  <label>Durée <select id="c-max"><option value="30">plan entier</option><option value="10">10 s au plus</option><option value="20">20 s au plus</option></select></label>
+  <label>Bandes IMAX <input type="checkbox" id="c-bandes" checked></label>
+  <p class="note" id="c-note">Le fond seul : ni texte ni calque. Enregistrement en temps réel, du début à la fin du plan.</p>
+  <div class="actions"><button type="button" id="c-fermer">Fermer</button><button type="button" class="primaire" id="c-go">Enregistrer</button></div>
+</div>
+
+<div id="aide" class="panneau" hidden role="dialog" aria-label="Raccourcis">
+  <h3>Raccourcis</h3>
+  <dl>
+    <dt>→ Espace clic</dt><dd>slide suivante</dd>
+    <dt>← PgUp</dt><dd>slide précédente</dd>
+    <dt>Début Fin</dt><dd>première, dernière slide</dd>
+    <dt>F</dt><dd>plein écran</dd>
+    <dt>H</dt><dd>masquer l'interface</dd>
+    <dt>E</dt><dd>exporter un clip du fond</dd>
+    <dt>B ou .</dt><dd>écran noir (pause du fond)</dd>
+    <dt>S</dt><dd>vue présentateur : notes, slide suivante, minuteur</dd>
+    <dt>N</dt><dd>système suivant</dd>
+    <dt>P</dt><dd>effets de la direction photo</dd>
+    <dt>Échap</dt><dd>fermer ce panneau, annuler un export</dd>
+  </dl>
+</div>
+
+<div id="presentateur" class="panneau" hidden role="dialog" aria-label="Vue présentateur">
+  <div class="p-tete"><span class="p-num"></span><span class="p-temps"></span></div>
+  <h3 class="p-titre"></h3>
+  <div class="p-notes"></div>
+  <p class="p-suivante"></p>
+  <div class="actions"><button type="button" class="p-zero">Minuteur à zéro</button><button type="button" class="p-prec" aria-label="Slide précédente">←</button><button type="button" class="p-suiv" aria-label="Slide suivante">→</button></div>
+  <p class="note">Visible par le public si l'écran est dupliqué. Le navigateur a refusé la fenêtre séparée.</p>
+</div>
+
+<div id="rec">REC</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/*@VENDOR@*/
+</script>
+<script>
+/*@JS@*/
+</script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  Voyage Spatial — présentation, lot P2 : démonstration du réalisateur céleste (src/realisateur.js sur shared/cosmos.js)
+  Page générée par presentation/build/build.py : ne pas modifier, éditer src/.
+  MIT License — Copyright (c) 2026 Frédéric Delorme
+-->
+<title>Réalisateur céleste — démonstration</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; color: #e8edf5;
+    font: 13px/1.45 ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, Consolas, monospace; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  #fade { position: fixed; inset: 0; background: #000; pointer-events: none; opacity: 1; }
+  #hud { position: fixed; left: 16px; top: 14px; max-width: min(560px, calc(100vw - 32px)); pointer-events: none; text-shadow: 0 1px 3px #000; }
+  #hud b { color: #5eead4; font-weight: 600; } #hud .dim { color: #8ea0c4; } #hud .amb { color: #ffb454; }
+  #keys { position: fixed; left: 16px; bottom: 12px; right: 16px; color: #8ea0c4; pointer-events: none; text-shadow: 0 1px 3px #000; }
+  #keys kbd { color: #ffb454; font: inherit; }
+  #textzone { position: fixed; top: 18%; bottom: 18%; width: 30%; border: 1px dashed rgba(255,180,84,.45); background: rgba(255,180,84,.05); display: none; pointer-events: none; }
+  body.nohud #hud, body.nohud #keys { display: none; }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div id="textzone"></div>
+<div id="fade"></div>
+<div id="hud"></div>
+<div id="keys"><kbd>Espace</kbd> coupe · <kbd>N</kbd> système suivant · <kbd>F</kbd> côté du texte (auto, gauche, droite, centre) · <kbd>T</kbd> zone de texte · <kbd>H</kbd> masquer</div>
+<script>
+/*@VENDOR@*/
+</script>
+<script>
+/*@JS@*/
+</script>
+</body>
+</html>

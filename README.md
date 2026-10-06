@@ -30,7 +30,7 @@ Chaque démo est un fichier HTML unique, sauf indication contraire. Les biblioth
 | `demos/ascii-city.html` | Ville façon GTA en raycasting ASCII haute définition |
 | `demos/cyberdeck.html` | Interface « cyberdeck » (captures dans `demos/img/`) |
 | `demos/oceans-data.html` | Circulation océanique : courants, température, vent (variantes `_2` et `_3`) |
-| [`demos/space-travel/`](./demos/space-travel/README.md) | Simulateur de vol spatial procédural *Space Travel & Transport*, et démo cinématique *Observation des étoiles*. Seul projet doté d'un vrai build (voir son `CLAUDE.md`) |
+| [`demos/space-travel/`](./demos/space-travel/README.md) | Simulateur de vol spatial procédural *Space Travel & Transport*, démo cinématique *Observation des étoiles*, et [présentation à fond cinématique](./demos/space-travel/presentation/README.md) ([en ligne](https://mcgivrer.github.io/csblog/demos/space-travel/presentation/)). Seul projet doté d'un vrai build (voir son `CLAUDE.md`) |
 | `demos/skill-charte-graphique-mcgivrer/` | Charte graphique McGivrer : guide HTML, Markdown, PDF, DOCX et gabarits |
 
 ## Structure

@@ -110,6 +110,7 @@ Toutes les captures de la documentation sont produites par `screenshots.sh` (voi
 | `space-travel.html`                                | Le jeu — fichier unique, autonome                                                                |
 | `space-travel.min.html`                            | Version minifiée du jeu, régénérée à chaque changement par `minify-html-bundle.py`               |
 | `minify-html-bundle.py`                            | Compacte un fichier HTML autonome (nécessite `terser` et `clean-css`)                            |
+| [`presentation/`](./presentation/README.md)        | Présentation à fond cinématique temps réel (slides HTML, look IMAX, export de clips) — [en ligne](https://mcgivrer.github.io/csblog/demos/space-travel/presentation/) |
 | `selftest.sh`, `selftest.expected`                 | Test de non-régression sous Chrome sans écran, et ses références                                 |
 | `screenshots.sh`, `screenshots.js`                 | Refont les captures d'écran de la documentation (Chrome sans écran, ImageMagick)                 |
 | `spec-pack.py`                                     | Assemble une spécification : `.md` autonome (images en base64) et `.zip`                         |

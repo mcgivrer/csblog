@@ -606,6 +606,24 @@ CO.create = function(opts){
     extras.push(x);
     return x;
   };
+  /* corps opaques pour une carte de distance analytique (profondeur de champ) : sphères [centre, rayon] et anneaux
+     [centre, normale, rayon interne, rayon externe], en mètres dans le repère du système */
+  W.depthBodies = function(){
+    const sph = [], rings = [], leg = W.leg; if(!leg) return { sph, rings };
+    sph.push([new V3(), leg.Rs]);
+    leg.planets.forEach(p => {
+      sph.push([p.position, p.radius]);
+      (p.moonPivots || []).forEach(pv => { const m = pv.children[0]; if(m) sph.push([m.getWorldPosition(new V3()), m.scale.x]); });
+      if(p.ring) rings.push([p.position, new V3(0, 0, 1).applyQuaternion(p.ring.getWorldQuaternion(new THREE.Quaternion())), p.radius*1.5, p.ringOuter]);
+    });
+    extras.forEach(x => (x.rocks || []).forEach(rk => sph.push([rk.mesh.getWorldPosition(new V3()), Math.max(rk.mesh.scale.x, rk.mesh.scale.y, rk.mesh.scale.z)*.85])));
+    return { sph, rings };
+  };
+  /* retire un amas (géométries et matériaux partagés : rien à libérer) */
+  W.dropCluster = function(x){
+    const i = extras.indexOf(x); if(i < 0) return;
+    extras.splice(i, 1); if(x.group.parent) x.group.parent.remove(x.group);
+  };
 
   /* ---------- mise à jour par image ---------- */
   const _sun = new V3(), _white = new THREE.Color(1, 1, 1), _buf = new THREE.Vector2();

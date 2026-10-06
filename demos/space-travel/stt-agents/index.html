@@ -1,0 +1,777 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>STT · Agents en direct</title>
+<meta name="description" content="Tableau de bord temps réel des agents Claude Code travaillant sur Space Travel &amp; Transport.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* charte McGivrer (web, sombre) */
+    --bg:#0b1220; --bg-2:#0e1729; --panel:#0f1a30; --panel-2:#13203a; --line:#25375c;
+    --ink:#e8edf5; --muted:#8ea0c4; --muted-2:#5d6f92;
+    --amber:#ffb454; --amber-dim:#a97a3d; --cyan:#5eead4;
+    /* statuts (toujours accompagnés d'un libellé) */
+    --st-run:#5eead4; --st-wait:#ffb454; --st-perm:#e66767; --st-idle:#5d6f92; --st-done:#0ca30c;
+    /* rôles AGENTS.md — palette validée (CVD tous couples) sur --panel */
+    --r-pm:#c98500; --r-arch:#3987e5; --r-dev:#d55181; --r-explo:#8ea0c4;
+    --radius:2px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; color:var(--ink); font-family:'Inter',system-ui,sans-serif; -webkit-font-smoothing:antialiased;
+    background:
+      linear-gradient(var(--bg-2) 1px, transparent 1px) 0 0/100% 32px,
+      linear-gradient(90deg, var(--bg-2) 1px, transparent 1px) 0 0/32px 100%,
+      var(--bg);
+    background-color:var(--bg);
+  }
+  body::before{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background-image:linear-gradient(rgba(94,234,212,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(94,234,212,.035) 1px,transparent 1px);
+    background-size:32px 32px;
+  }
+  .mono,code{font-family:'JetBrains Mono',ui-monospace,monospace}
+  a{color:var(--cyan)}
+  button{font:inherit;color:inherit}
+  a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(94,234,212,.55)}100%{box-shadow:0 0 0 7px rgba(94,234,212,0)}}
+  @keyframes pulseAmber{0%{box-shadow:0 0 0 0 rgba(255,180,84,.6)}100%{box-shadow:0 0 0 8px rgba(255,180,84,0)}}
+
+  /* ---------- ticker ---------- */
+  .ticker{position:sticky;top:0;z-index:5;height:34px;overflow:hidden;background:#080d18;border-bottom:1px solid var(--line);display:flex;align-items:center}
+  .ticker-label{flex:none;height:100%;display:flex;align-items:center;padding:0 14px;background:var(--amber);color:#0b1220;font:700 11px 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap}
+  .ticker-viewport{flex:1;overflow:hidden;height:100%;display:flex;align-items:center;
+    -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 24px,#000 calc(100% - 24px),transparent 100%);
+    mask-image:linear-gradient(90deg,transparent 0,#000 24px,#000 calc(100% - 24px),transparent 100%)}
+  .ticker-track{display:flex;width:max-content;animation:ticker-scroll 60s linear infinite}
+  .ticker:hover .ticker-track{animation-play-state:paused}
+  .ticker-item{font:12px 'JetBrains Mono',monospace;color:var(--muted);white-space:nowrap;padding:0 18px}
+  .ticker-item .date{color:var(--cyan);margin-right:8px}
+  .ticker-item .sep{color:var(--amber-dim);margin-left:18px}
+  @keyframes ticker-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+  .wrap{position:relative;z-index:1;max-width:1280px;margin:0 auto;padding:24px 24px 64px}
+
+  /* ---------- en-tête ---------- */
+  .site-header{border:1px solid var(--line);background:linear-gradient(180deg,rgba(94,234,212,.03),transparent 60%),var(--panel);position:relative;margin-bottom:20px}
+  .site-header::before,.site-header::after{content:"";position:absolute;width:12px;height:12px;border:1.5px solid var(--amber)}
+  .site-header::before{top:-1px;left:-1px;border-right:none;border-bottom:none}
+  .site-header::after{top:-1px;right:-1px;border-left:none;border-bottom:none}
+  .site-header-top{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:9px 18px;border-bottom:1px solid var(--line);font:10.5px 'JetBrains Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-2)}
+  .conn{color:var(--muted)}
+  .conn::before{content:"●";margin-right:6px}
+  .conn.live{color:var(--cyan)} .conn.live::before{animation:blink 1.8s infinite}
+  .conn.gh{color:var(--amber)} .conn.demo{color:var(--st-perm)} .conn.stale{color:var(--st-perm)}
+  .site-header-main{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;padding:16px 20px}
+  .site-brand{font:800 22px 'JetBrains Mono',monospace;color:var(--ink);text-decoration:none}
+  .site-brand .slash{color:var(--amber)}
+  .site-brand .cursor{display:inline-block;width:.45ch;height:1em;vertical-align:-2px;background:var(--amber);margin-left:4px;animation:blink 1s steps(1) infinite}
+  .site-sub{font:12px 'JetBrains Mono',monospace;color:var(--muted-2);margin-top:6px}
+  .site-nav{display:flex;gap:4px;flex-wrap:wrap}
+  .site-nav a,.site-nav button{font:12.5px 'JetBrains Mono',monospace;padding:7px 12px;text-decoration:none;color:var(--muted);border:1px solid transparent;background:none;cursor:pointer}
+  .site-nav a:hover,.site-nav button:hover{color:var(--ink);border-color:var(--line)}
+  .site-nav button.on{color:var(--amber);border-color:var(--line);background:rgba(255,180,84,.06)}
+
+  .banner{border:1px solid var(--line);border-left:3px solid var(--amber);background:var(--panel);padding:12px 16px;margin:0 0 20px;font-size:14px;color:var(--muted);line-height:1.6}
+  .banner b{color:var(--ink)} .banner code{color:var(--cyan);font-size:12.5px}
+  .banner.demo{border-left-color:var(--st-perm)}
+  .banner .tag{font:700 11px 'JetBrains Mono',monospace;letter-spacing:.1em;color:#0b1220;background:var(--st-perm);padding:2px 7px;margin-right:8px}
+  .banner.gh .tag{background:var(--amber)}
+
+  /* ---------- KPI ---------- */
+  .kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-bottom:36px}
+  .kpi{min-width:0;border:1px solid var(--line);background:var(--panel);padding:14px 16px;min-height:92px;position:relative}
+  .kpi .k{font:10.5px 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2)}
+  .kpi .v{font:800 30px 'JetBrains Mono',monospace;color:var(--ink);margin-top:8px;line-height:1}
+  .kpi .h{font:11.5px 'JetBrains Mono',monospace;color:var(--muted);margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .kpi.alert{border-color:var(--amber);background:linear-gradient(180deg,rgba(255,180,84,.08),transparent 70%),var(--panel)}
+  .kpi.alert .v{color:var(--amber)}
+  .kpi.na .v{color:var(--muted-2)}
+
+  /* ---------- sections ---------- */
+  section{margin-bottom:44px}
+  .section-head{display:flex;align-items:baseline;gap:12px;margin:0 0 18px;flex-wrap:wrap}
+  .section-num{font:13px 'JetBrains Mono',monospace;color:var(--amber-dim);flex:none}
+  .section-title{font:700 20px 'JetBrains Mono',monospace;color:var(--ink);margin:0;flex:none}
+  .section-rule{flex:1;min-width:40px;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
+  .section-aside{font:11.5px 'JetBrains Mono',monospace;color:var(--muted-2)}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{font:12px 'JetBrains Mono',monospace;padding:5px 10px;border:1px solid var(--line);color:var(--muted);background:transparent;cursor:pointer}
+  .chip:hover{color:var(--ink)}
+  .chip.on{color:var(--cyan);border-color:var(--cyan);background:rgba(94,234,212,.05)}
+  .chip .n{color:var(--muted-2);margin-left:4px}
+
+  /* ---------- cartes agents ---------- */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(380px,100%),1fr));gap:16px}
+  .agent{border:1px solid var(--line);background:var(--panel);padding:16px 18px 14px;position:relative;display:flex;flex-direction:column;gap:12px;min-width:0}
+  .agent::before{content:"";position:absolute;left:-1px;top:-1px;bottom:-1px;width:3px;background:var(--st-idle)}
+  .agent.s-run::before{background:var(--st-run)}
+  .agent.s-wait::before{background:var(--st-wait)}
+  .agent.s-perm::before{background:var(--st-perm)}
+  .agent.s-done::before{background:var(--st-done)}
+  .agent.s-wait,.agent.s-perm{border-color:#4a4330}
+  .agent.s-idle{opacity:.78}
+  .agent-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .pill{display:inline-flex;align-items:center;gap:7px;font:700 11px 'JetBrains Mono',monospace;letter-spacing:.08em;text-transform:uppercase;padding:4px 9px;border:1px solid var(--line);color:var(--ink)}
+  .pill i{width:8px;height:8px;border-radius:50%;background:var(--st-idle);flex:none}
+  .pill.s-run i{background:var(--st-run);animation:pulse 1.6s infinite}
+  .pill.s-wait i{background:var(--st-wait);animation:pulseAmber 1.4s infinite}
+  .pill.s-perm i{background:var(--st-perm);animation:blink 1s infinite}
+  .pill.s-done i{background:var(--st-done)}
+  .pill.s-wait{border-color:var(--amber-dim)} .pill.s-perm{border-color:#8a3d3d}
+  .since{font:11.5px 'JetBrains Mono',monospace;color:var(--muted)}
+  .model{margin-left:auto;font:11px 'JetBrains Mono',monospace;color:var(--muted-2);border:1px solid var(--line);padding:3px 7px}
+  .agent h3{margin:0;font:700 16px 'JetBrains Mono',monospace;color:var(--ink);word-break:break-word}
+  .agent h3 small{display:block;margin-top:5px;font:400 13px 'Inter',sans-serif;color:var(--muted);line-height:1.5}
+  .agent h3 .wt{color:var(--cyan)}
+
+  .steps{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin:0;padding:0;list-style:none}
+  .steps li{font:10px 'JetBrains Mono',monospace;color:var(--muted-2);text-align:center;padding-top:7px;border-top:3px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .steps li.done{border-top-color:#2c5a62;color:var(--muted)}
+  .steps li.cur{border-top-color:var(--cyan);color:var(--ink);font-weight:700}
+  .agent.s-wait .steps li.cur{border-top-color:var(--amber)}
+  .agent.s-perm .steps li.cur{border-top-color:var(--st-perm)}
+  .steps li.last.cur{border-top-color:var(--st-done)}
+
+  .now{display:flex;gap:8px;align-items:baseline;font:12.5px 'JetBrains Mono',monospace;color:var(--muted);background:#0b1426;border:1px solid var(--line);padding:8px 10px;min-width:0}
+  .now .arrow{color:var(--cyan)} .agent.s-perm .now .arrow,.agent.s-wait .now .arrow{color:var(--amber)}
+  .now b{color:var(--ink);font-weight:700;flex:none}
+  .now .what{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+  .now .t{flex:none;color:var(--muted-2)}
+  .quote{margin:0;font-size:13.5px;line-height:1.6;color:var(--muted);border-left:2px solid var(--line);padding:2px 0 2px 12px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  .agent.s-wait .quote{border-left-color:var(--amber);color:var(--ink)}
+  .role{display:inline-flex;align-items:center;gap:5px;font:700 10.5px 'JetBrains Mono',monospace;letter-spacing:.06em;color:var(--ink);padding:2px 6px;border:1px solid var(--line);white-space:nowrap}
+  .role::before{content:"";width:7px;height:7px;background:var(--r-explo)}
+  .role.PM::before{background:var(--r-pm)} .role.ARCH::before{background:var(--r-arch)} .role.DEV::before{background:var(--r-dev)}
+
+  .todo{display:flex;align-items:center;gap:10px;font:12px 'JetBrains Mono',monospace;color:var(--muted)}
+  .bar{flex:none;width:110px;height:6px;background:#1a2844;position:relative;overflow:hidden}
+  .bar span{position:absolute;inset:0 auto 0 0;background:var(--cyan)}
+  .todo .cur{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
+  details.more{font-size:12.5px;color:var(--muted)}
+  details.more summary{cursor:pointer;font:11.5px 'JetBrains Mono',monospace;color:var(--muted-2);list-style:none}
+  details.more summary::-webkit-details-marker{display:none}
+  details.more summary::before{content:"+ "} details.more[open] summary::before{content:"− "}
+  .todolist{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}
+  .todolist li{display:flex;gap:8px;line-height:1.45}
+  .todolist li::before{content:"○";font-family:'JetBrains Mono',monospace;color:var(--muted-2);flex:none}
+  .todolist li.completed{color:var(--muted-2);text-decoration:line-through}
+  .todolist li.completed::before{content:"●";color:var(--st-done)}
+  .todolist li.in_progress{color:var(--ink)} .todolist li.in_progress::before{content:"◐";color:var(--cyan)}
+
+  .subs{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+  .subs li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center;font-size:12.5px;color:var(--muted);min-width:0}
+  .subs .d{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .subs .d em{font-style:normal;color:var(--muted-2);font-family:'JetBrains Mono',monospace;font-size:11.5px}
+  .subs .s{font:11px 'JetBrains Mono',monospace;color:var(--muted-2);white-space:nowrap}
+  .subs .s.run{color:var(--cyan)} .subs .s.perm{color:var(--st-perm)} .subs .s.err{color:var(--st-perm)}
+  .agent-foot{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:auto;padding-top:10px;border-top:1px dashed var(--line);font:11.5px 'JetBrains Mono',monospace;color:var(--muted-2)}
+  .agent-foot b{color:var(--muted);font-weight:500}
+  .agent-foot a{color:var(--cyan);text-decoration:none} .agent-foot a:hover{text-decoration:underline}
+  .agent-foot svg{margin-left:auto}
+  .empty{border:1px dashed var(--line);padding:28px;text-align:center;color:var(--muted);font-size:14px;line-height:1.7}
+  .empty b{color:var(--ink);font-family:'JetBrains Mono',monospace}
+
+  /* ---------- chronologie ---------- */
+  .tl-box{border:1px solid var(--line);background:var(--panel);padding:14px 16px 10px;overflow:hidden}
+  .tl-box svg{display:block;width:100%}
+  .tl-legend{display:flex;gap:16px;flex-wrap:wrap;font:11px 'JetBrains Mono',monospace;color:var(--muted-2);margin-top:8px}
+  .tl-legend i{display:inline-block;width:10px;height:10px;vertical-align:-1px;margin-right:6px}
+
+  /* ---------- flux & livraisons ---------- */
+  .two{display:grid;grid-template-columns:1.25fr 1fr;gap:20px;align-items:start}
+  .box{border:1px solid var(--line);background:var(--panel)}
+  .feed{list-style:none;margin:0;padding:0;max-height:520px;overflow:auto}
+  .feed li{display:grid;grid-template-columns:62px auto 1fr;gap:10px;align-items:baseline;padding:8px 14px;border-bottom:1px solid #1a2844;font-size:12.5px;color:var(--muted)}
+  .feed li:last-child{border-bottom:none}
+  .feed li.fresh{animation:fresh 2.4s ease-out}
+  @keyframes fresh{from{background:rgba(94,234,212,.10)}to{background:transparent}}
+  .feed .t{font:11.5px 'JetBrains Mono',monospace;color:var(--cyan)}
+  .feed .who{font:11.5px 'JetBrains Mono',monospace;color:var(--ink);white-space:nowrap;display:flex;gap:6px;align-items:center}
+  .feed .msg{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .feed .kind{font:10px 'JetBrains Mono',monospace;letter-spacing:.06em;color:var(--muted-2);margin-right:6px;text-transform:uppercase}
+  .feed .kind.prompt,.feed .kind.interrupt{color:var(--amber)}
+  .feed .kind.spawn,.feed .kind.spawn_end{color:var(--cyan)}
+  .prs{list-style:none;margin:0;padding:0}
+  .prs li{padding:10px 14px;border-bottom:1px solid #1a2844;display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:13px}
+  .prs li:last-child{border-bottom:none}
+  .prs .num{font:700 12px 'JetBrains Mono',monospace;color:var(--cyan);text-decoration:none}
+  .prs .ti{color:var(--ink);line-height:1.45;min-width:0}
+  .prs .meta{grid-column:2;font:11px 'JetBrains Mono',monospace;color:var(--muted-2)}
+  .badge{font:700 10px 'JetBrains Mono',monospace;letter-spacing:.06em;text-transform:uppercase;padding:1px 6px;border:1px solid var(--line);margin-right:6px}
+  .badge.merged{color:#7ee787;border-color:#1f5a2a} .badge.open{color:var(--amber);border-color:var(--amber-dim)} .badge.closed{color:var(--muted-2)}
+  .box-head{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line);font:11px 'JetBrains Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2)}
+  .box-head .ok{color:#7ee787} .box-head .ko{color:var(--st-perm)} .box-head .run{color:var(--amber)}
+
+  /* ---------- worktrees ---------- */
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{text-align:left;font:10.5px 'JetBrains Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2);padding:9px 12px;border-bottom:1px solid var(--line);font-weight:400}
+  td{padding:9px 12px;border-bottom:1px solid #1a2844;color:var(--muted);vertical-align:top}
+  td.m{font-family:'JetBrains Mono',monospace;color:var(--ink);white-space:nowrap}
+  td .pos{color:#7ee787} td .neg{color:var(--amber)}
+  .tbl-wrap{overflow-x:auto}
+
+  footer.site-footer{border-top:1px solid var(--line);padding-top:20px;margin-top:20px;display:grid;grid-template-columns:1fr auto;gap:10px 24px;font:11.5px 'JetBrains Mono',monospace;color:var(--muted-2);line-height:1.7}
+  footer .src b{color:var(--muted);font-weight:500} footer .src .ok{color:#7ee787} footer .src .ko{color:var(--st-perm)}
+
+  @media (max-width:1100px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.two{grid-template-columns:1fr}}
+  @media (max-width:680px){
+    .wrap{padding:16px 16px 48px}
+    .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .grid{grid-template-columns:1fr}
+    .steps li{font-size:8.5px}
+    .feed li{grid-template-columns:52px 1fr}
+    .feed .msg{grid-column:1 / -1}
+    footer.site-footer{grid-template-columns:1fr}
+    .site-nav a{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *,*::before{animation:none !important}
+    .ticker-viewport{overflow-x:auto}
+    .ticker-track .dup{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="ticker" aria-label="Dernières actions des agents">
+  <div class="ticker-label">STT · agents</div>
+  <div class="ticker-viewport"><div class="ticker-track" id="ticker"></div></div>
+</div>
+
+<div class="wrap">
+  <header class="site-header">
+    <div class="site-header-top">
+      <span class="conn" id="conn">connexion…</span>
+      <span id="srcLine"></span>
+    </div>
+    <div class="site-header-main">
+      <div>
+        <a class="site-brand" href="#">STT<span class="slash"> // </span>agents<span class="cursor"></span></a>
+        <div class="site-sub" id="repoLine">Space Travel &amp; Transport · agents Claude Code</div>
+      </div>
+      <nav class="site-nav" aria-label="Sections">
+        <a href="#agents">Agents</a><a href="#timeline">Chronologie</a><a href="#feed">Flux</a><a href="#delivery">Livraisons</a>
+        <button id="btnAlerts" type="button" title="Notification du navigateur quand un agent t'attend">Alertes : off</button>
+      </nav>
+    </div>
+  </header>
+
+  <div id="banner"></div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <section id="agents">
+    <div class="section-head">
+      <span class="section-num">01</span><h2 class="section-title">Agents</h2><span class="section-rule"></span>
+      <div class="chips" id="filters" role="group" aria-label="Filtrer les agents"></div>
+    </div>
+    <div id="agentGrid" class="grid"></div>
+  </section>
+
+  <section id="timeline">
+    <div class="section-head">
+      <span class="section-num">02</span><h2 class="section-title">Chronologie · 6 h</h2><span class="section-rule"></span>
+      <span class="section-aside" id="tlAside"></span>
+    </div>
+    <div class="tl-box"><div id="tl"></div>
+      <div class="tl-legend"><span><i style="background:var(--cyan)"></i>actions de l'agent (intensité / 5 min)</span><span><i style="background:var(--amber)"></i>PR ouverte</span><span><i style="background:var(--st-done)"></i>PR mergée</span></div>
+    </div>
+  </section>
+
+  <div class="two">
+    <section id="feed">
+      <div class="section-head"><span class="section-num">03</span><h2 class="section-title">Flux en direct</h2><span class="section-rule"></span></div>
+      <div class="box"><ul class="feed" id="feedList" aria-live="polite"></ul></div>
+    </section>
+    <section id="delivery">
+      <div class="section-head"><span class="section-num">04</span><h2 class="section-title">Livraisons GitHub</h2><span class="section-rule"></span></div>
+      <div class="box"><div class="box-head"><span id="ghHead">pull requests</span><span id="pagesState"></span></div><ul class="prs" id="prList"></ul></div>
+    </section>
+  </div>
+
+  <section id="worktrees">
+    <div class="section-head"><span class="section-num">05</span><h2 class="section-title" id="wtTitle">Worktrees</h2><span class="section-rule"></span><span class="section-aside" id="wtAside"></span></div>
+    <div class="box tbl-wrap" id="wtBox"></div>
+  </section>
+
+  <footer class="site-footer">
+    <div class="src" id="srcFooter"></div>
+    <div id="verFooter"></div>
+  </footer>
+</div>
+
+<script>
+(() => {
+'use strict';
+// ------------------------------------------------------------------ outils
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const P = new URLSearchParams(location.search);
+const REPO = P.get('repo') || 'mcgivrer/csblog';
+const MAIN = 'main';
+const STEPS = [['Brief','PM'],['Spec','Archi'],['Dév','Dév'],['Revue','Archi'],['Clôture','PM'],['PR','GitHub'],['Livré','main']];
+const ROLE_TXT = {PM:'PM', ARCH:'ARCHI', DEV:'DÉV', EXPLORE:'EXPLO'};
+const STATE = {
+  running:['s-run','En action'], tool:['s-run','Outil en cours'], thinking:['s-run','Réfléchit'],
+  waiting:['s-wait','T’attend'], permission:['s-perm','Validation ?'], idle:['s-idle','Inactif'],
+  review:['s-wait','PR ouverte'], pushed:['s-run','Branche poussée'], delivered:['s-done','Livré'], closed:['s-idle','Fermée'], stale:['s-idle','Inactive']
+};
+const GROUP = s => ['running','tool','thinking','pushed'].includes(s) ? 'run' : ['waiting','permission'].includes(s) ? 'you' : s === 'review' ? 'review' : s === 'delivered' ? 'done' : 'idle';
+const store = { get(k, d){ try { const v = localStorage.getItem('stt-agents:' + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+                set(k, v){ try { localStorage.setItem('stt-agents:' + k, JSON.stringify(v)); } catch {} } };
+
+const ms = t => t ? Date.parse(t) : NaN;
+function ago(t, prefix = 'il y a '){
+  const d = (Date.now() - ms(t)) / 1000;
+  if (!isFinite(d)) return '—';
+  if (d < 5) return 'à l’instant';
+  if (d < 60) return prefix + Math.round(d) + ' s';
+  if (d < 3600) return prefix + Math.round(d / 60) + ' min';
+  if (d < 86400) return prefix + Math.floor(d / 3600) + ' h ' + String(Math.floor(d % 3600 / 60)).padStart(2, '0');
+  return prefix + Math.round(d / 86400) + ' j';
+}
+const hhmm = (t, sec) => { const d = new Date(ms(t)); return isNaN(d) ? '' : d.toLocaleTimeString('fr-FR', sec ? {hour:'2-digit',minute:'2-digit',second:'2-digit'} : {hour:'2-digit',minute:'2-digit'}); };
+const kfmt = n => n == null ? '—' : n >= 1e6 ? (n/1e6).toFixed(1).replace('.', ',') + ' M' : n >= 1e3 ? (n/1e3).toFixed(n >= 1e5 ? 0 : 1).replace('.', ',') + ' k' : String(n);
+const modelShort = m => { if (!m) return ''; const x = m.match(/^claude-([a-z]+)-(\d+)-(\d+)/); return x ? `${x[1]} ${x[2]}.${x[3]}` : m.replace(/^claude-/, ''); };
+const shortBranch = b => (b || '').replace(/^worktree-/, '');
+const role = r => r ? `<span class="role ${esc(r)}">${esc(ROLE_TXT[r] || r)}</span>` : '';
+
+// ------------------------------------------------------------------ GitHub (forme identique à slim_github() du serveur)
+function slimGithub(prs, events, runs){
+  return {
+    prs: (prs || []).map(p => ({ number:p.number, title:p.title, state:p.state, merged:!!p.merged_at, draft:!!p.draft,
+      head:p.head?.ref, base:p.base?.ref, user:p.user?.login, created_at:p.created_at, updated_at:p.updated_at,
+      merged_at:p.merged_at, closed_at:p.closed_at, url:p.html_url })),
+    events: (events || []).map(e => { const pl = e.payload || {}, pr = pl.pull_request || {};
+      return { type:e.type, created_at:e.created_at, actor:e.actor?.login, ref:(typeof pl.ref === 'string' ? pl.ref.replace('refs/heads/', '') : ''),
+        ref_type:pl.ref_type, action:pl.action, pr:pr.number, pr_title:pr.title, merged:!!pr.merged, head:(typeof pl.head === 'string' ? pl.head : '').slice(0, 7),
+        pr_head:pr.head?.ref || null }; }),
+    runs: ((runs || {}).workflow_runs || []).map(r => ({ id:r.id, name:r.name, title:r.display_title, status:r.status, conclusion:r.conclusion,
+      branch:r.head_branch, event:r.event, created_at:r.created_at, updated_at:r.updated_at, url:r.html_url }))
+  };
+}
+function deriveBranches(gh){
+  const map = new Map(), get = n => { if (!map.has(n)) map.set(n, {name:n, created:null, last:null, pr:null, pushes:[]}); return map.get(n); };
+  const later = (a, b) => (!a || (b && ms(b) > ms(a))) ? b : a;
+  for (const e of gh.events || []) {
+    if (!e.ref || e.ref === MAIN) continue;
+    if (e.type === 'CreateEvent' && e.ref_type === 'branch') { const b = get(e.ref); b.created = later(b.created, e.created_at); b.last = later(b.last, e.created_at); b.pushes.push(e.created_at); }
+    if (e.type === 'PushEvent') { const b = get(e.ref); b.last = later(b.last, e.created_at); b.pushes.push(e.created_at); }
+  }
+  for (const p of gh.prs || []) { if (!p.head || p.head === MAIN || p.head.startsWith('dependabot/')) continue;
+    const b = get(p.head); if (!b.pr || p.number > b.pr.number) b.pr = p; b.last = later(b.last, p.updated_at); }
+  const now = Date.now();
+  return [...map.values()].map(b => {
+    const pr = b.pr;
+    b.state = pr ? (pr.state === 'open' ? 'review' : pr.merged ? 'delivered' : 'closed') : (now - ms(b.last) < 3 * 3600e3 ? 'pushed' : 'stale');
+    return b;
+  }).sort((a, b) => ms(b.last) - ms(a.last));
+}
+
+// ------------------------------------------------------------------ état & rendu
+let S = null, mode = null, filter = store.get('filter', 'all');
+const openDetails = new Set();
+let lastTopFeed = null, lastFeedKeys = new Set(), alerts = store.get('alerts', false), prevNeedYou = new Set(), firstRender = true;
+
+function agentsView(){
+  if (!S) return [];
+  if (S.mode !== 'github') return S.agents || [];
+  // mode GitHub : une « carte » par branche d'agent récente
+  const day = Date.now() - 24 * 3600e3;
+  return deriveBranches(S.github).filter(b => b.state === 'review' || b.state === 'pushed' || (b.state === 'delivered' && ms(b.pr.merged_at) > day))
+    .map(b => ({ id:'br:' + b.name, kind:'branch', branch:b.name, title:b.pr ? b.pr.title : 'Branche sans PR', state:b.state,
+      state_label: b.state === 'review' ? 'PR ouverte — à relire' : b.state === 'pushed' ? 'Poussée récemment, pas encore de PR' : 'PR mergée',
+      since: b.state === 'delivered' ? b.pr.merged_at : b.last, last_activity:b.last, phase: b.state === 'delivered' ? 6 : b.state === 'review' ? 5 : -1,
+      pr:b.pr, pushes:b.pushes }));
+}
+
+function render(){
+  if (!S) return;
+  const agents = agentsView();
+  renderBanner(); renderHeader(); renderKpis(agents); renderFilters(agents); renderAgents(agents);
+  renderTimeline(agents); renderFeed(); renderPRs(); renderWorktrees(); renderFooter(); notify(agents);
+  firstRender = false;
+}
+
+function renderBanner(){
+  const b = $('#banner');
+  if (mode === 'demo') b.innerHTML = `<div class="banner demo"><span class="tag">Données d'exemple</span>${S.reason === 'demandé via ?demo' ? 'Mode démo' : 'Aucune source joignable' + (S.reason ? ' (' + esc(S.reason) + ')' : '')} : tout ce qui suit est <b>fictif</b> et sert d'aperçu. Lancez <code>python stt_agents_server.py --open</code> sur le PC des agents pour voir le vrai travail en cours.</div>`;
+  else if (mode === 'github') b.innerHTML = `<div class="banner gh"><span class="tag">GitHub seul</span>Vue publique de <b>${esc(REPO)}</b> : un agent n'apparaît qu'à ses <i>push</i> et PR. Pour l'activité en direct (outil en cours, rôle PM / Archi / Dév, todo, attente de validation), ouvrez la page servie par <code>stt_agents_server.py</code>.</div>`;
+  else b.innerHTML = '';
+}
+
+function renderHeader(){
+  const c = $('#conn');
+  if (mode === 'live') { c.className = 'conn ' + (stale ? 'stale' : 'live'); c.textContent = stale ? 'connexion perdue — reconnexion…' : 'live · serveur local'; }
+  else if (mode === 'github') { c.className = 'conn gh'; c.textContent = 'github · actualisé ' + ago(S.fetched_at); }
+  else { c.className = 'conn demo'; c.textContent = 'démo · données fictives'; }
+  const rate = S.sources?.github?.rate;
+  $('#srcLine').textContent = [S.generated_at ? 'instantané ' + hhmm(S.generated_at, true) : '', rate ? `quota github ${rate.remaining}/${rate.limit}` : ''].filter(Boolean).join(' · ');
+  const r = S.repo || {};
+  $('#repoLine').textContent = `${r.github || REPO} · ${r.path ? r.path.replace(/\\/g, '/').split('/').slice(-3).join('/') : 'demos/space-travel'} · branche principale ${r.main || MAIN}`;
+}
+
+function renderKpis(agents){
+  const live = mode !== 'github';
+  const cnt = g => agents.filter(a => GROUP(a.state) === g).length;
+  const need = agents.filter(a => GROUP(a.state) === 'you');
+  const subs = live ? agents.reduce((n, a) => n + (a.subagents || []).filter(s => s.status === 'running').length, 0) : null;
+  const prs = (S.github?.prs || []);
+  const open = prs.filter(p => p.state === 'open' && !(p.head || '').startsWith('dependabot/'));
+  const day = Date.now() - 24 * 3600e3;
+  const merged = prs.filter(p => p.merged && ms(p.merged_at) > day);
+  const tokens = live ? agents.reduce((n, a) => n + (a.tokens?.output || 0), 0) : null;
+  const tile = (k, v, h, cls = '') => `<div class="kpi ${cls}"><div class="k">${k}</div><div class="v">${v}</div><div class="h">${h}</div></div>`;
+  $('#kpis').innerHTML = [
+    tile('En action', live ? cnt('run') : '—', live ? (agents.filter(a => GROUP(a.state) === 'run').map(a => shortBranch(a.branch) || 'session').slice(0, 3).join(' · ') || 'aucun agent actif') : 'serveur local requis', live ? '' : 'na'),
+    tile('T’attendent', live ? need.length : '—', live ? (need.length ? need.map(a => shortBranch(a.branch) || 'session').slice(0, 3).join(' · ') : 'rien en attente') : 'serveur local requis', live ? (need.length ? 'alert' : '') : 'na'),
+    tile('Sous-agents actifs', live ? subs : '—', live ? 'PM · Archi · Dév' : 'serveur local requis', live ? '' : 'na'),
+    tile('PR ouvertes', open.length, open.length ? open.slice(0, 2).map(p => '#' + p.number).join(' · ') : 'aucune', open.length ? 'alert' : ''),
+    tile('Livrées · 24 h', merged.length, merged.length ? 'dernière ' + ago(merged[0].merged_at) : '—'),
+    tile('Tokens produits', live ? kfmt(tokens) : '—', live ? 'sessions des dernières 24 h' : 'serveur local requis', live ? '' : 'na'),
+  ].join('');
+}
+
+function renderFilters(agents){
+  const defs = [['all','Tous'],['you','T’attendent'],['run','En action'],['review','En revue'],['done','Livrés'],['idle','Inactifs']];
+  const n = g => g === 'all' ? agents.length : agents.filter(a => GROUP(a.state) === g).length;
+  $('#filters').innerHTML = defs.filter(([g]) => g === 'all' || n(g) || g === filter)
+    .map(([g, l]) => `<button type="button" class="chip ${filter === g ? 'on' : ''}" data-f="${g}" aria-pressed="${filter === g}">${l}<span class="n">${n(g)}</span></button>`).join('');
+}
+
+const ORDER = {you:0, run:1, review:2, done:3, idle:4};
+function renderAgents(agents){
+  const list = agents.filter(a => filter === 'all' || GROUP(a.state) === filter)
+    .sort((a, b) => (ORDER[GROUP(a.state)] - ORDER[GROUP(b.state)]) || (ms(b.last_activity) - ms(a.last_activity)));
+  const g = $('#agentGrid');
+  if (!list.length) {
+    g.innerHTML = `<div class="empty">${agents.length ? 'Aucun agent dans ce filtre.' : mode === 'github'
+      ? 'Aucune branche d’agent active sur GitHub depuis 24 h.<br>Dernières livraisons ci-dessous.'
+      : `Aucune session Claude Code sur ce dépôt depuis ${esc(S.sources?.claude?.error ? '' : '24 h')}.<br>${S.sources?.claude?.error ? '<b>' + esc(S.sources.claude.error) + '</b>' : 'Lancez un agent : il apparaîtra ici en moins de 2 secondes.'}`}</div>`;
+    return;
+  }
+  g.innerHTML = list.map(agentCard).join('');
+}
+
+function steps(phase){
+  return `<ol class="steps" aria-label="Étape du flux PM → Archi → Dév">${STEPS.map(([l, who], i) =>
+    `<li class="${i < phase ? 'done' : i === phase ? 'cur' : ''}${i === 6 ? ' last' : ''}" title="${esc(l + ' · ' + who)}">${esc(l)}</li>`).join('')}</ol>`;
+}
+
+function spark(vals){
+  if (!vals || !vals.length) return '';
+  const w = 96, h = 22, max = Math.max(1, ...vals), sx = w / (vals.length - 1 || 1);
+  const pts = vals.map((v, i) => `${(i * sx).toFixed(1)},${(h - 2 - v / max * (h - 4)).toFixed(1)}`);
+  const total = vals.reduce((a, b) => a + b, 0);
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="Activité 30 min : ${total} actions"><title>Activité des 30 dernières minutes : ${total} actions (max ${max}/min)</title>
+    <polygon points="0,${h} ${pts.join(' ')} ${w},${h}" fill="rgba(94,234,212,.12)"/><polyline points="${pts.join(' ')}" fill="none" stroke="var(--cyan)" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+}
+
+function agentCard(a){
+  const [cls, short] = STATE[a.state] || STATE.idle;
+  const key = esc(a.id);
+  let body = '';
+  if (a.kind === 'branch') {
+    body = `<div class="now"><span class="arrow">▸</span><span class="what">${a.pr ? `PR <b>#${a.pr.number}</b> · ${esc(a.pr.title)}` : `${a.pushes.length} push · dernière activité ${ago(a.last_activity)}`}</span></div>`;
+  } else {
+    if (a.current) body += `<div class="now"><span class="arrow">▸</span><b>${esc(a.current.tool)}</b><span class="what" title="${esc(a.current.summary)}">${esc(a.current.summary)}</span><span class="t" data-since="${esc(a.current.since)}">${ago(a.current.since, '')}</span></div>`;
+    const quote = ['waiting', 'permission'].includes(a.state) || !a.current ? a.last_text : null;
+    if (quote) body += `<p class="quote">${esc(quote)}</p>`;
+    const todos = a.todos || [];
+    if (todos.length) {
+      const done = todos.filter(t => t.status === 'completed').length;
+      const cur = todos.find(t => t.status === 'in_progress');
+      body += `<div class="todo"><span class="bar" role="progressbar" aria-valuenow="${done}" aria-valuemax="${todos.length}"><span style="width:${(done / todos.length * 100).toFixed(0)}%"></span></span><span>${done}/${todos.length}</span><span class="cur">${esc(cur ? (cur.activeForm || cur.content) : done === todos.length ? 'Tout est coché' : '')}</span></div>
+        <details class="more" data-k="todo:${key}" ${openDetails.has('todo:' + a.id) ? 'open' : ''}><summary>liste des tâches</summary><ul class="todolist">${todos.map(t => `<li class="${esc(t.status)}">${esc(t.content)}</li>`).join('')}</ul></details>`;
+    }
+    const subs = (a.subagents || []);
+    if (subs.length) {
+      const shown = [...subs.filter(s => s.status === 'running'), ...subs.filter(s => s.status !== 'running').reverse()].slice(0, 4);
+      body += `<ul class="subs">${shown.map(s => {
+        const st = s.status === 'running' ? (s.state === 'permission' ? ['perm', 'validation ?'] : ['run', s.last_tool ? s.last_tool.name : 'en cours']) : s.status === 'error' ? ['err', 'erreur'] : ['', 'terminé ' + ago(s.ended)];
+        return `<li>${role(s.role) || '<span class="role">AGENT</span>'}<span class="d" title="${esc(s.description)}">${esc(s.description || s.type)} ${s.status === 'running' && s.last_tool?.summary ? `<em>· ${esc(s.last_tool.summary)}</em>` : ''}</span><span class="s ${st[0]}">${esc(st[1])}</span></li>`; }).join('')}</ul>`;
+      if (subs.length > 4) body += `<div class="since">+ ${subs.length - 4} sous-agents plus anciens</div>`;
+    }
+  }
+  const gitb = a.git ? `${a.git.ahead != null ? `<span title="avance / retard sur ${esc(S.repo?.main || MAIN)}">git <b>+${a.git.ahead}/−${a.git.behind ?? 0}</b></span>` : ''}${a.git.dirty ? `<span title="${esc((a.git.files || []).join('\n'))}"><b>${a.git.dirty}</b> fichier${a.git.dirty > 1 ? 's' : ''} modifié${a.git.dirty > 1 ? 's' : ''}</span>` : ''}` : '';
+  const pr = a.pr ? `<a href="${esc(a.pr.url)}" target="_blank" rel="noopener">PR #${a.pr.number} · ${a.pr.merged ? 'mergée' : a.pr.state === 'open' ? 'ouverte' : 'fermée'}</a>` : '';
+  const tok = a.tokens ? `<span title="contexte courant / tokens produits">ctx <b>${kfmt(a.tokens.context)}</b> · sortie <b>${kfmt(a.tokens.output)}</b></span>` : '';
+  const title = a.kind === 'branch' ? `<span class="wt">${esc(shortBranch(a.branch))}</span>` : `${a.branch && a.branch !== (S.repo?.main || MAIN) ? `<span class="wt">${esc(shortBranch(a.branch))}</span>` : esc(a.branch || 'session')}`;
+  return `<article class="agent ${cls}" data-id="${key}">
+    <div class="agent-top"><span class="pill ${cls}"><i></i>${esc(short)}</span>${role(a.role)}<span class="since" data-since="${esc(a.since)}" data-prefix="depuis ">${ago(a.since, 'depuis ')}</span>${a.model ? `<span class="model">${esc(modelShort(a.model))}</span>` : ''}</div>
+    <h3>${title}<small>${esc(a.state_label)}${a.title && a.kind !== 'branch' ? ' — ' + esc(a.title) : a.kind === 'branch' ? ' — ' + esc(a.title) : ''}</small></h3>
+    ${steps(a.phase ?? -1)}
+    ${body}
+    <div class="agent-foot">${gitb}${pr}${tok}${a.errors ? `<span title="résultats d'outils en erreur">${a.errors} err.</span>` : ''}${spark(a.spark)}</div>
+  </article>`;
+}
+
+// --- chronologie (SVG, recalculée à la largeur du conteneur)
+function renderTimeline(agents){
+  const box = $('#tl'), W = Math.max(320, box.clientWidth || 900);
+  const to = mode === 'github' ? Date.now() : ms(S.timeline?.to) || Date.now(), span = 6 * 3600e3, from = to - span, bucket = 300e3, n = span / bucket;
+  let lanes = (S.timeline?.lanes || []).map(l => ({...l}));
+  if (mode === 'github') {
+    lanes = deriveBranches(S.github).filter(b => b.pushes.some(t => ms(t) > from) || (b.pr && ms(b.pr.updated_at) > from)).slice(0, 10).map(b => {
+      const bk = new Array(n).fill(0);
+      for (const t of b.pushes) { const i = Math.floor((ms(t) - from) / bucket); if (i >= 0 && i < n) bk[i] += 3; }
+      return {agent_id:'br:' + b.name, label:shortBranch(b.name), state:b.state, buckets:bk};
+    });
+  }
+  const marks = [];
+  for (const p of S.github?.prs || []) {
+    if (ms(p.created_at) > from) marks.push({t:ms(p.created_at), c:'var(--amber)', l:'#' + p.number + ' ouverte', head:p.head});
+    if (p.merged && ms(p.merged_at) > from) marks.push({t:ms(p.merged_at), c:'var(--st-done)', l:'#' + p.number + ' mergée', head:p.head});
+  }
+  $('#tlAside').textContent = `${lanes.length} piste${lanes.length > 1 ? 's' : ''} · ${hhmm(new Date(from).toISOString())} → ${hhmm(new Date(to).toISOString())}`;
+  const LW = W < 600 ? 92 : 150, top = 24, LH = 24, H = top + Math.max(1, lanes.length) * LH + 6, cw = (W - LW) / n;
+  const x = t => LW + (t - from) / span * (W - LW);
+  let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Chronologie de l'activité des agents sur 6 heures">`;
+  for (let h = Math.ceil(from / 3600e3) * 3600e3; h <= to; h += 3600e3) {
+    const xx = x(h).toFixed(1);
+    s += `<line x1="${xx}" x2="${xx}" y1="${top - 6}" y2="${H}" stroke="#1a2844"/><text x="${xx}" y="12" fill="var(--muted-2)" font-family="JetBrains Mono" font-size="10" text-anchor="middle">${hhmm(new Date(h).toISOString())}</text>`;
+  }
+  if (!lanes.length) s += `<text x="${LW}" y="${top + 16}" fill="var(--muted-2)" font-family="JetBrains Mono" font-size="11.5">aucune activité sur la période</text>`;
+  lanes.forEach((l, li) => {
+    const y = top + li * LH, max = Math.max(1, ...l.buckets);
+    s += `<text x="${LW - 10}" y="${y + 15}" fill="var(--ink)" font-family="JetBrains Mono" font-size="11" text-anchor="end">${esc(l.label.length > 18 ? l.label.slice(0, 17) + '…' : l.label)}</text>`;
+    s += `<rect x="${LW}" y="${y + 4}" width="${W - LW}" height="${LH - 8}" fill="#0b1426"/>`;
+    l.buckets.forEach((v, i) => {
+      if (!v) return;
+      const t0 = new Date(from + i * bucket), t1 = new Date(from + (i + 1) * bucket);
+      s += `<rect x="${(LW + i * cw + .5).toFixed(1)}" y="${y + 4}" width="${Math.max(1, cw - 1).toFixed(1)}" height="${LH - 8}" fill="var(--cyan)" fill-opacity="${(.18 + .82 * v / max).toFixed(2)}"><title>${esc(l.label)} · ${hhmm(t0.toISOString())}–${hhmm(t1.toISOString())} · ${mode === 'github' ? 'push' : v + ' action' + (v > 1 ? 's' : '')}</title></rect>`;
+    });
+  });
+  marks.forEach(m => {
+    const li = lanes.findIndex(l => l.label === shortBranch(m.head) || l.agent_id === 'br:' + m.head);
+    const xx = x(m.t).toFixed(1), y0 = li >= 0 ? top + li * LH + 2 : top - 6, y1 = li >= 0 ? y0 + LH - 4 : H;
+    s += `<g><line x1="${xx}" x2="${xx}" y1="${y0}" y2="${y1}" stroke="${m.c}" stroke-width="2"/><rect x="${(+xx - 4)}" y="${y0 - 2}" width="8" height="8" fill="${m.c}" transform="rotate(45 ${xx} ${y0 + 2})"/><title>PR ${esc(m.l)} · ${hhmm(new Date(m.t).toISOString())} · ${esc(m.head || '')}</title></g>`;
+  });
+  s += `<line x1="${W - 1}" x2="${W - 1}" y1="${top - 6}" y2="${H}" stroke="var(--amber)" stroke-dasharray="2 3"/></svg>`;
+  box.innerHTML = s;
+}
+
+// --- flux
+function ghFeed(sinceMs){
+  const byNum = new Map((S.github?.prs || []).map(p => [p.number, p]));
+  const act = {opened:'ouverte', reopened:'rouverte', merged:'mergée', ready_for_review:'prête pour revue', synchronize:'mise à jour'};
+  return (S.github?.events || []).filter(e => !sinceMs || ms(e.created_at) > sinceMs).map(e => {
+    const pr = e.pr ? byNum.get(e.pr) : null, title = e.pr_title || pr?.title || '';
+    const verb = e.action === 'closed' ? ((e.merged || pr?.merged) ? 'mergée' : 'fermée') : (act[e.action] || e.action || '');
+    return { ts:e.created_at, agent:shortBranch(e.ref || e.pr_head || pr?.head) || (e.pr ? 'PR #' + e.pr : 'dépôt'), kind:e.type,
+      text: e.type === 'PushEvent' ? `push sur ${e.ref}${e.head ? ' (' + e.head + ')' : ''}` : e.type === 'CreateEvent' ? `${e.ref_type === 'tag' ? 'tag' : 'branche'} créée : ${e.ref}` :
+        e.type === 'PullRequestEvent' ? `PR #${e.pr} ${verb}${title ? ' — ' + title : ''}` : e.type.replace('Event', '') };
+  });
+}
+function feedItems(){
+  if (mode === 'github') return ghFeed().slice(0, 60);
+  // live / démo : actions des sessions + PR GitHub des 6 dernières heures
+  const pr = ghFeed(Date.now() - 6 * 3600e3).filter(f => f.kind === 'PullRequestEvent');
+  return [...(S.feed || []), ...pr].sort((a, b) => ms(b.ts) - ms(a.ts)).slice(0, 80);
+}
+const KIND = {tool:'outil', text:'message', prompt:'demande', spawn:'sous-agent', spawn_end:'fin agent', interrupt:'interrompu', compact:'compactage',
+  PushEvent:'push', CreateEvent:'création', PullRequestEvent:'pr', DeleteEvent:'suppr.'};
+function renderFeed(){
+  const items = feedItems(), ul = $('#feedList');
+  if (!items.length) { ul.innerHTML = '<li><span></span><span></span><span class="msg">Rien pour l’instant.</span></li>'; return; }
+  const keys = new Set();
+  ul.innerHTML = items.map(f => {
+    const k = f.ts + '|' + f.agent + '|' + f.text; keys.add(k);
+    const fresh = !firstRender && !lastFeedKeys.has(k);
+    return `<li class="${fresh ? 'fresh' : ''}"><span class="t" title="${esc(new Date(ms(f.ts)).toLocaleString('fr-FR'))}">${hhmm(f.ts, true)}</span><span class="who">${esc(f.agent)}${f.sub ? '<span style="color:var(--muted-2)">›</span>' : ''}${role(f.role)}</span><span class="msg" title="${esc(f.text)}"><span class="kind ${esc(f.kind)}">${esc(KIND[f.kind] || f.kind)}</span>${f.sub ? `<span style="color:var(--muted-2)">[${esc(f.sub)}]</span> ` : ''}${esc(f.text)}</span></li>`;
+  }).join('');
+  lastFeedKeys = keys;
+  const top = items[0] && (items[0].ts + items[0].text);
+  if (top !== lastTopFeed) {
+    lastTopFeed = top;
+    const row = items.slice(0, 14).map(f => `<span class="ticker-item"><span class="date">${hhmm(f.ts)}</span>${esc(f.agent)} · ${esc(f.text)}<span class="sep">//</span></span>`).join('');
+    $('#ticker').innerHTML = `<div style="display:flex">${row}</div><div class="dup" style="display:flex" aria-hidden="true">${row}</div>`;
+  }
+}
+
+// --- livraisons
+function renderPRs(){
+  const prs = (S.github?.prs || []).filter(p => !(p.head || '').startsWith('dependabot/')).slice(0, 10);
+  const gh = S.sources?.github;
+  $('#ghHead').innerHTML = gh && !gh.ok && gh.error ? `<span class="ko">github indisponible</span>` : `pull requests · ${esc(S.repo?.github || REPO)}`;
+  const run = (S.github?.runs || []).find(r => /pages/i.test(r.name || ''));
+  $('#pagesState').innerHTML = run ? `pages : <span class="${run.status !== 'completed' ? 'run' : run.conclusion === 'success' ? 'ok' : 'ko'}">${run.status !== 'completed' ? 'déploiement en cours' : run.conclusion === 'success' ? 'déployé' : esc(run.conclusion)}</span> ${ago(run.updated_at)}` : '';
+  $('#prList').innerHTML = prs.length ? prs.map(p => {
+    const st = p.merged ? ['merged', 'mergée'] : p.state === 'open' ? ['open', p.draft ? 'brouillon' : 'ouverte'] : ['closed', 'fermée'];
+    return `<li><a class="num" href="${esc(p.url)}" target="_blank" rel="noopener">#${p.number}</a><span class="ti">${esc(p.title)}</span>
+      <span class="meta"><span class="badge ${st[0]}">${st[1]}</span>${esc(shortBranch(p.head))} · ${p.merged ? 'mergée ' + ago(p.merged_at) : 'maj ' + ago(p.updated_at)}</span></li>`;
+  }).join('') : `<li><span></span><span class="ti" style="color:var(--muted)">${gh && gh.error ? esc(gh.error) : 'Aucune PR.'}</span></li>`;
+}
+
+// --- worktrees / branches
+function renderWorktrees(){
+  const box = $('#wtBox');
+  if (mode === 'github') {
+    $('#wtTitle').textContent = 'Branches d’agents';
+    const br = deriveBranches(S.github).slice(0, 14);
+    $('#wtAside').textContent = 'depuis les événements GitHub';
+    box.innerHTML = `<table><thead><tr><th>Branche</th><th>État</th><th>PR</th><th>Dernière activité</th></tr></thead><tbody>${br.map(b => `<tr><td class="m">${esc(b.name)}</td><td>${esc((STATE[b.state] || STATE.idle)[1])}</td><td>${b.pr ? `<a href="${esc(b.pr.url)}" target="_blank" rel="noopener">#${b.pr.number}</a>` : '—'}</td><td>${ago(b.last)}</td></tr>`).join('')}</tbody></table>`;
+    return;
+  }
+  $('#wtTitle').textContent = 'Worktrees';
+  const wts = S.worktrees || [];
+  $('#wtAside').textContent = S.sources?.git?.ok ? `${wts.length} worktree${wts.length > 1 ? 's' : ''} · git local` : (S.sources?.git?.error || '');
+  box.innerHTML = wts.length ? `<table><thead><tr><th>Worktree</th><th>Branche</th><th>Avance / retard</th><th>Modifs</th><th>Dernier commit</th><th>Session</th></tr></thead><tbody>${wts.map(w => `<tr>
+      <td class="m">${esc(w.is_main ? '(dépôt principal)' : w.name)}</td><td class="m">${esc(w.branch || 'détachée')}</td>
+      <td class="m">${w.ahead == null ? '—' : `<span class="pos">+${w.ahead}</span> / <span class="neg">−${w.behind}</span>`}</td>
+      <td class="m" title="${esc((w.files || []).join('\n'))}">${w.dirty || '—'}</td>
+      <td>${esc(w.last_commit?.subject || '')} <span style="color:var(--muted-2)">${w.last_commit?.ts ? '· ' + ago(w.last_commit.ts) : ''}</span></td>
+      <td class="m">${(w.session_ids || []).length ? '● ' + w.session_ids.length : '—'}</td></tr>`).join('')}</tbody></table>`
+    : '<div class="empty">Aucun worktree.</div>';
+}
+
+function renderFooter(){
+  const s = S.sources || {};
+  const line = (n, o, txt) => o ? `<div><b>${n}</b> <span class="${o.ok ? 'ok' : 'ko'}">${o.ok ? 'ok' : 'ko'}</span> · ${esc(txt)}</div>` : '';
+  $('#srcFooter').innerHTML = mode === 'live' ? [
+    line('sessions', s.claude, s.claude ? `${s.claude.sessions} session(s) · ${s.claude.dir}${s.claude.error ? ' · ' + s.claude.error : ''}` : ''),
+    line('git', s.git, s.git ? (s.git.error || s.git.repo || '') : ''),
+    line('github', s.github, s.github ? `${s.github.slug || 'désactivé'}${s.github.auth ? ' (jeton)' : ''}${s.github.error ? ' · ' + s.github.error : s.github.fetched_at ? ' · ' + ago(s.github.fetched_at) : ''}` : ''),
+    `<div>seuils : actif &lt; ${S.thresholds?.active_s ?? 90} s · validation supposée après ${S.thresholds?.fast_tool_wait_s ?? 30} s (outil rapide) / ${S.thresholds?.long_tool_wait_s ?? 120} s (Bash)</div>`
+  ].join('') : mode === 'github' ? `<div><b>github</b> api publique · actualisation toutes les 60 s (requêtes conditionnelles)</div>` : `<div><b>démo</b> données générées localement</div>`;
+  $('#verFooter').textContent = `stt-agents ${S.version || ''} · ${mode}`;
+}
+
+// --- alertes
+function notify(agents){
+  const need = new Set(agents.filter(a => GROUP(a.state) === 'you' && mode !== 'github').map(a => a.id));
+  document.title = (need.size ? `(${need.size}) ` : '') + 'STT · Agents en direct';
+  if (alerts && !firstRender && 'Notification' in window && Notification.permission === 'granted') {
+    for (const a of agents) if (need.has(a.id) && !prevNeedYou.has(a.id))
+      try { new Notification(`STT · ${shortBranch(a.branch) || 'agent'} t’attend`, {body:`${a.state_label}${a.last_text ? ' — ' + a.last_text.slice(0, 140) : ''}`, tag:'stt-' + a.id}); } catch {}
+  }
+  prevNeedYou = need;
+}
+function paintAlertsBtn(){ const b = $('#btnAlerts'); b.textContent = 'Alertes : ' + (alerts ? 'on' : 'off'); b.classList.toggle('on', alerts); b.setAttribute('aria-pressed', alerts); }
+$('#btnAlerts').addEventListener('click', async () => {
+  if (!alerts && 'Notification' in window && Notification.permission !== 'granted') { try { await Notification.requestPermission(); } catch {} }
+  alerts = !alerts && (!('Notification' in window) || Notification.permission === 'granted');
+  store.set('alerts', alerts); paintAlertsBtn();
+});
+paintAlertsBtn();
+
+// --- interactions
+$('#filters').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; filter = b.dataset.f; store.set('filter', filter); render(); });
+document.addEventListener('toggle', e => { const d = e.target; if (d.matches && d.matches('details[data-k]')) d.open ? openDetails.add(d.dataset.k) : openDetails.delete(d.dataset.k); }, true);
+let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => S && renderTimeline(agentsView()), 150); });
+setInterval(() => { // horloges relatives sans re-rendu complet
+  document.querySelectorAll('[data-since]').forEach(el => { el.textContent = ago(el.dataset.since, el.dataset.prefix ?? ''); });
+  if (S) renderHeader();
+}, 1000);
+
+// ------------------------------------------------------------------ sources
+let stale = false, lastMsg = 0;
+function apply(state, m){ S = state; mode = m; stale = false; lastMsg = Date.now(); render(); }
+const timeout = (p, t) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('délai dépassé')), t))]);
+
+function startLive(){
+  const es = new EventSource('api/stream');
+  es.addEventListener('state', e => { try { apply(JSON.parse(e.data), 'live'); } catch (err) { console.error(err); } });
+  es.addEventListener('ping', () => { lastMsg = Date.now(); if (stale) { stale = false; renderHeader(); } });
+  es.onerror = () => { stale = true; renderHeader(); };
+  setInterval(() => { if (Date.now() - lastMsg > 40e3 && !stale) { stale = true; renderHeader(); } }, 5e3);
+}
+
+async function ghFetch(path){
+  const r = await timeout(fetch(`https://api.github.com/repos/${REPO}${path}`, {cache:'no-cache', headers:{Accept:'application/vnd.github+json'}}), 10e3);
+  const rate = r.headers.get('x-ratelimit-remaining');
+  if (!r.ok) throw new Error(`GitHub ${r.status}${rate === '0' ? ' (quota horaire épuisé)' : ''}`);
+  return [await r.json(), rate == null ? null : {remaining:+rate, limit:+(r.headers.get('x-ratelimit-limit') || 60)}];
+}
+async function pollGithub(){
+  const [[prs, rate], [events], [runs]] = await Promise.all([ghFetch('/pulls?state=all&per_page=30&sort=updated&direction=desc'), ghFetch('/events?per_page=60'), ghFetch('/actions/runs?per_page=10')]);
+  apply({mode:'github', version:'1.0.0', fetched_at:new Date().toISOString(), repo:{github:REPO, main:MAIN}, sources:{github:{ok:true, rate}}, github:slimGithub(prs, events, runs)}, 'github');
+}
+function startGithub(){
+  setInterval(() => pollGithub().catch(err => { if (S) { S.sources.github = {ok:false, error:err.message}; renderPRs(); } }), 60e3);
+}
+
+async function boot(){
+  if (P.has('demo')) return startDemo('demandé via ?demo');
+  const served = /^https?:$/.test(location.protocol) && !/github\.io$/i.test(location.hostname);
+  if (served) {
+    try {
+      const r = await timeout(fetch('api/state', {cache:'no-store'}), 3000);
+      if (r.ok) { const s = await r.json(); if (s && s.mode === 'live') { apply(s, 'live'); startLive(); return; } }
+    } catch {}
+  }
+  if (P.get('github') !== '0') {
+    try { await pollGithub(); startGithub(); return; } catch (err) { return startDemo(err.message); }
+  }
+  startDemo('GitHub désactivé');
+}
+
+// ------------------------------------------------------------------ démo (données fictives, clairement signalées)
+function startDemo(reason){
+  const now = () => Date.now(), iso = t => new Date(t).toISOString(), m = x => now() - x * 60e3;
+  const span = 72, bucket = 300e3;
+  const lane = (seed, from, to, k = 1) => Array.from({length:span}, (_, i) => { const t = now() - (span - i) * bucket; return t > m(from) && t < m(to) ? Math.round(k * (2 + 6 * Math.abs(Math.sin(i * seed)))) : 0; });
+  const sp = (k) => Array.from({length:30}, (_, i) => Math.round(k * (1 + 4 * Math.abs(Math.sin(i * .7 + k)))));
+  const tools = [['Bash', 'python3 build.py test'], ['Read', 'src/JS/game/ORDER.txt'], ['Edit', 'JS/game/21-scenes.js'], ['Grep', 'SCENES\\.switch'], ['Bash', 'python3 build.py compile'], ['Edit', 'src/test/scenes_test.py']];
+  let tick = 0;
+  const feed0 = [];
+  const push = (min, agent, role, kind, text, sub) => feed0.push({ts:iso(m(min)), agent, role, kind, text, sub});
+  push(.2, 'lot2-scenes', 'DEV', 'tool', 'Bash · python3 build.py test', 'Développeur lot 2');
+  push(1.1, 'fix-camera-jitter', 'DEV', 'tool', 'Edit · JS/game/20c-camera.js');
+  push(3.4, 'ports-orbitaux-docks', 'ARCH', 'text', 'Spec prête : trois options d’amarrage (A, B, C). Laquelle retiens-tu ?');
+  push(4, 'lot2-scenes', 'ARCH', 'spawn_end', 'Sous-agent terminé · Architecte : spec SCENES lot 2');
+  push(6, 'lot2-scenes', 'DEV', 'spawn', 'Lance un sous-agent · Développeur lot 2');
+  push(9, 'ports-orbitaux-docks', 'ARCH', 'tool', 'Write · docs/specs/spec-ports-orbitaux-docks.md');
+  push(14, 'lot2-scenes', 'PM', 'text', 'Brief : lot 2 du plan Scènes — T2.1 à T2.4, critères d’acceptation listés');
+  push(22, 'fix-camera-jitter', 'PM', 'prompt', 'Corrige le tressautement de la caméra en gros plan (cargo et navette)');
+  const demo = () => ({
+    mode:'demo', version:'1.0.0', reason, generated_at:iso(now()),
+    repo:{github:'mcgivrer/csblog', path:'…/html/csblog', main:'main'},
+    sources:{claude:{ok:true, sessions:4, dir:'(exemple)'}, git:{ok:true, repo:'(exemple)'}, github:{ok:true, slug:'mcgivrer/csblog', rate:{remaining:57, limit:60}}},
+    thresholds:{active_s:90, fast_tool_wait_s:30, long_tool_wait_s:120},
+    agents:[
+      {id:'d1', branch:'worktree-lot2-scenes', title:'Plan Scènes — lot 2 (exemple)', state:'tool', state_label:'Bash en cours', since:iso(m(.4)), last_activity:iso(m(.1)),
+       model:'claude-sonnet-5-5', role:'DEV', phase:2, current:{tool:tools[tick % tools.length][0], summary:tools[tick % tools.length][1], since:iso(now() - (tick % 5) * 7e3)},
+       todos:[{content:'T2.1 SCENES.register',status:'completed'},{content:'T2.2 transitions titre → vol',status:'completed'},{content:'T2.3 pause par scène',status:'completed'},{content:'T2.4 tests Playwright scènes',status:'in_progress',activeForm:'Écrit les tests Playwright des scènes'},{content:'Revue archi',status:'pending'},{content:'PR + rapport PM',status:'pending'}],
+       subagents:[{description:'Développeur lot 2', role:'DEV', status:'running', state:'tool', last_tool:{name:'Bash', summary:'python3 build.py test'}},{description:'Architecte : spec SCENES lot 2', role:'ARCH', status:'done', ended:iso(m(4))},{description:'PM : brief lot 2', role:'PM', status:'done', ended:iso(m(13))}],
+       tokens:{output:48210, context:91400}, spark:sp(1.2), git:{ahead:3, behind:0, dirty:4, files:['src/JS/game/21-scenes.js','src/test/scenes_test.py']}, pr:null},
+      {id:'d2', branch:'worktree-ports-orbitaux-docks', title:'Ports orbitaux : docks d’amarrage (exemple)', state:'waiting', state_label:'Attend ta réponse', since:iso(m(3.4)), last_activity:iso(m(3.4)),
+       model:'claude-opus-5-5', role:'ARCH', phase:1, current:null, last_text:'Spec prête : trois options d’amarrage — A pontons fixes, B bras articulés, C champ tracteur. Je recommande A (coût faible, lisible en gros plan). Laquelle retiens-tu ?',
+       todos:[{content:'Lire spec v2.16 ch. 24',status:'completed'},{content:'Rédiger options d’amarrage',status:'completed'},{content:'Valider l’option avec Frédéric',status:'in_progress',activeForm:'Attend le choix de l’option'}],
+       subagents:[], tokens:{output:22900, context:64300}, spark:sp(.4), git:{ahead:1, behind:2, dirty:1, files:['demos/space-travel/docs/specs/spec-ports-orbitaux-docks.md']}, pr:null},
+      {id:'d3', branch:'worktree-fix-camera-jitter', title:'Tressautement caméra en gros plan (exemple)', state:'permission', state_label:'Attend ta validation', since:iso(m(1.1)), last_activity:iso(m(1.1)),
+       model:'claude-sonnet-5-5', role:'DEV', phase:2, current:{tool:'Edit', summary:'JS/game/20c-camera.js', since:iso(m(1.1))}, last_text:'Je lisse la position caméra sur un pas fixe (60 Hz) pour supprimer la saccade.',
+       todos:[], subagents:[], tokens:{output:9100, context:38800}, spark:sp(.6), git:{ahead:0, behind:0, dirty:2, files:[]}, pr:null},
+      {id:'d4', branch:'worktree-spec-012-hud', title:'SPEC-012 : HUD et panneaux (exemple)', state:'idle', state_label:'Livré', since:iso(m(170)), last_activity:iso(m(170)),
+       model:'claude-sonnet-5-5', role:'PM', phase:6, current:null, last_text:'PR #22 mergée. Rapport final envoyé.', todos:[], subagents:[], tokens:{output:31000, context:52000}, spark:new Array(30).fill(0), git:null,
+       pr:{number:22, title:'SPEC-012 : HUD et panneaux (exemple)', state:'closed', merged:true, url:'#', merged_at:iso(m(168))}}
+    ],
+    worktrees:[
+      {name:'csblog', is_main:true, branch:'main', ahead:null, behind:null, dirty:0, last_commit:{subject:'Merge pull request #22 (exemple)', ts:iso(m(168))}, session_ids:[]},
+      {name:'lot2-scenes', branch:'worktree-lot2-scenes', ahead:3, behind:0, dirty:4, last_commit:{subject:'Scenes lot 2: register + transitions (exemple)', ts:iso(m(18))}, session_ids:['d1']},
+      {name:'ports-orbitaux-docks', branch:'worktree-ports-orbitaux-docks', ahead:1, behind:2, dirty:1, last_commit:{subject:'Spec ports orbitaux : options (exemple)', ts:iso(m(40))}, session_ids:['d2']},
+      {name:'fix-camera-jitter', branch:'worktree-fix-camera-jitter', ahead:0, behind:0, dirty:2, last_commit:{subject:'—', ts:null}, session_ids:['d3']}
+    ],
+    feed: feed0.slice().sort((a, b) => ms(b.ts) - ms(a.ts)),
+    github:{prs:[{number:22, title:'SPEC-012 : HUD et panneaux (exemple)', state:'closed', merged:true, head:'worktree-spec-012-hud', updated_at:iso(m(168)), merged_at:iso(m(168)), created_at:iso(m(175)), url:'#'}], events:[], runs:[{name:'pages build and deployment', status:'completed', conclusion:'success', updated_at:iso(m(166))}]},
+    timeline:{to:iso(now()), lanes:[{agent_id:'d1', label:'lot2-scenes', buckets:lane(.9, 70, 0, 1.2)},{agent_id:'d2', label:'ports-orbitaux-docks', buckets:lane(.5, 50, 3)},{agent_id:'d3', label:'fix-camera-jitter', buckets:lane(1.3, 24, 1, .7)},{agent_id:'d4', label:'spec-012-hud', buckets:lane(.7, 230, 168)}]}
+  });
+  apply(demo(), 'demo');
+  setInterval(() => { // un peu de vie : le développeur enchaîne les outils
+    tick++;
+    const [t, s] = tools[tick % tools.length];
+    push(0, 'lot2-scenes', 'DEV', 'tool', `${t} · ${s}`, 'Développeur lot 2');
+    const st = demo(); st.feed = feed0.slice().sort((a, b) => ms(b.ts) - ms(a.ts)).slice(0, 60); apply(st, 'demo');
+  }, 4000);
+}
+
+boot();
+})();
+</script>
+</body>
+</html>
