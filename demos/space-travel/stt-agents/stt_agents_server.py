@@ -29,6 +29,8 @@ restent sur la machine. --host 0.0.0.0 l'expose au réseau local (à vos risques
 """
 
 import argparse
+import hmac
+import secrets
 import hashlib
 import json
 import os
@@ -1313,6 +1315,26 @@ def _num(v):
     return v if isinstance(v, (int, float)) else 0
 
 
+RUNNER_RESERVED = ("runner", "session", "runState", "started", "ended")
+
+
+def _check_reserved(op):
+    """Refuse les clés réservées au lanceur dans une opération venue de l'extérieur."""
+    kind = op.get("op")
+    keys = set()
+    if kind in ("task", "lot", "decision_set"):
+        for part in ("set", "add"):
+            keys |= set((op.get(part) or {}).keys())
+        keys |= set(op.get("unset") or [])
+    elif kind == "task_add":
+        keys |= set((op.get("task") or {}).keys())
+    bad = keys & set(RUNNER_RESERVED)
+    if "inst" in keys and ("runner" in keys or (kind == "task_add" and (op.get("task") or {}).get("runner"))):
+        bad.add("inst")
+    if bad:
+        raise KanbanError("clés réservées au lanceur : " + ", ".join(sorted(bad)))
+
+
 def _apply_op(lines, op, now, log):
     kind = op.get("op")
     if kind in ("task", "lot", "decision_set"):
@@ -1413,7 +1435,7 @@ def _validate_node(path):
     return [int(x) for x in r.stdout.strip().split(",")]
 
 
-def kanban_apply(path, ops, dry_run=False):
+def kanban_apply(path, ops, dry_run=False, allow_reserved=False):
     """Applique une liste d'opérations ; tout ou rien. Renvoie le compte rendu."""
     if not path or not os.path.isfile(path):
         raise KanbanError(f"plan-status.js introuvable : {path}")
@@ -1431,6 +1453,8 @@ def kanban_apply(path, ops, dry_run=False):
         for op in ops:
             if not isinstance(op, dict):
                 raise KanbanError("chaque opération est un objet JSON")
+            if not allow_reserved:
+                _check_reserved(op)
             _apply_op(lines, op, now, log)
         if not any(o.get("op") == "top" and "updated" in (o.get("set") or {}) for o in ops):
             _apply_op(lines, {"op": "top", "set": {"updated": now}}, now, [])
@@ -1460,13 +1484,37 @@ def kanban_summary(path):
 # ---------------------------------------------------------------------------
 # HTTP
 # ---------------------------------------------------------------------------
+TOKEN_META = '<meta name="stt-token" content="">'
+
+
+def check_control(handler):
+    """Contrôle des routes de pilotage : jeton, Host, Origin obligatoire, Sec-Fetch-Site. Renvoie True si autorisé."""
+    hub_token = getattr(handler, "stt_token", "") or ""
+    got = handler.headers.get("X-STT-Token") or ""
+    if not hub_token or not hmac.compare_digest(got.encode("utf-8"), hub_token.encode("utf-8")):
+        return False
+    if not handler._host_ok():
+        return False
+    port = handler.server.server_address[1]
+    origin = handler.headers.get("Origin")
+    if not origin or origin not in {f"http://{h}:{port}" for h in ("127.0.0.1", "localhost", "[::1]")}:
+        return False
+    if (handler.headers.get("Sec-Fetch-Site") or "").lower() == "cross-site":
+        return False
+    return True
+
+
 def make_handler(hub, allowed_hosts):
     class Handler(BaseHTTPRequestHandler):
         server_version = f"STTAgents/{VERSION}"
+        stt_token = getattr(hub, "token", "")
 
         def log_message(self, fmt, *a):
             if hub.args.verbose:
                 sys.stderr.write("[http] " + fmt % a + "\n")
+
+        def _check_control(self):
+            return check_control(self)
 
         def _host_ok(self):
             if allowed_hosts is None:
@@ -1475,6 +1523,9 @@ def make_handler(hub, allowed_hosts):
             return host in allowed_hosts
 
         def _send(self, code, body, ctype, head=False, extra=None):
+            if ctype.startswith("text/html"):
+                body = body.replace(TOKEN_META.encode(), ('<meta name="stt-token" content="%s">' % getattr(hub, "token", "")).encode())
+                extra = dict(extra or {}, **{"Content-Security-Policy": "frame-ancestors 'self'", "Referrer-Policy": "no-referrer"})
             self.send_response(code)
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(body)))
@@ -1568,6 +1619,10 @@ def make_handler(hub, allowed_hosts):
             if not self._host_ok():
                 return self._send(403, b"Host refuse", "text/plain; charset=utf-8")
             path = self.path.split("?", 1)[0]
+            if path == "/api/runner/check":
+                if not check_control(self):
+                    return self._send(403, b"403", "text/plain; charset=utf-8")
+                return self._send(200, b'{"ok": true}', "application/json; charset=utf-8")
             if path != "/api/kanban":
                 return self._send(404, b"404", "text/plain")
             # l'en-tete personnalise force un preflight CORS : une page web tierce ne peut pas ecrire le Kanban
@@ -1638,8 +1693,14 @@ def main():
     ap.add_argument("--verbose", action="store_true")
     ap.add_argument("--kanban", help="plan-status.js du Kanban (défaut : %s dans le checkout principal)" % KANBAN_REL)
     ap.add_argument("--kanban-apply", metavar="OPS.json", help="applique des opérations au Kanban (fichier JSON ou - pour stdin) puis quitte ; --dry-run pour contrôler seulement")
+    ap.add_argument("--runner", action="store_true", help="active le lanceur d'agents (opt-in ; boucle locale uniquement, hors Windows)")
     ap.add_argument("--dry-run", action="store_true", help="avec --kanban-apply : valide sans écrire")
     args = ap.parse_args()
+    if args.runner:
+        if args.host not in ("127.0.0.1", "localhost", "::1"):
+            ap.exit(2, "--runner refusé : --host doit être la boucle locale (127.0.0.1, localhost ou ::1).\n")
+        if os.name == "nt":
+            ap.exit(2, "--runner refusé : non pris en charge sous Windows.\n")
 
     args.repo = os.path.abspath(os.path.expanduser(args.repo)) if args.repo else detect_repo(HERE)
     if args.repo:  # racine réelle du dépôt (et non un sous-dossier)
@@ -1661,6 +1722,7 @@ def main():
     if not args.github and not args.no_github:
         args.github = detect_github(args.repo)
     hub = Hub(args)
+    hub.token = secrets.token_urlsafe(32)  # en mémoire seulement
 
     if args.once:
         hub.git.refresh()
@@ -1678,6 +1740,7 @@ def main():
     srv.daemon_threads = True
     url = f"http://{'127.0.0.1' if local else args.host}:{args.port}/"
     print(f"STT · agents — {url}")
+    print(f"  jeton   : {hub.token}  (en mémoire, injecté dans les pages servies)", flush=True)
     print(f"  dépôt   : {args.repo or '?'}")
     print(f"  sessions: {hub.claude.projects}  (préfixe {hub.claude.status['slug']}{'' if args.strict else ', et tout dossier contenant « ' + str(hub.claude.base) + ' »'})")
     print(f"  GitHub  : {args.github or 'désactivé'}{' (jeton)' if hub.gh.token else ''}")

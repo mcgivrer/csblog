@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="stt-token" content="">
 <script>/* Thème posé AVANT le premier rendu (pas de flash) : « dark » par défaut, sinon la préférence enregistrée. */
 (function(){var t='dark';try{var v=localStorage.getItem('kanbanTheme');if(v==='light'||v==='dark')t=v}catch(e){}document.documentElement.setAttribute('data-theme',t)})();</script>
 <script>(function(){var m=/[?&]embed=(\w+)/.exec(location.search);if(m)document.documentElement.classList.add('embed','embed-'+(m[1]==='kpis'?'kpis':'board'))})();</script>
@@ -344,6 +345,12 @@ html.embed-kpis .kpi{padding:4px 8px 5px;gap:2px}
 html.embed-kpis .kpi .kc{display:none}
 html.embed-kpis .tm{height:54px!important;min-height:0}
 html.embed-board #kpis{display:none}
+html.embed-board .site-header{display:none}
+html.embed-board #topbar>.meta{margin-left:auto;order:9;font-size:11px;white-space:nowrap}
+/* Barre haute : onglets de vue + filtres, fixée sous l'en-tête de la page */
+.topbar{position:sticky;top:0;z-index:40;display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;background:var(--bg);padding:6px 0 8px;margin:0 0 6px;border-bottom:1px solid var(--line)}
+.topbar .tabs{margin:0}
+.topbar .filters{margin:0;flex:1 1 auto}
 </style>
 </head>
 <body data-view="board">
@@ -361,10 +368,29 @@ html.embed-board #kpis{display:none}
 
   <section class="kpis" id="kpis" aria-label="Indicateurs"></section>
 
+  <div class="topbar" id="topbar">
   <nav class="tabs" role="tablist" aria-label="Vues">
     <button role="tab" data-tab="board" aria-pressed="true" aria-selected="true">Tableau</button>
     <button role="tab" data-tab="ind" aria-pressed="false" aria-selected="false">Indicateurs</button>
   </nav>
+    <div class="filters" id="filters">
+      <span class="small mono">Agent :</span>
+      <button data-agent="all" aria-pressed="true">Tous</button>
+      <button data-agent="cp" aria-pressed="false">CP</button>
+      <button data-agent="archi" aria-pressed="false">ARCHI</button>
+      <button data-agent="dev" aria-pressed="false">DEV</button>
+      <button data-agent="dev1" aria-pressed="false" hidden>DEV 1</button>
+      <button data-agent="dev2" aria-pressed="false" hidden>DEV 2</button>
+      <button data-agent="dev3" aria-pressed="false" hidden>DEV 3</button>
+      <button data-agent="revue" aria-pressed="false">REVUE</button>
+      <button data-agent="autre" aria-pressed="false" hidden>Autre</button>
+      <label><input type="checkbox" id="auto" checked> actualiser toutes les 30 s</label>
+      <button id="docsToggle" aria-pressed="true">Docs</button>
+      <button id="foldAll" title="Tout déplier / tout replier toutes les tâches (toutes colonnes)">Tout replier</button>
+      <button id="reload" type="button"><span>Actualiser</span><i class="pg" aria-hidden="true"></i></button>
+    </div>
+  </div>
+  <script>if(document.documentElement.classList.contains('embed-board')){var m=document.getElementById('meta');if(m)document.getElementById('topbar').appendChild(m)}</script>
 
   <section class="v-ind" aria-labelledby="h-bd">
     <h2 id="h-bd"><span class="n">01</span>Burndown des tâches</h2>
@@ -398,22 +424,6 @@ html.embed-board #kpis{display:none}
 
   <section class="v-board" aria-labelledby="h-board">
     <h2 id="h-board"><span class="n">02</span>Tâches</h2>
-    <div class="filters" id="filters">
-      <span class="small mono">Agent :</span>
-      <button data-agent="all" aria-pressed="true">Tous</button>
-      <button data-agent="cp" aria-pressed="false">CP</button>
-      <button data-agent="archi" aria-pressed="false">ARCHI</button>
-      <button data-agent="dev" aria-pressed="false">DEV</button>
-      <button data-agent="dev1" aria-pressed="false" hidden>DEV 1</button>
-      <button data-agent="dev2" aria-pressed="false" hidden>DEV 2</button>
-      <button data-agent="dev3" aria-pressed="false" hidden>DEV 3</button>
-      <button data-agent="revue" aria-pressed="false">REVUE</button>
-      <button data-agent="autre" aria-pressed="false" hidden>Autre</button>
-      <label><input type="checkbox" id="auto" checked> actualiser toutes les 30 s</label>
-      <button id="docsToggle" aria-pressed="true">Docs</button>
-      <button id="foldAll" title="Tout déplier / tout replier toutes les tâches (toutes colonnes)">Tout replier</button>
-      <button id="reload" type="button"><span>Actualiser</span><i class="pg" aria-hidden="true"></i></button>
-    </div>
     <div class="board" id="board" style="margin-top:14px"></div>
   </section>
 
