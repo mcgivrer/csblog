@@ -77,7 +77,7 @@ class UiNotices(unittest.TestCase):
         page = ctx.new_page()
         self.errors = []
         page.on('pageerror', lambda e: self.errors.append(str(e)))
-        page.goto(self.url + '/' + qs)
+        page.goto(self.url + '/' + qs + '#agents')
         page.wait_for_function("/direct|live/i.test(document.querySelector('#srcLine').textContent + document.querySelector('#conn').textContent)", timeout=10000)
         page.wait_for_timeout(300)
         return page

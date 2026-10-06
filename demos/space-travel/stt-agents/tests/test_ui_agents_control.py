@@ -68,7 +68,7 @@ class UiAgentsControl(unittest.TestCase):
         srv = srv or self.srv
         if block_cdn:
             self.page.route(CDN, lambda r: r.abort())
-        self.page.goto(f'http://127.0.0.1:{srv.port}/?{query}')
+        self.page.goto(f'http://127.0.0.1:{srv.port}/?{query}#agents')
         self.page.wait_for_selector('#conn.live' if live else '#agentGrid > *')
 
     def start(self, prompt='SLEEP 0'):
