@@ -1345,6 +1345,16 @@ def _apply_op(lines, op, now, log):
         _with_comma(lines, last)
         lines.insert(last + 1, _render_row(task) + ("," if last + 1 < b else ""))
         log.append({"op": "task_add", "id": task["id"]})
+    elif kind == "lot_add":
+        lot = op.get("lot") or {}
+        if not lot.get("id") or not lot.get("title"):
+            raise KanbanError("lot_add : id et title obligatoires")
+        a, b = _section(lines, "lots")
+        if any(lines[i].lstrip().startswith("{") and _row_get(lines[i], "id") == lot["id"] for i in range(a, b)):
+            raise KanbanError(f"lot_add : « {lot['id']} » existe déjà")
+        _with_comma(lines, b - 1)
+        lines.insert(b, _render_row(lot))
+        log.append({"op": "lot_add", "id": lot["id"]})
     elif kind == "decision":
         a, b = _section(lines, "decisions")
         n = op.get("n")
