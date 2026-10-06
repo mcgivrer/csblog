@@ -18,11 +18,12 @@ Le moteur allégé est le module partagé [`../shared/cosmos.js`](../shared/cosm
 | P5 | finition et publication : version compacte, page d'entrée et aperçu de partage, repli sans WebGL, écran noir | ✅ (en ligne après fusion) |
 | P6 | présentation du jeu : 21 slides (but, univers, métier, campagne, moteur), illustrations, schémas, vue présentateur | ✅ |
 | P7 | ambiances de l'image de fond, une par slide : Nolan IMAX, Nolan 35 mm, noir & blanc, sépia, Technicolor, Super 8, CRT, VHS, vision nocturne | ✅ |
+| P8 | three.js r186 (dernière version) pour la présentation, aspect de r128 conservé ; le jeu garde r128 | ✅ |
 
 Spécifications : [`docs/SPEC-P1-cosmos.md`](docs/SPEC-P1-cosmos.md), [`docs/SPEC-P2-realisateur.md`](docs/SPEC-P2-realisateur.md),
 [`docs/SPEC-P3-photo.md`](docs/SPEC-P3-photo.md), [`docs/SPEC-P4-lecteur.md`](docs/SPEC-P4-lecteur.md),
 [`docs/SPEC-P5-publication.md`](docs/SPEC-P5-publication.md), [`docs/SPEC-P6-presentation_du_jeu.md`](docs/SPEC-P6-presentation_du_jeu.md),
-[`docs/SPEC-P7-ambiances.md`](docs/SPEC-P7-ambiances.md).
+[`docs/SPEC-P7-ambiances.md`](docs/SPEC-P7-ambiances.md), [`docs/SPEC-P8-three.md`](docs/SPEC-P8-three.md).
 Contenu des slides (texte, illustrations, notes de l'orateur) : [`docs/BROUILLON-slides-jeu.md`](docs/BROUILLON-slides-jeu.md).
 
 ## Construire et tester
@@ -36,7 +37,9 @@ python3 build/build.py test       # Playwright + Chromium ; parité avec ../sour
 python3 build/build.py apercu     # -> media/apercu.jpg, aperçu de partage 1200 × 630
 ```
 
-Seul Python 3 est nécessaire pour compiler (three r128 est lu dans `../sources/src/JS/vendor/`). Les captures du test
+Seul Python 3 est nécessaire pour compiler : three.js r186 est embarqué depuis `vendor/three.min.js`, un sous-ensemble
+(les symboles utilisés) produit par `python3 build/three_vendor.py [version]` (npm et réseau requis) ; la compilation
+vérifie que chaque `THREE.X` utilisé y figure. Le jeu et la démo « Observation des étoiles » gardent three r128. Les captures du test
 vont dans `dist/shots/` (non suivi).
 
 ## Visionneuse de test

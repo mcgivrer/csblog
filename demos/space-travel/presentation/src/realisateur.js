@@ -312,7 +312,7 @@ RZ.create = function(W, camera, opts){
     }
     applyCamera(k);
     const s2 = S.shot, near = s2.near ? s2.near(k) : null, far = s2.focus(k);
-    fill.intensity = s2.moon ? FILL : 0;
+    fill.intensity = s2.moon ? FILL*(W.lightK || 1) : 0;
     if(s2.moon){ const M = wpos(s2.moon); fill.position.copy(M).normalize().addScaledVector(W.leg.orbitN, .45); fill.target.position.set(0, 0, 0); fill.target.updateMatrixWorld(); }
     let focus = far, rack = 0;
     if(near !== null && s2.rack){ rack = smoother((k - s2.rack[0])/(s2.rack[1] - s2.rack[0])); focus = Math.exp(lerp(Math.log(Math.max(near, 1)), Math.log(Math.max(far, 1)), rack)); }

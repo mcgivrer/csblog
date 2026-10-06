@@ -244,12 +244,11 @@ PHO.create = function(renderer, opts){
   function alloc(w, h){
     Object.keys(T).forEach(k => { if(!TA[k]) T[k].dispose(); });
     const h2 = [w >> 1, h >> 1], h4 = [w >> 2, h >> 2], h8 = [w >> 3, h >> 3], h16 = [w >> 4, h >> 4], h32 = [w >> 5, h >> 5];
-    msaaOn = !!(gl2 && THREE.WebGLMultisampleRenderTarget && PH.quality.msaa);
+    msaaOn = !!(gl2 && PH.quality.msaa);
     /* profondeur 24 bits (DEPTH24_STENCIL8) : avec la profondeur 16 bits par défaut de three r128, un astre au fond d'une
        tranche (près de son plan lointain) se battait avec sa couronne et son halo (liseré qui scintillait au limbe) */
-    if(msaaOn){ T.scene = new THREE.WebGLMultisampleRenderTarget(w, h, { format: THREE.RGBAFormat, depthBuffer: true, stencilBuffer: true }); T.scene.samples = 4; }
-    else T.scene = mk(w, h, { depthBuffer: true, stencilBuffer: true });
-    T.scene.texture.encoding = THREE.sRGBEncoding;        /* matériaux de three : ACES + sRGB, comme à l'écran */
+    T.scene = mk(w, h, msaaOn ? { depthBuffer: true, stencilBuffer: true, samples: 4 } : { depthBuffer: true, stencilBuffer: true });   /* MSAA × 4 (three r186 : option samples) */
+    /* matériaux de three : ACES + sRGB, comme à l'écran (three-compat.js) */
     T.coc = mk(...h2); T.prep = mk(...h2); T.dofA = mk(...h2); T.tmp2 = mk(...h2);
     T.dofB = mk(...h4); T.tmp4 = mk(...h4); T.cf = mk(...h4);
     T.bright = mk(...h2); T.b1 = mk(...h4); T.b2 = mk(...h8); T.b3 = mk(...h16); T.b4 = mk(...h32);
@@ -364,7 +363,7 @@ PHO.create = function(renderer, opts){
     PH.passes = 0;
     renderer.getDrawingBufferSize(_buf);
     const w = _buf.x | 0, h = _buf.y | 0;
-    if(w !== size.w || h !== size.h || msaaOn !== !!(gl2 && THREE.WebGLMultisampleRenderTarget && PH.quality.msaa)) alloc(w, h);
+    if(w !== size.w || h !== size.h || msaaOn !== !!(gl2 && PH.quality.msaa)) alloc(w, h);
     PH.aspect = w/h;
     meta = meta || DEF_META;
     const st = PH.update(meta, dt), L = st.look;

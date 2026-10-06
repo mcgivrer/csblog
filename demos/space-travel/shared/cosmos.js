@@ -398,8 +398,10 @@ CO.create = function(opts){
   /* ---------- couche système (mètres, étoile hôte à l'origine) ---------- */
   const sysScene = new THREE.Scene();
   const sysWorld = new THREE.Group(); sysWorld.name = 'sysWorld'; sysScene.add(sysWorld);
-  sysScene.add(new THREE.AmbientLight(0x141c2e, 0.55));
-  const sunLight = new THREE.DirectionalLight(0xdfe8ff, 1.65); sysScene.add(sunLight); sysScene.add(sunLight.target);
+  /* three ≥ r155 : plus de mode d'éclairage « historique » (éclairement × π) ; W.lightK le rétablit (voir three-compat.js) */
+  const LK = W.lightK = (window.__THREE_COMPAT && window.__THREE_COMPAT.lightK) || 1;
+  sysScene.add(new THREE.AmbientLight(0x141c2e, 0.55*LK));
+  const sunLight = new THREE.DirectionalLight(0xdfe8ff, 1.65*LK); sysScene.add(sunLight); sysScene.add(sunLight.target);
   const rcam = new THREE.PerspectiveCamera();
   W.sysScene = sysScene; W.sysWorld = sysWorld; W.sunLight = sunLight;
   const SLB = [.2, 400, 8e5, 1.6e9, 3.2e12, 6.4e15, 1.3e19], SLS = [1, 1, 800, 1.6e6, 3.2e9, 6.4e12];

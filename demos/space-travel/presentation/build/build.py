@@ -3,13 +3,14 @@
 Voyage Spatial — présentation à fond cinématique : assemblage des pages.
 
   python3 build/build.py            compile, version compacte, puis test
-  python3 build/build.py compile    src/ + modules partagés + three r128 -> dist/*.html (lisibles)
+  python3 build/build.py compile    src/ + modules partagés + three r186 -> dist/*.html (lisibles)
   python3 build/build.py package    dist/presentation.min.html (minifieur du jeu : node + terser, npm install dans sources/)
   python3 build/build.py test       tests de tests/ sur les pages de dist/ (Playwright + Chromium)
   python3 build/build.py apercu     media/apercu.jpg : aperçu de partage 1200 × 630 (slide de titre)
 
-Chaque page est un gabarit de src/html/ où « /*@VENDOR@*/ » reçoit three r128 (lu dans le jeu,
-sources/src/JS/vendor/) et « /*@JS@*/ » la concaténation des modules listés ci-dessous, dans cet ordre :
+Chaque page est un gabarit de src/html/ où « /*@VENDOR@*/ » reçoit three r186 (vendor/three.min.js, sous-ensemble
+produit par build/three_vendor.py ; le jeu garde r128) et « /*@JS@*/ » la concaténation des modules listés ci-dessous,
+dans cet ordre (three-compat.js en premier : aspect de r128, voir docs/SPEC-P8-three.md) :
 ce sont des scripts classiques qui partagent la portée globale. Une entrée « shared/x.js » est lue
 dans ../shared/ (source unique, commune au jeu et à la démo « Observation des étoiles »).
 """
@@ -18,24 +19,24 @@ import base64, os, re, shutil, subprocess, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC, DIST = os.path.join(ROOT, 'src'), os.path.join(ROOT, 'dist')
 SHARED = os.path.join(ROOT, '..', 'shared')
-VENDOR = os.path.join(ROOT, '..', 'sources', 'src', 'JS', 'vendor', 'three.r128.min.js')
+VENDOR = os.path.join(ROOT, 'vendor', 'three.min.js')
 
 # page produite -> (gabarit, modules)
 PAGES = {
     'cosmos-test.html': ('cosmos-test.template.html', [
-        'shared/planets.js', 'shared/asteroids.js', 'shared/stars.js', 'shared/cosmos.js',
+        'three-compat.js', 'shared/planets.js', 'shared/asteroids.js', 'shared/stars.js', 'shared/cosmos.js',
         'cosmos-test.js',
     ]),
     'realisateur-test.html': ('realisateur-test.template.html', [
-        'shared/planets.js', 'shared/asteroids.js', 'shared/stars.js', 'shared/cosmos.js',
+        'three-compat.js', 'shared/planets.js', 'shared/asteroids.js', 'shared/stars.js', 'shared/cosmos.js',
         'realisateur.js', 'realisateur-test.js',
     ]),
     'photo-test.html': ('photo-test.template.html', [
-        'shared/planets.js', 'shared/asteroids.js', 'shared/stars.js', 'shared/cosmos.js',
+        'three-compat.js', 'shared/planets.js', 'shared/asteroids.js', 'shared/stars.js', 'shared/cosmos.js',
         'realisateur.js', 'photo.js', 'photo-test.js',
     ]),
     'presentation.html': ('presentation.template.html', [
-        'shared/planets.js', 'shared/asteroids.js', 'shared/stars.js', 'shared/cosmos.js',
+        'three-compat.js', 'shared/planets.js', 'shared/asteroids.js', 'shared/stars.js', 'shared/cosmos.js',
         'realisateur.js', 'photo.js', 'qualite.js', 'clip.js', 'lecteur.js',
     ]),
 }
@@ -57,6 +58,16 @@ def module(name):
     return f'/* ===== {name} ===== */\n' + read(path)
 
 
+def three_symbols(vendor, js, page):
+    """chaque THREE.X utilisé doit figurer dans le sous-ensemble embarqué (sinon : relancer build/three_vendor.py)"""
+    m = re.search(r'symboles : ([A-Za-z0-9_,]+)', vendor[:4000])
+    if not m: return
+    have = set(m.group(1).split(','))
+    used = set(re.findall(r'\bTHREE\.([A-Za-z_][A-Za-z0-9_]*)', re.sub(r'/\*.*?\*/', '', js, flags=re.S)))
+    if used - have:
+        sys.exit(f'  {page} : THREE.{", THREE.".join(sorted(used - have))} absent(s) de vendor/three.min.js — python3 build/three_vendor.py')
+
+
 def compile_pages():
     os.makedirs(DIST, exist_ok=True)
     vendor = read(VENDOR)
@@ -67,6 +78,7 @@ def compile_pages():
                 sys.exit(f'  {tpl} : marqueur {marker} absent ou répété')
         html = inline_images(html, tpl)
         js = '\n'.join(module(m) for m in mods)
+        three_symbols(vendor, js, out)
         html = html.replace('/*@VENDOR@*/', escape_script(vendor)).replace('/*@JS@*/', escape_script(js))
         with open(os.path.join(DIST, out), 'w', encoding='utf-8') as f:
             f.write(html)

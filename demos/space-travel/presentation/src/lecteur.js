@@ -33,7 +33,7 @@ let renderer, camera, W, D, PH, Q, CL, GL = true;
 try{
   if(P.get('webgl') === '0') throw new Error('désactivé (?webgl=0)');
   renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
-  renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
+  renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
   camera = new THREE.PerspectiveCamera(40, window.innerWidth/window.innerHeight, 1, 1e20);
   W = __COSMOS.create({ seed: SEED, starDensity: P.get('density') ? +P.get('density') : 1 });
   D = __REALISATEUR.create(W, camera, { seed: RZ, systems: +(deck.dataset.systemes || 6) });
