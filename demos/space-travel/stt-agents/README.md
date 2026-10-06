@@ -158,11 +158,11 @@ Les agents lancés par le serveur affichent un badge « lancé par le serveur »
 - **Killer** : SIGKILL immédiat (confirmation requise)
 - **Relancer** : re-queue depuis *stopped*, *killed* ou *failed*
 
-La section « **File du lanceur** » affiche les runs *queued* et ceux *starting* non encore dans les sous-agents. Les sessions créées par l'outil Agent de la session CP sont marquées « observé · non pilotable » si elles ne sont pas lancées par le serveur.
+La section « **File du lanceur** » affiche les runs en attente (*queued*) ou en démarrage (*starting*), et les runs vivants qui n'ont pas (encore) de carte, avec leurs contrôles. Les sessions et agents créés par l'outil Agent de la session CP sont marqués « observé · non pilotable ».
 
 ### Permissions
 
-Mode par défaut : **acceptEdits** (décision 33). Modes disponibles : `plan`, `manual`. Les modes `bypassPermissions`, `auto`, `dontAsk` sont refusés par le serveur (validation dans le terminal à la reprise).
+Modes **acceptés** (`ALLOWED_PERMS` dans `stt_runner.py`) : `acceptEdits` (**défaut**, décision 33), `plan` et `manual`. Modes **refusés** par le serveur (`FORBIDDEN_PERMS`) : `bypassPermissions`, `auto` et `dontAsk`. Avec `acceptEdits`, les commandes shell demandent ta validation dans le terminal de l'onglet Agents.
 
 ### Sécurité et limites
 
