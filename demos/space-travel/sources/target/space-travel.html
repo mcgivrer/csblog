@@ -9871,7 +9871,7 @@ let apEl = null, apShown = '', apFlash = null, apFlashT = 0;
 function apNote(kind){ apFlash = kind; apFlashT = performance.now() + 2600; }
 function apHud(){
   if(!apEl){ apEl = document.createElement('div'); apEl.id = 'apHud'; apEl.className = 'mono';
-    apEl.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);top:40px;z-index:6;display:none;font-size:11px;letter-spacing:.06em;padding:3px 12px;border:1px solid #25375c;background:rgba(15,26,48,.88);color:#e8edf5;pointer-events:none;text-align:center;white-space:nowrap';
+    apEl.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);top:40px;z-index:5;display:none;font-size:11px;letter-spacing:.06em;padding:3px 12px;border:1px solid #25375c;background:rgba(15,26,48,.88);color:#e8edf5;pointer-events:none;text-align:center;white-space:nowrap';
     document.body.appendChild(apEl); }
   const T = apTx(), ph = R.phase, M = R.mission; let html = '', col = '#5eead4';
   if(!M || jumpState || ph === 'WARP' || ph === 'WARPOUT' || ph === 'HOP' || ph === 'JUMP' || ph === 'IDLE'){ html = ''; }
