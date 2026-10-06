@@ -83,6 +83,30 @@ const M = (m) => (m instanceof Float64Array ? m : Float64Array.from(m));
 
 const PORT_PREF = ['AFT', 'PORT', 'STBD', 'TOP', 'BOT', 'FWD', 'DORSAL', 'SHUTTLE', 'PAD'];
 
+/* ---------- fiche de jeu : tables et règles pures (libellés fr par défaut ; l'appelant traduit via les codes) ---------- */
+const FAMILIES = { fret: 'Fret', passagers: 'Passagers', vrac: 'Vrac', independant: 'Indépendant', pousseur: 'Pousseur' };
+const ARCH_AUTO = { fret: 'Cargo modulaire', passagers: 'Paquebot modulaire', vrac: 'Citernier modulaire', independant: 'Indépendant modulaire', pousseur: 'Pousseur modulaire' };
+const CREW = { I: 2, II: 4, III: 6, IV: 10 };
+function autoGame(st) {
+  const tier = st.mass < 800 ? 'I' : st.mass < 1300 ? 'II' : st.mass < 2000 ? 'III' : 'IV';
+  const family = st.containers >= 4 ? 'fret' : st.passengers >= 48 ? 'passagers' : st.tank_m3 >= 1680 ? 'vrac' : st.parts <= 4 ? 'pousseur' : 'independant';
+  return { tier, family, ftl: tier === 'III' || tier === 'IV', crew: CREW[tier] };
+}
+function cleanGame(g, c) {
+  const o = {};
+  if (!g || typeof g !== 'object') return o;
+  if (FAMILIES[g.family]) o.family = g.family;
+  if (['I', 'II', 'III', 'IV'].includes(g.tier)) o.tier = g.tier;
+  if (typeof g.ftl === 'boolean') o.ftl = g.ftl;
+  if (+g.crew >= 1) o.crew = Math.min(60, Math.round(+g.crew));
+  if (g.arch && String(g.arch).trim()) o.arch = String(g.arch).trim().slice(0, 40);
+  if (g.description && String(g.description).trim()) o.description = String(g.description).trim().slice(0, 400);
+  const ports = new Set((c && c.docking_ports) || []);
+  const b = Array.isArray(g.berths) ? g.berths.filter((x) => x && ports.has(x.port) && ['S', 'M', 'L'].includes(x.cls)).map((x) => ({ port: x.port, cls: x.cls })) : [];
+  if (b.length) o.berths = b;
+  return o;
+}
+
 /* ---------- noyau lié à un environnement ---------- */
 function create(env) {
   env = env || {};
@@ -254,12 +278,149 @@ function create(env) {
   };
 
   /* ===== CONTRÔLES (L2a.4) ===== */
+  /* boîtes = [minx,miny,minz,maxx,maxy,maxz] relatives à STT_<KEY>_ROOT (geom.modules[k].hull / .full, geom.container.hull) */
+  const ZB = [0, 0, 0, 0, 0, 0];
+  const hullBox = (key) => key === '__CONTAINER__' ? ((geom.container && geom.container.hull) || ZB) : ((gm(key) && gm(key).hull) || ZB);
+  const fullBox = (key) => (gm(key) && (gm(key).full || gm(key).hull)) || ZB;   // statique + pièces animées (pose du fichier)
+  function obb(Mx, box, shrink) {
+    shrink = shrink || 0;
+    const u = [m4.col(Mx, 0), m4.col(Mx, 1), m4.col(Mx, 2)], sc = u.map(v3.len), un = u.map(v3.norm);
+    const s = [box[3] - box[0], box[4] - box[1], box[5] - box[2]];
+    const c = m4.point(Mx, [(box[0] + box[3]) / 2, (box[1] + box[4]) / 2, (box[2] + box[5]) / 2]);
+    return { c, u: un, e: [0, 1, 2].map((i) => Math.max(0.05, s[i] / 2 * sc[i] - shrink)) };
+  }
+  function obbCorners(o, out) {
+    for (let i = 0; i < 8; i++) {
+      out.push(v3.add(v3.add(v3.add(o.c, v3.scale(o.u[0], (i & 1 ? 1 : -1) * o.e[0])), v3.scale(o.u[1], (i & 2 ? 1 : -1) * o.e[1])), v3.scale(o.u[2], (i & 4 ? 1 : -1) * o.e[2])));
+    }
+    return out;
+  }
+  function obbOverlap(A, B) {   // séparation d'axes (Ericson, RTCD 4.4)
+    const R = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], AR = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) { R[i][j] = v3.dot(A.u[i], B.u[j]); AR[i][j] = Math.abs(R[i][j]) + 1e-6; }
+    const tv = v3.sub(B.c, A.c), t = [v3.dot(tv, A.u[0]), v3.dot(tv, A.u[1]), v3.dot(tv, A.u[2])];
+    const a = A.e, b = B.e; let ra, rb;
+    for (let i = 0; i < 3; i++) { ra = a[i]; rb = b[0] * AR[i][0] + b[1] * AR[i][1] + b[2] * AR[i][2]; if (Math.abs(t[i]) > ra + rb) return false; }
+    for (let j = 0; j < 3; j++) { ra = a[0] * AR[0][j] + a[1] * AR[1][j] + a[2] * AR[2][j]; rb = b[j]; if (Math.abs(t[0] * R[0][j] + t[1] * R[1][j] + t[2] * R[2][j]) > ra + rb) return false; }
+    ra = a[1] * AR[2][0] + a[2] * AR[1][0]; rb = b[1] * AR[0][2] + b[2] * AR[0][1]; if (Math.abs(t[2] * R[1][0] - t[1] * R[2][0]) > ra + rb) return false;
+    ra = a[1] * AR[2][1] + a[2] * AR[1][1]; rb = b[0] * AR[0][2] + b[2] * AR[0][0]; if (Math.abs(t[2] * R[1][1] - t[1] * R[2][1]) > ra + rb) return false;
+    ra = a[1] * AR[2][2] + a[2] * AR[1][2]; rb = b[0] * AR[0][1] + b[1] * AR[0][0]; if (Math.abs(t[2] * R[1][2] - t[1] * R[2][2]) > ra + rb) return false;
+    ra = a[0] * AR[2][0] + a[2] * AR[0][0]; rb = b[1] * AR[1][2] + b[2] * AR[1][1]; if (Math.abs(t[0] * R[2][0] - t[2] * R[0][0]) > ra + rb) return false;
+    ra = a[0] * AR[2][1] + a[2] * AR[0][1]; rb = b[0] * AR[1][2] + b[2] * AR[1][0]; if (Math.abs(t[0] * R[2][1] - t[2] * R[0][1]) > ra + rb) return false;
+    ra = a[0] * AR[2][2] + a[2] * AR[0][2]; rb = b[0] * AR[1][1] + b[1] * AR[1][0]; if (Math.abs(t[0] * R[2][2] - t[2] * R[0][2]) > ra + rb) return false;
+    ra = a[0] * AR[1][0] + a[1] * AR[0][0]; rb = b[1] * AR[2][2] + b[2] * AR[2][1]; if (Math.abs(t[1] * R[0][0] - t[0] * R[1][0]) > ra + rb) return false;
+    ra = a[0] * AR[1][1] + a[1] * AR[0][1]; rb = b[0] * AR[2][2] + b[2] * AR[2][0]; if (Math.abs(t[1] * R[0][1] - t[0] * R[1][1]) > ra + rb) return false;
+    ra = a[0] * AR[1][2] + a[1] * AR[0][2]; rb = b[0] * AR[2][1] + b[2] * AR[2][0]; if (Math.abs(t[1] * R[0][2] - t[0] * R[1][2]) > ra + rb) return false;
+    return true;
+  }
+  function rayOBB(o, d, b) {
+    let tmin = -Infinity, tmax = Infinity; const p = v3.sub(b.c, o);
+    for (let i = 0; i < 3; i++) {
+      const e = v3.dot(b.u[i], p), f = v3.dot(b.u[i], d);
+      if (Math.abs(f) > 1e-9) {
+        let t1 = (e + b.e[i]) / f, t2 = (e - b.e[i]) / f; if (t1 > t2) { const s = t1; t1 = t2; t2 = s; }
+        tmin = Math.max(tmin, t1); tmax = Math.min(tmax, t2); if (tmin > tmax || tmax < 0) return null;
+      } else if (-e - b.e[i] > 0 || -e + b.e[i] < 0) return null;
+    }
+    return tmin > 0 ? tmin : tmax;
+  }
+  const anyOverlap = (la, lb) => la.some((a) => lb.some((b) => obbOverlap(a, b)));
+  function partOBBs(c, p, Mx) {
+    const list = [obb(Mx, hullBox(p.key), 0.35)];
+    if (p.containers) containerMats(p.key).forEach((cm, i) => { if (p.containers[i]) list.push(obb(m4.mul(Mx, cm.M), hullBox('__CONTAINER__'), 0.2)); });
+    return list;
+  }
+  function analyze(c, W) {
+    W = W || world(c);
+    const issues = [], obbs = new Map(), colliding = new Set(), pairs = [], corners = [];
+    let mass = 0, nCont = 0, pax = 0, tank = 0, com = [0, 0, 0];
+    for (const [id, Mx] of W) {
+      const p = part(c, id), list = partOBBs(c, p, Mx);
+      obbs.set(id, list);
+      const m = massOf(p.key); mass += m; com = v3.add(com, v3.scale(list[0].c, m));
+      for (let i = 1; i < list.length; i++) { nCont++; mass += 6.5; com = v3.add(com, v3.scale(list[i].c, 6.5)); }
+      if (p.key === 'PAX') pax += 48; if (p.key === 'SHUTTLE') pax += 8; if (p.key === 'TANK') tank += 840;
+      obbCorners(obb(Mx, fullBox(p.key)), corners);
+      for (let i = 1; i < list.length; i++) obbCorners(list[i], corners);
+    }
+    if (mass) com = v3.scale(com, 1 / mass);
+    let aabb = [0, 0, 0, 0, 0, 0];
+    if (corners.length) {
+      aabb = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
+      for (const q of corners) for (let i = 0; i < 3; i++) { aabb[i] = Math.min(aabb[i], q[i]); aabb[i + 3] = Math.max(aabb[i + 3], q[i]); }
+    }
+    const ids = [...W.keys()];
+    for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
+      const a = part(c, ids[i]), b = part(c, ids[j]);
+      if (a.parent === b.id || b.parent === a.id) continue;
+      if (anyOverlap(obbs.get(a.id), obbs.get(b.id))) { pairs.push([a.id, b.id]); colliding.add(a.id); colliding.add(b.id); }
+    }
+    const of = (k) => c.parts.filter((p) => p.key === k);
+    let axis = [0, 0, 1];
+    const props = of('PROP');
+    if (props.length && W.has(props[0].id)) axis = v3.norm(m4.col(W.get(props[0].id), 2));
+    else if (c.parts.length) axis = v3.norm(m4.col(W.get(ordered(c)[0].id), 2));
+    let lo = Infinity, hi = -Infinity; for (const q of corners) { const d = v3.dot(q, axis); lo = Math.min(lo, d); hi = Math.max(hi, d); }
+    const length = corners.length ? hi - lo : 0;
+    const stats = { parts: c.parts.length, mass: Math.round(mass), containers: nCont, passengers: pax, tank_m3: tank, length_m: +length.toFixed(1),
+      size_m: corners.length ? [0, 1, 2].map((i) => +(aabb[i + 3] - aabb[i]).toFixed(1)) : [0, 0, 0] };
+    const res = { issues, obbs, colliding, pairs, aabb, stats, com };
+
+    if (!c.parts.length) { issues.push({ sev: 'info', code: 'empty', args: {}, ids: [] }); return res; }
+    if (c.type === 'station') {
+      for (const p of props) issues.push({ sev: 'err', code: 'station_prop', args: { id: p.id }, ids: [p.id] });
+    } else {
+      if (!props.length) issues.push({ sev: 'warn', code: 'no_prop', args: {}, ids: [] });
+      if (props.length > 1) issues.push({ sev: 'warn', code: 'multi_prop', args: { n: props.length }, ids: props.map((p) => p.id) });
+      if (!of('CMD').length) issues.push({ sev: 'warn', code: 'no_cmd', args: {}, ids: [] });
+      const pg = gm('PROP'), exRel = pg && pg.exhaust ? M(pg.exhaust) : m4.translation(0, 0, -lenOf('PROP'));
+      for (const p of props) {
+        const Wp = W.get(p.id); if (!Wp) continue;
+        const fwd = v3.norm(m4.col(Wp, 2)), o = m4.pos(m4.mul(Wp, exRel)), back = v3.scale(fwd, -1);
+        let hit = null;
+        for (const [id, list] of obbs) { if (id === p.id) continue; for (const b of list) { const t = rayOBB(o, back, b); if (t !== null && t > 0.2 && t < 400) { hit = id; break; } } if (hit) break; }
+        if (hit) issues.push({ sev: 'err', code: 'jet_hit', args: { id: p.id, hit }, ids: [p.id, hit] });
+        const off = v3.len(v3.cross(v3.sub(com, m4.pos(Wp)), fwd));
+        if (off > 2.5) issues.push({ sev: 'warn', code: 'thrust_offset', args: { id: p.id, off: +off.toFixed(1) }, ids: [p.id] });
+      }
+    }
+    if (!of('PWR').length) issues.push({ sev: 'warn', code: 'no_pwr', args: {}, ids: [] });
+    pairs.slice(0, 8).forEach(([a, b]) => issues.push({ sev: 'warn', code: 'overlap', args: { a, b }, ids: [a, b] }));
+    if (pairs.length > 8) issues.push({ sev: 'warn', code: 'overlap_more', args: { n: pairs.length - 8 }, ids: [] });
+    if (c.type === 'station' && !c.docking_ports.length) issues.push({ sev: 'info', code: 'no_dock', args: {}, ids: [] });
+    if (!issues.some((i) => i.sev === 'err' || i.sev === 'warn')) issues.unshift({ sev: 'ok', code: c.type === 'ship' ? 'valid_ship' : 'valid_station', args: {}, ids: [] });
+    return res;
+  }
+
+  /* --- fiche de jeu --- */
+  function resolvedGame(c, stats) {
+    const a = autoGame(stats), g = cleanGame(c.game, c);
+    if (c.type === 'station') {
+      const cls = Object.fromEntries((g.berths || []).map((b) => [b.port, b.cls]));
+      return { version: 1, class: 'station', description: g.description || '', berths: c.docking_ports.map((port) => ({ port, cls: cls[port] || 'M' })) };
+    }
+    const family = g.family || a.family, tier = g.tier || a.tier;
+    return { version: 1, class: 'ship', family, tier, ftl: g.ftl ?? (tier === 'III' || tier === 'IV'), crew: g.crew || CREW[tier], arch: g.arch || ARCH_AUTO[family], description: g.description || '' };
+  }
+  /* utilise core.toExport (L2a.5) ; erreurs en codes : empty | has_errors (+ issue) | no_prop | no_export */
+  function gameExport(c, analysis) {
+    const errs = analysis.issues.filter((i) => i.sev === 'err');
+    if (!c.parts.length) return { error: 'empty' };
+    if (errs.length) return { error: 'has_errors', issue: errs[0] };
+    if (c.type === 'ship' && !c.parts.some((p) => p.key === 'PROP')) return { error: 'no_prop' };
+    if (!core.toExport) return { error: 'no_export' };
+    const o = core.toExport(c);
+    o.game = resolvedGame(c, analysis.stats);
+    o.stats = analysis.stats;
+    return { data: o, warn: analysis.issues.filter((i) => i.sev === 'warn').length };
+  }
+  Object.assign(core, { hullBox, fullBox, obb, obbCorners, obbOverlap, rayOBB, anyOverlap, partOBBs, analyze, autoGame, cleanGame, resolvedGame, gameExport, FAMILIES, ARCH_AUTO, CREW });
 
   /* ===== IMPORT / EXPORT (L2a.5) ===== */
 
   return core;
 }
 
-return { m4, v3, PORT_PREF, create };
+return { m4, v3, PORT_PREF, FAMILIES, ARCH_AUTO, CREW, autoGame, cleanGame, create };
 })();
 if (typeof module !== 'undefined') module.exports = STTCOMP;
