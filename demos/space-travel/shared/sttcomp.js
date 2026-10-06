@@ -417,6 +417,111 @@ function create(env) {
   Object.assign(core, { hullBox, fullBox, obb, obbCorners, obbOverlap, rayOBB, anyOverlap, partOBBs, analyze, autoGame, cleanGame, resolvedGame, gameExport, FAMILIES, ARCH_AUTO, CREW });
 
   /* ===== IMPORT / EXPORT (L2a.5) ===== */
+  /* stt-composition v1. env facultatifs : knownCompany(k), companyOf(k)->{registry}, mergeCompanies(obj) (appelé à l'import) */
+  const known = (k) => (env.knownCompany ? !!env.knownCompany(k) : !!fleet.companies[k]);
+  const companyOf = (k) => (env.companyOf && env.companyOf(k)) || fleet.companies[k] || fleet.companies.STT || {};
+  const coDef = (d) => ({ name: d.name, mark: d.mark, tagline: d.tagline, registry: d.registry, livery_hex: d.livery_hex, emblem: d.emblem });
+  /* opts : { companies:{clé:def} marques perso utilisées, stats } */
+  function toExport(c, opts) {
+    opts = opts || {};
+    const custom = opts.companies || {};
+    const used = new Set([c.company, ...c.parts.map((p) => p.company).filter(Boolean)]);
+    const companies = {};
+    for (const k of used) if (custom[k]) companies[k] = coDef(custom[k]);
+    const parts = [], links = [], containers = {};
+    for (const p of ordered(c)) {
+      const o = {};
+      if (p.zone) o.zone = p.zone;
+      if (p.key === 'BAY') o.door = p.door || 'mech';
+      if (p.company) o.company = p.company;
+      parts.push(Object.keys(o).length ? [p.id, p.key, o] : [p.id, p.key]);
+      if (p.parent) links.push([`${p.parent}.${p.pport}`, `${p.id}.${p.port}`, p.roll || 0]);
+      if (p.containers && p.containers.some(Boolean)) containers[p.id] = p.containers.map((b) => b || null);
+    }
+    for (const l of c.extra_links) links.push(l);
+    const reg = c.registry || (custom[c.company] || companyOf(c.company)).registry;
+    const out = { format: 'stt-composition', version: 1, generator: 'Chantier naval STT', id: c.id, name: c.name, type: c.type, company: c.company, registry: reg };
+    if (Object.keys(companies).length) out.companies = companies;
+    Object.assign(out, { root: parts[0] ? parts[0][0] : null, parts, links, containers, docking_ports: c.docking_ports.map((port) => ({ port })) });
+    const gs = cleanGame(c.game, c);
+    if (Object.keys(gs).length) out.game = gs;
+    if (opts.stats) out.stats = opts.stats;
+    return out;
+  }
+  function fromGraph(o) {
+    const c = blank(o.type === 'station' ? 'station' : 'ship');
+    if (o.format === 'stt-composition' && o.id) c.id = String(o.id);
+    c.name = String(o.name || 'Composition importée').slice(0, 60);
+    c.company = known(o.company) ? o.company : 'STT';
+    const reg = String(o.registry || '').toUpperCase();
+    c.registry = reg && reg !== companyOf(c.company).registry ? reg.slice(0, 14) : '';
+    const defs = new Map();
+    for (const p of o.parts || []) {
+      const [id, key, opts] = Array.isArray(p) ? p : [p && p.id, p && p.key, p];
+      if (id != null && gm(key) && !defs.has(String(id))) defs.set(String(id), { key, opts: opts || {} });
+    }
+    let links = (o.links || []).filter((l) => Array.isArray(l) && l.length >= 2);
+    for (const [port, co] of o.shuttles || []) {
+      let n = 1; while (defs.has('shuttle' + n)) n++;
+      defs.set('shuttle' + n, { key: 'SHUTTLE', opts: { company: co } }); links = [...links, [port, `shuttle${n}.PAD`, 0]];
+    }
+    if (!defs.size) return c;
+    const conts = o.containers || {};
+    const mk = (id, parent, pport, port, roll) => {
+      const d = defs.get(id), op = d.opts || {}, n = containerMats(d.key).length;
+      let cs = null;
+      if (n) cs = Array.from({ length: n }, (_, i) => { const b = Array.isArray(conts[id]) ? conts[id][i] : null; return (fleet.container_brands || {})[b] ? b : null; });
+      return { id, key: d.key, parent, pport, port, roll: (((+roll || 0) % 360) + 360) % 360, zone: (fleet.zones || {})[op.zone] ? op.zone : null, door: op.door === 'field' ? 'field' : 'mech', company: op.company && known(op.company) ? op.company : null, containers: cs };
+    };
+    const rootId = o.root != null && defs.has(String(o.root)) ? String(o.root) : defs.keys().next().value;
+    const placed = new Set([rootId]); c.parts.push(mk(rootId, null, null, null, 0));
+    const valid = (id, port) => portsOf(defs.get(id).key).includes(port);
+    const extra = [];
+    let pending = links.slice(), progress = true;
+    while (pending.length && progress) {
+      progress = false; const next = [];
+      for (const l of pending) {
+        const [pa, pp] = String(l[0]).split('.'), [ca, cp] = String(l[1]).split('.'), r = +l[2] || 0;
+        if (!defs.has(pa) || !defs.has(ca) || !valid(pa, pp) || !valid(ca, cp)) continue;
+        if (placed.has(pa) && !placed.has(ca)) { c.parts.push(mk(ca, pa, pp, cp, r)); placed.add(ca); progress = true; }
+        else if (placed.has(ca) && !placed.has(pa)) { c.parts.push(mk(pa, ca, cp, pp, -r)); placed.add(pa); progress = true; }
+        else if (placed.has(pa) && placed.has(ca)) extra.push([`${pa}.${pp}`, `${ca}.${cp}`, r]);
+        else next.push(l);
+      }
+      pending = next;
+    }
+    const used = new Set(); for (const p of c.parts) if (p.parent) { used.add(p.id + '.' + p.port); used.add(p.parent + '.' + p.pport); }
+    for (const l of extra) if (!used.has(l[0]) && !used.has(l[1])) { c.extra_links.push(l); used.add(l[0]); used.add(l[1]); }
+    c.docking_ports = (o.docking_ports || []).map((d) => (typeof d === 'string' ? d : d && d.port)).filter(Boolean);
+    c.game = cleanGame(o.game, c);
+    return c;
+  }
+  function fromShip(s) {
+    const parts = [], links = [], containers = {}, counts = {};
+    (s.modules || []).forEach((key, i) => {
+      counts[key] = (counts[key] || 0) + 1;
+      const id = key.toLowerCase() + counts[key];
+      if (i) links.push([`${parts[i - 1][0]}.AFT`, `${id}.FWD`, (s.module_roll_deg || [])[i] || 0]);
+      parts.push([id, key]);
+      const cs = (s.containers || {})[`${key}#${counts[key]}`]; if (cs) containers[id] = cs;
+    });
+    return fromGraph({ name: s.name, type: 'ship', company: s.company, registry: s.registry, parts, links, containers });
+  }
+  const fromStation = (st) => fromGraph({ name: st.name, type: 'station', company: st.company, parts: st.parts, links: st.links, containers: st.containers, docking_ports: st.docking_ports, shuttles: st.shuttles });
+  function importObject(o) {
+    const out = [];
+    const take = (x) => {
+      if (!x || typeof x !== 'object') return;
+      if (Array.isArray(x)) { x.forEach(take); return; }
+      if (x.format === 'stt-composition') { if (env.mergeCompanies) env.mergeCompanies(x.companies); out.push(fromGraph(x)); }
+      else if (Array.isArray(x.parts) && Array.isArray(x.links)) out.push(fromStation(x));
+      else if (Array.isArray(x.modules)) out.push(fromShip(x));
+      else if (x.ships || x.stations || x.compositions) { (x.ships || []).forEach(take); (x.stations || []).forEach(take); (x.compositions || []).forEach(take); }
+    };
+    take(o);
+    return out.filter((c) => c.parts.length);
+  }
+  Object.assign(core, { toExport, fromGraph, fromShip, fromStation, importObject, coDef });
 
   return core;
 }

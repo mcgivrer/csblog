@@ -179,8 +179,9 @@ test('gameExport : erreurs en codes et données', () => {
   const np = ship(k, { noProp: true });
   assert.deepEqual(k.gameExport(np, k.analyze(np)), { error: 'no_prop' });
   const c = ship(k), a = k.analyze(c);
-  assert.deepEqual(k.gameExport(c, a), { error: 'no_export' });   // toExport arrive avec L2a.5
-  k.toExport = (x) => ({ format: 'stt-composition', id: x.id });
+  const te = k.toExport; delete k.toExport;
+  assert.deepEqual(k.gameExport(c, a), { error: 'no_export' });   // garde-fou si toExport manque
+  k.toExport = te;
   const r = k.gameExport(c, a);
   assert.equal(r.warn, 0); assert.equal(r.data.id, c.id);
   assert.deepEqual(r.data.stats, a.stats); assert.equal(r.data.game.class, 'ship');

@@ -45,5 +45,6 @@ export function make(opts = {}) {
     fleet: opts.fleet || { modules: {}, container_brands: { ACME: {}, ZED: {}, QUX: {} }, zones: {}, companies: {} },
     rand: opts.rand || (() => { s = (s * 16807) % 2147483647; return s / 2147483647; }),
     uid: opts.uid || (() => 'u' + (++n)),
+    mergeCompanies: opts.mergeCompanies, knownCompany: opts.knownCompany, companyOf: opts.companyOf,
   });
 }
