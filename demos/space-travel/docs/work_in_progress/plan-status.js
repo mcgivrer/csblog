@@ -1,16 +1,14 @@
 /* Données du Kanban des agents — SPEC-010 (Chantier Naval STT et campagne).
    SEUL fichier modifié par le chef de projet (stt-cp), par Edit ciblé : jamais kanban.html.
    Emplacement : demos/space-travel/docs/work_in_progress/ — mis à jour à chaque transition de tâche et à chaque rapport d'agent.
-   status : todo | doing | review | blocked | done      agent : cp | archi | dev | revue
-   inst   : (optionnel, entier 1 à 3, pour agent "dev") numéro de l'instance DEV parallèle qui exécute la tâche (une instance = un worktree/une branche) ;
-            absent = DEV non distingué. model reste par tâche : opus | sonnet | haiku.
+   status : todo | doing | review | blocked | done      agent : cp | archi | dev
    used   : tokens mesurés (total_tokens du bloc <usage> rendu par l'appel Agent) ; null = non mesuré ; est:true = estimation
    docs   : (optionnel) documents liés à la tâche : [ { f: "chemin relatif à demos/space-travel/", r: "lu" | "modifié" | "créé" } ]
             lu = nécessaire à la tâche ; modifié / créé = produit par elle. Docs de spec/contrat/plan/maquette/carte de code, pas le code du jeu.
             Le chemin doit exister (ou avoir existé dans l'historique git pour une tâche passée).
    Le total d'un lot est calculé par la page (somme des tâches) : ne pas le saisir. */
 window.PLAN = {
-  updated: "2026-10-05 15:00",
+  updated: "2026-10-05 12:00",
   spec: "SPEC-010-chantier_naval_et_campagne-V1.0.md",
   currentLot: "L1",
   models: { cp: "CP Sonnet", archi: "ARCHI Opus", dev: "DEV Sonnet / Haiku" },
@@ -18,14 +16,13 @@ window.PLAN = {
   lots: [
     { id: "C0", title: "Cadrage SPEC-010",      status: "done", budget: 500000,  version: "—" },
     { id: "L0", title: "Fondations",            status: "done"  , budget: 600000,  version: "stt_v2.18" },
-    { id: "L1", title: "Console",               status: "doing", budget: 500000,  version: "stt_v2.19" },
+    { id: "L1", title: "Console",               status: "todo", budget: 500000,  version: "stt_v2.19" },
     { id: "L2", title: "Chantier v1",           status: "todo", budget: 1200000, version: "stt_v2.20" },
     { id: "L3", title: "Flotte + équipages",    status: "todo", budget: 1200000, version: "stt_v2.21" },
     { id: "L4", title: "Technologies",          status: "todo", budget: 600000,  version: "stt_v2.22" },
     { id: "L5", title: "Station",               status: "todo", budget: 1100000, version: "stt_v2.23" },
     { id: "L6", title: "Marché, missions",      status: "todo", budget: 900000,  version: "stt_v2.24" },
-    { id: "L7", title: "Équilibrage, v3.0",     status: "todo", budget: 400000,  version: "stt_v3.0" },
-    { id: "T0", title: "Outillage agents",       status: "doing", budget: 250000, version: "—" }
+    { id: "L7", title: "Équilibrage, v3.0",     status: "todo", budget: 400000,  version: "stt_v3.0" }
   ],
 
   tasks: [
@@ -44,22 +41,6 @@ window.PLAN = {
     { id: "L0.5", lot: "L0", title: "GAME, RNG.game, DATA, SAVE + tests Node", agent: "dev", model: "sonnet", status: "done", progress: 100, budget: 140000, used: 116508, updated: "2026-10-04 23:51", note: "GAME, RNG.game, DATA, SAVE : 50 tests Node verts.", docs: [ { f: "docs/specs/lots/L0-contrat.md", r: "lu" }, { f: "docs/specs/SPEC-010-chantier_naval_et_campagne-V1.0.md", r: "lu" }, { f: "docs/specs/CODEMAP.md", r: "lu" }, { f: "sources/src/data/economy.json", r: "créé" } ] },
     { id: "L0.6", lot: "L0", title: "Choix Campagne / Partie libre, Courlis de départ", agent: "dev", model: "sonnet", status: "done", progress: 100, budget: 100000, used: 194050, updated: "2026-10-05 00:17", note: "Fait + 4 corrections de revue (reprise sur la même graine, confirmation, import, tests). Corrections non mesurées (reprise d'agent) : total réel plus élevé.", docs: [ { f: "docs/specs/lots/L0-contrat.md", r: "lu" }, { f: "docs/specs/SPEC-010-chantier_naval_et_campagne-V1.0.md", r: "lu" }, { f: "docs/specs/CODEMAP.md", r: "lu" }, { f: "docs/specs/img/spec010/console-flotte.svg", r: "lu" }, { f: "sources/src/data/economy.json", r: "lu" } ] },
     { id: "L0.7", lot: "L0", title: "Revue des diffs L0", agent: "archi", model: "opus", status: "done", progress: 100, budget: 50000, used: 12000, updated: "2026-10-05 00:17", note: "Revues sur diff faites par le CP-ARCHI de la session à chaque tâche.", est: true, docs: [ { f: "docs/specs/lots/L0-contrat.md", r: "lu" }, { f: "docs/specs/SPEC-010-chantier_naval_et_campagne-V1.0.md", r: "lu" }, { f: "docs/specs/CODEMAP.md", r: "modifié" } ] },
-    { id: "L1.P", lot: "L1", title: "Fiche de lot et pilotage", agent: "cp", model: "opus", status: "doing", progress: 10, budget: 30000, used: 80000, est: true, updated: "2026-10-05 15:00", note: "Pilotage CP de la session : fiche, contrat, revues, Kanban, règles d'agents (REVUE, DEV parallèles). Estimation.", docs: [ { f: "docs/specs/lots/L1-fiche.md", r: "créé" }, { f: "docs/specs/SPEC-010-chantier_naval_et_campagne-V1.0.md", r: "lu" }, { f: "docs/work_in_progress/plan-status.js", r: "modifié" } ] },
-    { id: "L1.A", lot: "L1", title: "Contrat L1 et découpage en tâches", agent: "archi", model: "opus", status: "done", progress: 100, budget: 40000, used: 120560, updated: "2026-10-05 12:30", note: "Contrat L1-contrat.md (121 lignes). Dépassement ×3 : inventaire des 7 nœuds DOM et des touches. 5 points à trancher (Tab, Échap, L, Alt+n, nommage).", docs: [ { f: "docs/specs/lots/L1-contrat.md", r: "créé" }, { f: "docs/specs/lots/L1-fiche.md", r: "lu" }, { f: "docs/specs/SPEC-010-chantier_naval_et_campagne-V1.0.md", r: "lu" }, { f: "docs/specs/CODEMAP.md", r: "lu" }, { f: "docs/specs/lots/L0-contrat.md", r: "lu" } ] },
-    { id: "L1.1", lot: "L1", title: "ui/50-console.js (modèle pur) + tests Node", agent: "dev", model: "sonnet", status: "done", progress: 100, budget: 40000, used: 71715, updated: "2026-10-05 13:10", note: "35a15cf : CONSOLE (modèle pur) + 14 tests Node ; revue ARCHI approuvée.", docs: [ { f: "docs/specs/lots/L1-contrat.md", r: "lu" }, { f: "docs/specs/CODEMAP.md", r: "lu" } ] },
-    { id: "L1.2", lot: "L1", title: "Cadre : vue, CSS, hébergement, observateur, clés I18N", agent: "dev", model: "sonnet", status: "done", progress: 100, budget: 70000, used: 89899, updated: "2026-10-05 13:10", note: "c88c6f4 : vue, CSS, hôte, observateur, 11 clés I18N ; revue approuvée. Transitoire : Tab n'ouvre plus la radio jusqu'à L1.7 (Alt+7).", docs: [ { f: "docs/specs/lots/L1-contrat.md", r: "lu" }, { f: "docs/specs/CODEMAP.md", r: "lu" } ] },
-    { id: "L1.3", lot: "L1", title: "Onglet Aide · Réglages", agent: "dev", model: "sonnet", status: "done", progress: 100, budget: 30000, used: 69675, updated: "2026-10-05 15:00", note: "c0338fa : onglet Aide · Réglages (52) et branches help/audio de 26 ; revue groupée L1.3-L1.4 approuvée.", docs: [ { f: "docs/specs/lots/L1-contrat.md", r: "lu" } ] },
-    { id: "L1.4", lot: "L1", title: "Onglet Navigation (carte)", agent: "dev", model: "sonnet", status: "done", progress: 100, budget: 40000, used: 76543, updated: "2026-10-05 15:00", note: "c92a4f9 : onglet Navigation (53), carte hébergée, resize ; revue approuvée ; corrections L1.4bis (défilement audio, état d'icône, double croix) confiées à DEV L1.5.", docs: [ { f: "docs/specs/lots/L1-contrat.md", r: "lu" } ] },
-    { id: "L1.5", lot: "L1", title: "Onglet Missions (deux tableaux)", agent: "dev", model: "sonnet", status: "doing", progress: 60, budget: 50000, used: null, updated: "2026-10-05 15:00", note: "En cours : onglet Missions (54), exports 20d, branche missions de 26 ; puis commit L1.4bis.", docs: [ { f: "docs/specs/lots/L1-contrat.md", r: "lu" } ] },
-    { id: "L1.6", lot: "L1", title: "Onglets Port et Chantier", agent: "dev", model: "sonnet", status: "todo", progress: 0, budget: 50000, used: null, updated: "2026-10-05 12:30", note: "", docs: [ { f: "docs/specs/lots/L1-contrat.md", r: "lu" } ] },
-    { id: "L1.7", lot: "L1", title: "Raccourcis (Tab, F1–F8, Alt+1..8)", agent: "dev", model: "sonnet", status: "todo", progress: 0, budget: 30000, used: null, updated: "2026-10-05 12:30", note: "Dépend des décisions 12 à 15 (touches).", docs: [ { f: "docs/specs/lots/L1-contrat.md", r: "lu" } ] },
-    { id: "L1.8", lot: "L1", title: "Tactile et étroit (390 / 960 px)", agent: "dev", model: "haiku", status: "todo", progress: 0, budget: 15000, used: null, updated: "2026-10-05 12:30", note: "", docs: [ { f: "docs/specs/lots/L1-contrat.md", r: "lu" } ] },
-    { id: "L1.9", lot: "L1", title: "console_test.py et suite complète", agent: "dev", model: "sonnet", status: "todo", progress: 0, budget: 50000, used: null, updated: "2026-10-05 12:30", note: "", docs: [ { f: "docs/specs/lots/L1-contrat.md", r: "lu" } ] },
-    { id: "L1.R", lot: "L1", title: "Revues des diffs L1", agent: "archi", model: "opus", status: "doing", progress: 40, budget: 30000, used: 205309, updated: "2026-10-05 15:00", note: "Revues : L1.1+L1.2 = 140 204 ; L1.3+L1.4 = 65 105. Budget 30 k dépassé ×6,8 : revues Opus trop coûteuses → première passe confiée à REVUE (Haiku 4.5), ARCHI sur les points à arbitrer seulement.", docs: [ { f: "docs/specs/lots/L1-contrat.md", r: "lu" } ] },
-    { id: "L1.V", lot: "L1", title: "Revues de conformité L1 (REVUE, Haiku)", agent: "revue", model: "haiku", status: "todo", progress: 0, budget: 40000, used: null, updated: "2026-10-05 15:00", note: "Première passe de conformité sur chaque commit DEV, avant l'ARCHI. À démarrer dès L1.5.", docs: [ { f: "../../.claude/agents/stt-revue.md", r: "créé" }, { f: "docs/specs/lots/L1-contrat.md", r: "lu" } ] },
-    { id: "T0.1", lot: "T0", title: "Kanban : docs par tâche, tâches faites repliées, onglet Indicateurs", agent: "dev", model: "sonnet", status: "done", progress: 100, budget: 100000, used: 93606, updated: "2026-10-05 15:00", note: "Sous-agent DEV ; kanban.html + plan-status.js.", docs: [ { f: "docs/work_in_progress/kanban.html", r: "modifié" }, { f: "docs/work_in_progress/plan-status.js", r: "modifié" } ] },
-    { id: "T0.2", lot: "T0", title: "Kanban : profils DEV 1/2/3 et REVUE", agent: "dev", model: "sonnet", status: "done", progress: 100, budget: 80000, used: 79674, updated: "2026-10-05 15:00", note: "Profils dérivés des données ; champ inst (1–3) ; filtres et indicateurs ; commit cdb9160.", docs: [ { f: "docs/work_in_progress/kanban.html", r: "modifié" }, { f: "docs/work_in_progress/plan-status.js", r: "modifié" }, { f: "../../.claude/agents/stt-cp.md", r: "modifié" } ] },
-    { id: "T0.3", lot: "T0", title: "Profil REVUE (Haiku 4.5), DEV parallèles, règles de coordination", agent: "cp", model: "sonnet", status: "done", progress: 100, budget: 40000, used: 40000, est: true, updated: "2026-10-05 15:00", note: "stt-revue.md, AGENTS.md, stt-cp.md, stt-dev.md : commits eeabc08, b9f9996, e3ebb73. Estimation.", docs: [ { f: "../../.claude/agents/stt-revue.md", r: "créé" }, { f: "../../AGENTS.md", r: "modifié" }, { f: "../../.claude/agents/stt-cp.md", r: "modifié" }, { f: "../../.claude/agents/stt-dev.md", r: "modifié" } ] },
     { id: "L6.M", lot: "L6", title: "Nouveaux maillages : laboratoire, raffinerie, fabrique, serre, tourelle (MCP Blender)", agent: "dev", model: "sonnet", status: "todo", progress: 0, budget: 250000, used: null, updated: "", note: "Décision 9. Le CP demande au mainteneur de démarrer Blender et son serveur MCP au moment de la tâche.", docs: [ { f: "docs/specs/SPEC-010-chantier_naval_et_campagne-V1.0.md", r: "lu" }, { f: "docs/specs/img/spec010/chantier.svg", r: "lu" }, { f: "docs/specs/img/spec010/station-site.svg", r: "lu" }, { f: "docs/specs/SPEC-001-vaisseaux_generatifs-V1.0.md", r: "lu" }, { f: "docs/specs/CODEMAP.md", r: "lu" } ] }
   ],
 
@@ -74,12 +55,7 @@ window.PLAN = {
     { n: 8,  subject: "Rendement automatisé 65 %", status: "validée (04/10)" },
     { n: 9,  subject: "Nouveaux maillages après L5", status: "validée (04/10)" },
     { n: 10, subject: "Lots M3 / P2 / M4 intercalés", status: "validée (04/10)" },
-    { n: 11, subject: "Campagne : facteur de primes ≈ 0,33 (economy.json) pour garder la station vers 6 h, à re-mesurer après M2 (gabares)", status: "validée (05/10)" },
-    { n: 12, subject: "L1 : Tab ouvre la console ; la radio passe à Alt+7 (+ icône de la barre)", status: "à valider" },
-    { n: 13, subject: "L1 : Échap ferme la console, sinon pause inchangée ; Aide · Réglages par H (la SPEC dit « H, Échap »)", status: "à valider" },
-    { n: 14, subject: "L1 : pas d'onglet Journal (aucun overlay) ; L reste Lagrange ; critère 2 de la fiche amendé", status: "à valider" },
-    { n: 15, subject: "L1 : Alt+1..8 peut être capté par le navigateur (changement d'onglet) ; repli = barre d'icônes ; autre combinaison ?", status: "à valider" },
-    { n: 16, subject: "Budget L1 : ≥ 127 % du budget hors outillage avant la fin de L1.5 ; règle des 30 % : arrêt et question au mainteneur avant L1.6", status: "à valider" }
+    { n: 11, subject: "Campagne : facteur de primes ≈ 0,33 (economy.json) pour garder la station vers 6 h, à re-mesurer après M2 (gabares)", status: "validée (05/10)" }
   ],
 
   journal: [
@@ -89,9 +65,6 @@ window.PLAN = {
     { at: "2026-10-04", text: "Lancement : clone cloud, branche stt-C0-L0, livraison par bundle git (pas d'accès en écriture à GitHub)." },
     { at: "2026-10-05", text: "L0 : C0.5, L0.1 à L0.7 faits dans la branche stt-C0-L0. Mesure des missions : 71 s (Courlis), 142 s (e18) ; décision 11 proposée (facteur de primes de campagne)." },
     { at: "2026-10-05", text: "Suite complète verte sur les pages lisible et obfusquée (556 contrôles, 0 échec). Branche livrée en bundle : à relire et fusionner par PR." },
-    { at: "2026-10-05", text: "L0 fusionnée dans main (5f7135d) ; build et suite complète relancés sur le code fusionné : 547 PASS, 0 échec. Décision 11 validée ; L0 close (tag stt_v2.18 après fusion de la PR de clôture). Kanban : docs par tâche, tâches faites repliées, onglet Indicateurs." },
-    { at: "2026-10-05", text: "L1 : contrat (121 lignes) et tâches L1.1 à L1.4 faites, revues ARCHI approuvées ; L1.5 en cours." },
-    { at: "2026-10-05", text: "Outillage : profil REVUE (Haiku 4.5), jusqu'à 3 DEV en parallèle, le CP décide et un DEV écrit le Kanban ; Kanban : profils DEV/REVUE." },
-    { at: "2026-10-05", text: "Budget : L1 à 127 % du budget (hors outillage) : revues Opus trop coûteuses ; décision 16." }
+    { at: "2026-10-05", text: "L0 fusionnée dans main (5f7135d) ; build et suite complète relancés sur le code fusionné : 547 PASS, 0 échec. Décision 11 validée ; L0 close (tag stt_v2.18 après fusion de la PR de clôture). Kanban : docs par tâche, tâches faites repliées, onglet Indicateurs." }
   ]
 };
