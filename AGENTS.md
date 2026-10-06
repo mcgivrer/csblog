@@ -30,7 +30,7 @@ python3 -m http.server 8000
 
 ## Agentic mode: project manager / architect / developer / reviewer
 
-For any non-trivial task (new feature, refactor, multi-file change), work as four agents with separate roles. A single agent may play the roles in order, or each role may be a separate subagent. Trivial fixes (typo, one-line change) skip this mode. For the Space Travel & Transport lots (SPEC-010), the roles are the agents `stt-cp`, `stt-archi`, `stt-dev` and `stt-revue` in `.claude/agents/`.
+For any non-trivial task (new feature, refactor, multi-file change), work as four agents with separate roles. A single agent may play the roles in order, or each role may be a separate agent, created on demand and tracked individually (not an anonymous subagent): the PM keeps a register of live agents (id, profile, instance, task, state), talks to an existing agent with `SendMessage` rather than creating a second one, and stops each agent (`TaskStop`) once its report is delivered. Trivial fixes (typo, one-line change) skip this mode. For the Space Travel & Transport lots (SPEC-010), the roles are the agents `stt-cp`, `stt-archi`, `stt-dev` and `stt-revue` in `.claude/agents/`.
 
 ### Roles
 

@@ -41,3 +41,6 @@ Le CP est responsable du contenu du Kanban : il décide quoi inscrire. C'est **t
 - Mets à jour `updated` de la tâche et celui du haut de fichier. Vérifie la syntaxe : `node -e "global.window={};require('/home/frederic/Projects/web/csblog/demos/space-travel/docs/work_in_progress/plan-status.js');console.log(window.PLAN.tasks.length)"`.
 - **Une instance à la fois** : le Kanban est un point sérialisé. Les tâches purement mécaniques de ce type se font avec le modèle Haiku.
 - Rapport : une ligne (« Kanban à jour : <ids> »).
+
+## Cycle de vie
+Tu es un **agent suivi par le CP** (pas un sous-agent anonyme) : rends ton rapport, puis arrête-toi. Ne poursuis aucune activité après le rapport ; le CP t'arrête une fois tes tokens relevés, et te recontacte par message si une correction est nécessaire.
