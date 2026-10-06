@@ -48,6 +48,8 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from stt_notices import NoticeEngine
+
 VERSION = "1.0.0"
 HERE = Path(__file__).resolve().parent
 
@@ -963,6 +965,7 @@ class Hub:
         self.version = 0
         self.payload = b"{}"
         self.digest = None
+        self.notices = NoticeEngine()
 
     def build(self):
         now = time.time()
@@ -1101,6 +1104,9 @@ class Hub:
     def tick(self):
         self.claude.refresh()
         state = self.build()
+        gh = state.get("github") or {}
+        self.notices.observe(state["agents"], gh["prs"] if "prs" in gh else None)
+        state["notices"], state["notice_seq"] = self.notices.recent(50), self.notices.seq
         body = json.dumps(state, ensure_ascii=False, separators=(",", ":"))
         # l'horodatage seul ne justifie pas un envoi : on hache sans lui
         digest = hashlib.sha1(json.dumps({k: v for k, v in state.items() if k not in ("timeline", "generated_at")}, ensure_ascii=False,
@@ -1354,7 +1360,10 @@ def _apply_op(lines, op, now, log):
             before[k] = _row_get(ln, k)
             ln = _row_unset(ln, k)
         lines[idx] = ln
-        log.append({"op": kind, "id": op.get("id", op.get("n")), "avant": before})
+        entry = {"op": kind, "id": op.get("id", op.get("n")), "avant": before}
+        if kind == "task":
+            entry["status"] = _row_get(ln, "status")  # nouveau statut (notices du Kanban)
+        log.append(entry)
     elif kind == "task_add":
         task = op.get("task") or {}
         if not task.get("id") or not task.get("lot"):
@@ -1636,6 +1645,8 @@ def make_handler(hub, allowed_hosts):
                 ops = data.get("ops") if isinstance(data, dict) else data
                 out = kanban_apply(hub.args.kanban, ops, dry_run=bool(isinstance(data, dict) and data.get("dry_run")))
                 code = 200
+                if not out.get("dry_run"):
+                    hub.notices.kanban_changes(out.get("changes"))
             except (KanbanError, ValueError, KeyError, IndexError) as exc:
                 out, code = {"ok": False, "error": str(exc)}, 400
             self._send(code, json.dumps(out, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
