@@ -393,6 +393,10 @@ html.embed-kpis .kpi .kc{display:none}
 html.embed-kpis .kcs{display:inline;font:9px var(--mono);color:var(--muted);margin:0 auto 0 8px;white-space:nowrap;text-transform:none;letter-spacing:0;overflow:hidden;text-overflow:ellipsis;min-width:0}
 html.embed-kpis .tm{height:54px!important;min-height:0}
 html.embed-board #kpis{display:none}
+.card .ed{width:24px;height:24px;padding:0;display:inline-flex;align-items:center;justify-content:center;color:var(--muted);background:transparent;border:1px solid transparent;cursor:pointer}
+.card .ed svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.card .ed:hover{color:var(--amber);border-color:var(--line)}
+.card .ed:focus-visible{outline:2px solid var(--cyan);outline-offset:1px;color:var(--amber)}
 .badge.goagent{font:inherit;cursor:pointer;background:transparent;text-decoration:none}
 .badge.goagent:hover,.badge.goagent:focus-visible{text-decoration:underline;box-shadow:0 0 0 1px currentColor}
 html.embed,html.embed body{overflow:hidden}
@@ -1012,12 +1016,15 @@ html.embed-board #topbar>.meta span{display:none}
     if(!pr) return '<h3 title="Prompt non conservé">' + esc(t.title) + '<span class="nd" aria-hidden="true">–</span></h3>';
     return '<h3><a class="ptl" href="' + esc(docHref(pr)) + '" data-pv="' + esc(pr) + '" data-task="' + esc(t.id) + '" data-ptitle="' + esc('Prompt exécuté — ' + t.id + ' · ' + t.title) + '" target="_blank" rel="noopener" title="Voir le prompt exécuté">' + esc(t.title) + PIC + '</a></h3>';
   }
+  const EDIT_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 13.5l.7-3L11 2.7l2.3 2.3L5.5 12.8z M9.6 4.1l2.3 2.3"/></svg>';
+  function canEdit(){ const m = document.querySelector('meta[name="stt-token"]'); return !!(m && m.getAttribute('content')); }
+  function editBtn(t){ return t.status === 'todo' && canEdit() ? '<button type="button" class="ed" data-edit="' + esc(t.id) + '" title="Modifier la tâche ' + esc(t.id) + '" aria-label="Modifier la tâche ' + esc(t.id) + '">' + EDIT_SVG + '</button>' : ''; }
   function revBadge(t){ const r = t.status === 'review' && (t.reviewer === 'revue' || t.reviewer === 'archi') ? t.reviewer : ''; return r ? '<span class="badge ' + r + '">EN REVUE · ' + r.toUpperCase() + '</span>' : ''; }
   function card(t){
     const u = used(t), b = num(t.budget), p = Math.max(0, Math.min(100, num(t.progress)));
     const o = isOpen(t);
     const tg = '<button class="tg" data-toggle="' + esc(t.id) + '" aria-expanded="' + o + '" aria-label="' + (o ? 'Replier' : 'Déplier') + ' la tâche ' + esc(t.id) + '">' + (o ? '▾' : '▸') + '</button>';
-    return '<article class="card' + (o ? '' : ' folded') + '" data-id="' + esc(t.id) + '" data-s="' + esc(t.status) + '"><div class="top"><span class="lead">' + tg + modBadge(t) + '<span class="id">' + esc(t.id) + '</span></span><span class="bdg">' + cxBadge(t) + agentTag(t) + revBadge(t) + '</span></div>' + titleHtml(t) + '<div class="body">' +
+    return '<article class="card' + (o ? '' : ' folded') + '" data-id="' + esc(t.id) + '" data-s="' + esc(t.status) + '"><div class="top"><span class="lead">' + tg + modBadge(t) + '<span class="id">' + esc(t.id) + '</span></span><span class="bdg">' + cxBadge(t) + agentTag(t) + revBadge(t) + editBtn(t) + '</span></div>' + titleHtml(t) + '<div class="body">' +
       '<div class="row"><span>Avancement</span><span>' + p + ' %</span></div>' + bar(p, 100, 'cy') +
       '<div class="row"><span>Tokens</span><span>' + (t.est ? '≈ ' : '') + (t.used == null ? 'n/m' : tok(u)) + (b ? ' / ' + tok(b) : '') + '</span></div>' + (b ? bar(u, b) : '') + cxLine(t) + timeRows(t) +
       (t.updated ? '<div class="row"><span>Mis à jour</span><span>' + esc(t.updated) + '</span></div>' : '') +
@@ -1096,7 +1103,7 @@ html.embed-board #topbar>.meta span{display:none}
     const btn = $('newBtn'), dlg = $('newTask'); if(!btn || !dlg) return;
     btn.hidden = !TOKEN;
     const MAXP = 200 * 1024, DEF_MODEL = { archi:'opus', dev:'sonnet', revue:'haiku' };
-    let sending = false, runner = null;
+    let sending = false, runner = null, editId = null;
     const f = (id) => $(id);
     const setErr = (id, field, msg) => { f(id).textContent = msg || ''; if(field){ if(msg) field.setAttribute('aria-invalid', 'true'); else field.removeAttribute('aria-invalid'); } };
     const bytes = (t) => new TextEncoder().encode(t).length;
@@ -1132,7 +1139,33 @@ html.embed-board #topbar>.meta span{display:none}
       try { const r = await fetch('/api/runner', { cache:'no-store' }); runner = r.ok ? await r.json() : null; } catch(e){ runner = null; }
       capHint();
     }
+    function setMode(id){
+      editId = id || null;
+      f('ntT').textContent = editId ? 'Modifier la tâche ' + editId : 'Nouvelle tâche';
+      f('ntLot').disabled = !!editId; f('ntPrompt').disabled = false; f('ntPrompt').placeholder = '';
+      f('ntAuto').closest('label').hidden = !!editId; f('ntAutoH').hidden = !!editId;
+    }
+    async function openEdit(id){
+      const t = ((window.PLAN || {}).tasks || []).find(x => x.id === id); if(!t || t.status !== 'todo') return;
+      f('ntForm').reset(); f('ntSrv').textContent = '';
+      [['ntLotE'], ['ntTitleE', 'ntTitle'], ['ntWtE', 'ntWt'], ['ntPrE', 'ntPrompt']].forEach(a => setErr(a[0], a[1] && f(a[1]), ''));
+      setMode(id); fillLots(); fillCx();
+      const setSel = (el, v) => { if(v != null && Array.from(el.options).some(o => o.value === String(v))) el.value = String(v); };
+      setSel(f('ntLot'), t.lot); f('ntTitle').value = t.title || ''; setSel(f('ntAgent'), t.agent || 'dev');
+      f('ntModel').value = DEF_MODEL[f('ntAgent').value] || 'sonnet'; setSel(f('ntModel'), t.model);
+      setSel(f('ntCx'), t.cx); setSel(f('ntPrio'), t.prio || 2); f('ntWt').value = t.worktree || ''; setSel(f('ntPerm'), t.perm || 'acceptEdits');
+      f('ntPrompt').value = ''; f('ntPrompt').disabled = true; f('ntPrompt').placeholder = 'Chargement du prompt…';
+      runner = null; cxHint(); prCount(); capHint(); setBusy(false);
+      if(!dlg.open) dlg.showModal();
+      f('ntTitle').focus();
+      try {
+        const r = await fetch('/kanban/doc/demos/space-travel/stt-agents/data/prompts/' + encodeURIComponent(id) + '.md', { cache:'no-store' });
+        if(editId === id) f('ntPrompt').value = r.ok ? await r.text() : '';
+      } catch(e){ if(editId === id) f('ntPrompt').value = ''; }
+      if(editId === id){ f('ntPrompt').disabled = false; f('ntPrompt').placeholder = ''; prCount(); }
+    }
     function openNew(){
+      setMode(null);
       f('ntForm').reset(); f('ntSrv').textContent = '';
       [['ntLotE'], ['ntTitleE', 'ntTitle'], ['ntWtE', 'ntWt'], ['ntPrE', 'ntPrompt']].forEach(a => setErr(a[0], a[1] && f(a[1]), ''));
       fillLots(); fillCx(); f('ntAgent').value = 'dev'; f('ntModel').value = DEF_MODEL.dev;
@@ -1141,10 +1174,10 @@ html.embed-board #topbar>.meta span{display:none}
       f('ntTitle').focus();
       loadRunner();
     }
-    function setBusy(b){ sending = b; f('ntOk').disabled = b; f('ntOk').textContent = b ? 'Envoi…' : 'Créer la tâche'; f('ntForm').setAttribute('aria-busy', String(b)); }
+    function setBusy(b){ sending = b; f('ntOk').disabled = b; f('ntOk').textContent = b ? 'Envoi…' : editId ? 'Enregistrer' : 'Créer la tâche'; f('ntForm').setAttribute('aria-busy', String(b)); }
     function validate(){
       let bad = null; const mark = (id, fld, msg) => { setErr(id, fld, msg); if(msg && !bad) bad = fld; };
-      mark('ntLotE', f('ntLot'), f('ntLot').value ? '' : 'Choisir un lot.');
+      mark('ntLotE', f('ntLot'), editId || f('ntLot').value ? '' : 'Choisir un lot.');
       mark('ntTitleE', f('ntTitle'), f('ntTitle').value.trim() ? '' : 'Le titre est obligatoire.');
       const wt = f('ntWt').value.trim();
       mark('ntWtE', f('ntWt'), !wt || (wt.indexOf('.claude/worktrees/') === 0 && wt.length > 18 && wt.split('/').indexOf('..') < 0 && wt.indexOf('\\') < 0) ? '' : 'Le worktree doit être un chemin sous .claude/worktrees/, sans « .. ».');
@@ -1167,19 +1200,22 @@ html.embed-board #topbar>.meta span{display:none}
       e.preventDefault(); if(sending) return;
       f('ntSrv').textContent = '';
       if(!validate()) return;
-      const body = { lot:f('ntLot').value, title:f('ntTitle').value.trim(), agent:f('ntAgent').value, model:f('ntModel').value, cx:f('ntCx').value,
-        prio:Number(f('ntPrio').value), perm:f('ntPerm').value, prompt:f('ntPrompt').value, autostart:f('ntAuto').checked && !f('ntAuto').disabled };
+      const body = { title:f('ntTitle').value.trim(), agent:f('ntAgent').value, model:f('ntModel').value, cx:f('ntCx').value,
+        prio:Number(f('ntPrio').value), perm:f('ntPerm').value, prompt:f('ntPrompt').value };
+      if(!editId){ body.lot = f('ntLot').value; body.autostart = f('ntAuto').checked && !f('ntAuto').disabled; }
       const wt = f('ntWt').value.trim(); if(wt) body.worktree = wt;
+      const url = editId ? '/api/tasks/' + encodeURIComponent(editId) + '/edit' : '/api/tasks';
       setBusy(true);
       try {
-        const r = await fetch('/api/tasks', { method:'POST', headers:{ 'Content-Type':'application/json', 'X-STT-Token':TOKEN }, body:JSON.stringify(body) });
+        const r = await fetch(url, { method:'POST', headers:{ 'Content-Type':'application/json', 'X-STT-Token':TOKEN }, body:JSON.stringify(body) });
         let j = null; try { j = await r.json(); } catch(_){}
-        if(!r.ok || !j || !j.ok){ f('ntSrv').textContent = 'Erreur ' + r.status + ' : ' + ((j && j.error) || r.statusText || 'échec de la création'); setBusy(false); return; }
+        if(!r.ok || !j || !j.ok){ f('ntSrv').textContent = 'Erreur ' + r.status + ' : ' + ((j && j.error) || r.statusText || (editId ? 'échec de l’enregistrement' : 'échec de la création')); setBusy(false); return; }
         dlg.close(); setBusy(false);
         reloadThen(() => highlight(j.id));
       } catch(err){ f('ntSrv').textContent = 'Serveur injoignable : ' + (err && err.message || err); setBusy(false); }
     }
     btn.addEventListener('click', openNew);
+    document.addEventListener('click', e => { const eb = e.target.closest('[data-edit]'); if(eb && TOKEN){ e.stopPropagation(); openEdit(eb.dataset.edit); } });
     f('ntX').addEventListener('click', () => dlg.close());
     f('ntCancel').addEventListener('click', () => dlg.close());
     f('ntForm').addEventListener('submit', submit);
