@@ -6,13 +6,13 @@ Usage : repérer `nom:ligne`, puis lire par plage (`sed -n 'a,bp' fichier`) plut
 **Liste noire** (ne jamais lire en entier) : fichiers de plus de 300 Ko (dont `src/JS/vendor/*.min.js`), `*.min.html`, `sources/target/*`, `docs/spec-*-P1.md`, `docs/specs/*-autonome.md`, `STT_ModuleLibrary.json`, `*.glb`, `archives/` ; voir aussi `CLAUDE.md`.
 Chemins : sans préfixe = `sources/src/JS/game/` ; `sim/`, `ui/` = `sources/src/JS/sim/`, `ui/` ; `shared/` = `demos/space-travel/shared/` (source unique, aussi utilisée par la démo « Observation des étoiles »).
 Légende : `fn` = function de niveau 0 · `var` = const/let/var de niveau 0 · `ns X` = `const X = (function(){…})()` et clés de son `return {…}` final (ligne de la déclaration locale, sinon de la clé) · `win` = `window.__X =` (×n = nombre d'affectations) · `[IIFE]` = module entièrement enveloppé : les déclarations listées sont locales, seuls les `win` sont globaux · `@provides` / `@requires` = balises de dépendances.
-Source de l'ordre : `src/JS/game/ORDER.txt` (70 entrées). 70 fichiers lus (0 absents ou ignorés) · 15230 lignes · 262 fn · 402 var · 22 ns · 26 window.__.
+Source de l'ordre : `src/JS/game/ORDER.txt` (77 entrées). 77 fichiers lus (0 absents ou ignorés) · 15931 lignes · 291 fn · 419 var · 23 ns · 26 window.__.
 
 ## Modules
 ### 00-prologue.js · 1 l
-### 01-internationalisation-francais-existant-anglais.js · 328 l — 0. INTERNATIONALISATION — français (existant), anglais, allemand,
-- fn: t:145, applyLanguage:296
-- var: LANG:6, I18N:7, RADIO_TEMPLATES:154
+### 01-internationalisation-francais-existant-anglais.js · 332 l — 0. INTERNATIONALISATION — français (existant), anglais, allemand,
+- fn: t:149, applyLanguage:300
+- var: LANG:6, I18N:7, RADIO_TEMPLATES:158
 ### 02-prng-seede-tout-l.js · 30 l — 1. PRNG SEEDÉ — tout l'univers découle d'une seule graine
 - fn: xmur3:4, mulberry32:17, rngFor:25
 - var: SEED:28
@@ -136,9 +136,9 @@ Source de l'ordre : `src/JS/game/ORDER.txt` (70 entrées). 70 fichiers lus (0 ab
 - ns REAL:20: active:24, parked:24, started:84, galPos:85, galCam:85, leg:86, hideCell:86, debugView:86, T:86, cloudT:86, corridor:86, hops:86, UNITS:87
 ### 20n-ports-orbitaux.js · 184 l — PORTS ORBITAUX — lot P1 : génération et rendu (SPEC-008-ports_orbitaux_et_navette-V1.0.md, Partie B)
 - ns PORTS:15: build:165, archetypeFor:174, orbitRadius:180, orient:182, CLASS_MAX:17, PONTOON_LEN:18, mats:32
-### 20d-commerce-local.js · 181 l — L3 — COMMERCE LOCAL (lot 3, fusion de la démo v7.2.2)
-- fn: buildStations:181
-- ns LOCAL:29: buildStations:45, updateStations:64, disposeStations:69, refreshShipyardRow:139, openContractBoard:101
+### 20d-commerce-local.js · 182 l — L3 — COMMERCE LOCAL (lot 3, fusion de la démo v7.2.2)
+- fn: buildStations:182
+- ns LOCAL:29: buildStations:45, updateStations:64, disposeStations:69, refreshShipyardRow:139, openContractBoard:101, closeContractBoard:127, openShipyard:151, closeShipyard:164
 ### 20e-carte-2d.js · 91 l — L4 — CARTE 2D DE LA DÉMO + CIBLAGE DE SAUT DU JEU (échelle réelle)
 - ns MAP2D:17: C:18
 - win: __CINE:18, __DEMO:79
@@ -172,8 +172,8 @@ Source de l'ordre : `src/JS/game/ORDER.txt` (70 entrées). 70 fichiers lus (0 ab
 - var: JUMP_GRID:93, WARP_STREAKS:93, WARP_STREAK_OFF:93, _jgUp:94, _wsFwd:94, _wsU:94, _wsY:94
 ### 22-commandes-de-vol-derive.js · 5 l — 8. COMMANDES DE VOL — dérive automatique par défaut, prise de contrôle
 - var: AXIS_X:5, AXIS_Y:5, AXIS_Z:5
-### 23-planification-relance-d-itineraire.js · 390 l — PLANIFICATION / RELANCE D'ITINÉRAIRE
-- fn: computeRoute:9, toggleRadioPanel:358, nextCameraMode:363, toggleVoiceMute:367, toggleAudioPanel:373
+### 23-planification-relance-d-itineraire.js · 389 l — PLANIFICATION / RELANCE D'ITINÉRAIRE
+- fn: computeRoute:9, toggleRadioPanel:357, nextCameraMode:362, toggleVoiceMute:366, toggleAudioPanel:372
 - var: keys:232
 ### 24-mode-pause-11-de.js · 234 l — MODE PAUSE — §11 de la spec v2.1.
 - fn: pickCinematicTarget:27, updateTitleCinematic:58, enterPause:94, resumeGame:107, quitToTitle:117, pickDistantShot:153, flashCameraModeLabel:183
@@ -181,10 +181,10 @@ Source de l'ordre : `src/JS/game/ORDER.txt` (70 entrées). 70 fichiers lus (0 ab
   lastPX:130, lastPY:130, dragYaw:130, dragPitch:130, touchLookHeld:135, camOrbitYaw:145, camOrbitPitch:145, ctrlDownAt:146, ctrlDragged:146, CAMERA_MODES:147, cameraMode:148,
   distantShotState:152, cameraModeFlashTimer:182
 ### 25-controle-tactile-15-de.js · 7 l — CONTRÔLE TACTILE — §15 de la spec v2.1. Détection par capacité de
-### 26-barre-d-icones-du.js · 403 l — BARRE D'ICÔNES DU HUD — §12 de la spec v2.1. Un mécanisme UNIQUE pour le
-- fn: isNearPortService:89, activateHudBarItem:102, refreshHudIconBar:129, buildHelpGrid:178, effectiveCruiseSpeed:398, speedUpgradeCost:401
-- var: HUD_ICONS:10, HUD_BAR_ITEMS:47, manual:378, lastInputTime:379, rcsDemand:381, rcsLevel:383, IDLE_MS:384, CRUISE_SPEED_BASE:385, BOOST_MULT:385, currentSpeed:389, speedUpgradeLevel:395,
-  SPEED_UPGRADE_STEP:396, SPEED_UPGRADE_MAX:397
+### 26-barre-d-icones-du.js · 420 l — BARRE D'ICÔNES DU HUD — §12 de la spec v2.1. Un mécanisme UNIQUE pour le
+- fn: isNearPortService:89, activateHudBarItem:102, refreshHudIconBar:138, buildHelpGrid:192, effectiveCruiseSpeed:415, speedUpgradeCost:418
+- var: HUD_ICONS:10, HUD_BAR_ITEMS:47, manual:395, lastInputTime:396, rcsDemand:398, rcsLevel:400, IDLE_MS:401, CRUISE_SPEED_BASE:402, BOOST_MULT:402, currentSpeed:406, speedUpgradeLevel:412,
+  SPEED_UPGRADE_STEP:413, SPEED_UPGRADE_MAX:414
 ### 27-carburant-22-jauge-consommation.js · 35 l — CARBURANT (§22) — jauge, consommation liée au régime moteur,
 - fn: fuelRefuelCost:33
 - var: FUEL_CAPACITY:10, fuel:11, FUEL_CONSUMPTION_EXPONENT:19, FUEL_EMPTY_SPEED_SCALE:27, FUEL_PRICE_PER_UNIT:30, FUEL_WARN_RATIO:32, FUEL_CRIT_RATIO:32
@@ -239,3 +239,29 @@ Source de l'ordre : `src/JS/game/ORDER.txt` (70 entrées). 70 fichiers lus (0 ab
 ### 45-campaign-bridge.js · 286 l — CAMPAGNE 5. PONT — BRIDGE : choix du mode, reprise, synchro crédits / horloge, sauvegarde automatique, menu p…
 - ns BRIDGE:7: chooseMode:90, resume:173
 - @provides BRIDGE · @requires GAME, SAVE, DATA · @requires-engine addCredits, credits, refreshCreditsDisplay, MODSHIP, MISSIONS, SHIPGEN, SEED, LANG, t, gameStarted, gamePaused, jumpState
+### ui/50-console.js · 210 l — CAMPAGNE 1. CONSOLE DE BORD — CONSOLE : modèle des onglets, événements, table des touches (L1)
+- ns CONSOLE:6: register:57, tabs:200, visibleTabs:52, current:202, last:203, isOpen:204, open:85, close:105, toggle:116, refresh:122, badge:138, badges:149, on:18, keyAction:155, _reset:191
+- @provides CONSOLE
+### ui/51-console-view.js · 231 l [IIFE] — CAMPAGNE 1. CONSOLE DE BORD — vue : cadre #sttConsole, CSS, hébergement des overlays, clavier minimal (L1)
+- fn: label:63, panelFor:68, buttonFor:82, render:99, ensure:122, sync:152, onMutation:159, attach:169, host:179, typing:190, eat:198, onKeyDown:200, onKeyUp:216
+- var: CSS:8, hosts:59, root:60, tabsEl:60, titleEl:60, closeEl:60, bodyEl:60, escHeld:61, TEXT_INPUT:189
+- @provides CONSOLE.view · @requires CONSOLE · @requires-engine t, gameStarted, gamePaused, activateHudBarItem, HUD_BAR_ITEMS
+### ui/52-tab-aide.js · 54 l [IIFE] — CAMPAGNE 1. CONSOLE DE BORD — onglet Aide · Réglages (#helpOverlay puis #audioOverlay) (L1.3)
+- fn: node:8, shown:9, isOn:10, toggleAudio:36
+- @provides CONSOLE.help · @requires CONSOLE, CONSOLE.view
+### ui/53-tab-navigation.js · 53 l [IIFE] — CAMPAGNE 1. CONSOLE DE BORD — onglet Navigation (#stmMap, carte de l'univers) (L1.4)
+- fn: shown:21, ensureHost:23
+- var: st:10, hosted:20
+- @provides CONSOLE.nav · @requires CONSOLE, CONSOLE.view · @requires-engine gameStarted, openStarMap, closeStarMap
+### ui/54-tab-missions.js · 58 l [IIFE] — CAMPAGNE 1. CONSOLE DE BORD — onglet Missions (#missionBoardOverlay, #contractBoardOverlay) (L1.5)
+- fn: node:16, missionShown:17, contractShown:18, isUp:19, ensureHosts:23
+- var: st:8, hostedMission:22, hostedContract:22, empty:22
+- @provides CONSOLE.missions · @requires CONSOLE, CONSOLE.view · @requires-engine MISSIONS, LOCAL, t
+### ui/55-tab-port.js · 39 l [IIFE] — CAMPAGNE 1. CONSOLE DE BORD — onglet Port (#portPanel) (L1.6)
+- fn: panel:9, shown:10, ensureHost:13
+- var: hosted:12
+- @provides CONSOLE.port · @requires CONSOLE, CONSOLE.view · @requires-engine isNearPortService, refreshPortPanel
+### ui/56-tab-chantier.js · 35 l [IIFE] — CAMPAGNE 1. CONSOLE DE BORD — onglet Chantier naval (#shipyardOverlay) (L1.6)
+- fn: shown:8, ensureHost:11
+- var: hosted:10
+- @provides CONSOLE.yard · @requires CONSOLE, CONSOLE.view · @requires-engine isNearPortService, LOCAL

@@ -191,7 +191,7 @@ function startBayOther(){
 function deliverDirect(){
   const os = orbitState; os.deliveredCount = (os.deliveredCount || 0) + 1;
   if(!os.creditsPaid && os.spawned.every(Boolean) && os.deliveredCount >= os.spawnFractions.length){
-    const total = os.cargoSplit.reduce((a, b) => a + b, 0); addCredits(total*os.unitPrice); os.creditsPaid = true; }
+    const total = os.cargoSplit.reduce((a, b) => a + b, 0); addCredits(total*os.unitPrice, 'delivery'); os.creditsPaid = true; }
 }
 function startBay(){
   if(!isContainerShip(SHIP_ID)) return startBayOther();

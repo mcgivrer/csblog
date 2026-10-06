@@ -405,7 +405,7 @@ Les maquettes des § 1.2 à 1.6 montrent la console et ses onglets (Flotte au §
 | **Aide · Réglages** | aide, audio, langue, qualité, sauvegardes | H, Échap | toujours |
 
 - `Tab` ouvre la console sur le dernier onglet, `Échap` la ferme. Des **badges** signalent alerte de flotte, recherche terminée, nouveaux candidats.
-- Les touches F1 à F8 basculent aujourd'hui les panneaux du HUD : elles passent aux onglets, et les panneaux du HUD gardent la barre d'icônes plus `Alt+1` à `Alt+8` (décision à valider, § 4).
+- Les touches F1 à F8 basculent aujourd'hui les panneaux du HUD : elles passent aux onglets, et les panneaux du HUD gardent la barre d'icônes plus les touches `1` à `8` (décision du mainteneur, 06/10/2026).
 - En vol, la console ne met pas le jeu en pause. Le Chantier coupe le rendu de vol (le vaisseau est à quai, § 2.7).
 - Tactile : console plein écran, onglets en barre défilante, un seul panneau à la fois (demande du TODO v2.5). Les onglets non débloqués sont masqués.
 - Charte McGivrer, comme le HUD existant.
@@ -711,7 +711,7 @@ L0, tâche 1 : `codemap.py` et le chronométrage des missions. Deux résultats u
 | 2 | Départ de campagne | *Courlis* modulaire, 4 000 CR | vaisseau procédural actuel, modulaire seulement plus tard |
 | 3 | Vaisseaux procéduraux en campagne | marché de l'occasion, non modifiables | retirés de la campagne |
 | 4 | Progression hors ligne | aucune au départ | rattrapage plafonné à 1 h |
-| 5 | Touches F1 à F8 | onglets de la console ; panneaux du HUD en `Alt+1` à `Alt+8` | F1 à F8 gardés aux panneaux, console sur `Tab` seulement |
+| 5 | Touches F1 à F8 | onglets de la console ; panneaux du HUD sur les touches `1` à `8` (décision du mainteneur, 06/10/2026) | F1 à F8 gardés aux panneaux, console sur `Tab` seulement |
 | 6 | Construction de la station | missions d'approvisionnement de la flotte, achat sur place possible à +40 % | achat instantané |
 | 7 | Taille de la flotte | bornée par les postes (station + 2 loués) | illimitée |
 | 8 | Rendement automatisé | 65 %, 75 % avec un capitaine expérimenté | 50 % ou 80 % (§ 1.7, sensibilité) |

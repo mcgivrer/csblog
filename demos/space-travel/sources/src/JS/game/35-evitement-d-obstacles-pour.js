@@ -315,7 +315,7 @@ function updateShuttles(dt, elapsed){
         if(!orbitState.creditsPaid && orbitState.spawned.every(Boolean)
            && orbitState.deliveredCount >= orbitState.spawnFractions.length){
           const total = orbitState.cargoSplit.reduce(function(a,b){ return a+b; }, 0);
-          addCredits(total * orbitState.unitPrice);
+          addCredits(total * orbitState.unitPrice, 'delivery');
           orbitState.creditsPaid = true;
         }
         if(s.noReturn){                                             /* navette du port : reste au port */

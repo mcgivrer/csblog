@@ -23,7 +23,7 @@ function refreshCreditsDisplay(flash){
     creditsFlashTimer = setTimeout(function(){ el.style.color = ''; }, 1500);
   }
 }
-function addCredits(amount){
+function addCredits(amount, reason){   // reason : motif facultatif (relayé par les adaptateurs 45 et 46), ignoré ici
   credits = Math.max(0, credits + amount);
   refreshCreditsDisplay(amount > 0);
   if(typeof refreshPortPanel === 'function') refreshPortPanel();

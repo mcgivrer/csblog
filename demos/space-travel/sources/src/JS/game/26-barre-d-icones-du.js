@@ -26,10 +26,6 @@ const HUD_ICONS = {
      pointillé — distinct de « route » (juste un trait entre deux points),
      pour ne pas confondre le plan de vol textuel et ce mini-suivi visuel. */
   itinerary: '<path d="M3 15h5.5M15.5 15H21" stroke-dasharray="2.5 3"/><circle cx="12" cy="15" r="1.8" fill="currentColor" stroke="none"/><path d="M12 3.5a4 4 0 0 1 4 4c0 3-4 7.5-4 7.5s-4-4.5-4-7.5a4 4 0 0 1 4-4z"/><circle cx="12" cy="7.3" r="1.3" fill="currentColor" stroke="none"/>',
-  /* point de Lagrange : boussole (cadran + aiguille) plutôt qu'un pictogramme
-     orbital littéral — c'est l'ORIENTATION relative qui est montrée, pas la
-     géométrie à N corps elle-même */
-  lagrange: '<circle cx="12" cy="12" r="8.5"/><path d="M12 5L14 12L12 19L10 12Z" fill="currentColor" stroke="none"/>',
   /* carte stellaire (§23) : trois points reliés par des traits fins,
      évoquant une petite constellation — distinct de « route » (un seul
      trait) et de « itinerary » (repère + trajet pointillé) déjà utilisés
@@ -54,14 +50,13 @@ const HUD_BAR_ITEMS = [
   { cls:null,            icon:'radio',   labelKey:'lblRadioChannel', kind:'radio'  },
   { cls:null,            icon:'port',    labelKey:'lblPortServices', kind:'port'   },
   { cls:null,            icon:'camera',  labelKey:null,              kind:'camera' },
-  /* itinéraire et point de Lagrange (§ amélioration v2.4) : deux nouveaux
-     panneaux, ajoutés APRÈS camera plutôt qu'entremêlés aux six premiers
+  /* itinéraire (§ amélioration v2.4) : nouvel
+     panneau, ajouté APRÈS camera plutôt qu'entremêlé aux six premiers
      panneaux d'info — F1-F9 sont affectés par POSITION dans ce tableau
      (cf. le gestionnaire keydown plus bas, indexé sur e.code), donc tout
      insertion avant radio/port/camera aurait décalé leurs raccourcis F7-F9.
-     Comme l'aide (H), ceux-ci prennent une touche FIXE plutôt qu'un F-slot. */
+     Comme l'aide (H), celui-ci prend une touche FIXE plutôt qu'un F-slot. */
   { cls:'hud-itinerary', icon:'itinerary', labelKey:'lblItinerary',  kind:'panel', hotkey:'I' },
-  { cls:'hud-lagrange',  icon:'lagrange',  labelKey:'lblLagrange',   kind:'panel', hotkey:'L' },
   /* carte stellaire (§23) : même principe (touche fixe, ajoutée après les
      six premiers panneaux pour ne pas décaler F7-F9) — indispensable au
      clavier ET au tactile, faute de quoi le module resterait totalement
@@ -108,21 +103,30 @@ function activateHudBarItem(item){
     toggleRadioPanel();
   } else if(item.kind === 'port'){
     if(!isNearPortService()) return;   /* icône inerte hors zone/livraison */
-    const el = document.getElementById('portPanel');
-    if(el){ el.classList.toggle('visible'); if(el.classList.contains('visible')) refreshPortPanel(); }
+    if(typeof CONSOLE !== 'undefined'){ CONSOLE.toggle('port'); }
+    else {
+      const el = document.getElementById('portPanel');
+      if(el){ el.classList.toggle('visible'); if(el.classList.contains('visible')) refreshPortPanel(); }
+    }
   } else if(item.kind === 'camera'){
     nextCameraMode();
   } else if(item.kind === 'help'){
-    const el = document.getElementById('helpOverlay');
-    if(el) el.classList.toggle('visible');
+    if(typeof CONSOLE !== 'undefined'){ CONSOLE.toggle('help'); }
+    else {
+      const el = document.getElementById('helpOverlay');
+      if(el) el.classList.toggle('visible');
+    }
   } else if(item.kind === 'starmap'){
-    if(isStarMapOpen()) closeStarMap(); else openStarMap();
+    if(typeof CONSOLE !== 'undefined'){ CONSOLE.toggle('nav'); }
+    else if(isStarMapOpen()) closeStarMap(); else openStarMap();
   } else if(item.kind === 'audio'){
-    toggleAudioPanel();
+    if(typeof CONSOLE !== 'undefined' && CONSOLE.help) CONSOLE.help.toggleAudio();
+    else toggleAudioPanel();
   } else if(item.kind === 'autopilot'){
     if(REAL.active && REAL.started) REAL.apToggle();
   } else if(item.kind === 'missions'){
-    if(typeof MISSIONS !== 'undefined' && MISSIONS.enabled()) MISSIONS.toggleBoard();
+    if(typeof CONSOLE !== 'undefined'){ CONSOLE.toggle('missions'); }
+    else if(typeof MISSIONS !== 'undefined' && MISSIONS.enabled()) MISSIONS.toggleBoard();
   }
   refreshHudIconBar();
 }
@@ -138,21 +142,25 @@ function refreshHudIconBar(){
       active = !!(el && el.classList.contains('visible'));
     } else if(item.kind === 'port'){
       const el = document.getElementById('portPanel');
-      active = !!(el && el.classList.contains('visible'));
+      active = (typeof CONSOLE !== 'undefined') ? CONSOLE.isOpen('port') : !!(el && el.classList.contains('visible'));
       disabled = !isNearPortService();
       if(disabled && active){
         /* la fenêtre d'activation s'est refermée (le vaisseau s'est
            éloigné) pendant que le panneau était ouvert : on le referme
            plutôt que de laisser un service inaccessible affiché */
-        el.classList.remove('visible'); active = false;
+        if(typeof CONSOLE !== 'undefined') CONSOLE.refresh(); else if(el) el.classList.remove('visible');
+        active = false;
       }
     } else if(item.kind === 'camera'){
       item.el.querySelector('svg').innerHTML = HUD_ICONS['cam_'+CAMERA_MODES[cameraMode]];
     } else if(item.kind === 'help'){
-      const el = document.getElementById('helpOverlay');
-      active = !!(el && el.classList.contains('visible'));
+      if(typeof CONSOLE !== 'undefined') active = CONSOLE.isOpen('help');
+      else {
+        const el = document.getElementById('helpOverlay');
+        active = !!(el && el.classList.contains('visible'));
+      }
     } else if(item.kind === 'starmap'){
-      active = isStarMapOpen();
+      active = (typeof CONSOLE !== 'undefined') ? CONSOLE.isOpen('nav') : isStarMapOpen();
     } else if(item.kind === 'audio'){
       const el = document.getElementById('audioOverlay');
       active = !!(el && el.classList.contains('visible'));
@@ -161,7 +169,8 @@ function refreshHudIconBar(){
       active = live && REAL.ap.on; disabled = !live;
     } else if(item.kind === 'missions'){
       const on = typeof MISSIONS !== 'undefined' && MISSIONS.enabled();
-      active = on && MISSIONS.boardOpen(); disabled = !on;
+      active = (typeof CONSOLE !== 'undefined') ? CONSOLE.isOpen('missions') : (on && MISSIONS.boardOpen());
+      disabled = !on;
     }
     item.el.classList.toggle('active', active);
     item.el.classList.toggle('disabled', disabled);
@@ -185,6 +194,8 @@ function buildHelpGrid(){
     [t('hk_aim'), t('hlp_aim')],
     [t('hk_freelook'), t('hlp_freelook')]
   ];
+  rows.push([t('hk_console'), t('hlp_console')]);
+  [['F2','conTabNav'],['F3','conTabMissions'],['F4','conTabPort'],['F5','conTabYard'],['L','conTabJournal']].forEach(function(r){ rows.push([r[0], t(r[1])]); });
   HUD_BAR_ITEMS.forEach(function(item){
     /* l'aide se décrit elle-même juste en dessous (« Affiche/masque cette
        aide ») — l'inclure ici aussi ferait doublon sur la touche H, comme
@@ -193,6 +204,7 @@ function buildHelpGrid(){
     const label = item.kind === 'camera' ? t('cameraLabel').replace(/[\s\u2014]+$/,'') : (item.labelKey ? t(item.labelKey) : '');
     rows.push([item.hotkey, label]);
   });
+  rows.push(['1 \u2013 8', t('hlp_hudAlt')]);
   rows.push(['X', t('hlp_brake')]);
   rows.push(['F10', t('hlp_voice')]);
   rows.push(['ESPACE / ENTR\u00c9E', t('hlp_skip')]);
@@ -238,7 +250,7 @@ document.addEventListener('click', function(e){
   const bar = document.getElementById('hudIconBar');
   if(!bar) return;
   HUD_BAR_ITEMS.forEach(function(item, idx){
-    if(!item.hotkey) item.hotkey = 'F' + (idx+1);   /* F1..F9, dans l'ordre — l'aide fixe déjà la sienne à 'H' */
+    if(!item.hotkey) item.hotkey = idx < 8 ? String(idx+1) : 'F' + (idx+1);   /* touches 1..8 sans Alt (F1-F8 migrés vers la console, L1.7), F9 caméra — l'aide fixe déjà la sienne à 'H' */
     const btn = document.createElement('button');
     btn.className = 'hud-icon-btn';
     btn.innerHTML = '<svg viewBox="0 0 24 24">'+HUD_ICONS[item.icon]+'</svg>';
@@ -365,7 +377,7 @@ document.addEventListener('click', function(e){
      bascule automatique) : pas la place de les garder tous ouverts en
      continu sur un écran de smartphone. */
   if(document.body.classList.contains('portrait-touch')){
-    ['hud-left','hud-route','hud-right','hud-temp','hud-engines','hud-telemetry','hud-itinerary','hud-lagrange'].forEach(function(cls){
+    ['hud-left','hud-route','hud-right','hud-temp','hud-engines','hud-telemetry','hud-itinerary'].forEach(function(cls){
       const el = document.querySelector('.'+cls);
       if(el) el.classList.add('panel-hidden');
     });

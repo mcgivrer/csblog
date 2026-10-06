@@ -36,13 +36,11 @@ function updateHud(now){
   const forward = new THREE.Vector3(0,0,-1).applyQuaternion(shipRig.quaternion);
   const heading = ((Math.atan2(forward.x, -forward.z)*180/Math.PI)+360)%360;
   document.getElementById('headingVal').textContent = String(Math.round(heading)).padStart(3,'0')+'°';
-  /* itinéraire (point-vaisseau) et point de Lagrange (§ v2.4) : hors du
+  /* itinéraire (point-vaisseau) : hors du
      throttle ci-dessous comme vitesse/secteur/cap juste au-dessus — un
      point qui saute par paliers de 350ms serait visiblement saccadé,
-     contrairement à un texte qui change peu d'une image à l'autre. Chaque
-     fonction sort tout de suite si son panneau est masqué. */
+     contrairement à un texte qui change peu d'une image à l'autre. */
   updateItineraryShip();
-  updateLagrangePanel();
 
   if(now - lastHudUpdate < 350) return;
   lastHudUpdate = now;

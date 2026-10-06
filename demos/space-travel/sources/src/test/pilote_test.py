@@ -28,10 +28,10 @@ with sync_playwright() as pw:
     pg.evaluate("() => { LAYERS.skipRender = true; let n = 0; while(n++ < 400 && !(missionBoardOverlay.style.display === 'flex')) window.__step(1); }")
 
     # --- tableau des missions : fermeture (×, J), pas de réouverture forcée, rappel (J) avec les mêmes offres
-    st = pg.evaluate("() => ({ open: missionBoardOverlay.style.display === 'flex', x: !!document.getElementById('missionClose') })")
-    check("tableau ouvert à l'arrivée, avec sa croix de fermeture", st["open"] and st["x"], st)
+    st = pg.evaluate("() => ({ open: missionBoardOverlay.style.display === 'flex', x: !!document.querySelector('#sttConsole .con-close') })")
+    check("tableau ouvert à l'arrivée, avec la croix de la console", st["open"] and st["x"], st)
     offers0 = pg.evaluate("() => MISSIONS.state.offers.map(o => o.dest.name + o.reward)")
-    pg.click("#missionClose")
+    pg.click("#sttConsole .con-close")
     pg.evaluate("() => window.__step(30)")
     st = pg.evaluate("() => ({ open: missionBoardOverlay.style.display === 'flex', phase: REAL.phase, fp: flightPhase })")
     check("croix : le tableau se ferme et ne se rouvre pas tout seul", not st["open"], st)

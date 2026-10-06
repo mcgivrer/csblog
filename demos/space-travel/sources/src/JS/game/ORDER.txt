@@ -5,6 +5,7 @@ sim/00-game-state.js
 sim/01-rng-game.js
 sim/02-data.js
 sim/03-save.js
+sim/04-journal.js
 03-generateur-de-noms-melange.js
 04-modele-astrophysique.js
 05-scene-three-js.js
@@ -68,3 +69,12 @@ shared/starmap.js
 41-animation-des-systemes-planetaires.js
 42-ecran-de-demarrage-sequence.js
 45-campaign-bridge.js
+46-journal-sources.js
+ui/50-console.js
+ui/51-console-view.js
+ui/52-tab-aide.js
+ui/53-tab-navigation.js
+ui/54-tab-missions.js
+ui/55-tab-port.js
+ui/56-tab-chantier.js
+ui/57-tab-journal.js

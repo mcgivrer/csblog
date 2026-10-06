@@ -207,7 +207,7 @@ function update(){
 /* ---------- démarrage : en orbite près de la planète de départ ---------- */
 function itineraryUi(hide){
   if(!document.getElementById('missionModeCss')){ const st = document.createElement('style'); st.id = 'missionModeCss';
-    st.textContent = 'body.missions-mode #itineraryPanel, body.missions-mode #lagrangePanel, body.missions-mode .route-panel, body.missions-mode #routePanel{ display:none !important; }';
+    st.textContent = 'body.missions-mode #itineraryPanel, body.missions-mode .route-panel, body.missions-mode #routePanel{ display:none !important; }';
     document.head.appendChild(st); }
   document.body.classList.toggle('missions-mode', !!hide);
   const fp = document.getElementById('lblFlightPlan'); const panel = fp && fp.closest('.panel'); if(panel) panel.style.display = hide ? 'none' : '';

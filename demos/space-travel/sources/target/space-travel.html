@@ -473,23 +473,6 @@
     transition:left 0.25s linear; pointer-events:none;
   }
 
-  /* ---------- orientation / point de Lagrange (§ amélioration v2.4) — bas
-     gauche. Le point visé n'est pas simulé en toute rigueur (les masses
-     réelles des planètes générées ne sont pas modélisées) : c'est un point
-     fixe placé sur l'axe étoile→planète de l'étape en cours, à 92% de la
-     distance en partant de l'étoile — une approximation assumée de L1,
-     suffisante pour donner un cap et une distance à suivre, pas une
-     simulation à N corps. */
-  .hud-lagrange{ left:18px; bottom:58px; width:196px; padding:10px 14px 12px; }
-  @media (max-width:900px){ .hud-lagrange{ display:none !important; } }
-  .touch-mode .hud-lagrange{ display:none !important; }
-  .lagrange-body{ display:flex; align-items:center; gap:12px; margin-top:8px; }
-  .lagrange-dial{ width:52px; height:52px; flex:none; }
-  #lagrangeNeedle{ transform-origin:30px 30px; transition:transform 0.15s linear; }
-  .lagrange-info{ display:flex; flex-direction:column; gap:3px; min-width:0; }
-  .lagrange-dist{ font-family:'JetBrains Mono',monospace; font-size:15px; font-weight:700; color:var(--amber); }
-  .lagrange-name{ font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--muted-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-
   /* ---------- canal radio — échanges équipage / contrôle du port ---------- */
   .hud-radio{
     position:absolute; right:18px; top:230px; width:300px;
@@ -1083,27 +1066,6 @@
     </div>
   </div>
 
-  <!-- orientation / point de Lagrange (§ amélioration v2.4) : bas gauche -->
-  <div class="panel hud-lagrange mono" id="lagrangePanel">
-    <button class="panel-close-btn" data-panel-cls="hud-lagrange" title="Fermer">×</button>
-    <div class="tm-title" id="lblLagrange">POINT DE LAGRANGE</div>
-    <div class="lagrange-body">
-      <svg class="lagrange-dial" viewBox="0 0 60 60">
-        <circle cx="30" cy="30" r="26" fill="none" stroke="var(--line)" stroke-width="1.5"/>
-        <path d="M30 6v8" stroke="var(--muted-2)" stroke-width="1.5"/>
-        <g id="lagrangeNeedle">
-          <path d="M30 30L30 10" stroke="var(--amber)" stroke-width="2" stroke-linecap="round"/>
-          <circle cx="30" cy="10" r="2.6" fill="var(--amber)" stroke="none"/>
-        </g>
-        <circle cx="30" cy="30" r="1.8" fill="var(--muted-2)" stroke="none"/>
-      </svg>
-      <div class="lagrange-info">
-        <div class="lagrange-dist" id="lagrangeDist">— u</div>
-        <div class="lagrange-name" id="lagrangeName">—</div>
-      </div>
-    </div>
-  </div>
-
   <!-- barre d'icônes du HUD (§12) — unifiée bureau + tactile, générée en JS -->
   <div id="hudIconBar" class="mono"></div>
 
@@ -1363,7 +1325,7 @@ const I18N = {
     topBrand: 'NAVIGATION QUANTIQUE', seedLabel: 'SEED', onlineLabel: 'EN LIGNE',
     lblSpeed: 'Vitesse', lblSector: 'Secteur', lblHeading: 'Cap',
     lblFlightPlan: 'Plan de vol', lblNearest: 'OBJET LE PLUS PROCHE',
-    lblItinerary: 'ITINÉRAIRE', lblLagrange: 'POINT DE LAGRANGE',
+    lblItinerary: 'ITINÉRAIRE',
     lblEngineTemp: 'TEMPÉRATURE MOTEUR', lblPropulsion: 'PROPULSION', lblEngineCmd: 'COMMANDES MOTEUR',
     lblRadioChannel: 'CANAL RADIO', radioMuteTitle: 'Couper le son du canal radio',
     badge_auto: 'AUTOPILOTE', badge_manual: 'MANUEL', badge_orbit: 'MISE EN ORBITE',
@@ -1390,14 +1352,15 @@ const I18N = {
     ssImport:'Importer une création…', ssImportOk:'{n} création(s) ajoutée(s) au hangar.', ssImportSt:'{n} station(s) rejoindront les ports orbitaux.', ssImportErr:'Fichier refusé : exporte la composition depuis le chantier naval (bouton « Pour le jeu »).', ssModTip:'Création du chantier naval', ttsLang: 'fr-FR', quitConfirm:'Quitter la partie et revenir à l’écran-titre ? La progression sera perdue.',ssTitle:'Hangar — choisissez votre vaisseau', ssNote:'Sélection provisoire : elle sera remplacée par la boutique du chantier naval.', ssConfirm:'Embarquer', ssPrev:'Vaisseau précédent', ssNext:'Vaisseau suivant', ssHint:'← → vaisseau, ↑ ↓ propulsion, Entrée pour embarquer', ssPropSel:'Système de propulsion', ssOptE:'Epstein +', ssOptJ:'Saut quantique', ssOptW:'Supraluminique', ssWarp:'Supraluminique', ssWarpYes:'×{f} — anneaux de distorsion ×{n}', ssWarpOff:'Non installée', ssOptNote:'Supraluminique et saut quantique réservés aux long-courriers', ssJumpLater:'Non installé — module achetable en escale', ssTier:'Palier', ssReg:'Immatriculation', ssLen:'Longueur', ssWid:'Largeur', ssHei:'Hauteur', ssDry:'Masse à vide', ssLoaded:'Masse en charge', ssCont:'Conteneurs', ssTanks:'Réservoirs de glace', ssPax:'Passagers', ssCrew:'Équipage', ssProp:'Propulsion', ssPropVal:'Epstein, {n} tuyères', ssJump:'Saut quantique', ssJumpYes:'Générateur de saut', ssJumpNo:'Non disponible', ssDef:'Défense', ssDefVal:'Tourelles PDC ×{n}', ssRad:'Radiateurs', portJumpLongHaul:'Réservé aux long-courriers', noRoute: 'Aucune route', creditsLabel: 'CRÉDITS', menuNavPanel: 'Vitesse / cap', pauseTitle: 'PAUSE', pauseSub: 'Simulation suspendue', pauseResumeLbl: 'REPRENDRE', pauseQuitLbl: 'QUITTER \u2014 \u00c9CRAN-TITRE', pauseHint: 'ESPACE / ENTR\u00c9E \u2014 reprendre \u00b7 \u00c9CHAP \u2014 quitter', lblPortServices: 'SERVICES PORTUAIRES', lblSpeedUpgrade: 'Propulseurs', portUpgradeBtn: 'AM\u00c9LIORER', portMaxLevel: 'NIVEAU MAXIMAL', lblFuelService: 'Carburant', portFuelBtn: 'RAVITAILLER', portFuelFull: 'PLEIN', lblFuel: 'CARBURANT', lblJumpService: 'Saut quantique', portJumpBtn: 'ACHETER', portJumpAcquired: 'ACQUIS', lblAudioTitle: 'SON', lblMusicVolume: 'Musique', lblVoiceVolume: 'Voix', lblAudioFoot: 'V \u2014 masquer ce r\u00e9glage', jumpBannerText: 'SAUT QUANTIQUE EN COURS', lblHelpTitle: 'AIDE \u2014 COMMANDES', lblHelpFoot: 'H \u2014 masquer cette aide', hk_move: '\u2191\u2193\u2190\u2192 / ZQSD', hlp_move: 'Orientation (tangage / lacet)', hk_roll: 'E / R', hlp_roll: 'Roulis', hk_thrust: 'MAJ / ESPACE', hlp_thrust: 'Propulsion', hk_aim: 'Glisser la souris', hlp_aim: 'Vis\u00e9e fine', hk_freelook: 'CTRL + glisser', hlp_freelook: 'Regard libre', hlp_voice: 'Coupe/r\u00e9tablit la voix', hlp_skip: 'Abr\u00e8ge la man\u0153uvre / reprend la pause', hlp_pause: 'Met le jeu en pause', hlp_help: 'Affiche/masque cette aide', llmChecking: 'Détection de l\u2019IA embarquée en cours\u2026', llmActive: 'IA embarquée (Gemini Nano) active \u2014 dialogues générés dynamiquement', llmInactive: 'IA embarquée indisponible \u2014 dialogues par gabarits', shuttleLabelGeneric: 'NAVETTE', lblAutopilot: 'Pilote automatique', lblMissions: 'Tableau des missions', hlp_autopilot: 'Pilote automatique : débrayer / engager (arrimage, navette)', hlp_brake: 'Freinage (vol manuel)',
     modeTitle:'MODE DE JEU', modeNew:'Nouvelle campagne', modeNewSub:'Dirigez STT : un cargo Courlis, un capital de départ, une compagnie à bâtir.', modeContinue:'Continuer', modeContinueSub:'Reprendre la sauvegarde de ce navigateur.', modeFree:'Partie libre', modeFreeSub:'Choisir un vaisseau et voyager librement, sans campagne.',
     saveExport:'Exporter la sauvegarde', saveImport:'Importer…', saveDone:'Sauvegarde terminée.', saveError:'Sauvegarde impossible : fichier invalide ou trop récent.',
-    modeReplace:'Une campagne existe : la remplacer ?', modeConfirm:'Confirmer', modeCancel:'Annuler', modeExportFirst:'Exporter d\u2019abord'
+    modeReplace:'Une campagne existe : la remplacer ?', modeConfirm:'Confirmer', modeCancel:'Annuler', modeExportFirst:'Exporter d\u2019abord',
+    conTitle:'Console de bord', conClose:'Fermer la console', conTabNav:'Navigation', conTabMissions:'Missions', conTabPort:'Port', conTabYard:'Chantier naval', conTabHelp:'Aide · Réglages', conEmptyMissions:'Aucune mission à afficher.', hk_console:'TAB', hlp_console:'Ouvre/ferme la console de bord (dernier onglet)', hlp_hudAlt:'Touches 1 à 8 : bascule les éléments du HUD (barre d\u2019icônes, dans l\u2019ordre ; radio sur 7)', conTabJournal:'Journal', jrnAll:'Tout', jrnRadio:'Radio', jrnFin:'Finances', jrnEvt:'Événements', jrnEmpty:'Aucune entrée pour le moment.', jrnBalance:'Solde', jrnFreeNote:'Partie libre : rien n’est sauvegardé, le solde part de la partie en cours.', jrnR_jeu:'Opération', jrnR_delivery:'Livraison', jrnR_yard:'Chantier naval', jrnR_speed:'Vitesse', jrnR_fuel:'Carburant', jrnR_jump:'Saut quantique', jrnE_msnAccept:'Mission acceptée : {a} (prime {b})', jrnE_msnDone:'Mission livrée : {a} (prime {b})', jrnE_jump:'Saut vers {a}', jrnE_arrive:'Arrivée : {a}', jrnE_orbit:'Mise en orbite : {a}', jrnE_dock:'Arrimage : {a}', jrnE_fuelLow:'Carburant bas : {b} %', jrnE_fuelCrit:'Carburant critique : {b} %', jrnE_incident:'Incident : {a}', hlp_journal:'Ouvre/ferme le journal de bord (radio, finances, événements) ; ← → rubrique, ↑ ↓ ligne, PgUp/PgDn défilement'
   },
   en: {
     title_sub: 'Choose a language',
     topBrand: 'QUANTUM NAVIGATION', seedLabel: 'SEED', onlineLabel: 'ONLINE',
     lblSpeed: 'Speed', lblSector: 'Sector', lblHeading: 'Heading',
     lblFlightPlan: 'Flight plan', lblNearest: 'NEAREST OBJECT',
-    lblItinerary: 'ITINERARY', lblLagrange: 'LAGRANGE POINT',
+    lblItinerary: 'ITINERARY',
     lblEngineTemp: 'ENGINE TEMPERATURE', lblPropulsion: 'PROPULSION', lblEngineCmd: 'ENGINE COMMANDS',
     lblRadioChannel: 'RADIO CHANNEL', radioMuteTitle: 'Mute the radio channel',
     badge_auto: 'AUTOPILOT', badge_manual: 'MANUAL', badge_orbit: 'ORBITAL INSERTION',
@@ -1424,14 +1387,15 @@ const I18N = {
     ssImport:'Import a design…', ssImportOk:'{n} design(s) added to the hangar.', ssImportSt:'{n} station(s) will join the orbital ports.', ssImportErr:'File rejected: export the composition from the shipyard editor (“For the game” button).', ssModTip:'Shipyard design', ttsLang: 'en-US', quitConfirm:'Quit the game and return to the title screen? Progress will be lost.',ssTitle:'Hangar — choose your ship', ssNote:'Temporary selection: it will be replaced by the shipyard store.', ssConfirm:'Board', ssPrev:'Previous ship', ssNext:'Next ship', ssHint:'← → ship, ↑ ↓ propulsion, Enter to board', ssPropSel:'Propulsion system', ssOptE:'Epstein +', ssOptJ:'Quantum jump', ssOptW:'FTL cruise', ssWarp:'FTL cruise', ssWarpYes:'×{f} — warp rings ×{n}', ssWarpOff:'Not fitted', ssOptNote:'FTL cruise and quantum jump reserved for long-haul ships', ssJumpLater:'Not fitted — module available in port', ssTier:'Tier', ssReg:'Registration', ssLen:'Length', ssWid:'Width', ssHei:'Height', ssDry:'Dry mass', ssLoaded:'Loaded mass', ssCont:'Containers', ssTanks:'Ice tanks', ssPax:'Passengers', ssCrew:'Crew', ssProp:'Propulsion', ssPropVal:'Epstein, {n} nozzles', ssJump:'Quantum jump', ssJumpYes:'Jump generator', ssJumpNo:'Not available', ssDef:'Defense', ssDefVal:'PDC turrets ×{n}', ssRad:'Radiators', portJumpLongHaul:'Long-haul ships only', noRoute: 'No route', creditsLabel: 'CREDITS', menuNavPanel: 'Speed / heading', pauseTitle: 'PAUSED', pauseSub: 'Simulation suspended', pauseResumeLbl: 'RESUME', pauseQuitLbl: 'QUIT \u2014 TITLE SCREEN', pauseHint: 'SPACE / ENTER \u2014 resume \u00b7 ESC \u2014 quit', lblPortServices: 'PORT SERVICES', lblSpeedUpgrade: 'Thrusters', portUpgradeBtn: 'UPGRADE', portMaxLevel: 'MAX LEVEL', lblFuelService: 'Fuel', portFuelBtn: 'REFUEL', portFuelFull: 'FULL', lblFuel: 'FUEL', lblJumpService: 'Quantum jump', portJumpBtn: 'BUY', portJumpAcquired: 'ACQUIRED', lblAudioTitle: 'AUDIO', lblMusicVolume: 'Music', lblVoiceVolume: 'Voice', lblAudioFoot: 'V \u2014 hide this setting', jumpBannerText: 'QUANTUM JUMP IN PROGRESS', lblHelpTitle: 'HELP \u2014 CONTROLS', lblHelpFoot: 'H \u2014 hide this help', hk_move: '\u2191\u2193\u2190\u2192 / WASD', hlp_move: 'Orientation (pitch / yaw)', hk_roll: 'E / R', hlp_roll: 'Roll', hk_thrust: 'SHIFT / SPACE', hlp_thrust: 'Thrust', hk_aim: 'Drag mouse', hlp_aim: 'Fine aim', hk_freelook: 'CTRL + drag', hlp_freelook: 'Free look', hlp_voice: 'Mute/unmute voice', hlp_skip: 'Skip maneuver / resume from pause', hlp_pause: 'Pause the game', hlp_help: 'Show/hide this help', llmChecking: 'Detecting on-device AI\u2026', llmActive: 'On-device AI (Gemini Nano) active \u2014 dialogue generated dynamically', llmInactive: 'On-device AI unavailable \u2014 template dialogue', shuttleLabelGeneric: 'SHUTTLE', lblAutopilot: 'Autopilot', lblMissions: 'Mission board', hlp_autopilot: 'Autopilot: disengage / engage (docking, shuttle)', hlp_brake: 'Brake (manual flight)',
     modeTitle:'GAME MODE', modeNew:'New campaign', modeNewSub:'Run STT: a Courlis freighter, starting capital, a company to build.', modeContinue:'Continue', modeContinueSub:'Resume the save stored in this browser.', modeFree:'Free play', modeFreeSub:'Pick a ship and fly freely, no campaign.',
     saveExport:'Export save', saveImport:'Import…', saveDone:'Save complete.', saveError:'Save failed: invalid or too recent a file.',
-    modeReplace:'A campaign exists: replace it?', modeConfirm:'Confirm', modeCancel:'Cancel', modeExportFirst:'Export first'
+    modeReplace:'A campaign exists: replace it?', modeConfirm:'Confirm', modeCancel:'Cancel', modeExportFirst:'Export first',
+    conTitle:'Ship console', conClose:'Close console', conTabNav:'Navigation', conTabMissions:'Missions', conTabPort:'Port', conTabYard:'Shipyard', conTabHelp:'Help · Settings', conEmptyMissions:'No mission to display.', hk_console:'TAB', hlp_console:'Open/close the ship console (last tab)', hlp_hudAlt:'Keys 1 to 8: toggle HUD elements (icon bar, in order; radio on 7)', conTabJournal:'Log', jrnAll:'All', jrnRadio:'Radio', jrnFin:'Finance', jrnEvt:'Events', jrnEmpty:'No entries yet.', jrnBalance:'Balance', jrnFreeNote:'Free play: nothing is saved; the balance starts from the current game.', jrnR_jeu:'Transaction', jrnR_delivery:'Delivery', jrnR_yard:'Shipyard', jrnR_speed:'Speed', jrnR_fuel:'Fuel', jrnR_jump:'Quantum jump', jrnE_msnAccept:'Mission accepted: {a} (bonus {b})', jrnE_msnDone:'Mission delivered: {a} (bonus {b})', jrnE_jump:'Jump to {a}', jrnE_arrive:'Arrival: {a}', jrnE_orbit:'Orbit insertion: {a}', jrnE_dock:'Docking: {a}', jrnE_fuelLow:'Fuel low: {b}%', jrnE_fuelCrit:'Fuel critical: {b}%', jrnE_incident:'Incident: {a}', hlp_journal:'Open/close the ship log (radio, finance, events); ← → section, ↑ ↓ line, PgUp/PgDn scroll'
   },
   de: {
     title_sub: 'Sprache wählen',
     topBrand: 'QUANTENNAVIGATION', seedLabel: 'SEED', onlineLabel: 'ONLINE',
     lblSpeed: 'Geschwindigkeit', lblSector: 'Sektor', lblHeading: 'Kurs',
     lblFlightPlan: 'Flugplan', lblNearest: 'N\u00c4CHSTES OBJEKT',
-    lblItinerary: 'ROUTE', lblLagrange: 'LAGRANGE-PUNKT',
+    lblItinerary: 'ROUTE',
     lblEngineTemp: 'TRIEBWERKSTEMPERATUR', lblPropulsion: 'ANTRIEB', lblEngineCmd: 'TRIEBWERKSSTEUERUNG',
     lblRadioChannel: 'FUNKKANAL', radioMuteTitle: 'Funkkanal stummschalten',
     badge_auto: 'AUTOPILOT', badge_manual: 'MANUELL', badge_orbit: 'ORBITEINSCHUSS',
@@ -1458,14 +1422,15 @@ const I18N = {
     ssImport:'Entwurf importieren…', ssImportOk:'{n} Entwurf/Entwürfe zum Hangar hinzugefügt.', ssImportSt:'{n} Station(en) werden zu Orbitalhäfen.', ssImportErr:'Datei abgelehnt: Komposition in der Werft exportieren („Für das Spiel“).', ssModTip:'Entwurf aus der Werft', ttsLang: 'de-DE', quitConfirm:'Spiel beenden und zum Titelbildschirm zurückkehren? Der Fortschritt geht verloren.',ssTitle:'Hangar — wähle dein Schiff', ssNote:'Vorläufige Auswahl: wird durch den Werftladen ersetzt.', ssConfirm:'An Bord gehen', ssPrev:'Vorheriges Schiff', ssNext:'Nächstes Schiff', ssHint:'← → Schiff, ↑ ↓ Antrieb, Eingabe zum Einsteigen', ssPropSel:'Antriebssystem', ssOptE:'Epstein +', ssOptJ:'Quantensprung', ssOptW:'Überlicht', ssWarp:'Überlichtflug', ssWarpYes:'×{f} — Warpringe ×{n}', ssWarpOff:'Nicht eingebaut', ssOptNote:'Überlichtflug und Quantensprung nur für Langstreckenschiffe', ssJumpLater:'Nicht eingebaut — Modul im Hafen erhältlich', ssTier:'Stufe', ssReg:'Kennung', ssLen:'Länge', ssWid:'Breite', ssHei:'Höhe', ssDry:'Leermasse', ssLoaded:'Beladene Masse', ssCont:'Container', ssTanks:'Eistanks', ssPax:'Passagiere', ssCrew:'Besatzung', ssProp:'Antrieb', ssPropVal:'Epstein, {n} Düsen', ssJump:'Quantensprung', ssJumpYes:'Sprunggenerator', ssJumpNo:'Nicht verfügbar', ssDef:'Verteidigung', ssDefVal:'PDC-Türme ×{n}', ssRad:'Radiatoren', portJumpLongHaul:'Nur für Langstreckenschiffe', noRoute: 'Keine Route', creditsLabel: 'GUTHABEN', menuNavPanel: 'Geschwindigkeit / Kurs', pauseTitle: 'PAUSE', pauseSub: 'Simulation angehalten', pauseResumeLbl: 'FORTSETZEN', pauseQuitLbl: 'BEENDEN \u2014 TITELBILDSCHIRM', pauseHint: 'LEERTASTE / EINGABE \u2014 fortsetzen \u00b7 ESC \u2014 beenden', lblPortServices: 'HAFENDIENSTE', lblSpeedUpgrade: 'Triebwerke', portUpgradeBtn: 'AUFR\u00dcSTEN', portMaxLevel: 'MAXIMALSTUFE', lblFuelService: 'Treibstoff', portFuelBtn: 'AUFTANKEN', portFuelFull: 'VOLL', lblFuel: 'TREIBSTOFF', lblJumpService: 'Quantensprung', portJumpBtn: 'KAUFEN', portJumpAcquired: 'ERWORBEN', lblAudioTitle: 'TON', lblMusicVolume: 'Musik', lblVoiceVolume: 'Stimme', lblAudioFoot: 'V \u2014 diese Einstellung ausblenden', jumpBannerText: 'QUANTENSPRUNG L\u00c4UFT', lblHelpTitle: 'HILFE \u2014 STEUERUNG', lblHelpFoot: 'H \u2014 Hilfe ausblenden', hk_move: '\u2191\u2193\u2190\u2192 / WASD', hlp_move: 'Ausrichtung (Nicken / Gieren)', hk_roll: 'E / R', hlp_roll: 'Rollen', hk_thrust: 'SHIFT / LEERTASTE', hlp_thrust: 'Schub', hk_aim: 'Maus ziehen', hlp_aim: 'Feinzielen', hk_freelook: 'STRG + ziehen', hlp_freelook: 'Freie Sicht', hlp_voice: 'Stimme stumm-/freischalten', hlp_skip: 'Man\u00f6ver abk\u00fcrzen / Pause fortsetzen', hlp_pause: 'Spiel pausieren', hlp_help: 'Diese Hilfe ein-/ausblenden', llmChecking: 'Geräteinterne KI wird erkannt\u2026', llmActive: 'Geräteinterne KI (Gemini Nano) aktiv \u2014 Dialoge dynamisch erzeugt', llmInactive: 'Geräteinterne KI nicht verfügbar \u2014 Dialoge aus Vorlagen', shuttleLabelGeneric: 'FÄHRE', lblAutopilot: 'Autopilot', lblMissions: 'Auftragstafel', hlp_autopilot: 'Autopilot: aus-/einschalten (Andocken, Fähre)', hlp_brake: 'Bremse (manueller Flug)',
     modeTitle:'SPIELMODUS', modeNew:'Neue Kampagne', modeNewSub:'Führen Sie STT: ein Frachter Courlis, Startkapital, eine Firma zum Aufbauen.', modeContinue:'Fortsetzen', modeContinueSub:'Den in diesem Browser gespeicherten Spielstand laden.', modeFree:'Freies Spiel', modeFreeSub:'Ein Schiff wählen und frei fliegen, ohne Kampagne.',
     saveExport:'Spielstand exportieren', saveImport:'Importieren…', saveDone:'Speichern abgeschlossen.', saveError:'Speichern fehlgeschlagen: ungültige oder zu neue Datei.',
-    modeReplace:'Es gibt bereits eine Kampagne: ersetzen?', modeConfirm:'Bestätigen', modeCancel:'Abbrechen', modeExportFirst:'Zuerst exportieren'
+    modeReplace:'Es gibt bereits eine Kampagne: ersetzen?', modeConfirm:'Bestätigen', modeCancel:'Abbrechen', modeExportFirst:'Zuerst exportieren',
+    conTitle:'Bordkonsole', conClose:'Konsole schließen', conTabNav:'Navigation', conTabMissions:'Aufträge', conTabPort:'Hafen', conTabYard:'Werft', conTabHelp:'Hilfe · Einstellungen', conEmptyMissions:'Keine Aufträge anzuzeigen.', hk_console:'TAB', hlp_console:'Bordkonsole öffnen/schließen (letzter Reiter)', hlp_hudAlt:'Tasten 1 bis 8: HUD-Elemente umschalten (Symbolleiste, in Reihenfolge; Funk auf 7)', conTabJournal:'Logbuch', jrnAll:'Alle', jrnRadio:'Funk', jrnFin:'Finanzen', jrnEvt:'Ereignisse', jrnEmpty:'Noch keine Einträge.', jrnBalance:'Saldo', jrnFreeNote:'Freies Spiel: nichts wird gespeichert; der Saldo beginnt mit dem laufenden Spiel.', jrnR_jeu:'Vorgang', jrnR_delivery:'Lieferung', jrnR_yard:'Werft', jrnR_speed:'Geschwindigkeit', jrnR_fuel:'Treibstoff', jrnR_jump:'Quantensprung', jrnE_msnAccept:'Auftrag angenommen: {a} (Prämie {b})', jrnE_msnDone:'Auftrag geliefert: {a} (Prämie {b})', jrnE_jump:'Sprung nach {a}', jrnE_arrive:'Ankunft: {a}', jrnE_orbit:'Orbit erreicht: {a}', jrnE_dock:'Andocken: {a}', jrnE_fuelLow:'Treibstoff niedrig: {b} %', jrnE_fuelCrit:'Treibstoff kritisch: {b} %', jrnE_incident:'Zwischenfall: {a}', hlp_journal:'Logbuch öffnen/schließen (Funk, Finanzen, Ereignisse); ← → Rubrik, ↑ ↓ Zeile, Bild↑/Bild↓ Scrollen'
   },
   es: {
     title_sub: 'Elige un idioma',
     topBrand: 'NAVEGACI\u00d3N CU\u00c1NTICA', seedLabel: 'SEED', onlineLabel: 'EN L\u00cdNEA',
     lblSpeed: 'Velocidad', lblSector: 'Sector', lblHeading: 'Rumbo',
     lblFlightPlan: 'Plan de vuelo', lblNearest: 'OBJETO M\u00c1S CERCANO',
-    lblItinerary: 'ITINERARIO', lblLagrange: 'PUNTO DE LAGRANGE',
+    lblItinerary: 'ITINERARIO',
     lblEngineTemp: 'TEMPERATURA DE MOTORES', lblPropulsion: 'PROPULSI\u00d3N', lblEngineCmd: 'CONTROL DE MOTORES',
     lblRadioChannel: 'CANAL DE RADIO', radioMuteTitle: 'Silenciar el canal de radio',
     badge_auto: 'PILOTO AUTOM\u00c1TICO', badge_manual: 'MANUAL', badge_orbit: 'INSERCI\u00d3N ORBITAL',
@@ -1492,7 +1457,8 @@ const I18N = {
     ssImport:'Importar un diseño…', ssImportOk:'{n} diseño(s) añadido(s) al hangar.', ssImportSt:'{n} estación(es) se unirán a los puertos orbitales.', ssImportErr:'Archivo rechazado: exporta la composición desde el astillero («Para el juego»).', ssModTip:'Diseño del astillero', ttsLang: 'es-ES', quitConfirm:'Salir de la partida y volver a la pantalla de título? Se perderá el progreso.',ssTitle:'Hangar — elige tu nave', ssNote:'Selección provisional: será sustituida por la tienda del astillero.', ssConfirm:'Embarcar', ssPrev:'Nave anterior', ssNext:'Nave siguiente', ssHint:'← → nave, ↑ ↓ propulsión, Intro para embarcar', ssPropSel:'Sistema de propulsión', ssOptE:'Epstein +', ssOptJ:'Salto cuántico', ssOptW:'Superlumínica', ssWarp:'Velocidad superlumínica', ssWarpYes:'×{f} — anillos de distorsión ×{n}', ssWarpOff:'No instalada', ssOptNote:'Superlumínica y salto cuántico reservados a naves de largo recorrido', ssJumpLater:'No instalado — módulo disponible en puerto', ssTier:'Nivel', ssReg:'Matrícula', ssLen:'Longitud', ssWid:'Anchura', ssHei:'Altura', ssDry:'Masa en vacío', ssLoaded:'Masa cargada', ssCont:'Contenedores', ssTanks:'Tanques de hielo', ssPax:'Pasajeros', ssCrew:'Tripulación', ssProp:'Propulsión', ssPropVal:'Epstein, {n} toberas', ssJump:'Salto cuántico', ssJumpYes:'Generador de salto', ssJumpNo:'No disponible', ssDef:'Defensa', ssDefVal:'Torretas PDC ×{n}', ssRad:'Radiadores', portJumpLongHaul:'Solo naves de largo recorrido', noRoute: 'Sin ruta', creditsLabel: 'CRÉDITOS', menuNavPanel: 'Velocidad / rumbo', pauseTitle: 'PAUSA', pauseSub: 'Simulaci\u00f3n suspendida', pauseResumeLbl: 'REANUDAR', pauseQuitLbl: 'SALIR \u2014 PANTALLA DE INICIO', pauseHint: 'ESPACIO / INTRO \u2014 reanudar \u00b7 ESC \u2014 salir', lblPortServices: 'SERVICIOS PORTUARIOS', lblSpeedUpgrade: 'Propulsores', portUpgradeBtn: 'MEJORAR', portMaxLevel: 'NIVEL M\u00c1XIMO', lblFuelService: 'Combustible', portFuelBtn: 'REPOSTAR', portFuelFull: 'LLENO', lblFuel: 'COMBUSTIBLE', lblJumpService: 'Salto cu\u00e1ntico', portJumpBtn: 'COMPRAR', portJumpAcquired: 'ADQUIRIDO', lblAudioTitle: 'SONIDO', lblMusicVolume: 'M\u00fasica', lblVoiceVolume: 'Voz', lblAudioFoot: 'V \u2014 ocultar este ajuste', jumpBannerText: 'SALTO CU\u00c1NTICO EN CURSO', lblHelpTitle: 'AYUDA \u2014 CONTROLES', lblHelpFoot: 'H \u2014 ocultar esta ayuda', hk_move: '\u2191\u2193\u2190\u2192 / WASD', hlp_move: 'Orientaci\u00f3n (cabeceo / gui\u00f1ada)', hk_roll: 'E / R', hlp_roll: 'Alabeo', hk_thrust: 'MAY\u00daS / ESPACIO', hlp_thrust: 'Propulsi\u00f3n', hk_aim: 'Arrastrar rat\u00f3n', hlp_aim: 'Punter\u00eda fina', hk_freelook: 'CTRL + arrastrar', hlp_freelook: 'Vista libre', hlp_voice: 'Silencia/activa la voz', hlp_skip: 'Abreviar maniobra / reanudar pausa', hlp_pause: 'Pausa el juego', hlp_help: 'Muestra/oculta esta ayuda', llmChecking: 'Detectando IA integrada\u2026', llmActive: 'IA integrada (Gemini Nano) activa \u2014 diálogos generados dinámicamente', llmInactive: 'IA integrada no disponible \u2014 diálogos por plantilla', shuttleLabelGeneric: 'NAVE', lblAutopilot: 'Piloto automático', lblMissions: 'Tablón de misiones', hlp_autopilot: 'Piloto automático: desactivar / activar (atraque, lanzadera)', hlp_brake: 'Freno (vuelo manual)',
     modeTitle:'MODO DE JUEGO', modeNew:'Nueva campaña', modeNewSub:'Dirige STT: un carguero Courlis, capital inicial, una compañía por construir.', modeContinue:'Continuar', modeContinueSub:'Retomar la partida guardada en este navegador.', modeFree:'Partida libre', modeFreeSub:'Elegir una nave y volar libremente, sin campaña.',
     saveExport:'Exportar partida', saveImport:'Importar…', saveDone:'Guardado completado.', saveError:'Error al guardar: archivo inválido o demasiado reciente.',
-    modeReplace:'Ya existe una campaña: ¿reemplazarla?', modeConfirm:'Confirmar', modeCancel:'Cancelar', modeExportFirst:'Exportar primero'
+    modeReplace:'Ya existe una campaña: ¿reemplazarla?', modeConfirm:'Confirmar', modeCancel:'Cancelar', modeExportFirst:'Exportar primero',
+    conTitle:'Consola de a bordo', conClose:'Cerrar la consola', conTabNav:'Navegación', conTabMissions:'Misiones', conTabPort:'Puerto', conTabYard:'Astillero', conTabHelp:'Ayuda · Ajustes', conEmptyMissions:'Ninguna misión que mostrar.', hk_console:'TAB', hlp_console:'Abre/cierra la consola de a bordo (última pestaña)', hlp_hudAlt:'Teclas 1 a 8: alterna elementos del HUD (barra de iconos, en orden; radio en 7)', conTabJournal:'Diario', jrnAll:'Todo', jrnRadio:'Radio', jrnFin:'Finanzas', jrnEvt:'Eventos', jrnEmpty:'Aún no hay entradas.', jrnBalance:'Saldo', jrnFreeNote:'Partida libre: no se guarda nada; el saldo parte de la partida en curso.', jrnR_jeu:'Operación', jrnR_delivery:'Entrega', jrnR_yard:'Astillero', jrnR_speed:'Velocidad', jrnR_fuel:'Combustible', jrnR_jump:'Salto cuántico', jrnE_msnAccept:'Misión aceptada: {a} (prima {b})', jrnE_msnDone:'Misión entregada: {a} (prima {b})', jrnE_jump:'Salto a {a}', jrnE_arrive:'Llegada: {a}', jrnE_orbit:'Puesta en órbita: {a}', jrnE_dock:'Atraque: {a}', jrnE_fuelLow:'Combustible bajo: {b} %', jrnE_fuelCrit:'Combustible crítico: {b} %', jrnE_incident:'Incidente: {a}', hlp_journal:'Abre/cierra el diario de a bordo (radio, finanzas, eventos); ← → sección, ↑ ↓ línea, RePág/AvPág desplazar'
   }
 };
 function t(key){
@@ -1651,7 +1617,7 @@ function applyLanguage(){
     topBrand:'topBrand', seedLabel:'seedLabel', onlineLabel:'onlineLabel',
     lblSpeed:'lblSpeed', lblSector:'lblSector', lblHeading:'lblHeading',
     lblFlightPlan:'lblFlightPlan', lblNearest:'lblNearest',
-    lblItinerary:'lblItinerary', lblLagrange:'lblLagrange',
+    lblItinerary:'lblItinerary',
     lblEngineTemp:'lblEngineTemp', lblPropulsion:'lblPropulsion', lblEngineCmd:'lblEngineCmd',
     lblRadioChannel:'lblRadioChannel', creditsLabel:'creditsLabel',
     lblPortServices:'lblPortServices', lblSpeedUpgrade:'lblSpeedUpgrade', lblFuelService:'lblFuelService', lblFuel:'lblFuel',
@@ -1718,6 +1684,7 @@ document.getElementById('seedVal').textContent = SEED;
 /* @provides GAME */
 const GAME = (function(){
   const LEDGER_MAX = 200;                   // entrées conservées dans state.ledger (les plus anciennes sont écartées)
+  const JOURNAL_SAVED_MAX = 100;            // événements conservés dans state.journal (les plus anciens sont écartés)
   let state = null;                         // null = Partie libre
   const listeners = Object.create(null);    // événement -> [{ fn, off }]
 
@@ -1760,6 +1727,7 @@ const GAME = (function(){
       credits: credits,
       rp: 0,
       ledger: [],
+      journal: [],
       flagship: 's1',
       ships: [{ id: 's1', name: o.name || 'STT Courlis', comp: o.starter || 'stt-courlis', wear: 0, fuel: 1, at: null, order: null, crew: [] }],
       blueprints: {},
@@ -1796,6 +1764,16 @@ const GAME = (function(){
       if(state.ledger.length > LEDGER_MAX) state.ledger.splice(0, state.ledger.length - LEDGER_MAX);
       emit('credits', { credits: state.credits, delta: delta, reason: reason });
       return state.credits;
+    },
+    /* { e:[t, code, a, b] } : ajoute un événement du Journal à state.journal (champ additif de v:1) */
+    'journal.push': function(a){
+      const e = a.e;
+      if(!Array.isArray(e) || typeof e[1] !== 'string') throw new Error('journal_invalide');
+      if(!Array.isArray(state.journal)) state.journal = [];
+      state.journal.push([e[0], e[1], e[2] === undefined ? null : e[2], e[3] === undefined ? null : e[3]]);
+      if(state.journal.length > JOURNAL_SAVED_MAX) state.journal.splice(0, state.journal.length - JOURNAL_SAVED_MAX);
+      emit('journal', { e: state.journal[state.journal.length - 1] });
+      return state.journal.length;
     }
   };
 
@@ -1975,6 +1953,171 @@ const SAVE = (function(){
     exportFile: exportFile, importText: importText
   };
   return api;
+})();
+
+/* =========================================================================
+   CAMPAGNE 1b. JOURNAL — radio, grand livre et événements de bord : anneau de 300 entrées, lecture fusionnée, détection
+   Couche simulation : ni THREE ni DOM. Détails (entrées, instantanés de detect, codes) plus bas.
+   ========================================================================= */
+/* @provides JOURNAL @requires GAME */
+/* Entrées { seq, t, kind, ... }, t = secondes de jeu actif.
+     radio { from:'ship'|'tower', who, text }   fin { reason, delta, bal }   evt { code, a, b, imp }
+   En campagne, les « fin » ne sont pas stockées ici : la source est state.ledger (cf. ledgerRows) ; les « evt » sont
+   aussi sauvegardés par GAME.cmd('journal.push') (state.journal) et réinjectés par restore(). La radio reste en mémoire.
+   detect(prev, snap) est pur : il compare deux instantanés du moteur (remplis par l'adaptateur de L1.13) :
+     { phase:      REAL.phase ('JUMP' | 'WARP' | 'WARPOUT' | 'ORBIT' | autre ; null/undefined ok),
+       legName:    nom de l'étape en cours (REAL.leg.name) ou null,
+       missionTarget: nom de la cible de mission (REAL.mission.target.name) ou null,
+       active:     mission acceptée { id, dest, reward } ou null (MISSIONS.state.active),
+       doneCount:  nombre de missions livrées (MISSIONS.state.done.length),
+       jump:       booléen, saut quantique classique en cours (jumpState),
+       nearPort:   faux, vrai, ou nom du port (isNearPortService),
+       fuelRatio:  fuel / FUEL_CAPACITY (0..1),
+       fuelWarn, fuelCrit: seuils FUEL_WARN_RATIO / FUEL_CRIT_RATIO (défauts 0.25 / 0.10) }
+   Codes : msn.accept (a = destination, b = prime), msn.done (imp), jump (a = étape), arrive (a = étape),
+   orbit (a = cible, sur front → 'ORBIT'), dock (a = port), fuel.low (imp, b = %), fuel.crit (imp, b = %).
+   ------------------------------------------------------------------------- */
+const JOURNAL = (function(){
+  const RING_MAX = 300;                     // entrées conservées, toutes rubriques (les plus anciennes sont écartées)
+  const IMPORTANT = { 'msn.done': 1, 'fuel.low': 1, 'fuel.crit': 1 };
+  let ring = [];
+  let seq = 0;                              // dernier numéro attribué
+  let readSeq = 0;                          // dernier numéro lu (markRead)
+  let freeClock = 0;                        // horloge de la Partie libre (pas de GAME.state)
+  const listeners = Object.create(null);
+
+  function warn(msg, err){ if(typeof console !== 'undefined') console.error(msg, err); }
+
+  /* ---- événements : même contrat que GAME.on / GAME.emit ---- */
+  function on(evt, fn){
+    if(typeof fn !== 'function') throw new TypeError('ecouteur_invalide');
+    const entry = { fn: fn, off: false };
+    (listeners[evt] || (listeners[evt] = [])).push(entry);
+    return function(){
+      if(entry.off) return;
+      entry.off = true;
+      const l = listeners[evt], i = l ? l.indexOf(entry) : -1;
+      if(i >= 0) l.splice(i, 1);
+    };
+  }
+  function emit(evt, data){
+    const l = listeners[evt];
+    if(!l) return;
+    l.slice().forEach(function(e){
+      if(e.off) return;
+      try{ e.fn(data); }catch(err){ warn('[JOURNAL] écouteur « ' + evt + ' » :', err); }
+    });
+  }
+
+  /* ---- horloge ---- */
+  function now(){ return GAME.state ? GAME.state.clock : freeClock; }
+  function tickFree(dt){
+    if(typeof dt !== 'number' || !(dt > 0) || !isFinite(dt)) return freeClock;
+    freeClock = Math.round((freeClock + dt) * 1000) / 1000;
+    return freeClock;
+  }
+
+  /* ---- collecte ---- */
+  /* add(e) : e = { kind, ... } (t facultatif : now()) ; renvoie l'entrée. En campagne une « fin » n'est pas stockée
+     (state.ledger fait foi) mais l'entrée est rendue et l'événement émis. */
+  function add(e){
+    if(!e || typeof e !== 'object') throw new TypeError('entree_invalide');
+    if(e.kind !== 'radio' && e.kind !== 'fin' && e.kind !== 'evt') throw new Error('kind_invalide');
+    const entry = Object.assign({}, e, { seq: ++seq, t: (typeof e.t === 'number' && isFinite(e.t)) ? e.t : now() });
+    if(entry.kind === 'evt' && entry.imp === undefined) entry.imp = !!IMPORTANT[entry.code];
+    if(!(entry.kind === 'fin' && GAME.state)){
+      ring.push(entry);
+      if(ring.length > RING_MAX) ring.splice(0, ring.length - RING_MAX);
+    }
+    emit('add', entry);
+    return entry;
+  }
+
+  /* Grand livre de la campagne : [{ t, kind:'fin', reason, delta, bal }] chronologique, bal recalculé à rebours depuis st.credits */
+  function ledgerRows(st){
+    if(!st || !Array.isArray(st.ledger)) return [];
+    const rows = new Array(st.ledger.length);
+    let bal = typeof st.credits === 'number' ? st.credits : 0;
+    for(let i = st.ledger.length - 1; i >= 0; i--){
+      const l = st.ledger[i];
+      rows[i] = { t: l[0], kind: 'fin', reason: l[1], delta: l[2], bal: bal };
+      bal -= l[2];
+    }
+    return rows;
+  }
+
+  /* list({ kinds, limit }) : plus récent d'abord ; en campagne, anneau fusionné avec ledgerRows (tri stable par t) */
+  function list(o){
+    const opt = o || {};
+    const kinds = Array.isArray(opt.kinds) && opt.kinds.length ? opt.kinds : null;
+    const ok = r => !kinds || kinds.indexOf(r.kind) >= 0;
+    let out = ring.filter(ok).reverse();
+    if(GAME.state){
+      const fin = kinds && kinds.indexOf('fin') < 0 ? [] : ledgerRows(GAME.state).reverse();
+      out = out.concat(fin).sort((x, y) => y.t - x.t);
+    }
+    if(typeof opt.limit === 'number' && opt.limit >= 0) out = out.slice(0, opt.limit);
+    return out;
+  }
+
+  function unread(){
+    let n = 0;
+    for(let i = 0; i < ring.length; i++) if(ring[i].seq > readSeq && ring[i].kind === 'evt' && ring[i].imp) n++;
+    return n;
+  }
+  function markRead(){ readSeq = seq; }
+
+  /* restore(arr) : remplace l'anneau par les événements sauvegardés [t, code, a, b] (undefined accepté = journal vide) ;
+     les entrées restaurées sont considérées comme lues. */
+  function restore(arr){
+    ring = []; seq = 0; readSeq = 0;
+    (Array.isArray(arr) ? arr : []).forEach(function(r){
+      if(!Array.isArray(r) || typeof r[1] !== 'string') return;
+      ring.push({ seq: ++seq, t: typeof r[0] === 'number' ? r[0] : 0, kind: 'evt', code: r[1], a: r[2], b: r[3], imp: !!IMPORTANT[r[1]] });
+    });
+    if(ring.length > RING_MAX) ring.splice(0, ring.length - RING_MAX);
+    readSeq = seq;
+    emit('restore', null);
+  }
+
+  /* ---- détection : pure, sans état ; prev null (premier instantané ou reprise) -> aucun événement ---- */
+  const LEAP = { JUMP: 1, WARP: 1 };
+  function detect(prev, snap){
+    const out = [];
+    if(!prev || !snap) return out;
+    const evt = (code, a, b) => out.push({ kind: 'evt', code: code, a: a === undefined ? null : a, b: b === undefined ? null : b, imp: !!IMPORTANT[code] });
+    const leg = snap.legName || prev.legName || null;
+    const pa = prev.active, sa = snap.active;
+    if(sa && (!pa || pa.id !== sa.id)) evt('msn.accept', sa.dest, sa.reward);
+    if((snap.doneCount | 0) > (prev.doneCount | 0)){
+      const m = pa || sa;
+      evt('msn.done', m ? m.dest : null, m ? m.reward : null);
+    }
+    if((LEAP[snap.phase] && !LEAP[prev.phase]) || (snap.jump && !prev.jump)) evt('jump', leg);
+    if((snap.phase === 'WARPOUT' && prev.phase !== 'WARPOUT') || (prev.jump && !snap.jump)) evt('arrive', leg);
+    if(snap.phase === 'ORBIT' && prev.phase !== 'ORBIT') evt('orbit', snap.missionTarget || leg);
+    if(snap.nearPort && !prev.nearPort) evt('dock', typeof snap.nearPort === 'string' ? snap.nearPort : null);
+    const warnR = typeof snap.fuelWarn === 'number' ? snap.fuelWarn : 0.25;
+    const critR = typeof snap.fuelCrit === 'number' ? snap.fuelCrit : 0.10;
+    const pf = prev.fuelRatio, sf = snap.fuelRatio;
+    if(typeof pf === 'number' && typeof sf === 'number'){
+      const pct = Math.round(sf * 100);
+      if(sf <= critR && pf > critR) evt('fuel.crit', null, pct);
+      else if(sf <= warnR && sf > critR && pf > warnR) evt('fuel.low', null, pct);
+    }
+    return out;
+  }
+
+  function _reset(){
+    ring = []; seq = 0; readSeq = 0; freeClock = 0;
+    Object.keys(listeners).forEach(k => { delete listeners[k]; });
+  }
+
+  return {
+    RING_MAX: RING_MAX,
+    add: add, list: list, ledgerRows: ledgerRows, unread: unread, markRead: markRead,
+    on: on, now: now, tickFree: tickFree, detect: detect, restore: restore, _reset: _reset
+  };
 })();
 
 /* =========================================================================
@@ -7846,7 +7989,7 @@ function refreshRoutePanel(){
 }
 
 /* =========================================================================
-   ITINÉRAIRE + POINT DE LAGRANGE (§ amélioration v2.4)
+   ITINÉRAIRE (§ amélioration v2.4)
    ========================================================================= */
 
 /* Pastilles de la piste — régénérées seulement quand ROUTE.index change
@@ -7892,46 +8035,6 @@ function updateItineraryShip(){
   const localIdx = THREE.MathUtils.clamp(idx-start, 0, count-1);
   const frac = count>1 ? (localIdx+legFrac)/(count-1) : 0;
   ship.style.left = (THREE.MathUtils.clamp(frac,0,1)*100)+'%';
-}
-
-/* Point de Lagrange approximatif (L1) de l'étape en cours : sur l'axe
-   étoile→planète cible, à 92% de la distance en partant de l'étoile — une
-   approximation assumée (cf. commentaire CSS de .hud-lagrange), pas un
-   calcul à N corps : les planètes générées n'ont pas de masse simulée dont
-   tirer un vrai point de libration. */
-const LAGRANGE_FRACTION = 0.92;
-function computeLagrangePoint(leg){
-  if(!leg || !leg.planet || !leg.starPosition) return null;
-  const dir = leg.planet.position.clone().sub(leg.starPosition);
-  const dist = dir.length();
-  if(dist < 1) return leg.planet.position.clone();
-  dir.normalize();
-  return leg.starPosition.clone().addScaledVector(dir, dist*LAGRANGE_FRACTION);
-}
-const _lagTmp = new THREE.Vector3();
-function updateLagrangePanel(){
-  const panel = document.querySelector('.hud-lagrange');
-  if(!panel || panel.classList.contains('panel-hidden')) return;
-  const distEl = document.getElementById('lagrangeDist');
-  const nameEl = document.getElementById('lagrangeName');
-  const needle = document.getElementById('lagrangeNeedle');
-  if(!distEl || !nameEl || !needle) return;
-  const leg = ROUTE.legs[ROUTE.index];
-  const lp = computeLagrangePoint(leg);
-  if(!lp){
-    distEl.textContent = '—';
-    nameEl.textContent = t('noRoute');
-    return;
-  }
-  const forward = new THREE.Vector3(0,0,-1).applyQuaternion(shipRig.quaternion);
-  const heading = ((Math.atan2(forward.x, -forward.z)*180/Math.PI)+360)%360;
-  _lagTmp.copy(lp).sub(shipRig.position);
-  const dist = _lagTmp.length();
-  const targetHeading = ((Math.atan2(_lagTmp.x, -_lagTmp.z)*180/Math.PI)+360)%360;
-  const relBearing = (targetHeading-heading+360)%360;
-  needle.style.transform = 'rotate('+relBearing.toFixed(1)+'deg)';
-  distEl.textContent = Math.round(dist)+' u';
-  nameEl.textContent = 'L1 · '+leg.name;
 }
 
 /* =====================================================================
@@ -9768,7 +9871,7 @@ let apEl = null, apShown = '', apFlash = null, apFlashT = 0;
 function apNote(kind){ apFlash = kind; apFlashT = performance.now() + 2600; }
 function apHud(){
   if(!apEl){ apEl = document.createElement('div'); apEl.id = 'apHud'; apEl.className = 'mono';
-    apEl.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);top:40px;z-index:6;display:none;font-size:11px;letter-spacing:.06em;padding:3px 12px;border:1px solid #25375c;background:rgba(15,26,48,.88);color:#e8edf5;pointer-events:none;text-align:center;white-space:nowrap';
+    apEl.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);top:40px;z-index:5;display:none;font-size:11px;letter-spacing:.06em;padding:3px 12px;border:1px solid #25375c;background:rgba(15,26,48,.88);color:#e8edf5;pointer-events:none;text-align:center;white-space:nowrap';
     document.body.appendChild(apEl); }
   const T = apTx(), ph = R.phase, M = R.mission; let html = '', col = '#5eead4';
   if(!M || jumpState || ph === 'WARP' || ph === 'WARPOUT' || ph === 'HOP' || ph === 'JUMP' || ph === 'IDLE'){ html = ''; }
@@ -10305,7 +10408,7 @@ const LOCAL = (function(){
   document.getElementById('shipyardList').addEventListener('click', function(e){
     const b = e.target.closest('.board-row-btn'); if(!b || b.classList.contains('port-disabled')) return;
     const price = +b.dataset.price; if(credits < price) return;
-    addCredits(-price);
+    addCredits(-price, 'yard');
     installShip(b.dataset.id, {});
     closeShipyard(); refreshShipyardRow(); refreshPortPanel();
   });
@@ -10316,7 +10419,8 @@ const LOCAL = (function(){
   document.querySelectorAll('[data-panel-cls="__contracts__"]').forEach(function(b){ b.addEventListener('click', closeContractBoard); });
 
   return { buildStations: buildStations, updateStations: updateStations, disposeStations: disposeStations,
-    refreshShipyardRow: refreshShipyardRow, openContractBoard: openContractBoard };
+    refreshShipyardRow: refreshShipyardRow, openContractBoard: openContractBoard, closeContractBoard: closeContractBoard,
+    openShipyard: openShipyard, closeShipyard: closeShipyard };
 })();
 function buildStations(leg){ LOCAL.buildStations(leg); }
 
@@ -11205,7 +11309,7 @@ function startBayOther(){
 function deliverDirect(){
   const os = orbitState; os.deliveredCount = (os.deliveredCount || 0) + 1;
   if(!os.creditsPaid && os.spawned.every(Boolean) && os.deliveredCount >= os.spawnFractions.length){
-    const total = os.cargoSplit.reduce((a, b) => a + b, 0); addCredits(total*os.unitPrice); os.creditsPaid = true; }
+    const total = os.cargoSplit.reduce((a, b) => a + b, 0); addCredits(total*os.unitPrice, 'delivery'); os.creditsPaid = true; }
 }
 function startBay(){
   if(!isContainerShip(SHIP_ID)) return startBayOther();
@@ -11548,7 +11652,7 @@ function update(){
 /* ---------- démarrage : en orbite près de la planète de départ ---------- */
 function itineraryUi(hide){
   if(!document.getElementById('missionModeCss')){ const st = document.createElement('style'); st.id = 'missionModeCss';
-    st.textContent = 'body.missions-mode #itineraryPanel, body.missions-mode #lagrangePanel, body.missions-mode .route-panel, body.missions-mode #routePanel{ display:none !important; }';
+    st.textContent = 'body.missions-mode #itineraryPanel, body.missions-mode .route-panel, body.missions-mode #routePanel{ display:none !important; }';
     document.head.appendChild(st); }
   document.body.classList.toggle('missions-mode', !!hide);
   const fp = document.getElementById('lblFlightPlan'); const panel = fp && fp.closest('.panel'); if(panel) panel.style.display = hide ? 'none' : '';
@@ -12770,6 +12874,9 @@ window.addEventListener('keydown', function(e){
   /* générique, écran-titre, choix du vaisseau : le clavier appartient à ces écrans (42-…), jamais aux
      panneaux, à la pause ni au pilotage de la partie, qui n'existe pas encore */
   if(!gameStarted) return;
+  /* frappe dans un champ texte (import de sauvegarde, réglages) : aucun raccourci, sauf Échap (pause) */
+  if(e.code !== 'Escape' && e.target && e.target.tagName && (e.target.tagName === 'TEXTAREA' || e.target.isContentEditable ||
+     (e.target.tagName === 'INPUT' && /^(|text|search|url|tel|email|password|number)$/i.test(e.target.getAttribute('type') || '')))) return;
   /* abrégé de la manœuvre d'orbite/livraison : le reste de la séquence se
      joue en accéléré (travelling rapide) plutôt que d'être coupé net —
      les navettes et le canal radio restent visibles, juste comprimés.
@@ -12842,15 +12949,10 @@ window.addEventListener('keydown', function(e){
     const helpItem = HUD_BAR_ITEMS.find(function(it){ return it.kind === 'help'; });
     if(helpItem) activateHudBarItem(helpItem);
   }
-  /* I / L — itinéraire et point de Lagrange (§ amélioration v2.4), mêmes
-     touches fixes que H : passent par activateHudBarItem, jamais dupliquées
-     entre clavier et bouton de la barre. */
+  /* I — itinéraire (§ amélioration v2.4), même touche fixe que H : passe par
+     activateHudBarItem, jamais dupliquée entre clavier et bouton de la barre. */
   if(e.code === 'KeyI'){
     const it = HUD_BAR_ITEMS.find(function(x){ return x.cls === 'hud-itinerary'; });
-    if(it) activateHudBarItem(it);
-  }
-  if(e.code === 'KeyL'){
-    const it = HUD_BAR_ITEMS.find(function(x){ return x.cls === 'hud-lagrange'; });
     if(it) activateHudBarItem(it);
   }
   /* V — réglage des volumes (demande utilisateur), même principe que H/I/L */
@@ -12858,24 +12960,20 @@ window.addEventListener('keydown', function(e){
     const it = HUD_BAR_ITEMS.find(function(x){ return x.kind === 'audio'; });
     if(it) activateHudBarItem(it);
   }
-  /* TAB bascule directement l'affichage du canal radio, à tout moment —
-     un simple interrupteur, pas une préférence qui viendrait interférer
-     avec l'affichage/masquage automatique au début/fin de la manœuvre.
-     preventDefault : Tab déplacerait sinon le focus clavier sur la page. */
-  if(e.code === 'Tab'){
+  /* Touches 1 à 8 (sans modificateur) — slots de la barre du HUD (par position physique : AZERTY compris). Normalement
+     traité avant par la console (51-console-view, capture) ; repli si la vue est absente. Tab (console) et F1-F8
+     (onglets F2-F5, F1/F6-F8 réservés) appartiennent à la console depuis L1.7 : la radio est sur 7. */
+  if(!e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && /^Digit[1-8]$/.test(e.code)){
+    if(typeof CONSOLE !== 'undefined' && CONSOLE.view) return;   /* la vue (capture) s'en charge : pas de double bascule */
     e.preventDefault();
-    toggleRadioPanel();
+    const it = HUD_BAR_ITEMS[Number(e.code.slice(5)) - 1];
+    if(it) activateHudBarItem(it);
+    return;
   }
-  /* F1 à F9 — bascule chacune des icônes de la barre du HUD (§12), dans
-     leur ordre d'affichage (remplace l'ancienne affectation dédiée de F3
-     à la caméra, désormais F9 comme les autres icônes — une seule
-     numérotation, plus simple à retenir et à documenter dans l'aide). */
-  if(e.code.length === 2 && e.code[0] === 'F' && e.code >= 'F1' && e.code <= 'F9'){
-    const idx = Number(e.code.slice(1)) - 1;
-    if(HUD_BAR_ITEMS[idx]){
-      e.preventDefault();
-      activateHudBarItem(HUD_BAR_ITEMS[idx]);
-    }
+  /* F9 — caméra (slot 9 de la barre) */
+  if(e.code === 'F9'){
+    e.preventDefault();
+    if(HUD_BAR_ITEMS[8]) activateHudBarItem(HUD_BAR_ITEMS[8]);
   }
   /* F10 — coupe/rétablit la voix de synthèse. Agit sur le MÊME état que le
      bouton muet du panneau radio (une seule source de vérité) : l'icône du
@@ -13195,10 +13293,6 @@ const HUD_ICONS = {
      pointillé — distinct de « route » (juste un trait entre deux points),
      pour ne pas confondre le plan de vol textuel et ce mini-suivi visuel. */
   itinerary: '<path d="M3 15h5.5M15.5 15H21" stroke-dasharray="2.5 3"/><circle cx="12" cy="15" r="1.8" fill="currentColor" stroke="none"/><path d="M12 3.5a4 4 0 0 1 4 4c0 3-4 7.5-4 7.5s-4-4.5-4-7.5a4 4 0 0 1 4-4z"/><circle cx="12" cy="7.3" r="1.3" fill="currentColor" stroke="none"/>',
-  /* point de Lagrange : boussole (cadran + aiguille) plutôt qu'un pictogramme
-     orbital littéral — c'est l'ORIENTATION relative qui est montrée, pas la
-     géométrie à N corps elle-même */
-  lagrange: '<circle cx="12" cy="12" r="8.5"/><path d="M12 5L14 12L12 19L10 12Z" fill="currentColor" stroke="none"/>',
   /* carte stellaire (§23) : trois points reliés par des traits fins,
      évoquant une petite constellation — distinct de « route » (un seul
      trait) et de « itinerary » (repère + trajet pointillé) déjà utilisés
@@ -13223,14 +13317,13 @@ const HUD_BAR_ITEMS = [
   { cls:null,            icon:'radio',   labelKey:'lblRadioChannel', kind:'radio'  },
   { cls:null,            icon:'port',    labelKey:'lblPortServices', kind:'port'   },
   { cls:null,            icon:'camera',  labelKey:null,              kind:'camera' },
-  /* itinéraire et point de Lagrange (§ amélioration v2.4) : deux nouveaux
-     panneaux, ajoutés APRÈS camera plutôt qu'entremêlés aux six premiers
+  /* itinéraire (§ amélioration v2.4) : nouvel
+     panneau, ajouté APRÈS camera plutôt qu'entremêlé aux six premiers
      panneaux d'info — F1-F9 sont affectés par POSITION dans ce tableau
      (cf. le gestionnaire keydown plus bas, indexé sur e.code), donc tout
      insertion avant radio/port/camera aurait décalé leurs raccourcis F7-F9.
-     Comme l'aide (H), ceux-ci prennent une touche FIXE plutôt qu'un F-slot. */
+     Comme l'aide (H), celui-ci prend une touche FIXE plutôt qu'un F-slot. */
   { cls:'hud-itinerary', icon:'itinerary', labelKey:'lblItinerary',  kind:'panel', hotkey:'I' },
-  { cls:'hud-lagrange',  icon:'lagrange',  labelKey:'lblLagrange',   kind:'panel', hotkey:'L' },
   /* carte stellaire (§23) : même principe (touche fixe, ajoutée après les
      six premiers panneaux pour ne pas décaler F7-F9) — indispensable au
      clavier ET au tactile, faute de quoi le module resterait totalement
@@ -13277,21 +13370,30 @@ function activateHudBarItem(item){
     toggleRadioPanel();
   } else if(item.kind === 'port'){
     if(!isNearPortService()) return;   /* icône inerte hors zone/livraison */
-    const el = document.getElementById('portPanel');
-    if(el){ el.classList.toggle('visible'); if(el.classList.contains('visible')) refreshPortPanel(); }
+    if(typeof CONSOLE !== 'undefined'){ CONSOLE.toggle('port'); }
+    else {
+      const el = document.getElementById('portPanel');
+      if(el){ el.classList.toggle('visible'); if(el.classList.contains('visible')) refreshPortPanel(); }
+    }
   } else if(item.kind === 'camera'){
     nextCameraMode();
   } else if(item.kind === 'help'){
-    const el = document.getElementById('helpOverlay');
-    if(el) el.classList.toggle('visible');
+    if(typeof CONSOLE !== 'undefined'){ CONSOLE.toggle('help'); }
+    else {
+      const el = document.getElementById('helpOverlay');
+      if(el) el.classList.toggle('visible');
+    }
   } else if(item.kind === 'starmap'){
-    if(isStarMapOpen()) closeStarMap(); else openStarMap();
+    if(typeof CONSOLE !== 'undefined'){ CONSOLE.toggle('nav'); }
+    else if(isStarMapOpen()) closeStarMap(); else openStarMap();
   } else if(item.kind === 'audio'){
-    toggleAudioPanel();
+    if(typeof CONSOLE !== 'undefined' && CONSOLE.help) CONSOLE.help.toggleAudio();
+    else toggleAudioPanel();
   } else if(item.kind === 'autopilot'){
     if(REAL.active && REAL.started) REAL.apToggle();
   } else if(item.kind === 'missions'){
-    if(typeof MISSIONS !== 'undefined' && MISSIONS.enabled()) MISSIONS.toggleBoard();
+    if(typeof CONSOLE !== 'undefined'){ CONSOLE.toggle('missions'); }
+    else if(typeof MISSIONS !== 'undefined' && MISSIONS.enabled()) MISSIONS.toggleBoard();
   }
   refreshHudIconBar();
 }
@@ -13307,21 +13409,25 @@ function refreshHudIconBar(){
       active = !!(el && el.classList.contains('visible'));
     } else if(item.kind === 'port'){
       const el = document.getElementById('portPanel');
-      active = !!(el && el.classList.contains('visible'));
+      active = (typeof CONSOLE !== 'undefined') ? CONSOLE.isOpen('port') : !!(el && el.classList.contains('visible'));
       disabled = !isNearPortService();
       if(disabled && active){
         /* la fenêtre d'activation s'est refermée (le vaisseau s'est
            éloigné) pendant que le panneau était ouvert : on le referme
            plutôt que de laisser un service inaccessible affiché */
-        el.classList.remove('visible'); active = false;
+        if(typeof CONSOLE !== 'undefined') CONSOLE.refresh(); else if(el) el.classList.remove('visible');
+        active = false;
       }
     } else if(item.kind === 'camera'){
       item.el.querySelector('svg').innerHTML = HUD_ICONS['cam_'+CAMERA_MODES[cameraMode]];
     } else if(item.kind === 'help'){
-      const el = document.getElementById('helpOverlay');
-      active = !!(el && el.classList.contains('visible'));
+      if(typeof CONSOLE !== 'undefined') active = CONSOLE.isOpen('help');
+      else {
+        const el = document.getElementById('helpOverlay');
+        active = !!(el && el.classList.contains('visible'));
+      }
     } else if(item.kind === 'starmap'){
-      active = isStarMapOpen();
+      active = (typeof CONSOLE !== 'undefined') ? CONSOLE.isOpen('nav') : isStarMapOpen();
     } else if(item.kind === 'audio'){
       const el = document.getElementById('audioOverlay');
       active = !!(el && el.classList.contains('visible'));
@@ -13330,7 +13436,8 @@ function refreshHudIconBar(){
       active = live && REAL.ap.on; disabled = !live;
     } else if(item.kind === 'missions'){
       const on = typeof MISSIONS !== 'undefined' && MISSIONS.enabled();
-      active = on && MISSIONS.boardOpen(); disabled = !on;
+      active = (typeof CONSOLE !== 'undefined') ? CONSOLE.isOpen('missions') : (on && MISSIONS.boardOpen());
+      disabled = !on;
     }
     item.el.classList.toggle('active', active);
     item.el.classList.toggle('disabled', disabled);
@@ -13354,6 +13461,8 @@ function buildHelpGrid(){
     [t('hk_aim'), t('hlp_aim')],
     [t('hk_freelook'), t('hlp_freelook')]
   ];
+  rows.push([t('hk_console'), t('hlp_console')]);
+  [['F2','conTabNav'],['F3','conTabMissions'],['F4','conTabPort'],['F5','conTabYard'],['L','conTabJournal']].forEach(function(r){ rows.push([r[0], t(r[1])]); });
   HUD_BAR_ITEMS.forEach(function(item){
     /* l'aide se décrit elle-même juste en dessous (« Affiche/masque cette
        aide ») — l'inclure ici aussi ferait doublon sur la touche H, comme
@@ -13362,6 +13471,7 @@ function buildHelpGrid(){
     const label = item.kind === 'camera' ? t('cameraLabel').replace(/[\s\u2014]+$/,'') : (item.labelKey ? t(item.labelKey) : '');
     rows.push([item.hotkey, label]);
   });
+  rows.push(['1 \u2013 8', t('hlp_hudAlt')]);
   rows.push(['X', t('hlp_brake')]);
   rows.push(['F10', t('hlp_voice')]);
   rows.push(['ESPACE / ENTR\u00c9E', t('hlp_skip')]);
@@ -13407,7 +13517,7 @@ document.addEventListener('click', function(e){
   const bar = document.getElementById('hudIconBar');
   if(!bar) return;
   HUD_BAR_ITEMS.forEach(function(item, idx){
-    if(!item.hotkey) item.hotkey = 'F' + (idx+1);   /* F1..F9, dans l'ordre — l'aide fixe déjà la sienne à 'H' */
+    if(!item.hotkey) item.hotkey = idx < 8 ? String(idx+1) : 'F' + (idx+1);   /* touches 1..8 sans Alt (F1-F8 migrés vers la console, L1.7), F9 caméra — l'aide fixe déjà la sienne à 'H' */
     const btn = document.createElement('button');
     btn.className = 'hud-icon-btn';
     btn.innerHTML = '<svg viewBox="0 0 24 24">'+HUD_ICONS[item.icon]+'</svg>';
@@ -13534,7 +13644,7 @@ document.addEventListener('click', function(e){
      bascule automatique) : pas la place de les garder tous ouverts en
      continu sur un écran de smartphone. */
   if(document.body.classList.contains('portrait-touch')){
-    ['hud-left','hud-route','hud-right','hud-temp','hud-engines','hud-telemetry','hud-itinerary','hud-lagrange'].forEach(function(cls){
+    ['hud-left','hud-route','hud-right','hud-temp','hud-engines','hud-telemetry','hud-itinerary'].forEach(function(cls){
       const el = document.querySelector('.'+cls);
       if(el) el.classList.add('panel-hidden');
     });
@@ -13819,7 +13929,7 @@ function refreshCreditsDisplay(flash){
     creditsFlashTimer = setTimeout(function(){ el.style.color = ''; }, 1500);
   }
 }
-function addCredits(amount){
+function addCredits(amount, reason){   // reason : motif facultatif (relayé par les adaptateurs 45 et 46), ignoré ici
   credits = Math.max(0, credits + amount);
   refreshCreditsDisplay(amount > 0);
   if(typeof refreshPortPanel === 'function') refreshPortPanel();
@@ -13955,15 +14065,15 @@ function repositionAllPanels(){
   repositionPortPanel();   /* enchaîne déjà repositionRadioPanel() */
   repositionCornerBottomPanels();
 }
-/* évite le chevauchement entre les deux panneaux bas-coin (itinéraire,
-   Lagrange, §21) et la rangée basse CENTRÉE (température/propulsion/
+/* évite le chevauchement entre le panneau bas-coin (itinéraire,
+   §21) et la rangée basse CENTRÉE (température/propulsion/
    commandes, §8) — repéré sur une capture d'écran de documentation à
    1100px de large : la rangée centrée peut s'étendre assez pour mordre
-   sur leur emplacement habituel, alors qu'à 1280px l'un et l'autre
-   semblaient avoir assez de marge. On les remonte au-dessus d'elle plutôt
-   que de les laisser se chevaucher. Repositionnement dynamique (mesuré),
-   pas un simple seuil de largeur fixe : la largeur de la rangée centrée
-   dépend aussi de QUELS panneaux elle contient à l'instant.
+   sur son emplacement habituel, alors qu'à 1280px il semblait avoir assez
+   de marge. On le remonte au-dessus d'elle plutôt que de le laisser se
+   chevaucher. Repositionnement dynamique (mesuré), pas un simple seuil
+   de largeur fixe : la largeur de la rangée centrée dépend aussi de QUELS
+   panneaux elle contient à l'instant.
 
    Bug remonté en jeu (v2.6, ajout du carburant §22) : le panneau ITINÉRAIRE
    peut AUSSI chevaucher la pile de droite (objet proche → services
@@ -13981,17 +14091,7 @@ function repositionAllPanels(){
 function repositionCornerBottomPanels(){
   const row = document.querySelector('.hud-bottom-row');
   const itin = document.querySelector('.hud-itinerary');
-  const lag = document.querySelector('.hud-lagrange');
   const MARGIN = 14;
-
-  if(lag) lag.style.bottom = '';
-  if(row && lag && !lag.classList.contains('panel-hidden')){
-    const rowRect = row.getBoundingClientRect();
-    const lagRect = lag.getBoundingClientRect();
-    if(lagRect.right > rowRect.left - MARGIN){
-      lag.style.bottom = ((window.innerHeight - rowRect.top) + MARGIN)+'px';
-    }
-  }
 
   if(!itin || itin.classList.contains('panel-hidden')) return;
   itin.style.bottom = '';
@@ -14105,7 +14205,7 @@ function buySpeedUpgrade(){
   if(speedUpgradeLevel >= SPEED_UPGRADE_MAX) return;
   const cost = speedUpgradeCost(speedUpgradeLevel);
   if(credits < cost) return;
-  addCredits(-cost);
+  addCredits(-cost, 'speed');
   speedUpgradeLevel++;
   refreshPortPanel();
 }
@@ -14113,14 +14213,14 @@ function buyFuel(){
   if(fuel >= FUEL_CAPACITY - 0.5) return;
   const cost = fuelRefuelCost();
   if(credits < cost) return;
-  addCredits(-cost);
+  addCredits(-cost, 'fuel');
   fuel = FUEL_CAPACITY;
   refreshPortPanel();
 }
 function buyQuantumJump(){
   if(hasQuantumJump || !SHIP_CAN_JUMP) return;
   if(credits < QUANTUM_JUMP_PRICE) return;
-  addCredits(-QUANTUM_JUMP_PRICE);
+  addCredits(-QUANTUM_JUMP_PRICE, 'jump');
   hasQuantumJump = true;
   refitJumpCore();
   refreshPortPanel();
@@ -15011,7 +15111,7 @@ function updateShuttles(dt, elapsed){
         if(!orbitState.creditsPaid && orbitState.spawned.every(Boolean)
            && orbitState.deliveredCount >= orbitState.spawnFractions.length){
           const total = orbitState.cargoSplit.reduce(function(a,b){ return a+b; }, 0);
-          addCredits(total * orbitState.unitPrice);
+          addCredits(total * orbitState.unitPrice, 'delivery');
           orbitState.creditsPaid = true;
         }
         if(s.noReturn){                                             /* navette du port : reste au port */
@@ -15683,13 +15783,11 @@ function updateHud(now){
   const forward = new THREE.Vector3(0,0,-1).applyQuaternion(shipRig.quaternion);
   const heading = ((Math.atan2(forward.x, -forward.z)*180/Math.PI)+360)%360;
   document.getElementById('headingVal').textContent = String(Math.round(heading)).padStart(3,'0')+'°';
-  /* itinéraire (point-vaisseau) et point de Lagrange (§ v2.4) : hors du
+  /* itinéraire (point-vaisseau) : hors du
      throttle ci-dessous comme vitesse/secteur/cap juste au-dessus — un
      point qui saute par paliers de 350ms serait visiblement saccadé,
-     contrairement à un texte qui change peu d'une image à l'autre. Chaque
-     fonction sort tout de suite si son panneau est masqué. */
+     contrairement à un texte qui change peu d'une image à l'autre. */
   updateItineraryShip();
-  updateLagrangePanel();
 
   if(now - lastHudUpdate < 350) return;
   lastHudUpdate = now;
@@ -16581,11 +16679,11 @@ const BRIDGE = (function(){
     linked = true;
     /* crédits : addCredits reste l'unique point d'écriture du moteur ; GAME.state suit */
     const addCredits0 = addCredits;
-    addCredits = function(amount){
-      addCredits0(amount);
+    addCredits = function(amount, reason){
+      addCredits0(amount, reason);
       const st = GAME.state;
       if(!st || st.credits === credits) return;
-      try{ GAME.cmd('credits.set', { credits: credits, reason: 'jeu' }); }catch(err){ console.error('[BRIDGE] crédits :', err); }
+      try{ GAME.cmd('credits.set', { credits: credits, reason: reason || 'jeu' }); }catch(err){ console.error('[BRIDGE] crédits :', err); }
     };
     /* horloge : secondes de jeu actif (ni avant le départ, ni en pause) */
     setInterval(function(){ if(GAME.state && gameStarted && !gamePaused) GAME.tick(1); }, 1000);
@@ -16638,6 +16736,1034 @@ const BRIDGE = (function(){
   }
 
   return { chooseMode: chooseMode, resume: resume };
+})();
+
+/* =========================================================================
+   CAMPAGNE 1b. SOURCES DU JOURNAL — adaptateur : radio, finances (avec motif) et événements de bord
+   Branche JOURNAL (sim/04) sur le moteur sans modifier celui-ci, hors le 2e argument « reason » des addCredits.
+   ========================================================================= */
+/* @provides JOURNAL.sources @requires JOURNAL, GAME @requires-engine addCredits, credits, appendRadioLine, REAL, MISSIONS, fuel, FUEL_CAPACITY, FUEL_WARN_RATIO, FUEL_CRIT_RATIO, jumpState, isNearPortService, gameStarted, gamePaused */
+(function(){
+  const PERIOD = 250;                       // ms entre deux instantanés
+  let prev = null;                          // instantané précédent (null : premier ou reprise -> aucun événement)
+
+  /* ---- radio : enveloppe de appendRadioLine, texte brut, mémoire seule ---- */
+  if(typeof appendRadioLine === 'function'){
+    const radio0 = appendRadioLine;
+    appendRadioLine = function(entry){
+      const r = radio0.apply(this, arguments);
+      try{
+        if(entry) JOURNAL.add({ kind: 'radio', from: entry.from === 'tower' ? 'tower' : 'ship', who: entry.label, text: String(entry.text == null ? '' : entry.text) });
+      }catch(err){ console.error('[JOURNAL] radio :', err); }
+      return r;
+    };
+  }
+
+  /* ---- finances : en libre, delta réel et solde ; en campagne le grand livre (state.ledger) fait foi (cf. 45) ---- */
+  if(typeof addCredits === 'function'){
+    const credits0 = addCredits;
+    addCredits = function(amount, reason){
+      const before = credits;
+      const r = credits0.apply(this, arguments);
+      try{
+        if(!GAME.state){
+          const delta = credits - before;
+          JOURNAL.add({ kind: 'fin', reason: reason || 'jeu', delta: delta, bal: credits });
+        }
+      }catch(err){ console.error('[JOURNAL] finances :', err); }
+      return r;
+    };
+  }
+
+  /* ---- événements : instantané du moteur ---- */
+  function snapshot(){
+    const s = { phase: null, legName: null, missionTarget: null, active: null, doneCount: 0, jump: false, nearPort: false,
+                fuelRatio: 1, fuelWarn: 0.25, fuelCrit: 0.10 };
+    try{ s.phase = REAL.phase || null; }catch(e){}
+    try{ s.legName = (REAL.leg && REAL.leg.name) || null; }catch(e){}
+    try{ s.missionTarget = (REAL.mission && REAL.mission.target && REAL.mission.target.name) || null; }catch(e){}
+    try{
+      const a = MISSIONS.state.active;
+      s.active = a ? { id: a.id, dest: a.dest ? a.dest.name : null, reward: a.reward } : null;
+    }catch(e){}
+    try{ s.doneCount = MISSIONS.state.done.length; }catch(e){}
+    try{ s.jump = !!jumpState; }catch(e){}
+    try{ s.nearPort = isNearPortService() || false; }catch(e){}
+    try{ s.fuelRatio = fuel / FUEL_CAPACITY; }catch(e){}
+    try{ s.fuelWarn = FUEL_WARN_RATIO; s.fuelCrit = FUEL_CRIT_RATIO; }catch(e){}
+    return s;
+  }
+
+  function sample(){
+    let on = false;
+    try{ on = gameStarted && !gamePaused; }catch(e){}
+    if(!on) return;
+    if(!GAME.state) JOURNAL.tickFree(PERIOD / 1000);
+    const snap = snapshot();
+    const evts = JOURNAL.detect(prev, snap);
+    prev = snap;
+    evts.forEach(function(evt){
+      const e = JOURNAL.add(evt);
+      if(GAME.state){
+        try{ GAME.cmd('journal.push', { e: [e.t, e.code, e.a, e.b] }); }catch(err){ console.error('[JOURNAL] push :', err); }
+      }
+    });
+  }
+
+  /* reprise / nouvelle campagne : journal sauvegardé restauré, puis instantané neuf (aucun événement fantôme) */
+  function reset(){
+    JOURNAL.restore((GAME.state && GAME.state.journal) || []);
+    prev = null;
+  }
+  GAME.on('new', reset);
+  GAME.on('loaded', reset);
+
+  setInterval(sample, PERIOD);
+})();
+
+/* =========================================================================
+   CAMPAGNE 1. CONSOLE DE BORD — CONSOLE : modèle des onglets, événements, table des touches (L1)
+   Couche pure : ni THREE ni DOM. La vue (51-console-view.js) et les onglets s'y inscrivent.
+   ========================================================================= */
+/* @provides CONSOLE */
+const CONSOLE = (function(){
+  const tabs = [];                          // onglets inscrits, triés par order
+  const listeners = Object.create(null);    // événement -> [{ fn, off }]
+  const badgeMap = Object.create(null);     // id -> n (> 0 ; absent = pas de pastille)
+  let current = null;                       // id de l'onglet affiché, null = console fermée
+  let last = null;                          // dernier onglet affiché (survit à la fermeture)
+  let visibleIds = '';                      // signature des onglets visibles à la dernière évaluation
+
+  function warn(msg, err){ if(typeof console !== 'undefined') console.error(msg, err); }
+
+  /* ---- événements ------------------------------------------------------ */
+  /* on() renvoie la fonction de désabonnement (idempotente) */
+  function on(evt, fn){
+    if(typeof fn !== 'function') throw new TypeError('ecouteur_invalide');
+    const entry = { fn: fn, off: false };
+    (listeners[evt] || (listeners[evt] = [])).push(entry);
+    return function(){
+      if(entry.off) return;
+      entry.off = true;
+      const l = listeners[evt], i = l ? l.indexOf(entry) : -1;
+      if(i >= 0) l.splice(i, 1);
+    };
+  }
+
+  /* Une erreur d'écouteur est journalisée, jamais propagée ; un écouteur désabonné en cours d'émission n'est pas appelé */
+  function emit(evt, data){
+    const l = listeners[evt];
+    if(!l) return;
+    l.slice().forEach(function(e){
+      if(e.off) return;
+      try{ e.fn(data); }catch(err){ warn('[CONSOLE] écouteur « ' + evt + ' » :', err); }
+    });
+  }
+
+  /* ---- onglets --------------------------------------------------------- */
+  function find(id){
+    for(let i = 0; i < tabs.length; i++) if(tabs[i].id === id) return tabs[i];
+    return null;
+  }
+
+  /* Une exception dans visible() vaut « invisible » */
+  function isVisible(t){
+    if(typeof t.visible !== 'function') return true;
+    try{ return !!t.visible(); }catch(err){ warn('[CONSOLE] visible() de « ' + t.id + ' » :', err); return false; }
+  }
+
+  function visibleTabs(){ return tabs.filter(isVisible); }
+  function signature(){ return visibleTabs().map(function(t){ return t.id; }).join(','); }
+  function ids(sig){ return sig ? sig.split(',') : []; }
+
+  /* def : { id, order, labelKey, fkey, keys, visible, onShow, onHide, onKey } ; doublon d'id -> Error('onglet_double') */
+  function register(def){
+    if(!def || typeof def.id !== 'string' || !def.id) throw new TypeError('onglet_invalide');
+    if(find(def.id)) throw new Error('onglet_double');
+    const t = {
+      id: def.id,
+      order: typeof def.order === 'number' ? def.order : 100,
+      labelKey: def.labelKey || null,
+      fkey: def.fkey || null,
+      keys: Array.isArray(def.keys) ? def.keys.slice() : [],
+      visible: def.visible,
+      onShow: def.onShow,
+      onHide: def.onHide,
+      onKey: def.onKey,                     // facultatif : clavier interne (flèches, Page*, Début, Fin)
+      panel: null                           // renseigné par la vue : élément passé à onShow
+    };
+    tabs.push(t);
+    tabs.sort(function(a, b){ return a.order - b.order; });   // tri stable : à égalité, ordre d'inscription
+    visibleIds = signature();
+    emit('tabs', { ids: ids(visibleIds) });
+    return t;
+  }
+
+  function call(t, fn, arg){
+    if(typeof fn !== 'function') return;
+    try{ fn.call(t, arg); }catch(err){ warn('[CONSOLE] onglet « ' + t.id + ' » :', err); }
+  }
+
+  /* ---- ouverture / fermeture ------------------------------------------- */
+  /* Sans id : dernier onglet visible, sinon premier visible. Refuse un onglet inconnu ou invisible. */
+  function open(id){
+    let t;
+    if(id == null){
+      t = last ? find(last) : null;
+      if(!t || !isVisible(t)) t = visibleTabs()[0] || null;
+    }else{
+      t = find(id);
+      if(t && !isVisible(t)) t = null;
+    }
+    if(!t) return false;
+    if(current === t.id) return true;
+    const from = current;
+    if(from){ const p = find(from); call(p, p.onHide, 'switch'); }
+    current = last = t.id;
+    call(t, t.onShow, t.panel);
+    if(from) emit('tab', { from: from, to: t.id });
+    else emit('open', { id: t.id });
+    return true;
+  }
+
+  function close(reason){
+    if(!current) return false;
+    const r = reason === undefined ? 'user' : reason;
+    const id = current, t = find(id);
+    current = null;
+    call(t, t.onHide, r);
+    emit('close', { id: id, reason: r });
+    return true;
+  }
+
+  /* Ouvert sur id -> ferme ; sinon ouvre id */
+  function toggle(id){
+    if(current === id){ close('user'); return true; }
+    return open(id);
+  }
+
+  /* Réévalue les visible() ; vrai si l'ensemble visible a changé ou si l'onglet courant a été fermé */
+  function refresh(){
+    let changed = false;
+    const sig = signature();
+    if(sig !== visibleIds){
+      visibleIds = sig;
+      changed = true;
+      emit('tabs', { ids: ids(sig) });
+    }
+    if(current){
+      const t = find(current);
+      if(!t || !isVisible(t)){ close('hidden'); changed = true; }
+    }
+    return changed;
+  }
+
+  /* ---- pastilles (API seule, alimentée à partir de L2) ------------------ */
+  function badge(id, n){
+    const v = (typeof n === 'number' && isFinite(n) && n > 0) ? Math.floor(n) : null;
+    if(v === null){
+      if(!(id in badgeMap)) return;
+      delete badgeMap[id];
+    }else{
+      if(badgeMap[id] === v) return;
+      badgeMap[id] = v;
+    }
+    emit('badge', { id: id, n: v });
+  }
+  function badges(){ return Object.assign({}, badgeMap); }
+
+  /* ---- touches ----------------------------------------------------------
+     Pure : décide seulement. k = { code, altKey, ctrlKey, metaKey, shiftKey, repeat }, ctx = { started, paused, typing }.
+     Renvoie { act:'toggle', tab } | { act:'last' } | { act:'close' } | { act:'hud', index } | { act:'tabkey', tab, code }
+           | { act:'swallow' } | { act:'reserved' } | null (touche non traitée : le jeu la garde). */
+  const NAV_KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End'];
+  function keyAction(k, ctx){
+    if(!k || !ctx || !ctx.started || ctx.paused || ctx.typing) return null;
+    if(k.ctrlKey || k.metaKey) return null;                    // raccourcis du navigateur : jamais touchés
+    const code = k.code, isOpen = current !== null;
+
+    /* touches 1 à 8 SANS modificateur (décision du mainteneur 06/10 : le navigateur capte Alt+n) : panneaux du HUD,
+       console ouverte comprise. Avec Alt ou Maj : rien (Alt+n, Maj+n restent au navigateur / au jeu). */
+    const dig = /^Digit([1-8])$/.exec(code);
+    if(dig) return (k.altKey || k.shiftKey) ? null : { act: 'hud', index: Number(dig[1]) - 1 };
+
+    if(isOpen){
+      if(code === 'KeyP' || code === 'Pause' || code === 'F9' || code === 'F10') return null;
+      if(k.altKey) return { act: 'swallow' };
+    }else if(k.altKey) return null;
+
+    if(code === 'Escape') return isOpen ? { act: 'close' } : null;   // fermée : la pause garde Échap
+    /* navigation interne : l'onglet courant la prend s'il a onKey (la répétition de touche est permise : défilement) */
+    if(isOpen && NAV_KEYS.indexOf(code) >= 0){
+      const cur = find(current);
+      if(cur && typeof cur.onKey === 'function') return { act: 'tabkey', tab: cur.id, code: code };
+    }
+    if(k.repeat) return isOpen ? { act: 'swallow' } : null;
+
+    if(code === 'Tab') return isOpen ? { act: 'close' } : { act: 'last' };
+
+    if(/^F[1-8]$/.test(code)){
+      const f = tabs.filter(function(x){ return x.fkey === code; })[0];
+      return f ? { act: 'toggle', tab: f.id } : { act: 'reserved' };
+    }
+
+    if(code === 'Space' || code === 'Enter' || code === 'NumpadEnter'){
+      return isOpen ? (current === 'nav' ? { act: 'close' } : { act: 'swallow' }) : null;
+    }
+
+    const t = tabs.filter(function(x){ return x.keys.indexOf(code) >= 0; })[0];
+    if(t) return { act: 'toggle', tab: t.id };
+
+    return isOpen ? { act: 'swallow' } : null;
+  }
+
+  /* Remise à zéro (tests) */
+  function _reset(){
+    tabs.length = 0;
+    Object.keys(listeners).forEach(function(k){ delete listeners[k]; });
+    Object.keys(badgeMap).forEach(function(k){ delete badgeMap[k]; });
+    current = null; last = null; visibleIds = '';
+  }
+
+  return {
+    register: register,
+    tabs: function(){ return tabs.slice(); },
+    visibleTabs: visibleTabs,
+    current: function(){ return current; },
+    last: function(){ return last; },
+    isOpen: function(id){ return id === undefined ? current !== null : current === id; },
+    open: open, close: close, toggle: toggle, refresh: refresh,
+    badge: badge, badges: badges,
+    on: on, keyAction: keyAction,
+    _reset: _reset
+  };
+})();
+
+/* =========================================================================
+   CAMPAGNE 1. CONSOLE DE BORD — vue : cadre #sttConsole, CSS, hébergement des overlays, clavier minimal (L1)
+   Le modèle (CONSOLE, 50-console.js) décide ; ce fichier dessine et relaie les touches.
+   Seul le membre CONSOLE.view est ajouté : aucune globale nouvelle.
+   ========================================================================= */
+/* @provides CONSOLE.view @requires CONSOLE @requires-engine t, gameStarted, gamePaused, activateHudBarItem, HUD_BAR_ITEMS */
+(function(){
+  const CSS = [
+    '#sttConsole{ position:fixed; inset:0; z-index:6; display:flex; align-items:center; justify-content:center; pointer-events:none; font-family:"JetBrains Mono",monospace; }',
+    '#sttConsole[hidden]{ display:none; }',
+    '#sttConsole .con-frame{ position:relative; pointer-events:auto; display:flex; flex-direction:column; width:min(1100px,96vw); height:min(760px,90vh); border:1px solid var(--line);',
+    '  background:linear-gradient(180deg, rgba(94,234,212,0.05), transparent 60%), rgba(11,18,32,0.96); backdrop-filter:blur(2px); color:var(--ink); }',
+    '#sttConsole .con-frame::before, #sttConsole .con-frame::after{ content:""; position:absolute; width:14px; height:14px; border:1.5px solid var(--amber); pointer-events:none; }',
+    '#sttConsole .con-frame::before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }',
+    '#sttConsole .con-frame::after{ bottom:-1px; right:-1px; border-left:none; border-top:none; }',
+    '#sttConsole .con-head{ display:flex; align-items:center; gap:14px; padding:8px 12px; border-bottom:1px solid var(--line); }',
+    '#sttConsole .con-title{ font-weight:700; font-size:13px; letter-spacing:0.14em; text-transform:uppercase; color:var(--amber); white-space:nowrap; }',
+    '#sttConsoleTabs{ display:flex; gap:4px; flex:1; min-width:0; overflow-x:auto; }',
+    '#sttConsoleTabs button{ position:relative; flex:none; padding:5px 12px; background:none; border:1px solid transparent; color:var(--muted); font:inherit; font-size:12px;',
+    '  letter-spacing:0.08em; text-transform:uppercase; cursor:pointer; }',
+    '#sttConsoleTabs button:hover{ color:var(--ink); border-color:var(--line); }',
+    '#sttConsoleTabs button.on{ color:var(--amber); border-color:var(--amber-dim); }',
+    '#sttConsoleTabs button[hidden]{ display:none; }',
+    '#sttConsole .con-badge{ display:inline-block; min-width:14px; margin-left:6px; padding:0 4px; border-radius:7px; background:var(--amber); color:var(--bg); font-size:10px; line-height:14px; text-align:center; }',
+    '#sttConsole .con-badge[hidden]{ display:none; }',
+    '#sttConsole .con-close{ flex:none; width:24px; height:24px; padding:0; background:none; border:none; color:var(--muted-2); font:inherit; font-size:16px; line-height:1; cursor:pointer; }',
+    '#sttConsole .con-close:hover{ color:#ff6b57; }',
+    '#sttConsole .con-body{ position:relative; flex:1; min-height:0; overflow:auto; }',
+    '#sttConsole .con-panel{ padding:10px 14px; }',
+    '#sttConsole .con-panel[hidden]{ display:none; }',
+    /* neutralisation des overlays hébergés : plus de plein écran, de voile ni de position propre */
+    '#sttConsole .con-hosted{ position:static !important; inset:auto !important; top:auto !important; left:auto !important; right:auto !important; bottom:auto !important;',
+    '  transform:none !important; z-index:auto !important; width:auto !important; max-width:none !important; height:auto !important; max-height:none !important; margin:0 !important;',
+    '  background:none !important; backdrop-filter:none !important; box-shadow:none !important; opacity:1 !important; pointer-events:auto !important; transition:none !important; }',
+    '#sttConsole .con-hosted:not([data-con-shown]){ display:none !important; }',
+    '#sttConsole .con-hosted .help-panel{ width:auto; max-width:none; max-height:none; border:none; background:none; padding:0; }',
+    /* Tactile et écran étroit : ≤760px de large ou pointeur tactile */
+    '@media (max-width:760px), (pointer:coarse){',
+    '  #sttConsole{ position:fixed; inset:0; width:100%; height:100%; max-width:100%; max-height:100%;',
+    '    inset:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }',
+    '  #sttConsole .con-frame{ width:100%; height:100%; border:none; border-radius:0;',
+    '    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }',
+    '  #sttConsole .con-frame::before, #sttConsole .con-frame::after{ display:none; }',
+    '  #sttConsoleTabs{ overflow-x:auto; white-space:nowrap; -webkit-overflow-scrolling:touch; flex-wrap:nowrap; }',
+    '  #sttConsoleTabs button{ min-height:44px; flex-shrink:0; }',
+    '  #sttConsole .con-close{ min-width:44px; min-height:44px; width:44px; height:44px; }',
+    '  #sttConsole .con-body{ overflow:auto; -webkit-overflow-scrolling:touch; }',
+    '  #sttConsole .con-hosted{ box-sizing:border-box; max-width:100%; }',
+    '  #helpOverlay{ max-width:100%; box-sizing:border-box; }',
+    '  #audioOverlay{ max-width:100%; box-sizing:border-box; }',
+    '  #stmMap{ max-width:100%; box-sizing:border-box; }',
+    '  #missionBoardOverlay{ max-width:100%; box-sizing:border-box; }',
+    '  #contractBoardOverlay{ max-width:100%; box-sizing:border-box; }',
+    '  #portPanel{ max-width:100%; box-sizing:border-box; }',
+    '  #shipyardOverlay{ max-width:100%; box-sizing:border-box; }',
+    '}'
+  ].join('\n');
+
+  const hosts = [];          // { id, node, shown }
+  let root = null, tabsEl = null, titleEl = null, closeEl = null, bodyEl = null;
+  let escHeld = false;       // Échap vient de fermer la console : la répétition ne doit pas déclencher la pause
+
+  function label(tab){
+    const k = tab.labelKey;
+    return k ? t(k) : tab.id;
+  }
+
+  function panelFor(id){
+    if(!bodyEl) return null;
+    let p = bodyEl.querySelector('.con-panel[data-tab="' + id + '"]');
+    if(!p){
+      p = document.createElement('div');
+      p.className = 'con-panel';
+      p.setAttribute('data-tab', id);
+      p.setAttribute('role', 'tabpanel');
+      p.hidden = true;
+      bodyEl.appendChild(p);
+    }
+    return p;
+  }
+
+  function buttonFor(id){
+    let b = tabsEl.querySelector('button[data-tab="' + id + '"]');
+    if(!b){
+      b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('role', 'tab');
+      b.setAttribute('data-tab', id);
+      b.tabIndex = -1;                     // jamais de focus clavier : les touches restent au jeu
+      b.appendChild(document.createElement('span')).className = 'con-lbl';
+      const bd = b.appendChild(document.createElement('span'));
+      bd.className = 'con-badge'; bd.hidden = true;
+      tabsEl.appendChild(b);
+    }
+    return b;
+  }
+
+  /* Synchronise boutons, panneaux, libellés, pastilles et visibilité avec le modèle */
+  function render(){
+    if(!root) return;
+    titleEl.textContent = t('conTitle');
+    closeEl.setAttribute('aria-label', t('conClose'));
+    closeEl.title = t('conClose');
+    root.setAttribute('aria-label', t('conTitle'));
+    const cur = CONSOLE.current(), badges = CONSOLE.badges();
+    CONSOLE.tabs().forEach(function(tab){
+      if(!tab.panel) tab.panel = panelFor(tab.id);
+      const b = buttonFor(tab.id), p = panelFor(tab.id);
+      tabsEl.appendChild(b);               // respecte l'ordre du modèle (tabs() est trié)
+      const vis = CONSOLE.visibleTabs().indexOf(tab) >= 0;
+      b.hidden = !vis;
+      b.firstChild.textContent = label(tab);
+      b.classList.toggle('on', cur === tab.id);
+      b.setAttribute('aria-selected', cur === tab.id ? 'true' : 'false');
+      const n = badges[tab.id];
+      b.lastChild.hidden = !n; b.lastChild.textContent = n ? String(n) : '';
+      p.hidden = !(vis && cur === tab.id);
+    });
+    root.hidden = cur === null;
+  }
+
+  function ensure(){
+    if(root) return true;
+    if(typeof document === 'undefined' || !document.body) return false;
+    const st = document.createElement('style');
+    st.id = 'sttConsoleCss';
+    st.textContent = CSS;
+    document.head.appendChild(st);
+    root = document.createElement('div');
+    root.id = 'sttConsole';
+    root.setAttribute('role', 'dialog');
+    root.setAttribute('aria-modal', 'false');
+    root.hidden = true;
+    root.innerHTML = '<div class="con-frame"><div class="con-head"><span class="con-title" id="sttConsoleTitle"></span>' +
+      '<div id="sttConsoleTabs" role="tablist"></div><button type="button" class="con-close" tabindex="-1">×</button></div>' +
+      '<div class="con-body"></div></div>';
+    document.body.appendChild(root);
+    titleEl = root.querySelector('.con-title');
+    tabsEl = root.querySelector('#sttConsoleTabs');
+    closeEl = root.querySelector('.con-close');
+    bodyEl = root.querySelector('.con-body');
+    closeEl.addEventListener('click', function(){ CONSOLE.close('user'); });
+    tabsEl.addEventListener('click', function(e){
+      const b = e.target.closest ? e.target.closest('button[data-tab]') : null;
+      if(b){ CONSOLE.open(b.getAttribute('data-tab')); b.blur(); }
+    });
+    hosts.forEach(attach);
+    return true;
+  }
+
+  /* ---- hébergement des overlays existants ------------------------------ */
+  function sync(h){
+    let on = false;
+    try{ on = !!h.shown(h.node); }catch(err){ on = false; }
+    if(on) h.node.setAttribute('data-con-shown', ''); else h.node.removeAttribute('data-con-shown');
+    return on;
+  }
+
+  function onMutation(h){
+    const on = sync(h);
+    if(on){
+      if(CONSOLE.current() !== h.id) CONSOLE.open(h.id);
+    }else if(CONSOLE.current() === h.id){
+      const encore = hosts.some(function(o){ return o.id === h.id && o !== h && o.node.hasAttribute('data-con-shown'); });
+      if(!encore) CONSOLE.close('legacy');
+    }
+  }
+
+  function attach(h){
+    if(h.mo || !bodyEl) return;
+    const p = panelFor(h.id);
+    h.node.classList.add('con-hosted');
+    p.appendChild(h.node);
+    sync(h);
+    h.mo = new MutationObserver(function(){ onMutation(h); });
+    h.mo.observe(h.node, { attributes: true, attributeFilter: ['class', 'style'] });
+  }
+
+  function host(id, node, shown){
+    if(typeof node === 'string') node = document.getElementById(node);
+    if(!node || typeof shown !== 'function') return false;
+    const h = { id: id, node: node, shown: shown, mo: null };
+    hosts.push(h);
+    if(ensure()) attach(h);
+    return true;
+  }
+
+  /* ---- clavier ----------------------------------------------------------- */
+  const TEXT_INPUT = /^(text|number|search|email|url|password|tel|)$/i;
+  function typing(el){
+    if(!el || el.nodeType !== 1) return false;
+    const tag = el.tagName;
+    if(tag === 'TEXTAREA') return true;
+    if(tag === 'INPUT') return TEXT_INPUT.test(el.getAttribute('type') || '');
+    return !!el.isContentEditable;
+  }
+
+  function eat(e){ e.preventDefault(); e.stopImmediatePropagation(); }
+
+  function onKeyDown(e){
+    if(e.code === 'Escape' && e.repeat && escHeld){ eat(e); return; }
+    const a = CONSOLE.keyAction(
+      { code: e.code, altKey: e.altKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey, shiftKey: e.shiftKey, repeat: e.repeat },
+      { started: gameStarted, paused: gamePaused, typing: typing(e.target) || typing(document.activeElement) });
+    if(!a) return;
+    switch(a.act){
+      case 'toggle': CONSOLE.toggle(a.tab); break;
+      case 'last':   CONSOLE.open(); break;
+      case 'close':  CONSOLE.close('user'); if(e.code === 'Escape') escHeld = true; break;
+      case 'tabkey': { const tb = CONSOLE.tabs().filter(function(x){ return x.id === a.tab; })[0]; if(tb && typeof tb.onKey === 'function'){ try{ tb.onKey(a.code); }catch(err){ console.error('[CONSOLE] onKey « ' + a.tab + ' » :', err); } } break; }
+      case 'hud':    if(HUD_BAR_ITEMS[a.index]) activateHudBarItem(HUD_BAR_ITEMS[a.index]); break;
+      default: break;   /* swallow, reserved : sans effet */
+    }
+    eat(e);   /* toute action non nulle : le jeu (23) ne voit plus la touche, même si open/toggle a refusé */
+  }
+
+  function onKeyUp(e){ if(e.code === 'Escape') escHeld = false; }
+
+  /* ---- branchement -------------------------------------------------------- */
+  CONSOLE.on('tabs', function(){ if(ensure()) render(); });
+  ['open', 'close', 'tab', 'badge'].forEach(function(evt){ CONSOLE.on(evt, render); });
+  if(typeof window !== 'undefined'){
+    window.addEventListener('keydown', onKeyDown, true);
+    window.addEventListener('keyup', onKeyUp, true);
+    setInterval(function(){ if(gameStarted) CONSOLE.refresh(); }, 250);
+    if(typeof document !== 'undefined' && !document.body){
+      document.addEventListener('DOMContentLoaded', function(){ if(ensure()) render(); });
+    }else ensure();
+  }
+
+  CONSOLE.view = { host: host, render: render };
+})();
+
+/* =========================================================================
+   CAMPAGNE 1. CONSOLE DE BORD — onglet Aide · Réglages (#helpOverlay puis #audioOverlay) (L1.3)
+   ========================================================================= */
+/* @provides CONSOLE.help @requires CONSOLE, CONSOLE.view */
+(function(){
+  'use strict';
+
+  function node(id){ return document.getElementById(id); }
+  function shown(n){ return n.classList.contains('visible'); }
+  function isOn(id){ const n = node(id); return !!(n && shown(n)); }
+
+  CONSOLE.register({
+    id: 'help',
+    order: 90,
+    labelKey: 'conTabHelp',
+    fkey: null,
+    keys: ['KeyH', 'KeyV'],
+    visible: function(){ return true; },
+    onShow: function(){
+      const n = node('helpOverlay');
+      if(n) n.classList.add('visible');
+    },
+    onHide: function(reason){
+      if(reason === 'legacy') return;
+      const h = node('helpOverlay'), a = node('audioOverlay');
+      if(h) h.classList.remove('visible');
+      if(a) a.classList.remove('visible');
+    }
+  });
+
+  CONSOLE.view.host('help', 'helpOverlay', shown);
+  CONSOLE.view.host('help', 'audioOverlay', shown);
+
+  /* V : ouvre l'aide, affiche les volumes et y fait défiler ; seconde pression :
+     retire les volumes, et ferme la console si l'aide n'est plus affichée. */
+  function toggleAudio(){
+    const a = node('audioOverlay');
+    if(!a) return;
+    if(CONSOLE.isOpen('help') && shown(a)){
+      a.classList.remove('visible');
+      if(!isOn('helpOverlay')) CONSOLE.close('user');
+      return;
+    }
+    CONSOLE.open('help');
+    a.classList.add('visible');
+    /* #audioOverlay reste display:none tant que l'observateur n'a pas posé data-con-shown (microtâche) */
+    if(typeof a.scrollIntoView === 'function'){
+      const go = function(){ a.scrollIntoView({ block: 'nearest' }); };
+      if(typeof requestAnimationFrame === 'function') requestAnimationFrame(go); else setTimeout(go, 0);
+    }
+  }
+
+  CONSOLE.help = { toggleAudio: toggleAudio };
+})();
+
+/* =========================================================================
+   CAMPAGNE 1. CONSOLE DE BORD — onglet Navigation (#stmMap, carte de l'univers) (L1.4)
+   ========================================================================= */
+/* @provides CONSOLE.nav @requires CONSOLE, CONSOLE.view @requires-engine gameStarted, openStarMap, closeStarMap */
+(function(){
+  'use strict';
+
+  /* Dans le panneau, la carte épouse l'espace du corps de la console (le module partagé la dimensionne
+     sur la fenêtre : 95vw × 92vh) ; son canevas mesure .view, d'où le resize après ouverture. */
+  const st = document.createElement('style');
+  st.textContent = [
+    '#sttConsole .con-panel[data-tab="nav"]{ padding:0; height:100%; }',
+    '#sttConsole #stmMap.con-hosted{ height:100% !important; }',
+    '#sttConsole #stmMap.con-hosted.on{ display:block; }',
+    '#sttConsole #stmMap .p{ width:100%; height:100%; border:0; }',
+    '#sttConsole #stmMap .x{ display:none; }'
+  ].join('\n');
+  document.head.appendChild(st);
+
+  let hosted = false;
+  function shown(n){ return n.classList.contains('on'); }
+  /* #stmMap est créé par shared/starmap.js : l'hôte est posé dès que le nœud existe */
+  function ensureHost(){
+    if(hosted) return true;
+    if(!document.getElementById('stmMap')) return false;
+    hosted = CONSOLE.view.host('nav', 'stmMap', shown);
+    return hosted;
+  }
+
+  CONSOLE.register({
+    id: 'nav',
+    order: 20,
+    labelKey: 'conTabNav',
+    fkey: 'F2',
+    keys: ['KeyM', 'Semicolon'],
+    visible: function(){ ensureHost(); return !!gameStarted && !!window.__STARMAP; },
+    onShow: function(){
+      ensureHost();
+      openStarMap();
+      /* le panneau n'est affiché qu'après onShow : une seconde mesure suit la mise en page */
+      const fit = function(){ window.dispatchEvent(new Event('resize')); };
+      fit();
+      if(typeof requestAnimationFrame === 'function') requestAnimationFrame(fit);
+      setTimeout(fit, 60);
+    },
+    onHide: function(reason){
+      if(reason === 'legacy') return;
+      closeStarMap();
+    }
+  });
+
+  ensureHost();
+})();
+
+/* =========================================================================
+   CAMPAGNE 1. CONSOLE DE BORD — onglet Missions (#missionBoardOverlay, #contractBoardOverlay) (L1.5)
+   ========================================================================= */
+/* @provides CONSOLE.missions @requires CONSOLE, CONSOLE.view @requires-engine MISSIONS, LOCAL, t */
+(function(){
+  'use strict';
+
+  const st = document.createElement('style');
+  st.textContent = [
+    '#sttConsole .con-panel[data-tab="missions"] .con-empty{ padding:18px; text-align:center; opacity:.7; }',
+    '#sttConsole .con-panel[data-tab="missions"]:has(.con-hosted[data-con-shown]) .con-empty{ display:none; }',
+    '#sttConsole #missionClose{ display:none; }'
+  ].join('\n');
+  document.head.appendChild(st);
+
+  function node(id){ return document.getElementById(id); }
+  function missionShown(n){ return n.style.display === 'flex'; }
+  function contractShown(n){ return n.classList.contains('visible'); }
+  function isUp(id, fn){ const n = node(id); return !!(n && fn(n)); }
+
+  /* #missionBoardOverlay est créé tardivement par MISSIONS (ensureDom) : hôte posé dès qu'il existe */
+  let hostedMission = false, hostedContract = false, empty = null;
+  function ensureHosts(){
+    if(!hostedContract && node('contractBoardOverlay'))
+      hostedContract = CONSOLE.view.host('missions', 'contractBoardOverlay', contractShown);
+    if(!hostedMission && node('missionBoardOverlay'))
+      hostedMission = CONSOLE.view.host('missions', 'missionBoardOverlay', missionShown);
+    const p = document.querySelector('#sttConsole .con-panel[data-tab="missions"]');
+    if(p){
+      if(!empty){ empty = document.createElement('div'); empty.className = 'con-empty'; }
+      if(empty.parentNode !== p) p.insertBefore(empty, p.firstChild);
+      empty.textContent = t('conEmptyMissions');
+    }
+  }
+
+  CONSOLE.register({
+    id: 'missions',
+    order: 30,
+    labelKey: 'conTabMissions',
+    fkey: 'F3',
+    keys: ['KeyJ'],
+    visible: function(){ ensureHosts(); return true; },
+    onShow: function(){
+      ensureHosts();
+      if(isUp('missionBoardOverlay', missionShown) || isUp('contractBoardOverlay', contractShown)) return;
+      if(typeof MISSIONS !== 'undefined' && MISSIONS.enabled()){ MISSIONS.toggleBoard(); ensureHosts(); }
+      else if(typeof LOCAL !== 'undefined' && typeof REAL !== 'undefined' && REAL.leg) LOCAL.openContractBoard();
+    },
+    onHide: function(reason){
+      if(reason === 'legacy') return;
+      /* fermeture par le joueur : MISSIONS marque « dismissed » (pas de réouverture avant la prochaine escale) */
+      if(isUp('missionBoardOverlay', missionShown) && typeof MISSIONS !== 'undefined') MISSIONS.closeBoard(true);
+      if(isUp('contractBoardOverlay', contractShown) && typeof LOCAL !== 'undefined') LOCAL.closeContractBoard();
+    }
+  });
+
+  ensureHosts();
+})();
+
+/* =========================================================================
+   CAMPAGNE 1. CONSOLE DE BORD — onglet Port (#portPanel) (L1.6)
+   ========================================================================= */
+/* @provides CONSOLE.port @requires CONSOLE, CONSOLE.view @requires-engine isNearPortService, refreshPortPanel */
+(function(){
+  'use strict';
+
+  /* le `top` posé en ligne par repositionPortPanel est neutralisé par la CSS de la vue (.con-hosted) */
+  function panel(){ return document.getElementById('portPanel'); }
+  function shown(n){ return n.classList.contains('visible'); }
+
+  let hosted = false;
+  function ensureHost(){
+    if(!hosted && panel()) hosted = CONSOLE.view.host('port', 'portPanel', shown);
+  }
+
+  CONSOLE.register({
+    id: 'port',
+    order: 40,
+    labelKey: 'conTabPort',
+    fkey: 'F4',
+    keys: [],
+    visible: function(){ ensureHost(); return isNearPortService(); },
+    onShow: function(){
+      ensureHost();
+      const el = panel();
+      if(!el) return;
+      el.classList.add('visible');
+      if(typeof refreshPortPanel === 'function') refreshPortPanel();
+    },
+    onHide: function(reason){
+      if(reason === 'legacy') return;
+      const el = panel();
+      if(el) el.classList.remove('visible');
+    }
+  });
+
+  ensureHost();
+})();
+
+/* =========================================================================
+   CAMPAGNE 1. CONSOLE DE BORD — onglet Chantier naval (#shipyardOverlay) (L1.6)
+   ========================================================================= */
+/* @provides CONSOLE.yard @requires CONSOLE, CONSOLE.view @requires-engine isNearPortService, LOCAL */
+(function(){
+  'use strict';
+
+  function shown(n){ return n.classList.contains('visible'); }
+
+  let hosted = false;
+  function ensureHost(){
+    if(!hosted && document.getElementById('shipyardOverlay'))
+      hosted = CONSOLE.view.host('yard', 'shipyardOverlay', shown);
+  }
+
+  CONSOLE.register({
+    id: 'yard',
+    order: 50,
+    labelKey: 'conTabYard',
+    fkey: 'F5',
+    keys: [],
+    visible: function(){ ensureHost(); return isNearPortService(); },
+    onShow: function(){
+      ensureHost();
+      const el = document.getElementById('shipyardOverlay');
+      if(el && !shown(el) && typeof LOCAL !== 'undefined') LOCAL.openShipyard();
+    },
+    onHide: function(reason){
+      if(reason === 'legacy') return;
+      if(typeof LOCAL !== 'undefined') LOCAL.closeShipyard();
+    }
+  });
+
+  ensureHost();
+})();
+
+/* =========================================================================
+   CAMPAGNE 1b. CONSOLE DE BORD — onglet Journal (touche L) : radio, finances, événements de bord (L1.14)
+   Rendu dans le panneau de l'onglet (pas de nœud hôte). Le texte radio est TOUJOURS posé par textContent : jamais de HTML.
+   ========================================================================= */
+/* @provides CONSOLE.journal @requires CONSOLE, CONSOLE.view, JOURNAL @requires-engine t, formatCredits */
+(function(){
+  'use strict';
+
+  const CSS = [
+    '#sttConsole .jrn-bar{ position:sticky; top:-10px; z-index:2; display:flex; flex-wrap:wrap; gap:6px; margin:-10px -14px 8px; padding:10px 14px 8px; background:rgba(11,18,32,0.98); border-bottom:1px solid var(--line); }',
+    '#sttConsole .jrn-chip{ min-height:36px; padding:4px 14px; background:none; border:1px solid var(--line); color:var(--muted); font:inherit; font-size:12px; letter-spacing:0.06em; text-transform:uppercase; cursor:pointer; }',
+    '#sttConsole .jrn-chip:hover{ color:var(--ink); }',
+    '#sttConsole .jrn-chip[aria-pressed="true"]{ color:var(--amber); border-color:var(--amber); background:rgba(255,180,84,0.08); }',
+    '#sttConsole .jrn-note{ margin:0 0 8px; padding:6px 10px; border-left:2px solid var(--amber-dim); color:var(--muted); font-size:12px; }',
+    '#sttConsole .jrn-empty{ padding:18px; text-align:center; color:var(--muted-2); }',
+    '#sttConsole .jrn-list{ list-style:none; margin:0; padding:0; }',
+    '#sttConsole .jrn-row{ display:flex; flex-wrap:wrap; align-items:center; gap:2px 10px; min-height:36px; padding:6px 8px; border-bottom:1px dashed var(--line); font-size:12.5px; cursor:pointer; scroll-margin-top:56px; }',
+    '#sttConsole .jrn-row:hover{ background:rgba(94,234,212,0.05); }',
+    '#sttConsole .jrn-row.cur{ background:rgba(255,180,84,0.10); box-shadow:inset 2px 0 0 var(--amber); }',
+    '#sttConsole .jrn-t{ flex:none; color:var(--muted-2); font-size:11px; letter-spacing:0.04em; }',
+    '#sttConsole .jrn-ic{ flex:none; width:16px; text-align:center; color:var(--cyan); }',
+    '#sttConsole .jrn-row[data-kind="fin"] .jrn-ic{ color:var(--amber); }',
+    '#sttConsole .jrn-row[data-kind="evt"] .jrn-ic{ color:var(--nav-done); }',
+    '#sttConsole .jrn-row.imp .jrn-ic{ color:#ff6b57; }',
+    '#sttConsole .jrn-x{ flex:1 1 0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }',
+    '#sttConsole .jrn-row.open .jrn-x{ flex-basis:100%; white-space:normal; overflow:visible; overflow-wrap:anywhere; order:5; padding-left:2px; }',
+    '#sttConsole .jrn-who{ color:var(--muted); }',
+    '#sttConsole .jrn-amt{ flex:none; font-weight:700; }',
+    '#sttConsole .jrn-amt.pos{ color:var(--nav-upcoming); }',
+    '#sttConsole .jrn-amt.neg{ color:#ff6b57; }',
+    '#sttConsole .jrn-bal{ flex:none; color:var(--muted-2); font-size:11px; }',
+    '@media (max-width:760px), (pointer:coarse){',
+    '  #sttConsole .jrn-chip{ min-height:44px; flex:1 1 auto; padding:4px 10px; }',
+    '  #sttConsole .jrn-row{ min-height:44px; }',
+    '  #sttConsole .jrn-bal{ display:none; }',
+    '  #sttConsole .jrn-row.open .jrn-bal{ display:inline; }',
+    '}'
+  ].join('\n');
+
+  const FILTERS = [
+    { id: 'all',   key: 'jrnAll',   kinds: null },
+    { id: 'radio', key: 'jrnRadio', kinds: ['radio'] },
+    { id: 'fin',   key: 'jrnFin',   kinds: ['fin'] },
+    { id: 'evt',   key: 'jrnEvt',   kinds: ['evt'] }
+  ];
+  const ICONS = { radio: '≋', fin: '¤', evt: '◆' };
+  const EVT_KEY = { 'msn.accept': 'jrnE_msnAccept', 'msn.done': 'jrnE_msnDone', 'jump': 'jrnE_jump', 'arrive': 'jrnE_arrive',
+    'orbit': 'jrnE_orbit', 'dock': 'jrnE_dock', 'fuel.low': 'jrnE_fuelLow', 'fuel.crit': 'jrnE_fuelCrit', 'incident': 'jrnE_incident' };
+  const MAX_LINES = 300;
+
+  const st = document.createElement('style');
+  st.id = 'sttJournalCss';
+  st.textContent = CSS;
+  document.head.appendChild(st);
+
+  let filter = 'all';          // gardé en mémoire pour la session
+  let cursor = -1;             // ligne-curseur (clavier), -1 = aucune
+  let root = null, barEl = null, noteEl = null, listEl = null, emptyEl = null;
+
+  function pad(n){ return (n < 10 ? '0' : '') + n; }
+  function stamp(sec){
+    const s = Math.max(0, Math.floor(typeof sec === 'number' && isFinite(sec) ? sec : 0));
+    return 'T+' + pad(Math.floor(s / 3600)) + ':' + pad(Math.floor(s % 3600 / 60)) + ':' + pad(s % 60);
+  }
+  function has(key){ return t(key) !== key; }
+
+  function reasonLabel(r){
+    const k = 'jrnR_' + r;
+    return has(k) ? t(k) : String(r == null ? t('jrnR_jeu') : r);
+  }
+
+  /* Gabarits {a} / {b} remplacés ici : t() n'interpole pas. Les primes sont des crédits. */
+  function eventText(e){
+    const k = EVT_KEY[e.code];
+    if(!k) return String(e.code);
+    const money = e.code === 'msn.accept' || e.code === 'msn.done';
+    const a = e.a == null ? '—' : String(e.a);
+    const b = e.b == null ? '—' : (money && typeof e.b === 'number' ? formatCredits(e.b) : String(e.b));
+    let tpl = t(k);
+    if(e.a == null) tpl = tpl.replace(/\s*:?\s*\{a\}/g, '');   // pas de « Arrimage : — »
+    return tpl.replace(/\{a\}/g, function(){ return a; }).replace(/\{b\}/g, function(){ return b; });
+  }
+
+  function span(cls, text){
+    const s = document.createElement('span');
+    s.className = cls;
+    s.textContent = text;          // textContent exclusivement
+    return s;
+  }
+
+  function rowFor(e){
+    const li = document.createElement('li');
+    li.className = 'jrn-row' + (e.kind === 'evt' && e.imp ? ' imp' : '');
+    li.setAttribute('data-kind', e.kind);
+    li.appendChild(span('jrn-t', stamp(e.t)));
+    li.appendChild(span('jrn-ic', ICONS[e.kind] || '?'));
+    let full;
+    if(e.kind === 'radio'){
+      const x = span('jrn-x', '');
+      if(e.who){ x.appendChild(span('jrn-who', String(e.who) + ' — ')); }
+      x.appendChild(document.createTextNode(String(e.text == null ? '' : e.text)));
+      full = (e.who ? String(e.who) + ' — ' : '') + String(e.text == null ? '' : e.text);
+      li.appendChild(x);
+    }else if(e.kind === 'fin'){
+      full = reasonLabel(e.reason);
+      li.appendChild(span('jrn-x', full));
+      const d = typeof e.delta === 'number' ? e.delta : 0;
+      li.appendChild(span('jrn-amt ' + (d < 0 ? 'neg' : 'pos'), (d < 0 ? '−' : '+') + formatCredits(Math.abs(d))));
+      const bal = typeof e.bal === 'number' ? t('jrnBalance') + ' ' + formatCredits(e.bal) : '';
+      if(bal){ li.appendChild(span('jrn-bal', bal)); full += ' ' + (d < 0 ? '−' : '+') + formatCredits(Math.abs(d)) + ' · ' + bal; }
+    }else{
+      full = eventText(e);
+      li.appendChild(span('jrn-x', full));
+    }
+    li.title = full;
+    return li;
+  }
+
+  function ensureRoot(panel){
+    const p = panel || document.querySelector('#sttConsole .con-panel[data-tab="journal"]');
+    if(!p) return false;
+    if(root && root.parentNode === p) return true;
+    root = document.createElement('div');
+    root.className = 'jrn-root';
+    barEl = document.createElement('div');
+    barEl.className = 'jrn-bar';
+    barEl.setAttribute('role', 'group');
+    FILTERS.forEach(function(f){
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'jrn-chip';
+      b.tabIndex = -1;                       // jamais de focus clavier : les touches restent à la console
+      b.setAttribute('data-f', f.id);
+      b.addEventListener('click', function(){ setFilter(f.id); b.blur(); });
+      barEl.appendChild(b);
+    });
+    noteEl = document.createElement('p');
+    noteEl.className = 'jrn-note';
+    emptyEl = document.createElement('div');
+    emptyEl.className = 'jrn-empty';
+    listEl = document.createElement('ol');
+    listEl.className = 'jrn-list';
+    listEl.addEventListener('click', function(ev){
+      const li = ev.target.closest ? ev.target.closest('.jrn-row') : null;
+      if(!li) return;
+      const i = Array.prototype.indexOf.call(listEl.children, li);
+      if(i === cursor){ cursor = -1; li.classList.remove('cur', 'open'); }
+      else li.classList.toggle('open');
+    });
+    root.appendChild(barEl); root.appendChild(noteEl); root.appendChild(emptyEl); root.appendChild(listEl);
+    p.textContent = '';
+    p.appendChild(root);
+    return true;
+  }
+
+  function render(){
+    if(!root) return;
+    FILTERS.forEach(function(f, i){
+      const b = barEl.children[i];
+      b.textContent = t(f.key);
+      b.setAttribute('aria-pressed', f.id === filter ? 'true' : 'false');
+    });
+    const f = FILTERS.filter(function(x){ return x.id === filter; })[0];
+    const showNote = filter === 'fin' && !GAME.state;
+    noteEl.hidden = !showNote;
+    noteEl.textContent = showNote ? t('jrnFreeNote') : '';
+    let rows = [];
+    try{ rows = JOURNAL.list({ kinds: f.kinds, limit: MAX_LINES }); }catch(err){ console.error('[JOURNAL] liste :', err); }
+    listEl.textContent = '';
+    rows.forEach(function(e){ listEl.appendChild(rowFor(e)); });
+    emptyEl.hidden = rows.length > 0;
+    emptyEl.textContent = rows.length ? '' : t('jrnEmpty');
+    if(cursor >= rows.length) cursor = rows.length - 1;
+    markCursor(false);
+  }
+
+  function markCursor(scroll){
+    const kids = listEl ? listEl.children : [];
+    for(let i = 0; i < kids.length; i++){
+      const on = i === cursor, was = kids[i].classList.contains('cur');
+      if(on) kids[i].classList.add('cur', 'open');
+      else if(was) kids[i].classList.remove('cur', 'open');   // l'ancienne ligne-curseur se replie
+    }
+    if(scroll && cursor >= 0 && kids[cursor] && kids[cursor].scrollIntoView) kids[cursor].scrollIntoView({ block: 'nearest' });
+  }
+
+  function setFilter(id){
+    if(id === filter) return;
+    filter = id;
+    cursor = -1;
+    render();
+  }
+
+  function scroller(){ return root ? root.parentNode.parentNode : null; }   // .con-body
+
+  function onKey(code){
+    if(!root) return;
+    const n = listEl.children.length;
+    const ix = FILTERS.map(function(f){ return f.id; }).indexOf(filter);
+    switch(code){
+      case 'ArrowLeft':  setFilter(FILTERS[(ix + FILTERS.length - 1) % FILTERS.length].id); break;
+      case 'ArrowRight': setFilter(FILTERS[(ix + 1) % FILTERS.length].id); break;
+      case 'ArrowDown':  if(n){ cursor = Math.min(n - 1, cursor + 1); markCursor(true); } break;
+      case 'ArrowUp':    if(n){ cursor = Math.max(0, cursor - 1); markCursor(true); } break;
+      case 'PageDown': case 'PageUp': {
+        const s = scroller();
+        if(s) s.scrollTop += (code === 'PageDown' ? 1 : -1) * Math.max(40, s.clientHeight * 0.85);
+        break;
+      }
+      case 'Home': { const s = scroller(); if(s) s.scrollTop = 0; if(cursor >= 0 && n){ cursor = 0; markCursor(false); } break; }
+      case 'End':  { const s = scroller(); if(s) s.scrollTop = s.scrollHeight; if(cursor >= 0 && n){ cursor = n - 1; markCursor(false); } break; }
+      default: break;
+    }
+  }
+
+  function isCurrent(){ return CONSOLE.current() === 'journal'; }
+  function syncBadge(){
+    if(isCurrent()){ JOURNAL.markRead(); CONSOLE.badge('journal', null); }
+    else CONSOLE.badge('journal', JOURNAL.unread());
+  }
+
+  JOURNAL.on('add', function(){
+    if(isCurrent()) render();
+    syncBadge();
+  });
+  JOURNAL.on('restore', function(){
+    cursor = -1;
+    if(isCurrent()) render();
+    syncBadge();
+  });
+
+  CONSOLE.register({
+    id: 'journal',
+    order: 80,
+    labelKey: 'conTabJournal',
+    fkey: null,
+    keys: ['KeyL'],
+    visible: function(){ return true; },
+    onShow: function(panel){
+      if(!ensureRoot(panel)) return;
+      cursor = -1;
+      render();
+      JOURNAL.markRead();
+      CONSOLE.badge('journal', null);
+    },
+    onHide: function(){ },
+    onKey: onKey
+  });
 })();
 
 </script>
