@@ -2,7 +2,7 @@
 
 2026-10-05 · Frédéric Delorme · réponse à SPEC-010 « arbre des technologies et missions »
 
-> Version de travail pour les agents (CP, ARCHI, DEV). Relecture et commentaires : [Claude Doc](https://claude.ai/code/artifact/852ce71b-afb7-44ba-b78d-b41981473f89). Modèle d'équilibrage : `sources/tools/eco_sim.py`. Suivi : `kanban/kanban.html`. Maquettes : `img/spec010/`.
+> Version de travail pour les agents (CP, ARCHI, DEV). Relecture et commentaires : [Claude Doc](https://claude.ai/code/artifact/852ce71b-afb7-44ba-b78d-b41981473f89). Modèle d'équilibrage : `sources/tools/eco_sim.py`. Suivi : `stt-agents/kanban.html`. Maquettes : `img/spec010/`.
 
 Cette proposition intègre l'éditeur STT\_Modules dans *Space Travel & Transport* sous le nom **Chantier Naval STT**, et en fait le cœur d'une campagne de gestion : modules achetés, flotte, équipages, technologies, puis première station.
 
@@ -595,7 +595,7 @@ Le plan prolonge le mode *chef de projet / architecte / développeur* déjà dé
 
 | Rôle | Où | Modèle | Lit | Produit | Ne fait jamais |
 | --- | --- | --- | --- | --- | --- |
-| **CP** | session principale (`stt-cp`) | Sonnet, ou Haiku pour le suivi courant | `kanban/plan-status.js`, fiche de lot, rapports | fiches de lot, affectations, suivi, rapport final | coder, relire du code |
+| **CP** | session principale (`stt-cp`) | Sonnet, ou Haiku pour le suivi courant | `stt-agents/data/plan-status.js`, fiche de lot, rapports | fiches de lot, affectations, suivi, rapport final | coder, relire du code |
 | **ARCHI** | sous-agent `stt-archi` | Opus | `CODEMAP.md`, plages de fichiers ciblées, diffs | contrat de lot, découpage en tâches, revue | implémenter |
 | **DEV** | sous-agent `stt-dev` | Sonnet (Haiku pour les tâches mécaniques : traductions, JSON) | la tâche et sa section du contrat | code, tests, rapport court | changer le périmètre ou la conception |
 
@@ -696,7 +696,7 @@ Question : …
 ### 3.7 Fichiers d'agents fournis
 
 - `.claude/agents/stt-cp.md`, `stt-archi.md`, `stt-dev.md`, à la racine du dépôt `csblog`.
-- `demos/space-travel/kanban/kanban.html` et `plan-status.js` : Kanban des tâches des agents (avancement, tokens consommés), tenu à jour à chaque transition par l'outil de suivi des agents (`stt-agents`) sur ordre du CP ; la page ne change jamais, seul `plan-status.js` est modifié.
+- `demos/space-travel/stt-agents/kanban.html` et `plan-status.js` : Kanban des tâches des agents (avancement, tokens consommés), tenu à jour à chaque transition par l'outil de suivi des agents (`stt-agents`) sur ordre du CP ; la page ne change jamais, seul `plan-status.js` est modifié.
 - Usage : lancer la session principale avec l'agent CP (`claude --agent stt-cp`, ou la consigne « agis en CP selon `.claude/agents/stt-cp.md` »), puis « démarre le lot L0 ».
 
 ### 3.8 Premier pas

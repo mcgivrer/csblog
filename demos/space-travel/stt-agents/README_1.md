@@ -7,6 +7,8 @@ Deux fichiers, aucune dépendance (Python 3.8+ standard, page HTML autonome) :
 | Fichier | Rôle |
 |---|---|
 | `stt_agents_server.py` | Collecte (sessions Claude Code + git + GitHub) et sert la page sur `http://127.0.0.1:8765`, avec mises à jour poussées en direct (SSE, ~2 s). |
+| `kanban.html` | Le Kanban des lots (page fixe), servi sur `http://127.0.0.1:8765/kanban/`. Lit `data/plan-status.js` et affiche les documents liés par le serveur (aperçu Markdown, Mermaid, images). |
+| `data/plan-status.js`, `data/prompts/` | Données du Kanban et prompts exécutés par les agents. **Écrits uniquement par le serveur** (voir « Kanban »), toujours dans le checkout principal. |
 | `index.html` | Le tableau de bord. Servi par le serveur : vue complète. Ouvert seul (fichier local ou GitHub Pages) : vue GitHub publique. |
 
 ## Démarrer
@@ -67,9 +69,11 @@ Le bouton **Alertes** active une notification du navigateur quand un agent passe
 
 Le serveur n'écoute que sur `127.0.0.1` et refuse les requêtes dont l'en-tête `Host` n'est pas local (protection DNS rebinding) ; il n'envoie pas d'en-têtes CORS, donc un site tiers ne peut pas lire `/api/state`. La page affiche des extraits de transcripts (consignes, fichiers modifiés) : `--host 0.0.0.0` les rend lisibles par tout le réseau local.
 
-## Kanban (écriture pilotée par le CP)
+## Kanban
 
-L'outil est aussi l'**unique écrivain** du Kanban (`demos/space-travel/kanban/plan-status.js`, toujours dans le checkout principal, jamais un worktree). Le chef de projet (`stt-cp`) lui envoie des opérations ; le fichier est édité ligne à ligne, validé avec Node, puis remplacé atomiquement (tout ou rien).
+Le Kanban fait partie de l'outil : page `kanban.html` à `http://127.0.0.1:8765/kanban/`, données dans `data/` (checkout principal uniquement, jamais un worktree).
+
+**Écriture, pilotée par le CP.** Le chef de projet (`stt-cp`) envoie des opérations ; le serveur édite `data/plan-status.js` ligne à ligne, le valide avec Node, puis le remplace atomiquement (tout ou rien). Aucun agent DEV n'écrit le Kanban.
 
 ```bash
 python3 stt_agents_server.py --kanban-apply ops.json            # sans serveur ; --dry-run pour contrôler seulement
@@ -77,7 +81,9 @@ curl -s -X POST http://127.0.0.1:8765/api/kanban -H 'X-STT-Kanban: 1' -H 'Conten
 curl -s http://127.0.0.1:8765/api/kanban                          # résumé : tâches, lots, journal
 ```
 
-Opérations (`{"ops": [...]}`) : `task` (`set`, `add` cumulant `used`/`ms`, `unset`), `task_add`, `lot`, `decision`, `decision_set`, `journal`, `top` (`currentLot`, `updated`, `docRoots`), `history_snapshot` (estimation et consommation calculées). `updated` est posé automatiquement et ne recule jamais. L'en-tête `X-STT-Kanban: 1` est obligatoire : il bloque l'écriture depuis une page web tierce. `--kanban CHEMIN` remplace le chemin par défaut.
+Opérations (`{"ops": [...]}`) : `task` (`set`, `add` cumulant `used`/`ms`, `unset`), `task_add`, `lot`, `decision`, `decision_set`, `journal`, `top` (`currentLot`, `updated`), `history_snapshot` (estimation et consommation calculées). `updated` est posé automatiquement et ne recule jamais. L'en-tête `X-STT-Kanban: 1` est obligatoire : il bloque l'écriture depuis une page web tierce. `--kanban CHEMIN` remplace le chemin par défaut des données.
+
+**Documents affichés.** Les chemins des données (`docs`, `prompt`, `spec`) sont relatifs à `KANBAN_DOC_BASE` (`demos/space-travel/`). Le serveur les sert sous `/kanban/doc/…` en cherchant, dans l'ordre, dans les racines de la variable **`KANBAN_DOC_ROOTS`** de `stt_agents_server.py` (relatives au checkout principal ; `""` = le checkout principal). Une racine de worktree permet d'afficher un document pas encore fusionné, avec un bandeau « version du worktree » ; **l'ordre compte** (le premier fichier trouvé gagne) et une racine se retire de la liste une fois sa branche fusionnée. Les fichiers HTML, JS ou JSON sont servis en texte, les SVG en bac à sable ; `..`, `.git` et `node_modules` sont refusés.
 
 ## Dépannage
 

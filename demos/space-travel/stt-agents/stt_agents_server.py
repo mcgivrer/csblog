@@ -42,6 +42,7 @@ import urllib.request
 import webbrowser
 from collections import deque
 from datetime import datetime, timezone
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -1027,27 +1028,59 @@ class Hub:
 # Le CP ne modifie plus le fichier à la main ni par un agent DEV : il envoie des opérations à cet outil
 # (POST /api/kanban, ou --kanban-apply fichier.json). Le fichier est édité ligne à ligne (une tâche = une
 # ligne), validé avec Node, puis remplacé atomiquement. Toujours dans le checkout PRINCIPAL, jamais un worktree.
-KANBAN_REL = "demos/space-travel/kanban/plan-status.js"
+# Chemin des données du Kanban, relatif au checkout PRINCIPAL (jamais un worktree).
+KANBAN_REL = "demos/space-travel/stt-agents/data/plan-status.js"
+# Documents affichés par le Kanban (aperçu, liens) : les chemins de plan-status.js sont relatifs à KANBAN_DOC_BASE
+# (depuis la racine du dépôt) ; le serveur les cherche dans KANBAN_DOC_ROOTS, dans l'ordre. Chaque racine est relative
+# au checkout principal : "" = le checkout principal lui-même ; un worktree permet d'afficher un document pas encore fusionné
+# dans main (bandeau « version du worktree » dans l'aperçu). À retirer de la liste une fois la branche fusionnée.
+KANBAN_DOC_BASE = "demos/space-travel/"
+KANBAN_DOC_ROOTS = [
+    ".claude/worktrees/adr-001-refactoring/",   # ADR-001 amendé (PR #26)
+    ".claude/worktrees/stt-L2a/",               # contrat L2a (branche worktree-stt-L2a)
+    "",                                          # checkout principal
+]
+KANBAN_DOC_MAX = 25 * 1024 * 1024
+KANBAN_DOC_DENY = {".git", "node_modules", "__pycache__"}
 KANBAN_LOCK = threading.Lock()
 KANBAN_SECTIONS = ("lots", "tasks", "decisions", "journal")
-KANBAN_TOP = ("updated", "spec", "currentLot", "docRoots")
+KANBAN_TOP = ("updated", "spec", "currentLot")
 
 
 class KanbanError(Exception):
     pass
 
 
+def main_checkout(repo):
+    """Racine du checkout principal (premier worktree de git) ; à défaut, le dépôt donné."""
+    out = git(["worktree", "list", "--porcelain"], repo) if repo else None
+    m = re.search(r"^worktree (.+)$", out or "", re.M)
+    return m.group(1).strip() if m else repo
+
+
 def find_kanban(repo, explicit=None):
-    """Chemin de plan-status.js : --kanban, sinon le checkout principal (premier worktree de git)."""
+    """Chemin de plan-status.js : --kanban, sinon le checkout principal."""
     if explicit:
         return os.path.abspath(os.path.expanduser(explicit))
-    root = repo
-    out = git(["worktree", "list", "--porcelain"], repo) if repo else None
-    if out:
-        m = re.search(r"^worktree (.+)$", out, re.M)
-        if m:
-            root = m.group(1).strip()
+    root = main_checkout(repo)
     return os.path.join(root, *KANBAN_REL.split("/")) if root else None
+
+
+def find_doc(main_root, rel):
+    """(fichier, racine) d'un document du Kanban : première racine de KANBAN_DOC_ROOTS qui le contient, sinon (None, None)."""
+    parts = [x for x in rel.split("/") if x]
+    if not parts or any(x in ("..", ".") or "\\" in x or "\0" in x or x in KANBAN_DOC_DENY for x in parts):
+        return None, None
+    for root in KANBAN_DOC_ROOTS:
+        base = Path(main_root, *[x for x in root.split("/") if x]).resolve()
+        cand = base.joinpath(*parts).resolve()
+        try:
+            cand.relative_to(base)
+        except ValueError:
+            continue
+        if cand.is_file():
+            return cand, root
+    return None, None
 
 
 def _js(v):
@@ -1316,19 +1349,74 @@ def make_handler(hub, allowed_hosts):
             host = (self.headers.get("Host") or "").rsplit(":", 1)[0].strip("[]").lower()
             return host in allowed_hosts
 
-        def _send(self, code, body, ctype):
+        def _send(self, code, body, ctype, head=False, extra=None):
             self.send_response(code)
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
+            for k, v in (extra or {}).items():
+                self.send_header(k, v)
             self.end_headers()
-            self.wfile.write(body)
+            if not head:
+                self.wfile.write(body)
+
+        def _kanban_get(self, path, head=False):
+            """Page du Kanban, config, données et documents : True si la route est traitée."""
+            if path == "/kanban":
+                self.send_response(301)
+                self.send_header("Location", "/kanban/")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return True
+            if not path.startswith("/kanban/"):
+                return False
+            sub = path[len("/kanban/"):]
+            if sub in ("", "index.html"):
+                try:
+                    self._send(200, (HERE / "kanban.html").read_bytes(), "text/html; charset=utf-8", head)
+                except OSError:
+                    self._send(500, "kanban.html introuvable à côté du serveur".encode("utf-8"), "text/plain; charset=utf-8", head)
+            elif sub == "config.js":
+                cfg = {"docBase": KANBAN_DOC_BASE, "docRoots": KANBAN_DOC_ROOTS}
+                self._send(200, ("window.KANBAN_CFG = " + json.dumps(cfg, ensure_ascii=False) + ";").encode("utf-8"),
+                           "application/javascript; charset=utf-8", head)
+            elif sub == "plan-status.js":
+                try:
+                    self._send(200, Path(hub.args.kanban).read_bytes(), "application/javascript; charset=utf-8", head)
+                except (OSError, TypeError):
+                    self._send(404, b"plan-status.js introuvable", "text/plain; charset=utf-8", head)
+            elif sub.startswith("doc/"):
+                rel = urllib.parse.unquote(sub[4:].split("?", 1)[0])
+                f, root = find_doc(hub.args.main_root, rel)
+                if not f:
+                    return self._send(404, b"document introuvable", "text/plain; charset=utf-8", head) or True
+                if f.stat().st_size > KANBAN_DOC_MAX:
+                    return self._send(413, b"document trop gros", "text/plain; charset=utf-8", head) or True
+                ext = f.suffix.lower()
+                ctype = {".md": "text/markdown; charset=utf-8", ".svg": "image/svg+xml", ".pdf": "application/pdf",
+                         ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp",
+                         ".gif": "image/gif"}.get(ext, "text/plain; charset=utf-8")  # html, js, json… : texte, jamais exécuté
+                extra = {"X-Doc-Root": root}
+                if ext == ".svg":
+                    extra["Content-Security-Policy"] = "sandbox"
+                self._send(200, f.read_bytes(), ctype, head, extra)
+            else:
+                self._send(404, b"404", "text/plain", head)
+            return True
+
+        def do_HEAD(self):
+            if not self._host_ok():
+                return self._send(403, b"Host refuse", "text/plain; charset=utf-8", True)
+            if not self._kanban_get(self.path.split("?", 1)[0], head=True):
+                self._send(404, b"404", "text/plain", True)
 
         def do_GET(self):
             if not self._host_ok():  # protection contre le DNS rebinding
                 return self._send(403, b"Host refuse", "text/plain; charset=utf-8")
             path = self.path.split("?", 1)[0]
+            if self._kanban_get(path):
+                return
             if path in ("/", "/index.html"):
                 try:
                     body = (HERE / "index.html").read_bytes()
@@ -1431,6 +1519,7 @@ def main():
     if args.repo:  # racine réelle du dépôt (et non un sous-dossier)
         args.repo = detect_repo(args.repo) or args.repo
     args.kanban = find_kanban(args.repo, args.kanban)
+    args.main_root = main_checkout(args.repo)
     if args.kanban_apply:
         sys.stdout.reconfigure(encoding="utf-8") if hasattr(sys.stdout, "reconfigure") else None
         try:
@@ -1465,7 +1554,8 @@ def main():
     print(f"  dépôt   : {args.repo or '?'}")
     print(f"  sessions: {hub.claude.projects}  (préfixe {hub.claude.prefix})")
     print(f"  GitHub  : {args.github or 'désactivé'}{' (jeton)' if hub.gh.token else ''}")
-    print(f"  Kanban  : {args.kanban or '?'}  (POST /api/kanban, X-STT-Kanban: 1)")
+    print(f"  Kanban  : {url}kanban/  ·  données {args.kanban or '?'}  (POST /api/kanban, X-STT-Kanban: 1)")
+    print(f"  Documents du Kanban : {', '.join(repr(r) for r in KANBAN_DOC_ROOTS)} (KANBAN_DOC_ROOTS)")
     if not local:
         print("  ATTENTION : serveur exposé au réseau, les extraits de transcripts sont lisibles par tout le LAN.")
     if args.open:

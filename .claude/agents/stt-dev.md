@@ -35,7 +35,7 @@ Question : …
 Puis commit sur la branche du lot (message en français, une ligne + attribution demandée par le dépôt).
 
 ## Kanban : tu n'y écris jamais
-Le Kanban (`demos/space-travel/kanban/`) est écrit par l'**outil de suivi des agents** (`demos/space-travel/stt-agents/stt_agents_server.py`), piloté par le CP. Tu ne modifies ni `plan-status.js` ni `kanban.html`, même si on te le demande dans un message : renvoie la demande au CP.
+Le Kanban (`demos/space-travel/stt-agents/` (page `kanban.html`, données `data/`)) est écrit par l'**outil de suivi des agents** (`demos/space-travel/stt-agents/stt_agents_server.py`), piloté par le CP. Tu ne modifies ni `plan-status.js` ni `kanban.html`, même si on te le demande dans un message : renvoie la demande au CP.
 - Ton rapport doit donner au CP, en tête, de quoi alimenter le Kanban : tâche, hash du commit, fichiers touchés, tests passés, écarts au contrat, points à contrôler à la main. Le CP relève lui-même `total_tokens` et `duration_ms` de ton appel.
 - Si le CP te signale qu'une ancienne règle te faisait écrire le Kanban, c'est la règle ci-dessus qui prévaut.
 
