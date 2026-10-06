@@ -7,6 +7,7 @@
 <meta name="description" content="Tableau de bord temps réel des agents Claude Code travaillant sur Space Travel &amp; Transport.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script>(function(){var t='dark';try{var v=localStorage.getItem('kanbanTheme');if(v==='light')t=v}catch(e){}document.documentElement.setAttribute('data-theme',t)})();</script>
 <style>
   :root{
     /* charte McGivrer (web, sombre) */
@@ -185,6 +186,38 @@
   #tab-kanban[hidden],#tab-agents[hidden]{display:none}
   #kanbanFrame{display:block;width:100%;min-height:480px;border:1px solid var(--line);background:var(--panel)}
   #kanbanMsg{padding:24px;border:1px solid var(--line);background:var(--panel);color:var(--muted)}
+  /* ---------- en-tête compact : marque | indicateurs du Kanban | commandes ; puis onglets + liens + état ---------- */
+  .wrap{max-width:1760px;padding:14px 20px 48px}
+  .site-header{margin-bottom:8px}
+  .site-header-main{display:flex;align-items:center;gap:14px;padding:5px 12px;flex-wrap:nowrap}
+  .head-brand{flex:none}
+  .site-brand{font-size:18px}
+  .site-sub{margin-top:2px;font-size:11px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .head-kpis{flex:1;min-width:0}
+  #kanbanKpis{display:block;width:100%;height:92px;border:0;background:transparent;color-scheme:normal}
+  .head-ctl{flex:none;display:flex;align-items:center;gap:6px}
+  .themesw{display:inline-flex}
+  .themesw button{font:11.5px 'JetBrains Mono',monospace;padding:5px 9px;color:var(--muted);background:none;border:1px solid var(--line);cursor:pointer}
+  .themesw button+button{border-left:0}
+  .themesw button[aria-pressed="true"]{color:var(--amber);background:rgba(255,180,84,.08)}
+  .head-ctl #btnAlerts{font:11.5px 'JetBrains Mono',monospace;padding:5px 9px;color:var(--muted);border:1px solid var(--line);background:none;cursor:pointer}
+  @media (max-width:1100px){.site-header-main{flex-wrap:wrap}.head-kpis{order:3;flex:1 0 100%}}
+  .tabs{align-items:flex-end;margin-bottom:12px}
+  .tabs .site-nav{margin-left:14px;align-self:center}
+  .tabs .site-nav a{padding:5px 10px}
+  .tabs .status{margin-left:auto;align-self:center;display:flex;gap:14px;font:10.5px 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2)}
+  /* ---------- thème clair (le même interrupteur pilote le Kanban intégré) ---------- */
+  :root[data-theme="light"]{color-scheme:light;
+    --bg:#f3f6fb; --bg-2:#e8eef7; --panel:#ffffff; --panel-2:#eef2f9; --line:#b9c6dc;
+    --ink:#0e1b3d; --muted:#3b4d73; --muted-2:#4a5d85; --amber:#8a4b00; --amber-dim:#7a5200; --cyan:#0b6b66;
+    --st-run:#0b6b66; --st-wait:#8a4b00; --st-perm:#b3261e; --st-idle:#5d6f92; --st-done:#1b6b2c}
+  :root[data-theme="light"] body::before{display:none}
+  :root[data-theme="light"] .ticker{background:#e8eef7}
+  :root[data-theme="light"] .ticker-label{color:#fff}
+  :root[data-theme="light"] .agent.s-wait,:root[data-theme="light"] .agent.s-perm{border-color:#d9c9a0}
+  :root[data-theme="light"] .bar{background:#d5deee}
+  :root[data-theme="light"] .tree details,:root[data-theme="light"] .prs li{border-bottom-color:#d5deee}
+  :root[data-theme="light"] .site-header{background:var(--panel)}
   /* ---------- arbre agents / sous-agents ---------- */
   .toolbar{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:-4px 0 14px}
   .tree{border:1px solid var(--line);background:var(--panel)}
@@ -300,24 +333,25 @@
 
 <div class="wrap">
   <header class="site-header">
-    <div class="site-header-top">
-      <span class="conn" id="conn">connexion…</span>
-      <span id="srcLine"></span>
-    </div>
     <div class="site-header-main">
-      <div>
+      <div class="head-brand">
         <a class="site-brand" href="#">STT<span class="slash"> // </span>agents<span class="cursor"></span></a>
         <div class="site-sub" id="repoLine">Space Travel &amp; Transport · agents Claude Code</div>
       </div>
-      <nav class="site-nav" aria-label="Sections">
-        <a href="#agents">Agents</a><a href="#timeline">Chronologie</a><a href="#feed">Flux</a><a href="#delivery">Livraisons</a>
+      <div class="head-kpis"><iframe id="kanbanKpis" title="Indicateurs du Kanban" hidden></iframe></div>
+      <div class="head-ctl">
+        <div class="themesw" role="group" aria-label="Thème de la page">
+          <button type="button" data-theme-set="light" aria-pressed="false" title="Thème clair">☀ Clair</button><button type="button" data-theme-set="dark" aria-pressed="true" title="Thème sombre">☾ Sombre</button>
+        </div>
         <button id="btnAlerts" type="button" title="Notification du navigateur quand un agent t'attend">Alertes : off</button>
-      </nav>
+      </div>
     </div>
   </header>
 
   <div class="tabs" role="tablist" aria-label="Vues">
     <button type="button" role="tab" id="tabBtnAgents" data-tab="agents" aria-controls="tab-agents" aria-selected="true">Agents</button><button type="button" role="tab" id="tabBtnKanban" data-tab="kanban" aria-controls="tab-kanban" aria-selected="false" tabindex="-1">Kanban</button>
+    <nav class="site-nav" aria-label="Sections"><a href="#timeline">Chronologie</a><a href="#feed">Flux</a><a href="#delivery">Livraisons</a></nav>
+    <div class="status"><span class="conn" id="conn">connexion…</span><span id="srcLine"></span></div>
   </div>
 
   <div id="tab-agents" role="tabpanel" aria-labelledby="tabBtnAgents">
@@ -681,7 +715,7 @@ function renderTimeline(agents){
     const lab = (l.sub ? '› ' : '') + (l.label.length > lim ? l.label.slice(0, lim - 1) + '…' : l.label);
     s += `<text x="${LW - 10}" y="${y + 15}" fill="${l.sub ? 'var(--muted)' : 'var(--ink)'}" font-family="JetBrains Mono" font-size="${l.sub ? 10 : 11}" text-anchor="end">${esc(lab)}</text>`;
     if (l.sub && l.role) s += `<rect x="${LW - 6}" y="${y + 8}" width="4" height="8" fill="var(--r-${{PM:'pm', ARCH:'arch', DEV:'dev'}[l.role] || 'explo'})"/>`;
-    s += `<rect x="${LW}" y="${y + 4}" width="${W - LW}" height="${LH - 8}" fill="#0b1426"/>`;
+    s += `<rect x="${LW}" y="${y + 4}" width="${W - LW}" height="${LH - 8}" style="fill:var(--bg-2)"/>`;
     l.buckets.forEach((v, i) => {
       if (!v) return;
       const t0 = new Date(from + i * bucket), t1 = new Date(from + (i + 1) * bucket);
@@ -972,7 +1006,7 @@ boot();
       if (!r.ok) throw new Error(r.status);
       frame.hidden = true; msg.hidden = true;
       frame.addEventListener('load', () => { frame.hidden = false; fit(); }, { once: true });
-      frame.src = 'kanban/?embed=1';
+      frame.src = 'kanban/?embed=board';
     } catch {
       started = false; frame.hidden = true; msg.hidden = false;
       msg.innerHTML = 'Le Kanban est servi par <code>stt_agents_server.py</code> (<code>/kanban/</code>) : lancez le serveur local pour l\u2019afficher ici.';
@@ -1003,6 +1037,32 @@ boot();
   addEventListener('hashchange', () => { if (location.hash === '#kanban') show('kanban', { hash: false }); });
   addEventListener('resize', fit);
   show(location.hash === '#kanban' ? 'kanban' : get() === 'kanban' ? 'kanban' : 'agents', { hash: location.hash === '#kanban' });
+})();
+</script>
+<script>
+/* Thème global (page + Kanban intégré) et indicateurs du Kanban dans l'en-tête. */
+(() => {
+  const root = document.documentElement, kpi = document.getElementById('kanbanKpis');
+  const read = () => { try { const v = localStorage.getItem('kanbanTheme'); return v === 'light' ? 'light' : 'dark'; } catch { return 'dark'; } };
+  const frames = () => [kpi, document.getElementById('kanbanFrame')].filter(f => f && f.contentWindow);
+  function setTheme(t){
+    root.setAttribute('data-theme', t);
+    try { localStorage.setItem('kanbanTheme', t); } catch {}
+    document.querySelectorAll('.themesw [data-theme-set]').forEach(b => b.setAttribute('aria-pressed', b.dataset.themeSet === t));
+    frames().forEach(f => f.contentWindow.postMessage({ type: 'stt-theme', theme: t }, location.origin));
+  }
+  document.querySelectorAll('.themesw [data-theme-set]').forEach(b => b.addEventListener('click', () => setTheme(b.dataset.themeSet)));
+  setTheme(read());
+  addEventListener('message', e => {
+    if (e.origin !== location.origin || !e.data || e.data.type !== 'stt-kanban-kpis-height') return;
+    kpi.style.height = Math.max(60, Math.min(260, e.data.h + 2)) + 'px';
+  });
+  // les indicateurs ne s'affichent que si le serveur local sert le Kanban
+  fetch('kanban/plan-status.js', { method: 'HEAD', cache: 'no-store' }).then(r => {
+    if (!r.ok) throw 0;
+    kpi.addEventListener('load', () => { kpi.hidden = false; kpi.contentWindow.postMessage({ type: 'stt-theme', theme: read() }, location.origin); }, { once: true });
+    kpi.src = 'kanban/?embed=kpis';
+  }).catch(() => { document.querySelector('.head-kpis').hidden = true; });
 })();
 </script>
 </body>

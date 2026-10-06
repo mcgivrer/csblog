@@ -37,6 +37,10 @@ Options utiles :
 
 `GITHUB_TOKEN` (facultatif) dans l'environnement relève le quota GitHub de 60 à 5 000 requêtes/heure. Sans jeton, le serveur interroge GitHub toutes les 75 s avec des requêtes conditionnelles (ETag) : les réponses inchangées ne consomment pas de quota.
 
+## L'en-tête
+
+L'en-tête tient sur une rangée : la marque, les **indicateurs du Kanban** (tokens consommés, temps estimé / consommé, tâches faites, lot en cours, lots · surface = estimation, chargés depuis `kanban/?embed=kpis` et visibles quel que soit l'onglet), puis le **thème clair / sombre** et les alertes. Le thème est unique pour toute la page : l'interrupteur de l'en-tête pilote aussi les deux cadres du Kanban (message `stt-theme`) et se mémorise sous la clé `kanbanTheme`, la même que celle du Kanban autonome. Sous l'en-tête, une rangée porte les onglets, les liens de la page Agents et l'état de la connexion. Sans le serveur local, les indicateurs sont masqués.
+
 ## Les onglets
 
 Le tableau de bord (`http://127.0.0.1:8765/`) a deux onglets : **Agents** (sessions, agents créés, chronologie, flux, livraisons) et **Kanban**. L'onglet choisi est mémorisé ; `#kanban` dans l'URL ouvre directement le Kanban, et les liens de la barre de navigation (`#feed`…) ramènent à l'onglet Agents. Le Kanban n'est chargé qu'à la première ouverture et demande le serveur local : sans lui (GitHub Pages, fichier local), l'onglet affiche un message. La barre « Agents créés » filtre par état (actif et silencieux cochés par défaut ; terminé, arrêté, erreur décochés).

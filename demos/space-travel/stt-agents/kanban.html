@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script>/* Thème posé AVANT le premier rendu (pas de flash) : « dark » par défaut, sinon la préférence enregistrée. */
 (function(){var t='dark';try{var v=localStorage.getItem('kanbanTheme');if(v==='light'||v==='dark')t=v}catch(e){}document.documentElement.setAttribute('data-theme',t)})();</script>
-<script>if(/[?&]embed=1/.test(location.search))document.documentElement.classList.add('embed');</script>
+<script>(function(){var m=/[?&]embed=(\w+)/.exec(location.search);if(m)document.documentElement.classList.add('embed','embed-'+(m[1]==='kpis'?'kpis':'board'))})();</script>
 <title>Tableau des agents</title>
 <!-- Kanban des lots SPEC-010. Page FIXE : seul plan-status.js change, écrit par l'outil stt-agents sur ordre du CP (stt-cp). -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -332,8 +332,18 @@ footer{color:var(--muted-2);font:11px var(--mono);margin-top:40px}
 @media (max-width:760px){.meta{flex-basis:100%;flex-wrap:wrap;justify-content:flex-start;white-space:normal}}
 .kpi.ktm b{font-size:16px;white-space:nowrap}
 @media (max-width:900px){.kpi .small,.kd,.kc{white-space:normal}}
-html.embed .site-header h1,html.embed .site-header .eyebrow{display:none}
-html.embed .wrap{padding-top:8px}
+/* Modes intégrés dans l'en-tête de stt-agents/index.html : indicateurs seuls (kpis) ou tableau seul (board) ; le thème vient de la page hôte. */
+html.embed .site-header h1,html.embed .site-header .eyebrow,html.embed .site-header .themesw{display:none}
+html.embed .wrap{padding:0;max-width:none}
+html.embed .site-header{border:0;background:none;padding:0 2px 6px;margin:0}
+html.embed .site-header::before,html.embed .site-header::after{display:none}
+html.embed-kpis body{background:transparent}
+html.embed-kpis .wrap>:not(#kpis){display:none!important}
+html.embed-kpis .kpis{margin:0}
+html.embed-kpis .kpi{padding:4px 8px 5px;gap:2px}
+html.embed-kpis .kpi .kc{display:none}
+html.embed-kpis .tm{height:54px!important;min-height:0}
+html.embed-board #kpis{display:none}
 </style>
 </head>
 <body data-view="board">
@@ -994,6 +1004,12 @@ html.embed .wrap{padding-top:8px}
   }
   document.querySelectorAll('[data-theme-set]').forEach(b => b.addEventListener('click', () => { setTheme(b.dataset.themeSet); b.focus(); }));
   syncThemeBtns();
+  // intégré dans stt-agents/index.html : la page hôte pilote le thème et reçoit la hauteur des indicateurs
+  addEventListener('message', e => { if(e.origin === location.origin && e.data && e.data.type === 'stt-theme' && e.data.theme !== themeNow()) setTheme(e.data.theme); });
+  if(window.parent !== window && document.documentElement.classList.contains('embed-kpis')){
+    const send = () => { const k = document.getElementById('kpis'); if(k) parent.postMessage({ type:'stt-kanban-kpis-height', h:Math.ceil(k.getBoundingClientRect().height) }, location.origin); };
+    new ResizeObserver(send).observe(document.documentElement); addEventListener('load', send); setTimeout(send, 600);
+  }
   $('reload').addEventListener('click', reload);
   setInterval(function(){ if($('auto').checked) reload(); }, 30000);
 
