@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" font-family="system-ui, sans-serif" font-size="14">
+<title>ADR-001 : arborescence cible de demos/space-travel</title>
+<desc>Arborescence cible proposée : apps, packages, tools, public, docs, archives, assets, avec le rôle et l'ancien emplacement de chaque dossier principal.</desc>
+<rect width="960" height="600" fill="#f6f5f0"/>
+<text x="480" y="32" text-anchor="middle" font-size="19" font-weight="700" fill="#141413">Arborescence cible (proposition, rien n'est déplacé)</text>
+<g stroke-width="1.5">
+<rect x="20" y="50" width="450" height="530" rx="12" fill="#ffffff" stroke="#555"/>
+<rect x="490" y="50" width="450" height="530" rx="12" fill="#ffffff" stroke="#555"/>
+</g>
+<g font-family="ui-monospace, monospace" font-size="14" fill="#141413">
+<text x="36" y="80" font-weight="700">demos/space-travel/</text>
+<text x="36" y="106">├ index.html</text>
+<text x="36" y="130" fill="#2e7d32" font-weight="700">├ apps/</text>
+<text x="36" y="154">│ ├ game/</text>
+<text x="36" y="178">│ ├ cinematic/</text>
+<text x="36" y="202">│ ├ presentation/</text>
+<text x="36" y="226">│ └ shipyard-editor/</text>
+<text x="36" y="250" fill="#1f5f99" font-weight="700">├ packages/</text>
+<text x="36" y="274">│ ├ core/</text>
+<text x="36" y="298">│ ├ universe/</text>
+<text x="36" y="322">│ ├ ships/</text>
+<text x="36" y="346">│ ├ postfx/  starmap/</text>
+<text x="36" y="370">│ ├ ship-modules/</text>
+<text x="36" y="394">│ └ three-r128/</text>
+<text x="36" y="418" fill="#555" font-weight="700">├ tools/</text>
+<text x="36" y="442">│ ├ build/  codemap/  checks/</text>
+<text x="36" y="466">│ └ agents-dashboard/</text>
+<text x="36" y="490" fill="#a3305a" font-weight="700">├ public/</text>
+<text x="36" y="514" fill="#9a6a00" font-weight="700">├ docs/</text>
+<text x="36" y="538">├ assets/music/</text>
+<text x="36" y="562">└ archives/</text>
+</g>
+<g fill="#141413">
+<text x="506" y="80" font-weight="700">Rôle (ancien emplacement)</text>
+<text x="506" y="106">portail : liens stables vers les 4 produits</text>
+<text x="506" y="130" fill="#2e7d32" font-weight="700">produits livrables, un HTML chacun</text>
+<text x="506" y="154">jeu Space Travel (sources/)</text>
+<text x="506" y="178">démo cinématique (observation-des-etoiles/)</text>
+<text x="506" y="202">diaporama (presentation/)</text>
+<text x="506" y="226">Chantier naval STT (STT_modules/sources/)</text>
+<text x="506" y="250" fill="#1f5f99" font-weight="700">code partagé, source unique (shared/)</text>
+<text x="506" y="274">noyau pur Node : sttcomp (futur)</text>
+<text x="506" y="298">planets, stars, asteroids, cosmos</text>
+<text x="506" y="322">shipdrive, shipglass, shipwear, smallcraft…</text>
+<text x="506" y="346">post-traitement ; carte 2D</text>
+<text x="506" y="370">pack de modules (STT_modules/, assets/)</text>
+<text x="506" y="394">three r128 figé (sources/src/JS/vendor/)</text>
+<text x="506" y="418" fill="#555" font-weight="700">outillage, jamais embarqué</text>
+<text x="506" y="442">sttbuild, minify, codemap, i18n (sources/tools/)</text>
+<text x="506" y="466">tableau de bord des agents (stt-agents/)</text>
+<text x="506" y="490" fill="#a3305a" font-weight="700">fichiers servis par GitHub Pages</text>
+<text x="506" y="514" fill="#9a6a00" font-weight="700">specs, DAT, ADRs, Kanban (inchangé)</text>
+<text x="506" y="538">musique (musics/)</text>
+<text x="506" y="562">historique, inchangé</text>
+</g>
+</svg>

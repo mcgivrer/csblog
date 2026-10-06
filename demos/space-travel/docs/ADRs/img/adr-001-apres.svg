@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560" font-family="system-ui, sans-serif" font-size="13">
+<title>ADR-001 : organisation cible en couches</title>
+<desc>Cinq couches colorées : applications, paquets de rendu et d'interface, noyau pur et données, outils, publication. Les dépendances vont uniquement vers le bas ; les outils produisent les fichiers publiés.</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#333"/></marker></defs>
+<rect width="960" height="560" fill="#f6f5f0"/>
+<text x="480" y="32" text-anchor="middle" font-size="19" font-weight="700" fill="#141413">Après : apps/ consomment packages/, tools/ construit, public/ publie</text>
+<g stroke-width="1.5">
+<rect x="20" y="52" width="840" height="96" rx="12" fill="#e4f4e4" stroke="#2e7d32"/>
+<rect x="20" y="160" width="840" height="96" rx="12" fill="#e3effa" stroke="#1f5f99"/>
+<rect x="20" y="268" width="840" height="96" rx="12" fill="#fdf0d5" stroke="#9a6a00"/>
+<rect x="20" y="376" width="840" height="76" rx="12" fill="#ececec" stroke="#555"/>
+<rect x="20" y="464" width="840" height="76" rx="12" fill="#fbe5ec" stroke="#a3305a"/>
+</g>
+<g fill="#ffffff" stroke="#888">
+<rect x="40" y="88" width="190" height="48" rx="8"/><rect x="245" y="88" width="190" height="48" rx="8"/><rect x="450" y="88" width="190" height="48" rx="8"/><rect x="655" y="88" width="190" height="48" rx="8"/>
+<rect x="40" y="196" width="190" height="48" rx="8"/><rect x="245" y="196" width="190" height="48" rx="8"/><rect x="450" y="196" width="190" height="48" rx="8"/><rect x="655" y="196" width="190" height="48" rx="8"/>
+<rect x="40" y="304" width="250" height="48" rx="8"/><rect x="305" y="304" width="250" height="48" rx="8"/><rect x="570" y="304" width="275" height="48" rx="8"/>
+</g>
+<g fill="#141413">
+<text x="34" y="74" font-weight="700">1. Applications : apps/ (une sortie HTML autonome chacune)</text>
+<text x="135" y="109" text-anchor="middle" font-weight="700">game</text><text x="135" y="127" text-anchor="middle">jeu, tag stt_</text>
+<text x="340" y="109" text-anchor="middle" font-weight="700">cinematic</text><text x="340" y="127" text-anchor="middle">démo, moteur v2.15, ode_</text>
+<text x="545" y="109" text-anchor="middle" font-weight="700">presentation</text><text x="545" y="127" text-anchor="middle">diaporama sur cosmos</text>
+<text x="750" y="109" text-anchor="middle" font-weight="700">shipyard-editor</text><text x="750" y="127" text-anchor="middle">éditeur, three r169</text>
+<text x="34" y="182" font-weight="700">2. Rendu et interface : packages/ (THREE r128 ou DOM)</text>
+<text x="135" y="217" text-anchor="middle" font-weight="700">universe</text><text x="135" y="235" text-anchor="middle">planets stars asteroids cosmos</text>
+<text x="340" y="217" text-anchor="middle" font-weight="700">ships</text><text x="340" y="235" text-anchor="middle">drive glass wear craft warp hitex</text>
+<text x="545" y="217" text-anchor="middle" font-weight="700">postfx</text><text x="545" y="235" text-anchor="middle">bloom, profondeur de champ</text>
+<text x="750" y="217" text-anchor="middle" font-weight="700">starmap</text><text x="750" y="235" text-anchor="middle">carte 2D, objet hôte</text>
+<text x="34" y="290" font-weight="700">3. Noyau pur et données : sans THREE ni DOM, testé sous Node</text>
+<text x="165" y="325" text-anchor="middle" font-weight="700">core</text><text x="165" y="343" text-anchor="middle">sttcomp : règles d'assemblage</text>
+<text x="430" y="325" text-anchor="middle" font-weight="700">ship-modules</text><text x="430" y="343" text-anchor="middle">bibliothèque, textures, fleet</text>
+<text x="707" y="325" text-anchor="middle" font-weight="700">three-r128</text><text x="707" y="343" text-anchor="middle">vendor figé : three, GLTF, meshopt</text>
+<text x="34" y="398" font-weight="700">4. Outils : tools/ (build, contrôles, carte de code, tableau de bord des agents)</text>
+<text x="34" y="424">sttbuild : concaténation ordonnée, @requires, sttData, images en ligne, minification terser unique</text>
+<text x="34" y="442">release : version, copie vers public/, tag stt_ ode_ ; codemap ; parité i18n ; eco_sim</text>
+<text x="34" y="486" font-weight="700">5. Publication : public/ + redirections aux anciennes URLs</text>
+<text x="34" y="512">space-travel.html · observation-des-etoiles.html · presentation.html · versions/</text>
+<text x="34" y="530">sources/target/…, presentation/, observation-des-etoiles-v7.19.x : pages de redirection</text>
+</g>
+<g stroke="#333" stroke-width="2" fill="none" marker-end="url(#a)">
+<path d="M905 70L905 360"/><path d="M905 410L905 520"/>
+</g>
+<g fill="#141413" font-size="12" font-weight="600">
+<text x="918" y="200" transform="rotate(90 918 200)" text-anchor="middle">importe vers le bas</text>
+<text x="918" y="465" transform="rotate(90 918 465)" text-anchor="middle">produit</text>
+</g>
+</svg>
