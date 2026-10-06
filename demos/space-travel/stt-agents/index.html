@@ -427,7 +427,7 @@
   </header>
 
   <div class="tabs" role="tablist" aria-label="Vues">
-    <button type="button" role="tab" id="tabBtnAgents" data-tab="agents" aria-controls="tab-agents" aria-selected="true">Agents</button><button type="button" role="tab" id="tabBtnTimeline" data-tab="timeline" aria-controls="tab-timeline" aria-selected="false" tabindex="-1">Chronologie</button><button type="button" role="tab" id="tabBtnFeed" data-tab="feed" aria-controls="tab-feed" aria-selected="false" tabindex="-1">Flux</button><button type="button" role="tab" id="tabBtnDelivery" data-tab="delivery" aria-controls="tab-delivery" aria-selected="false" tabindex="-1">Livraisons</button><button type="button" role="tab" id="tabBtnKanban" data-tab="kanban" aria-controls="tab-kanban" aria-selected="false" tabindex="-1">Kanban</button>
+    <button type="button" role="tab" id="tabBtnKanban" data-tab="kanban" aria-controls="tab-kanban" aria-selected="true">Kanban</button><button type="button" role="tab" id="tabBtnAgents" data-tab="agents" aria-controls="tab-agents" aria-selected="false" tabindex="-1">Agents</button><button type="button" role="tab" id="tabBtnTimeline" data-tab="timeline" aria-controls="tab-timeline" aria-selected="false" tabindex="-1">Chronologie</button><button type="button" role="tab" id="tabBtnFeed" data-tab="feed" aria-controls="tab-feed" aria-selected="false" tabindex="-1">Flux</button><button type="button" role="tab" id="tabBtnDelivery" data-tab="delivery" aria-controls="tab-delivery" aria-selected="false" tabindex="-1">Livraisons</button>
     <div class="status"><span class="conn" id="conn">connexion…</span><span id="srcLine"></span></div>
   </div>
 
@@ -1485,7 +1485,7 @@ boot();
   addEventListener('hashchange', () => { const n = location.hash.slice(1); if (panel[n]) show(n, { hash: false }); });
   addEventListener('resize', fit);
   const h0 = location.hash.slice(1);
-  show(panel[h0] ? h0 : panel[get()] ? get() : 'agents', { hash: !!panel[h0] });
+  show(panel[h0] ? h0 : panel[get()] ? get() : 'kanban', { hash: !!panel[h0] });
 })();
 </script>
 <script>
