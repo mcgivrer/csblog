@@ -46,12 +46,14 @@ node tests/longrun.js LONG-10   # 20 simulated minutes: errors, memory, shot-typ
 
 ## Shared modules (`shared/`)
 
-Eleven modules are **single-source** in `demos/space-travel/shared/` and consumed by both builds: `asteroids`, `hitex`, `planets`, `postfx`, `shipdrive`, `shipglass`, `shipwear`, `smallcraft`, `starmap`, `stars`, `warpring`. Never copy one into `sources/` or `observation-des-etoiles/src/`: edit it in `shared/` (it affects both products).
+Twelve modules are **single-source** in `demos/space-travel/shared/` and consumed by both the game and demo: `asteroids`, `hitex`, `planets`, `postfx`, `shipdrive`, `shipglass`, `shipwear`, `smallcraft`, `starmap`, `stars`, `sttcomp`, `warpring`. Never copy one into `sources/` or `observation-des-etoiles/src/`: edit it in `shared/` (it affects both products).
 
 - The game reads them through `shared/x.js` lines in `ORDER.txt`; the demo through `../../shared/x.js` in `build/build.py` and `build/build_min.js`.
+- Exception: `sttcomp` is consumed by the game (via `ORDER.txt`) and by the editor `STT_modules/sources/index.html`, but **not** by the demo `observation-des-etoiles/` (no rebuild, no version `ode_`). Documentation is clarified in `CODEMAP.md`.
+- The noyau (`sttcomp`) renders **codes, not text**; it has **no dependency** on THREE or DOM, and takes all randomness and identifiers as injected parameters (`env.rand`, `env.uid`).
 - Game-specific behaviour does **not** go into a shared module. The game extends it from its own files loaded around it: `09b-baies-ventrales.js` extends `__SHIPGLASS.BELLY`; `20e2-carte-hote.js` sets `window.__STARMAP_HOST` (translation, no camera buttons, jump refusal messages) before `shared/starmap.js`. A new shared module that needs per-product behaviour should take a host object the same way, with the demo's behaviour as default.
-- A change in `shared/` changes the demo's output: rebuild it, and release it (version bump, tag `ode_`) when its behaviour changes. Until then the committed demo HTML lags the source.
-- `shared/cosmos.js` (`window.__COSMOS.create(opts)`) is a twelfth module, consumed only by `presentation/` for now: the universe without any ship (galactic layer, systems at real scale, depth-sliced rendering), needing only THREE and `planets.js`, `stars.js`, `asteroids.js`. It **reproduces the game's draws** (modules 02–04, 07, 11, 12, 14, 16 and the system part of 20c): if you change how the game generates stars, systems, rings or moons, change `cosmos.js` the same way — `presentation/tests/cosmos_test.py` checks parity with `REAL.systemInfo` on the built game.
+- A change in `shared/` (except `sttcomp`) changes the demo's output: rebuild it, and release it (version bump, tag `ode_`) when its behaviour changes. Until then the committed demo HTML lags the source.
+- `shared/cosmos.js` (`window.__COSMOS.create(opts)`) is a thirteenth module, consumed only by `presentation/` for now: the universe without any ship (galactic layer, systems at real scale, depth-sliced rendering), needing only THREE and `planets.js`, `stars.js`, `asteroids.js`. It **reproduces the game's draws** (modules 02–04, 07, 11, 12, 14, 16 and the system part of 20c): if you change how the game generates stars, systems, rings or moons, change `cosmos.js` the same way — `presentation/tests/cosmos_test.py` checks parity with `REAL.systemInfo` on the built game.
 
 ## Dependencies and tracked build output
 
