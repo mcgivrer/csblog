@@ -346,11 +346,12 @@ html.embed-kpis .kpi .kc{display:none}
 html.embed-kpis .tm{height:54px!important;min-height:0}
 html.embed-board #kpis{display:none}
 html.embed-board .site-header{display:none}
-html.embed-board #topbar>.meta{margin-left:auto;order:9;font-size:11px;white-space:nowrap}
+html.embed-board #topbar>.meta{margin-left:auto;order:9;flex:0 0 auto;font-size:11px;white-space:nowrap}
+html.embed-board #topbar>.meta span{display:none}
 /* Barre haute : onglets de vue + filtres, fixée sous l'en-tête de la page */
 .topbar{position:sticky;top:0;z-index:40;display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;background:var(--bg);padding:6px 0 8px;margin:0 0 6px;border-bottom:1px solid var(--line)}
 .topbar .tabs{margin:0}
-.topbar .filters{margin:0;flex:1 1 auto}
+.topbar .filters{margin:0;flex:0 1 auto}
 </style>
 </head>
 <body data-view="board">
