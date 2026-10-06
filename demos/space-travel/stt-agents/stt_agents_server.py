@@ -1592,18 +1592,13 @@ class TaskService:
         """Phrase passée à l'agent : chemin ABSOLU du prompt (checkout principal), calculé ici, jamais fourni par le client."""
         return f"Exécute la tâche {task} : lis {os.path.abspath(os.path.join(self.prompts_dir, task + '.md'))}"
 
-    def create_task(self, body):
-        if not isinstance(body, dict):
-            raise HttpError(400, "objet JSON attendu")
-        lot, agent = body.get("lot"), body.get("agent")
-        model, cx = body.get("model"), body.get("cx")
+    def _clean_fields(self, body, lot):
+        """Validation commune à la création et à l'édition (lot : celui de la tâche, déjà vérifié)."""
+        agent, model, cx = body.get("agent"), body.get("model"), body.get("cx")
         title, prompt = body.get("title"), body.get("prompt")
         perm = body.get("perm", "acceptEdits")
         prio = body.get("prio", 2)
         worktree = body.get("worktree") or None
-        autostart = body.get("autostart", False)
-        if not isinstance(autostart, bool):
-            raise HttpError(400, "autostart : booléen attendu")
         if not isinstance(title, str) or not title.strip() or len(title) > 200:
             raise HttpError(400, "title : texte de 1 à 200 caractères")
         if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 200 * 1024:
@@ -1619,12 +1614,8 @@ class TaskService:
             if not ok:
                 raise HttpError(400, "docs : liste de {f, r} (r : lu, modifié ou créé)")
             docs = [{"f": d["f"], "r": d["r"]} for d in docs]
-        if not isinstance(lot, str) or not re.match(r"^[A-Za-z0-9][A-Za-z0-9._-]*$", lot):
-            raise HttpError(400, "lot invalide")
         if not isinstance(cx, str):
             raise HttpError(400, "cx invalide")
-        if autostart and self.runner is None:
-            raise HttpError(409, RUNNER_OFF_REASON)
         wt = None
         try:
             if worktree is not None:
@@ -1636,6 +1627,23 @@ class TaskService:
                                       wt or stt_runner.WORKTREE_PREFIX + "stt-" + lot, lot, None)
         except (stt_runner.ValidationError, TypeError) as exc:
             raise HttpError(400, str(exc))
+        return {"title": title.strip(), "agent": agent, "model": model, "cx": cx, "prio": prio,
+                "perm": perm, "wt": wt, "prompt": prompt, "docs": docs}
+
+    def create_task(self, body):
+        if not isinstance(body, dict):
+            raise HttpError(400, "objet JSON attendu")
+        lot = body.get("lot")
+        autostart = body.get("autostart", False)
+        if not isinstance(autostart, bool):
+            raise HttpError(400, "autostart : booléen attendu")
+        if not isinstance(lot, str) or not re.match(r"^[A-Za-z0-9][A-Za-z0-9._-]*$", lot):
+            raise HttpError(400, "lot invalide")
+        f = self._clean_fields(body, lot)
+        title, agent, model, cx, prio = f["title"], f["agent"], f["model"], f["cx"], f["prio"]
+        perm, wt, prompt, docs = f["perm"], f["wt"], f["prompt"], f["docs"]
+        if autostart and self.runner is None:
+            raise HttpError(409, RUNNER_OFF_REASON)
         with self._create_lock:
             try:
                 plan = read_plan(self.args.kanban)
@@ -1648,7 +1656,7 @@ class TaskService:
                             for m in [re.match(rf"^{re.escape(lot)}\.(\d+)$", str(t.get("id")))] if m]
                 tid = f"{lot}.{max(suffixes or [0]) + 1}"
                 rel = f"stt-agents/data/prompts/{tid}.md"
-                row = {"id": tid, "lot": lot, "title": title.strip(), "agent": agent, "model": model, "status": "todo",
+                row = {"id": tid, "lot": lot, "title": title, "agent": agent, "model": model, "status": "todo",
                        "progress": 0, "budget": budget, "est0": budget, "cx": cx, "prompt": rel}
                 if prio != 2:
                     row["prio"] = prio
@@ -1675,6 +1683,60 @@ class TaskService:
                 self.runner.enqueue(tid, agent, model, perm, prio, wt, lot, self.prompt_phrase(tid), budget)
             except stt_runner.RunnerError as exc:
                 raise HttpError(409, f"tâche {tid} créée mais non mise en file : {exc}")
+        return {"ok": True, "id": tid, "budget": budget, "prompt": rel}
+
+
+    def edit_task(self, tid, body):
+        """POST /api/tasks/<id>/edit : réécrit une tâche encore « todo » et inconnue du lanceur."""
+        if not isinstance(body, dict):
+            raise HttpError(400, "objet JSON attendu")
+        with self._create_lock:
+            try:
+                plan = read_plan(self.args.kanban)
+                row = next((t for t in plan["tasks"] if t.get("id") == tid), None)
+                if row is None:
+                    raise HttpError(404, f"tâche inconnue : {tid}")
+                if row.get("status") != "todo":
+                    raise HttpError(409, f"{tid} : seule une tâche « À faire » peut être modifiée (statut : {row.get('status')})")
+                if self.runner is not None and tid in self.runner.runs:
+                    raise HttpError(409, f"{tid} : déjà connue du lanceur (état {self.runner.runs[tid].state}), non modifiable")
+                bad = [k for k in RUNNER_RESERVED if k in row]
+                if bad:
+                    raise HttpError(409, f"{tid} : portée par le lanceur (" + ", ".join(bad) + "), non modifiable")
+                f = self._clean_fields(body, str(row.get("lot")))
+                if f["cx"] not in plan["scale"]:
+                    raise HttpError(400, "cx : " + ", ".join(plan["scale"]))
+                budget = int(plan["scale"][f["cx"]]["tokens"])
+                rel = f"stt-agents/data/prompts/{tid}.md"
+                sets = {"title": f["title"], "agent": f["agent"], "model": f["model"], "cx": f["cx"],
+                        "budget": budget, "est0": budget, "prompt": rel}
+                unset = []
+                for key, val, default in (("prio", f["prio"], 2), ("perm", f["perm"], "acceptEdits"), ("worktree", f["wt"], None)):
+                    if val is None or val == default:
+                        unset.append(key)
+                    else:
+                        sets[key] = val
+                if f["docs"] is not None:
+                    sets["docs"] = f["docs"]
+                ppath = os.path.join(self.prompts_dir, tid + ".md")
+                old = None
+                try:
+                    with open(ppath, encoding="utf-8") as fh:
+                        old = fh.read()
+                except OSError:
+                    pass
+                text = f["prompt"]
+                write_atomic(ppath, text if text.endswith("\n") else text + "\n")
+                try:
+                    kanban_apply(self.args.kanban, [{"op": "task", "id": tid, "set": sets, "unset": unset}])
+                except Exception:
+                    if old is None:
+                        os.remove(ppath)
+                    else:
+                        write_atomic(ppath, old)
+                    raise
+            except KanbanError as exc:
+                raise HttpError(400, str(exc))
         return {"ok": True, "id": tid, "budget": budget, "prompt": rel}
 
 
@@ -2042,7 +2104,7 @@ def make_handler(hub, allowed_hosts):
                 if not check_control(self):
                     return self._send(403, b"403", "text/plain; charset=utf-8")
                 return self._send(200, b'{"ok": true}', "application/json; charset=utf-8")
-            if path == "/api/tasks" or path.startswith("/api/runner/"):
+            if path == "/api/tasks" or path.startswith("/api/runner/") or (path.startswith("/api/tasks/") and path.endswith("/edit")):
                 return self._runner_post(path)
             if path != "/api/kanban":
                 return self._send(404, b"404", "text/plain")
@@ -2089,6 +2151,11 @@ def make_handler(hub, allowed_hosts):
             try:
                 if path == "/api/tasks":
                     return self._json(200, hub.tasks.create_task(self._read_json(BODY_MAX)))
+                if path.startswith("/api/tasks/") and path.endswith("/edit"):
+                    tid = urllib.parse.unquote(path[len("/api/tasks/"):-len("/edit")])
+                    if not stt_runner._TASK_RE.match(tid) or ".." in tid:
+                        raise HttpError(404, "route inconnue")
+                    return self._json(200, hub.tasks.edit_task(tid, self._read_json(BODY_MAX)))
                 if hub.runner is None:
                     raise HttpError(409, RUNNER_OFF_REASON)
                 parts = [urllib.parse.unquote(x) for x in path.split("/")]
