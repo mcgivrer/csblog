@@ -29,6 +29,7 @@ restent sur la machine. --host 0.0.0.0 l'expose au réseau local (à vos risques
 """
 
 import argparse
+import contextlib
 import hmac
 import secrets
 import select
@@ -42,11 +43,16 @@ import re
 import signal
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.error
 import urllib.request
 import webbrowser
+try:
+    import fcntl          # verrou inter-processus du plan (absent sous Windows)
+except ImportError:  # pragma: no cover
+    fcntl = None
 from collections import deque
 from datetime import datetime, timezone
 import urllib.parse
@@ -1469,13 +1475,51 @@ def _validate_node(path):
     return [int(x) for x in r.stdout.strip().split(",")]
 
 
+PLAN_LOCK_TIMEOUT = 10.0
+
+
+def plan_lock_path(path):
+    """Fichier de verrou du plan : hors du dépôt (jamais suivi), le même pour tous les processus
+    (dérivé du chemin réel du plan), dans un dossier 0700 propre à l'utilisateur."""
+    d = os.path.join(tempfile.gettempdir(), "stt-plan-locks-%s" % (os.getuid() if hasattr(os, "getuid") else "u"))
+    os.makedirs(d, mode=0o700, exist_ok=True)
+    return os.path.join(d, hashlib.sha1(os.path.realpath(path).encode("utf-8")).hexdigest() + ".lock")
+
+
+@contextlib.contextmanager
+def _plan_file_lock(path, timeout=None):
+    """Verrou de fichier exclusif (fcntl.flock) entre PROCESSUS : serveur et --kanban-apply du CP.
+    Fichier de verrou 0600 (voir plan_lock_path), pris autour du cycle lecture → écriture."""
+    if fcntl is None:
+        yield
+        return
+    timeout = PLAN_LOCK_TIMEOUT if timeout is None else timeout
+    fd = os.open(plan_lock_path(path), os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        end = time.monotonic() + timeout
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError:
+                if time.monotonic() >= end:
+                    raise KanbanError(f"plan-status.js verrouillé par un autre processus depuis plus de {timeout:g} s : réessayez")
+                time.sleep(0.02)
+        try:
+            yield
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+    finally:
+        os.close(fd)
+
+
 def kanban_apply(path, ops, dry_run=False, allow_reserved=False):
     """Applique une liste d'opérations ; tout ou rien. Renvoie le compte rendu."""
     if not path or not os.path.isfile(path):
         raise KanbanError(f"plan-status.js introuvable : {path}")
     if not isinstance(ops, list) or not ops:
         raise KanbanError("ops : liste non vide attendue")
-    with KANBAN_LOCK:
+    with KANBAN_LOCK, _plan_file_lock(path):
         text = Path(path).read_text(encoding="utf-8")
         eol = "\r\n" if "\r\n" in text else "\n"
         lines = text.replace("\r\n", "\n").split("\n")
@@ -1576,6 +1620,28 @@ def write_atomic(path, text):
     os.replace(tmp, path)
 
 
+AGENT_RULES = ("Règles : ne modifie jamais data/plan-status.js ni kanban.html ; ne change pas le statut de ta tâche "
+               "(le serveur le fait) ; reste dans ton worktree ; rends un rapport court à la fin.")
+
+
+def list_worktrees(root):
+    """Contenu de GET /api/worktrees : worktrees sous .claude/worktrees/ et branches locales (git, lecture seule, sans shell)."""
+    wts, cur = [], None
+    out = git(["worktree", "list", "--porcelain"], root) or ""
+    for line in out.splitlines() + [""]:
+        if line.startswith("worktree "):
+            cur = {"path": line[9:], "branch": None}
+        elif line.startswith("branch ") and cur:
+            cur["branch"] = line[7:].replace("refs/heads/", "", 1)
+        elif not line and cur:
+            rel = os.path.relpath(cur["path"], root).replace(os.sep, "/")
+            if rel.startswith(stt_runner.WORKTREE_PREFIX):
+                wts.append({"path": rel, "branch": cur["branch"]})
+            cur = None
+    br = git(["for-each-ref", "--format=%(refname:short)", "refs/heads/"], root) or ""
+    return {"worktrees": wts, "branches": sorted(b for b in br.splitlines() if b)}
+
+
 class TaskService:
     """Création de tâches (POST /api/tasks) ; fonctionne aussi sans lanceur (autostart refusé)."""
     runner = None
@@ -1590,7 +1656,7 @@ class TaskService:
 
     def prompt_phrase(self, task):
         """Phrase passée à l'agent : chemin ABSOLU du prompt (checkout principal), calculé ici, jamais fourni par le client."""
-        return f"Exécute la tâche {task} : lis {os.path.abspath(os.path.join(self.prompts_dir, task + '.md'))}"
+        return f"Exécute la tâche {task} : lis {os.path.abspath(os.path.join(self.prompts_dir, task + '.md'))}. " + AGENT_RULES
 
     def _clean_fields(self, body, lot):
         """Validation commune à la création et à l'édition (lot : celui de la tâche, déjà vérifié)."""
@@ -1599,6 +1665,7 @@ class TaskService:
         perm = body.get("perm", "acceptEdits")
         prio = body.get("prio", 2)
         worktree = body.get("worktree") or None
+        base = body.get("base") or None
         if not isinstance(title, str) or not title.strip() or len(title) > 200:
             raise HttpError(400, "title : texte de 1 à 200 caractères")
         if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 200 * 1024:
@@ -1618,6 +1685,14 @@ class TaskService:
             raise HttpError(400, "cx invalide")
         wt = None
         try:
+            if base is not None:
+                if not isinstance(base, str):
+                    raise HttpError(400, "base invalide")
+                stt_runner.validate_base(base)
+                if not stt_runner.branch_exists(self.root, base):
+                    raise HttpError(400, f"base : branche locale inconnue : {base}")
+                if base == "main":
+                    base = None
             if worktree is not None:
                 if not isinstance(worktree, str):
                     raise HttpError(400, "worktree invalide")
@@ -1628,7 +1703,7 @@ class TaskService:
         except (stt_runner.ValidationError, TypeError) as exc:
             raise HttpError(400, str(exc))
         return {"title": title.strip(), "agent": agent, "model": model, "cx": cx, "prio": prio,
-                "perm": perm, "wt": wt, "prompt": prompt, "docs": docs}
+                "perm": perm, "wt": wt, "prompt": prompt, "docs": docs, "base": base}
 
     def create_task(self, body):
         if not isinstance(body, dict):
@@ -1641,7 +1716,7 @@ class TaskService:
             raise HttpError(400, "lot invalide")
         f = self._clean_fields(body, lot)
         title, agent, model, cx, prio = f["title"], f["agent"], f["model"], f["cx"], f["prio"]
-        perm, wt, prompt, docs = f["perm"], f["wt"], f["prompt"], f["docs"]
+        perm, wt, prompt, docs, base = f["perm"], f["wt"], f["prompt"], f["docs"], f["base"]
         if autostart and self.runner is None:
             raise HttpError(409, RUNNER_OFF_REASON)
         with self._create_lock:
@@ -1662,6 +1737,8 @@ class TaskService:
                     row["prio"] = prio
                 if wt:
                     row["worktree"] = wt
+                if base:
+                    row["base"] = base
                 if perm != "acceptEdits":
                     row["perm"] = perm
                 if docs:
@@ -1680,7 +1757,7 @@ class TaskService:
         self.hub.notices.kanban_changes(out.get("changes"))
         if autostart:
             try:
-                self.runner.enqueue(tid, agent, model, perm, prio, wt, lot, self.prompt_phrase(tid), budget)
+                self.runner.enqueue(tid, agent, model, perm, prio, wt, lot, self.prompt_phrase(tid), budget, base)
             except stt_runner.RunnerError as exc:
                 raise HttpError(409, f"tâche {tid} créée mais non mise en file : {exc}")
         return {"ok": True, "id": tid, "budget": budget, "prompt": rel}
@@ -1711,7 +1788,7 @@ class TaskService:
                 sets = {"title": f["title"], "agent": f["agent"], "model": f["model"], "cx": f["cx"],
                         "budget": budget, "est0": budget, "prompt": rel}
                 unset = []
-                for key, val, default in (("prio", f["prio"], 2), ("perm", f["perm"], "acceptEdits"), ("worktree", f["wt"], None)):
+                for key, val, default in (("prio", f["prio"], 2), ("perm", f["perm"], "acceptEdits"), ("worktree", f["wt"], None), ("base", f["base"], None)):
                     if val is None or val == default:
                         unset.append(key)
                     else:
@@ -1924,6 +2001,8 @@ class RunnerGlue(TaskService):
         if action == "enqueue":
             prio = body.get("prio") if isinstance(body, dict) else None
             try:
+              with self._create_lock:      # même verrou que edit_task : lecture du plan + création du run indivisibles
+                run = r.runs.get(task)
                 if run is not None:
                     r.enqueue(task, prio=prio)
                 else:
@@ -1937,7 +2016,7 @@ class RunnerGlue(TaskService):
                         raise HttpError(409, f"{task} : tâche inconnue du lanceur et sans prompt (data/prompts/{task}.md absent) : créez-la par le formulaire « Nouvelle tâche »")
                     r.enqueue(task, row.get("agent"), row.get("model") or "sonnet", row.get("perm") or "acceptEdits",
                               prio if prio is not None else row.get("prio", 2), row.get("worktree") or None, row.get("lot"),
-                              self.prompt_phrase(task), row.get("budget") or row.get("est0"))
+                              self.prompt_phrase(task), row.get("budget") or row.get("est0"), row.get("base") or None)
             except KanbanError as exc:
                 raise HttpError(400, str(exc))
         else:
@@ -2084,6 +2163,8 @@ def make_handler(hub, allowed_hosts):
                 return self._stream()
             if path == "/api/runner":
                 return self._json(200, runner_payload(hub.runner))
+            if path == "/api/worktrees":
+                return self._json(200, list_worktrees(hub.args.main_root or hub.args.repo))
             if path.startswith("/api/runner/") and path.endswith("/tty"):
                 return self._tty(path)
             if path == "/api/kanban":

@@ -520,7 +520,8 @@ html.embed-board #topbar>.meta span{display:none}
     <label class="f"><span>Modèle</span><select id="ntModel"><option value="opus">opus</option><option value="sonnet">sonnet</option><option value="haiku">haiku</option></select></label>
     <label class="f"><span>Taille (complexité)</span><select id="ntCx" aria-describedby="ntCxH"></select><span class="hint" id="ntCxH"></span></label>
     <label class="f"><span>Priorité</span><select id="ntPrio"><option value="1">1 · haute</option><option value="2" selected>2 · normale</option><option value="3">3 · basse</option></select></label>
-    <label class="f"><span>Worktree (facultatif)</span><input type="text" id="ntWt" placeholder=".claude/worktrees/stt-L2a" autocomplete="off" aria-describedby="ntWtH ntWtE"><span class="hint" id="ntWtH">Chemin sous <span class="mono">.claude/worktrees/</span>, sans « .. ». Vide : un worktree propre à la tâche.</span><span class="fe" id="ntWtE"></span></label>
+    <label class="f"><span>Worktree (facultatif)</span><input type="text" id="ntWt" list="ntWtList" placeholder=".claude/worktrees/stt-L2a" autocomplete="off" aria-describedby="ntWtH ntWtE"><datalist id="ntWtList"></datalist><span class="hint" id="ntWtH">Chemin sous <span class="mono">.claude/worktrees/</span>, sans « .. ». Vide : un worktree propre à la tâche.</span><span class="fe" id="ntWtE"></span></label>
+    <label class="f"><span>Base du worktree</span><select id="ntBase" aria-describedby="ntBaseH ntBaseE"><option value="main" selected>main</option></select><span class="fe" id="ntBaseE"></span><span class="hint" id="ntBaseH">Utilisée seulement si le worktree est créé ; pour travailler sur du code non fusionné, choisis le worktree existant ou la branche qui le porte.</span></label>
     <label class="f"><span>Mode de permission</span><select id="ntPerm"><option value="acceptEdits">acceptEdits</option><option value="plan">plan</option><option value="manual">manual</option></select></label>
     <label class="f w"><span>Prompt (Markdown) *</span><textarea id="ntPrompt" required aria-describedby="ntPrCnt ntPrE"></textarea><span class="hint" id="ntPrCnt"></span><span class="fe" id="ntPrE"></span></label>
     <label class="f w chk"><input type="checkbox" id="ntAuto" aria-describedby="ntAutoH"> <span>Lancer dès que possible</span></label>
@@ -1139,6 +1140,19 @@ html.embed-board #topbar>.meta span{display:none}
       try { const r = await fetch('/api/runner', { cache:'no-store' }); runner = r.ok ? await r.json() : null; } catch(e){ runner = null; }
       capHint();
     }
+    let wantBase = 'main';
+    async function loadWts(){
+      let j = null;
+      try { const r = await fetch('/api/worktrees', { cache:'no-store' }); j = r.ok ? await r.json() : null; } catch(e){ j = null; }
+      const dl = f('ntWtList'); dl.textContent = '';
+      ((j && j.worktrees) || []).forEach(w => { const o = document.createElement('option'); o.value = w.path; if(w.branch) o.label = w.path + ' (' + w.branch + ')'; dl.appendChild(o); });
+      const sel = f('ntBase'), names = ['main'];
+      ((j && j.branches) || []).forEach(b => { if(names.indexOf(b) < 0) names.push(b); });
+      if(wantBase && names.indexOf(wantBase) < 0) names.push(wantBase);
+      sel.textContent = '';
+      names.forEach(b => { const o = document.createElement('option'); o.value = b; o.textContent = b; sel.appendChild(o); });
+      sel.value = wantBase || 'main';
+    }
     function setMode(id){
       editId = id || null;
       f('ntT').textContent = editId ? 'Modifier la tâche ' + editId : 'Nouvelle tâche';
@@ -1153,11 +1167,11 @@ html.embed-board #topbar>.meta span{display:none}
       const setSel = (el, v) => { if(v != null && Array.from(el.options).some(o => o.value === String(v))) el.value = String(v); };
       setSel(f('ntLot'), t.lot); f('ntTitle').value = t.title || ''; setSel(f('ntAgent'), t.agent || 'dev');
       f('ntModel').value = DEF_MODEL[f('ntAgent').value] || 'sonnet'; setSel(f('ntModel'), t.model);
-      setSel(f('ntCx'), t.cx); setSel(f('ntPrio'), t.prio || 2); f('ntWt').value = t.worktree || ''; setSel(f('ntPerm'), t.perm || 'acceptEdits');
+      setSel(f('ntCx'), t.cx); setSel(f('ntPrio'), t.prio || 2); f('ntWt').value = t.worktree || ''; wantBase = t.base || 'main'; setSel(f('ntPerm'), t.perm || 'acceptEdits');
       f('ntPrompt').value = ''; f('ntPrompt').disabled = true; f('ntPrompt').placeholder = 'Chargement du prompt…';
       runner = null; cxHint(); prCount(); capHint(); setBusy(false);
       if(!dlg.open) dlg.showModal();
-      f('ntTitle').focus();
+      f('ntTitle').focus(); loadWts();
       try {
         const r = await fetch('/kanban/doc/demos/space-travel/stt-agents/data/prompts/' + encodeURIComponent(id) + '.md', { cache:'no-store' });
         if(editId === id) f('ntPrompt').value = r.ok ? await r.text() : '';
@@ -1165,13 +1179,13 @@ html.embed-board #topbar>.meta span{display:none}
       if(editId === id){ f('ntPrompt').disabled = false; f('ntPrompt').placeholder = ''; prCount(); }
     }
     function openNew(){
-      setMode(null);
+      setMode(null); wantBase = 'main';
       f('ntForm').reset(); f('ntSrv').textContent = '';
       [['ntLotE'], ['ntTitleE', 'ntTitle'], ['ntWtE', 'ntWt'], ['ntPrE', 'ntPrompt']].forEach(a => setErr(a[0], a[1] && f(a[1]), ''));
       fillLots(); fillCx(); f('ntAgent').value = 'dev'; f('ntModel').value = DEF_MODEL.dev;
       runner = null; cxHint(); prCount(); capHint(); setBusy(false);
       if(!dlg.open) dlg.showModal();
-      f('ntTitle').focus();
+      f('ntTitle').focus(); loadWts();
       loadRunner();
     }
     function setBusy(b){ sending = b; f('ntOk').disabled = b; f('ntOk').textContent = b ? 'Envoi…' : editId ? 'Enregistrer' : 'Créer la tâche'; f('ntForm').setAttribute('aria-busy', String(b)); }
@@ -1181,6 +1195,8 @@ html.embed-board #topbar>.meta span{display:none}
       mark('ntTitleE', f('ntTitle'), f('ntTitle').value.trim() ? '' : 'Le titre est obligatoire.');
       const wt = f('ntWt').value.trim();
       mark('ntWtE', f('ntWt'), !wt || (wt.indexOf('.claude/worktrees/') === 0 && wt.length > 18 && wt.split('/').indexOf('..') < 0 && wt.indexOf('\\') < 0) ? '' : 'Le worktree doit être un chemin sous .claude/worktrees/, sans « .. ».');
+      const bs = f('ntBase').value;
+      mark('ntBaseE', f('ntBase'), !bs || (/^[A-Za-z0-9][A-Za-z0-9._\/-]*$/.test(bs) && bs.indexOf('..') < 0) ? '' : 'Nom de branche invalide.');
       const pr = f('ntPrompt').value;
       mark('ntPrE', f('ntPrompt'), !pr.trim() ? 'Le prompt est obligatoire.' : bytes(pr) > MAXP ? 'Prompt trop long (limite ' + (MAXP / 1024) + ' Kio).' : '');
       if(bad){ bad.focus(); return false; }
@@ -1204,6 +1220,7 @@ html.embed-board #topbar>.meta span{display:none}
         prio:Number(f('ntPrio').value), perm:f('ntPerm').value, prompt:f('ntPrompt').value };
       if(!editId){ body.lot = f('ntLot').value; body.autostart = f('ntAuto').checked && !f('ntAuto').disabled; }
       const wt = f('ntWt').value.trim(); if(wt) body.worktree = wt;
+      const bs = f('ntBase').value; if(bs && bs !== 'main') body.base = bs;
       const url = editId ? '/api/tasks/' + encodeURIComponent(editId) + '/edit' : '/api/tasks';
       setBusy(true);
       try {

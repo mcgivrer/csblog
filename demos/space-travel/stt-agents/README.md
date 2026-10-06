@@ -130,6 +130,13 @@ Par défaut, la commande est `["claude","--agent","stt-{agent}","--model","{mode
 
 Bouton « **＋ Nouvelle tâche** » du Kanban (formulaire livré par T1.5) : lot, titre, profil (dev/archi/revue), modèle, complexité, priorité, worktree optionnel, mode de permission, prompt Markdown, « lancer dès que possible ». Les tâches créées sans lanceur restent « à faire » et peuvent être lancées ultérieurement.
 
+### Worktree, base et consigne de l'agent (T1.11)
+
+- **Base du worktree.** Champ facultatif `base` (formulaire de création et d'édition, corps de `POST /api/tasks` et `POST /api/tasks/<id>/edit`) : nom d'une branche **locale existante** (`^[A-Za-z0-9][A-Za-z0-9._/-]*$`, ni `..` ni tiret initial ; sinon 400). Elle n'est utilisée **que si le worktree de la tâche n'existe pas encore** : le lanceur crée alors la branche `worktree-stt-<lot>` à partir de `base` (défaut `main`). Si le worktree (ou la branche `worktree-stt-<lot>`) existe déjà, `base` est **ignorée**. Elle est stockée dans la ligne du plan (clé `base`, supprimée si vide ou « main ») et relue quand on met en file une tâche connue du plan. Pour travailler sur du code non fusionné, choisir le worktree existant ou la branche qui le porte.
+- **`GET /api/worktrees`** (sans jeton) : `{"worktrees": [{"path": ".claude/worktrees/…", "branch": "…"}], "branches": ["main", …]}` ; alimente la liste de suggestions et la liste déroulante « Base du worktree » du formulaire.
+- **Règles à jour pour les agents.** Un agent lancé lit `.claude/agents/` **de son worktree**, pas celui du checkout principal : pour qu'il applique les règles à jour (par exemple « le serveur écrit le Kanban, pas le DEV »), son worktree doit porter une branche qui les contient (d'où le champ `base`). La phrase donnée à l'agent lui rappelle en plus : ne jamais modifier `data/plan-status.js` ni `kanban.html`, ne pas changer le statut de sa tâche (le serveur le fait), rester dans son worktree, rendre un rapport court.
+- **Écriture du plan.** Toute modification de `plan-status.js` (serveur ou `--kanban-apply`) prend un verrou de fichier exclusif (`flock` sur un fichier de verrou 0600 du dossier temporaire, dérivé du chemin du plan, donc jamais dans le dépôt ; 10 s au plus) en plus du verrou du processus : deux processus ne perdent plus de mise à jour. Édition d'une tâche et mise en file d'une tâche connue du plan sont sérialisées.
+
 ### Cycle de vie d'un agent lancé
 
 | État | Sens |

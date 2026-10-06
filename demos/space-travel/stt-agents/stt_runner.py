@@ -150,11 +150,34 @@ def process_start_tag(pid):
         return None
 
 
-def ensure_worktree(root, rel, lot):
-    """Cree le worktree `rel` (relatif a `root`) s'il manque, depuis `main`,
-    avec la branche `worktree-stt-<lot>` (reutilisee si elle existe deja).
+_BASE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]*$")
+
+
+def validate_base(base):
+    """Nom de branche locale servant de point de depart (format seulement)."""
+    if not isinstance(base, str) or not _BASE_RE.match(base) or ".." in base or len(base) > 200 \
+            or base.endswith(("/", ".lock")) or "//" in base:
+        raise ValidationError("base invalide: %r" % (base,))
+    return base
+
+
+def branch_exists(root, name):
+    """Vrai si la branche LOCALE `name` existe (git, sans shell)."""
+    try:
+        return subprocess.run(["git", "-C", root, "rev-parse", "--verify", "--quiet",
+                               "refs/heads/" + name], capture_output=True, timeout=10).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def ensure_worktree(root, rel, lot, base=None):
+    """Cree le worktree `rel` (relatif a `root`) s'il manque, avec la branche
+    `worktree-stt-<lot>` creee depuis `base` (branche locale, defaut `main`).
+    Si le worktree ou la branche existe deja, `base` est ignoree.
     Retourne le chemin absolu."""
     rel = validate_worktree(rel)
+    if base:
+        base = validate_base(base)
     path = os.path.join(root, rel)
     if os.path.isdir(path):
         return path
@@ -168,7 +191,7 @@ def ensure_worktree(root, rel, lot):
     if exists:
         cmd = ["git", "-C", root, "worktree", "add", path, branch]
     else:
-        cmd = ["git", "-C", root, "worktree", "add", "-b", branch, path, "main"]
+        cmd = ["git", "-C", root, "worktree", "add", "-b", branch, path, base or "main"]
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
         raise RunnerError("git worktree add a echoue: %s" % r.stderr.strip())
@@ -211,7 +234,7 @@ class Run:
     PERSISTED = ("task", "agent", "model", "perm", "prio", "session", "worktree",
                  "lot", "state", "pid", "pgid", "proc_start", "inst", "enqueued",
                  "started", "ended", "exit", "note", "budget", "prompt",
-                 "resumed", "paused_s", "paused_at", "budget_ack", "order")
+                 "resumed", "paused_s", "paused_at", "budget_ack", "order", "base")
 
     def __init__(self, task, agent, model, perm, prio, session, worktree, lot):
         self.task = task
@@ -239,6 +262,7 @@ class Run:
         self.paused_at = None
         self.budget_ack = False
         self.order = 0
+        self.base = None           # branche de depart du worktree (si a creer)
         self.tokens = None
         # non persistes
         self.master = None
@@ -407,7 +431,7 @@ class Runner:
 
     # ---- validation ------------------------------------------------------
 
-    def _validate(self, task, agent, model, perm, prio, worktree, lot, prompt):
+    def _validate(self, task, agent, model, perm, prio, worktree, lot, prompt, base=None):
         if not isinstance(task, str) or not _TASK_RE.match(task) or ".." in task:
             raise ValidationError("tache invalide: %r" % (task,))
         if agent not in self.profile_cap:
@@ -425,6 +449,8 @@ class Runner:
         if prompt is not None and (not isinstance(prompt, str) or prompt.startswith("-")
                                    or "\x00" in prompt or len(prompt) > 4000):
             raise ValidationError("prompt invalide")
+        if base:
+            validate_base(base)
         wt = validate_worktree(worktree)
         base = os.path.realpath(os.path.join(self.root, WORKTREE_PREFIX))
         real = os.path.realpath(os.path.join(self.root, wt))
@@ -435,7 +461,7 @@ class Runner:
     # ---- API : file ------------------------------------------------------
 
     def enqueue(self, task, agent="dev", model="sonnet", perm="acceptEdits",
-                prio=None, worktree=None, lot=None, prompt=None, budget=None):
+                prio=None, worktree=None, lot=None, prompt=None, budget=None, base=None):
         """Met en file un nouveau run, ou relance un run stopped|killed|failed
         (reprise par --resume, parametres d'origine conserves)."""
         with self._lock:
@@ -463,13 +489,14 @@ class Runner:
             prio = 2 if prio is None else prio
             lot = lot or str(task).split(".")[0]
             wt = worktree or (WORKTREE_PREFIX + "stt-%s" % lot)
-            wt = self._validate(task, agent, model, perm, prio, wt, lot, prompt)
+            wt = self._validate(task, agent, model, perm, prio, wt, lot, prompt, base)
             self._order += 1
             r = Run(task, agent, model, perm, prio, str(uuid.uuid4()), wt, lot)
             r.enqueued = self.now()
             r.order = self._order
             r.budget = budget
             r.prompt = prompt
+            r.base = base or None
             self.runs[task] = r
             self._save()
             self._notify(r)
@@ -658,7 +685,10 @@ class Runner:
 
     def _launch(self, run):
         try:
-            cwd = self.worktree_factory(self.root, run.worktree, run.lot)
+            if getattr(run, "base", None):
+                cwd = self.worktree_factory(self.root, run.worktree, run.lot, run.base)
+            else:
+                cwd = self.worktree_factory(self.root, run.worktree, run.lot)
             prompt = run.prompt or DEFAULT_PROMPT.format(task=run.task)
             argv = substitute_command(self.command, {
                 "agent": run.agent, "model": run.model, "session": run.session,
