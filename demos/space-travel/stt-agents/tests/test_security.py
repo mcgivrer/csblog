@@ -92,7 +92,10 @@ class SecurityTests(unittest.TestCase):
         for path in ('/', '/kanban/?embed=board'):
             st, _, r = raw(self.port, 'GET', path)
             self.assertEqual(st, 200)
-            self.assertEqual(r.getheader('Content-Security-Policy'), "frame-ancestors 'self'")
+            csp = r.getheader('Content-Security-Policy')
+            for d in ("frame-ancestors 'self'", "object-src 'none'", "base-uri 'none'", "form-action 'self'",
+                      "connect-src 'self' https://api.github.com"):
+                self.assertIn(d, csp)
             self.assertEqual(r.getheader('Referrer-Policy'), 'no-referrer')
 
     def test_kanban_iframe(self):

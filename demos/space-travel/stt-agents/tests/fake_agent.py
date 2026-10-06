@@ -87,6 +87,40 @@ def main():
             if m:
                 tokens = int(m.group(1))
 
+    # Consignes de durcissement : ENV <fichier>, TTY <fichier>, HUP <fichier>
+    m = re.search(r'\bENV\s+(\S+)', prompt)
+    if m:
+        with open(m.group(1), 'w') as f:
+            json.dump(dict(os.environ), f)
+    m = re.search(r'\bTTY\s+(\S+)', prompt)
+    if m:
+        info = {}
+        try:
+            info['ttyname'] = os.ttyname(0)
+        except OSError as e:
+            info['ttyname'] = None
+        try:
+            fd = os.open('/dev/tty', os.O_RDWR)
+            os.close(fd)
+            info['devtty'] = True
+        except OSError:
+            info['devtty'] = False
+        try:
+            info['pgrp_is_fg'] = os.tcgetpgrp(0) == os.getpgrp()
+        except OSError:
+            info['pgrp_is_fg'] = None
+        with open(m.group(1), 'w') as f:
+            json.dump(info, f)
+    m = re.search(r'\bHUP\s+(\S+)', prompt)
+    if m:
+        hup_file = m.group(1)
+
+        def on_hup(signum, frame):
+            with open(hup_file, 'w') as f:
+                f.write('SIGHUP')
+            os._exit(0)
+        signal.signal(signal.SIGHUP, on_hup)
+
     # Set up signal handlers
     if ignore_term:
         signal.signal(signal.SIGTERM, signal.SIG_IGN)

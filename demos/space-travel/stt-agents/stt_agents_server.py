@@ -31,6 +31,8 @@ restent sur la machine. --host 0.0.0.0 l'expose au réseau local (à vos risques
 import argparse
 import hmac
 import secrets
+import select
+import socket
 import hashlib
 import base64
 import json
@@ -971,6 +973,8 @@ class Hub:
         self.digest = None
         self.notices = NoticeEngine()
         self.runner = None   # RunnerGlue si --runner
+        self.tty_lock = threading.Lock()
+        self.tty_open = {}   # tâche -> nombre de flux tty ouverts
         self.tasks = None    # TaskService (création de tâches), RunnerGlue si --runner
 
     def build(self):
@@ -1172,6 +1176,10 @@ KANBAN_DOC_ROOTS = [
     "",                                          # checkout principal
 ]
 KANBAN_DOC_MAX = 25 * 1024 * 1024
+# CSP des pages HTML : pas de script-src/style-src (xterm vient de cdnjs/jsDelivr) ; GitHub = index.html
+HTML_CSP = ("frame-ancestors 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; "
+            "connect-src 'self' https://api.github.com")
+TTY_MAX_PER_TASK = 4
 KANBAN_DOC_DENY = {".git", "node_modules", "__pycache__"}
 KANBAN_LOCK = threading.Lock()
 KANBAN_SECTIONS = ("lots", "tasks", "decisions", "journal")
@@ -1201,6 +1209,11 @@ def find_doc(main_root, rel):
     """(fichier, racine) d'un document du Kanban : première racine de KANBAN_DOC_ROOTS qui le contient, sinon (None, None)."""
     parts = [x for x in rel.split("/") if x]
     if not parts or any(x in ("..", ".") or "\\" in x or "\0" in x or x in KANBAN_DOC_DENY for x in parts):
+        return None, None
+    # .claude (état du lanceur, journaux, projets, worktrees) : seulement .claude/agents/<fichier>.md
+    dots = [i for i, x in enumerate(parts) if x.lower() == ".claude"]
+    if dots and not (dots == [0] and len(parts) == 3 and parts[1] == "agents"
+                     and parts[-1].lower().endswith(".md")):
         return None, None
     for root in KANBAN_DOC_ROOTS:
         base = Path(main_root, *[x for x in root.split("/") if x]).resolve()
@@ -1858,6 +1871,8 @@ class RunnerGlue(TaskService):
                         raise KeyError(task)
                     if row.get("agent") not in ("dev", "archi", "revue"):
                         raise HttpError(400, "agent non lançable : " + str(row.get("agent")))
+                    if not os.path.isfile(os.path.join(self.prompts_dir, task + ".md")):
+                        raise HttpError(409, f"{task} : tâche inconnue du lanceur et sans prompt (data/prompts/{task}.md absent) : créez-la par le formulaire « Nouvelle tâche »")
                     r.enqueue(task, row.get("agent"), row.get("model") or "sonnet", row.get("perm") or "acceptEdits",
                               prio if prio is not None else row.get("prio", 2), row.get("worktree") or None, row.get("lot"),
                               self.prompt_phrase(task), row.get("budget") or row.get("est0"))
@@ -1925,7 +1940,7 @@ def make_handler(hub, allowed_hosts):
         def _send(self, code, body, ctype, head=False, extra=None):
             if ctype.startswith("text/html"):
                 body = body.replace(TOKEN_META.encode(), ('<meta name="stt-token" content="%s">' % getattr(hub, "token", "")).encode())
-                extra = dict(extra or {}, **{"Content-Security-Policy": "frame-ancestors 'self'", "Referrer-Policy": "no-referrer"})
+                extra = dict(extra or {}, **{"Content-Security-Policy": HTML_CSP, "Referrer-Policy": "no-referrer"})
             self.send_response(code)
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(body)))
@@ -2130,6 +2145,27 @@ def make_handler(hub, allowed_hosts):
             rn = hub.runner.runner
             if rn.get(task).state == "orphan":
                 return self._json(409, {"ok": False, "error": f"{task} : processus orphelin : pas de terminal, seul kill est permis"})
+            with hub.tty_lock:
+                if hub.tty_open.get(task, 0) >= TTY_MAX_PER_TASK:
+                    return self._json(429, {"ok": False, "error": f"{task} : {TTY_MAX_PER_TASK} flux terminal simultanés au plus"})
+                hub.tty_open[task] = hub.tty_open.get(task, 0) + 1
+            try:
+                return self._tty_stream(rn, task, since)
+            finally:
+                with hub.tty_lock:
+                    hub.tty_open[task] -= 1
+                    if hub.tty_open[task] <= 0:
+                        del hub.tty_open[task]
+
+        def _client_gone(self):
+            """Vrai si le client a fermé sa connexion (lecture à 0 octet) : libère le flux sans attendre une écriture."""
+            try:
+                r, _, _ = select.select([self.connection], [], [], 0)
+                return bool(r) and self.connection.recv(1, socket.MSG_PEEK) == b""
+            except (OSError, ValueError):
+                return True
+
+        def _tty_stream(self, rn, task, since):
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
@@ -2141,6 +2177,8 @@ def make_handler(hub, allowed_hosts):
             try:
                 self.wfile.write(b"retry: 3000\n\n")
                 while True:
+                    if self._client_gone():
+                        return
                     state = rn.get(task).state
                     seq, data = rn.read_output(task, since)
                     sent = False
@@ -2296,7 +2334,8 @@ def main():
     print(f"  Documents du Kanban : {', '.join(repr(r) for r in KANBAN_DOC_ROOTS)} (KANBAN_DOC_ROOTS)")
     if args.runner:
         print(f"  Lanceur : actif · état {hub.runner.state_dir} · commande {(runner_cmd or stt_runner.RUNNER_COMMAND)[0]}")
-        signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
+        for _sig in (signal.SIGTERM, signal.SIGHUP):
+            signal.signal(_sig, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
     if not local:
         print("  ATTENTION : serveur exposé au réseau, les extraits de transcripts sont lisibles par tout le LAN.")
     if args.open:

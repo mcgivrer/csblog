@@ -167,6 +167,12 @@ Modes **acceptés** (`ALLOWED_PERMS` dans `stt_runner.py`) : `acceptEdits` (**d�
 ### Sécurité et limites
 
 - **Jeton** : généré à chaque démarrage du serveur, mémoire seule, affichage console unique.
+- **Machine partagée** : tout compte local pouvant joindre `127.0.0.1:<port>` lit le jeton (`GET /`) et pilote les agents : ne pas utiliser sur une machine partagée.
+- **Environnement des agents** : `CLAUDECODE`, `CLAUDE_CODE_*`, `CLAUDE_PID`, `CLAUDE_JOB_DIR` et `CLAUDE_EFFORT` ne sont pas transmis (le reste, dont `CLAUDE_CONFIG_DIR`, `PATH`, `HOME`, `ANTHROPIC_*`, l'est). Chaque agent a le pty pour terminal de contrôle (fermeture du pty ⇒ SIGHUP). SIGHUP et SIGTERM arrêtent le serveur proprement.
+- **Fichiers** : `.claude/stt-runner/` en 0700, `state.json` et journaux en 0600 ; `/kanban/doc/` refuse tout chemin contenant `.claude` sauf `.claude/agents/*.md`.
+- **Enqueue** : une tâche inconnue du lanceur n'est lancée que si `data/prompts/<id>.md` existe (écrit par le formulaire `POST /api/tasks`), sinon 409.
+- **Terminal** : 4 flux `tty` simultanés au plus par tâche (429 au-delà).
+- **Budget** : `tokens_of` compte input + output + cache_write (cache de lecture exclu).
 - **Authentification** : `X-STT-Token` en en-tête HTTP, `Origin` (obligatoire, boucle locale), `Host` local, CSP `frame-ancestors 'self'`.
 - **Clés réservées** : POST `/api/kanban` refuse les clés `runner`, `session`, `runState`, `started`, `ended`, `inst` du lanceur.
 - **Orphelins** : groupe de processus + détection PID/heure de départ ; seul `kill` permis, pas d'accès terminal.

@@ -21,6 +21,7 @@ import json
 import os
 import re
 import select
+import shutil
 import signal
 import struct
 import subprocess
@@ -93,6 +94,40 @@ class ValidationError(RunnerError, ValueError):
 # --------------------------------------------------------------------------
 # Utilitaires
 # --------------------------------------------------------------------------
+
+# Variables du `claude` parent qui ne doivent pas atteindre les agents (jeton de
+# messagerie, identifiants de session...). CLAUDE_CONFIG_DIR et ANTHROPIC_* restent.
+AGENT_ENV_DROP = {"CLAUDECODE", "CLAUDE_PID", "CLAUDE_JOB_DIR", "CLAUDE_EFFORT"}
+AGENT_ENV_DROP_PREFIX = "CLAUDE_CODE_"
+
+# Trampoline : donne a l'agent le pty comme terminal de controle (stdin = esclave,
+# nouvelle session), puis exec (le pid ne change pas). Pas de preexec_fn (fils).
+CTTY_TRAMPOLINE = [sys.executable, "-c",
+                   "import os,sys,fcntl,termios;fcntl.ioctl(0,termios.TIOCSCTTY,0);"
+                   "os.execvp(sys.argv[1],sys.argv[1:])"]
+
+
+def agent_environment(environ):
+    """Copie de l'environnement sans les variables de session du claude parent."""
+    return {k: v for k, v in environ.items()
+            if k not in AGENT_ENV_DROP and not k.startswith(AGENT_ENV_DROP_PREFIX)}
+
+
+def ensure_private_dir(path):
+    """Cree le dossier en 0o700 (et resserre ses droits s'il existe deja)."""
+    os.makedirs(path, mode=0o700, exist_ok=True)
+    os.chmod(path, 0o700)
+
+
+def private_fd(path, flags):
+    """Ouvre `path` en 0o600 (droits resserres si le fichier existait)."""
+    fd = os.open(path, flags, 0o600)
+    try:
+        os.fchmod(fd, 0o600)
+    except OSError:
+        pass
+    return fd
+
 
 def process_start_tag(pid):
     """Identifiant de l'heure de depart d'un processus, ou None s'il n'existe
@@ -289,11 +324,11 @@ class Runner:
 
     def _save(self):
         with self._lock:
-            os.makedirs(self.state_dir, exist_ok=True)
+            ensure_private_dir(self.state_dir)
             data = {"version": 1,
                     "runs": [r.to_dict() for r in self.runs.values()]}
             tmp = self.state_path + ".tmp"
-            with open(tmp, "w") as f:
+            with os.fdopen(private_fd(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC), "w") as f:
                 json.dump(data, f, indent=1)
                 f.flush()
                 os.fsync(f.fileno())
@@ -629,13 +664,17 @@ class Runner:
                 "agent": run.agent, "model": run.model, "session": run.session,
                 "perm": run.perm, "task": run.task, "prompt": prompt},
                 resume=run.resumed)
-            env = dict(os.environ)
+            env = agent_environment(os.environ)
             env.update(self.env)
             env.setdefault("TERM", "xterm-256color")
+            exe = argv[0]
+            if not shutil.which(exe, path=env.get("PATH")) if os.sep not in exe else not os.access(exe, os.X_OK):
+                # le trampoline masquerait l'echec d'exec : on le detecte avant
+                raise FileNotFoundError("commande introuvable: %s" % exe)
             master, slave = os.openpty()
             try:
                 fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 80, 0, 0))
-                proc = subprocess.Popen(argv, stdin=slave, stdout=slave, stderr=slave,
+                proc = subprocess.Popen(CTTY_TRAMPOLINE + argv, stdin=slave, stdout=slave, stderr=slave,
                                         cwd=cwd, env=env, start_new_session=True,
                                         close_fds=True)
             except BaseException:
@@ -669,9 +708,9 @@ class Runner:
         run.reader_stop = False
         run.budget_ack = False
         run.resumed = True
-        os.makedirs(self.state_dir, exist_ok=True)
+        ensure_private_dir(self.state_dir)
         run.log_path = os.path.join(self.state_dir, run.task + ".log")
-        run.log_fh = open(run.log_path, "ab")
+        run.log_fh = os.fdopen(private_fd(run.log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND), "ab")
         run.log_size = run.log_fh.tell()
         self._set_state(run, "starting")
         run.reader = threading.Thread(target=self._read_loop, args=(run,),
@@ -728,10 +767,10 @@ class Runner:
                     f.seek(-keep, os.SEEK_END)
                     tail = f.read()
                 tmp = run.log_path + ".tmp"
-                with open(tmp, "wb") as f:
+                with os.fdopen(private_fd(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC), "wb") as f:
                     f.write(tail)
                 os.replace(tmp, run.log_path)
-                run.log_fh = open(run.log_path, "ab")
+                run.log_fh = os.fdopen(private_fd(run.log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND), "ab")
                 run.log_size = len(tail)
         except OSError:
             pass
