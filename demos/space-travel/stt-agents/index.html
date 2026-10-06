@@ -514,7 +514,7 @@ const STATE = {
   done:['s-done','Terminé'], error:['s-perm','Erreur'],
   review:['s-wait','PR ouverte'], pushed:['s-run','Branche poussée'], delivered:['s-done','Livré'], closed:['s-idle','Fermée'], stale:['s-idle','Inactive']
 };
-const GROUP = s => ['running','tool','thinking','pushed'].includes(s) ? 'run' : ['waiting','permission'].includes(s) ? 'you' : s === 'review' ? 'review' : s === 'delivered' ? 'done' : 'idle';
+const GROUP = s => ['running','tool','thinking','pushed'].includes(s) ? 'run' : ['waiting','permission'].includes(s) ? 'you' : s === 'review' ? 'review' : ['delivered', 'done'].includes(s) ? 'done' : 'idle';
 const store = { get(k, d){ try { const v = localStorage.getItem('stt-agents:' + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
                 set(k, v){ try { localStorage.setItem('stt-agents:' + k, JSON.stringify(v)); } catch {} } };
 
@@ -571,9 +571,19 @@ let S = null, mode = null, filter = store.get('filter', 'all'), view = store.get
 const openDetails = new Set();
 let lastTopFeed = null, lastFeedKeys = new Set(), prevNeedYou = new Set(), firstRender = true;
 
+// Une session lancée par le serveur dont le processus est fini n'attend plus rien : « Terminé » / « Arrêté » / « Échec » au lieu de « T'attend »
+// (son dernier message est du texte, ce que la lecture du transcript prend pour une attente).
+function withRunStates(list){
+  const runs = (S.runner && S.runner.enabled && S.runner.runs) || [];
+  const lab = { done: ['done', 'Terminé · lancé par le serveur'], stopped: ['done', 'Arrêté · lancé par le serveur'], failed: ['error', 'Échec · lancé par le serveur'], killed: ['error', 'Tué · lancé par le serveur'] };
+  const m = new Map(runs.filter(r => lab[r.state] && r.session).map(r => [r.session, r]));
+  if (!m.size) return list;
+  return list.map(a => { const r = m.get(a.id); if (!r || !['waiting', 'permission', 'thinking', 'idle'].includes(a.state)) return a;
+    const [st, label] = lab[r.state]; return Object.assign({}, a, { state: st, state_label: label + (r.state === 'failed' && r.exit != null ? ' (code ' + r.exit + ')' : '') }); });
+}
 function agentsView(){
   if (!S) return [];
-  if (S.mode !== 'github') return S.agents || [];
+  if (S.mode !== 'github') return withRunStates(S.agents || []);
   // mode GitHub : une « carte » par branche d'agent récente
   const day = Date.now() - 24 * 3600e3;
   return deriveBranches(S.github).filter(b => b.state === 'review' || b.state === 'pushed' || (b.state === 'delivered' && ms(b.pr.merged_at) > day))
