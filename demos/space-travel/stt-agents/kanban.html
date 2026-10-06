@@ -146,6 +146,11 @@ label{font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center}
 .dmod b{position:absolute;top:-5px;right:-7px;min-width:15px;height:15px;padding:0 3px;background:var(--amber);color:var(--bg);font:700 10px/15px var(--mono);text-align:center}
 .card.folded .body{display:none}
 .col>header .hc{display:inline-flex;align-items:center;gap:8px}
+.so{display:inline-flex;gap:2px}
+.so button{width:22px;height:20px;padding:0;display:inline-flex;align-items:center;justify-content:center;color:var(--muted);background:none;border:1px solid var(--line);cursor:pointer}
+.so button:hover{color:var(--ink);border-color:var(--muted-2)}
+.so button[aria-pressed=true]{color:var(--amber);border-color:var(--amber)}
+.so svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .cf{padding:2px 8px;font-size:10px;text-transform:none;letter-spacing:0;color:var(--muted)}
 .card.folded h3{margin-bottom:0}
 /* Titre = prompt exécuté : lien vers le document (aperçu) ; sans prompt, titre simple et tiret discret */
@@ -545,6 +550,11 @@ html.embed-board #topbar>.meta span{display:none}
   }
   const sum = (arr) => arr.reduce((s, t) => s + used(t), 0);
   const view = { lot:'all', agent:'all' };
+  // Colonne « Fait » : ordre d'affichage choisi par les icônes ▲ ▼ de son en-tête (sur la date de mise à jour de la tâche), mémorisé
+  let doneSort = 'desc';
+  try { const v = localStorage.getItem('kanbanDoneSort'); if(v === 'asc' || v === 'desc' || v === 'plan') doneSort = v; } catch(e){}
+  const SORT_ICON = { asc:'<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 10V2M2.5 5.5 6 2l3.5 3.5"/></svg>', desc:'<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 2v8M2.5 6.5 6 10l3.5-3.5"/></svg>' };
+  const sortDone = (list, all) => doneSort === 'plan' ? list : list.slice().sort((a, b) => { const k = String(a.updated || '').localeCompare(String(b.updated || '')) || (all.indexOf(a) - all.indexOf(b)); return doneSort === 'asc' ? k : -k; });
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const num = (n) => (typeof n === 'number' && isFinite(n)) ? n : 0;
@@ -712,8 +722,10 @@ html.embed-board #topbar>.meta span{display:none}
     const shown = tasks.filter(t => (view.lot === 'all' || t.lot === view.lot) && matchAgent(t, view.agent));
     const fl2 = document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('list') ? document.activeElement.closest('.col').dataset.s : null;
     $('board').innerHTML = COLS.map(([s, label]) => {
-      const list = shown.filter(t => t.status === s);
-      return '<div class="col" data-s="' + s + '"><header><span>' + label + '</span><span class="hc">' + (list.length ? '<button class="cf" data-colfold="' + s + '"></button>' : '') + '<span>' + list.length + '</span></span></header><div class="list" tabindex="0" role="region" aria-label="Tâches : ' + label + '">' +
+      let list = shown.filter(t => t.status === s);
+      if(s === 'done') list = sortDone(list, tasks);
+      const so = s === 'done' && list.length > 1 ? '<span class="so" role="group" aria-label="Ordre d\'affichage des tâches faites">' + ['asc', 'desc'].map(d => '<button type="button" data-sort="' + d + '" aria-pressed="' + (doneSort === d) + '" title="' + (d === 'asc' ? 'Plus anciennes d’abord' : 'Plus récentes d’abord') + (doneSort === d ? ' (cliquer pour revenir à l’ordre du plan)' : '') + '" aria-label="' + (d === 'asc' ? 'Trier : plus anciennes d’abord' : 'Trier : plus récentes d’abord') + '">' + SORT_ICON[d] + '</button>').join('') + '</span>' : '';
+      return '<div class="col" data-s="' + s + '"><header><span>' + label + '</span><span class="hc">' + so + (list.length ? '<button class="cf" data-colfold="' + s + '"></button>' : '') + '<span>' + list.length + '</span></span></header><div class="list" tabindex="0" role="region" aria-label="Tâches : ' + label + '">' +
         (list.length ? list.map(card).join('') : '<div class="empty">—</div>') + '</div></div>';
     }).join('');
     const profs = profiles(tasks), pu = (p) => sum(p.tasks), maxA = Math.max(1, ...profs.map(pu));
@@ -1014,6 +1026,9 @@ html.embed-board #topbar>.meta span{display:none}
       open[id] = o; saveOpen(); card.classList.toggle('folded', !o);
       g.setAttribute('aria-expanded', o); g.textContent = o ? '▾' : '▸';
       g.setAttribute('aria-label', (o ? 'Replier' : 'Déplier') + ' la tâche ' + id); syncFold(); return; }
+    const so = e.target.closest('[data-sort]');
+    if(so){ doneSort = doneSort === so.dataset.sort ? 'plan' : so.dataset.sort; try { localStorage.setItem('kanbanDoneSort', doneSort); } catch(err){}
+      render(); const nb = document.querySelector('[data-sort="' + so.dataset.sort + '"]'); if(nb) nb.focus(); return; }
     const cf = e.target.closest('[data-colfold]');
     if(cf){ const col = cf.closest('.col'), cards = Array.from(col.querySelectorAll('.card')), expand = cards.every(c => c.classList.contains('folded'));
       cards.forEach(c => { const b = c.querySelector('[data-toggle]'); if(b) open[b.dataset.toggle] = expand; });
