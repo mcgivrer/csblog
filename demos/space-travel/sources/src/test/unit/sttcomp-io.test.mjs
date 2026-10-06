@@ -51,6 +51,18 @@ test('core.toExport branché sur gameExport', () => {
   assert.equal(r.data.format, 'stt-composition'); assert.deepEqual(r.data.stats, a.stats);
   assert.equal(r.data.game.class, 'ship');
 });
+test('gameExport : opts.companies conserve les marques perso, sans opts inchangé', () => {
+  const c = K.importObject(compos.find(([f]) => /meridian/.test(f))[1])[0];
+  const a = K.analyze(c);
+  const base = K.gameExport(c, a).data;
+  assert.deepEqual(K.gameExport(c, a, undefined).data, base);
+  assert.deepEqual(base, Object.assign(K.toExport(c, { stats: a.stats }), { game: base.game }));
+  const d = { name: 'Zed', mark: 'ZED', tagline: 'Z', registry: 'ZED-1', livery_hex: '#112233', emblem: 'chevrons' };
+  c.company = 'ZED';
+  const r = K.gameExport(c, a, { companies: { ZED: d } }).data;
+  assert.deepEqual(Object.keys(r.companies), ['ZED']);
+  assert.deepEqual(r.stats, a.stats);
+});
 
 const F = JSON.parse(fs.readFileSync(FLEET_EDITOR, 'utf8'));
 test('flotte : vaisseaux au format fleet.json', () => {

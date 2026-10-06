@@ -328,6 +328,7 @@ Les règles d'assemblage de l'éditeur (repères, ports, graphe de pièces, ajou
 - `geom` est construit **depuis les prototypes three** par `geomFromProtos()` (sockets, masses, boîtes `hull` / `full`, hublot d'éjection) : l'éditeur ne lit pas `modules-geom.json`, il reste autonome et identique hors ligne.
 - La composition `comp` est passée explicitement au noyau ; `toast`, `commit`, la sélection, le cadrage, le rendu, l'historique et le glisser-déposer restent dans l'éditeur.
 - Le noyau rend des **codes** (`jet_hit`, `overlap`…) ; la table `ISSUE_FR` de l'éditeur les traduit en français (textes inchangés).
+- **Précision** : la géométrie du jeu (JSON arrondi à 6 décimales) et celle de l'éditeur (`geomFromProtos`, pleine précision) peuvent différer jusqu'à 1e-5 m.
 - **Service** : comme l'éditeur charge `../../shared/sttcomp.js`, il se sert désormais depuis la racine `demos/space-travel/` (`python3 -m http.server` dans ce dossier, page `/STT_modules/sources/index.html`). Ouvert depuis `STT_modules/sources/` seul, le script du noyau est introuvable. L'éditeur autonome produit par `build_viewer_standalone.py` (hors dépôt) n'est pas modifié : son intégration du noyau est reportée.
 - **Sonde de non-régression** : `?probe` expose `window.__sttProbe` (enveloppes, `geomFromProtos`) ; `python3 STT_modules/tests/editor_probe.py --check` compare l'éditeur au golden `sources/src/test/unit/fixtures/sttcomp-golden.json` (exports et codes / messages à l'identique, matrices et stats à 1e-6 près) ; sans `?probe`, `__sttProbe` est indéfini.
 
