@@ -4573,6 +4573,38 @@ window.__stt = {
   rec: () => ({ mode: recMode(), dur: RS.recDur, cycle: +cycleSec().toFixed(2), on: !!rec, cine: cine.on, label: $('#t-rec').textContent, badge: $('#rec-t').textContent, bar: $('#rec-bar').style.width }),
 };
 
+// ------------------------------------------------------------------ sonde de non-régression (?probe) : sans effet hors de cette option
+if (new URLSearchParams(location.search).has('probe')) {
+  // geom au format de modules-geom.json, construit depuis les prototypes three (L2a.3 : sonde ; câblage éditeur en L2a.6)
+  const geomFromProtos = () => {
+    const r6 = (b) => [b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z].map((v) => +v.toFixed(6));
+    const m16 = (m) => m.elements.map((v) => +v.toFixed(6));
+    const modules = {};
+    for (const key of Object.keys(protos).sort()) {
+      const root = protos[key], sockets = {}, containers = [];
+      for (const port of portsOf(key)) sockets[port] = m16(relMatrix(root, root.getObjectByName(`SOCKET_${key}_${port}`)));
+      const cs = [];
+      root.traverse((o) => { if (/^SOCKET_(CRG6_)?CONTAINER_/.test(o.name)) cs.push(o); });
+      cs.sort((a, b) => a.name.localeCompare(b.name));
+      for (const o of cs) containers.push({ slot: o.name.replace(/^SOCKET_(CRG6_)?CONTAINER_/, ''), m: m16(relMatrix(root, o)) });
+      const m = { mass_t: massOf(key), length_m: lenOf(key), ports: portsOf(key), sockets, containers, hull: r6(hullBox(key)), full: r6(fullBox(key)) };
+      const ex = root.getObjectByName('VFX_PROP_MAIN_EXHAUST');
+      if (ex) m.exhaust = m16(relMatrix(root, ex));
+      modules[key] = m;
+    }
+    return { format: 'stt-modules-geom', version: 1, axes: 'gltf', units: 'm', modules, container: { hull: r6(hullBox('__CONTAINER__')) } };
+  };
+  // analyze/computeWorld/freePortsList lisent la composition globale : on la permute le temps de l'appel
+  const withComp = (c, fn) => {
+    const sc = comp, sw = edWorld;
+    try { comp = c; edWorld = computeWorld(c); return fn(c, edWorld); } finally { comp = sc; edWorld = sw; }
+  };
+  window.__sttProbe = {
+    importObject, toExport, analyze, freePortsList, computeWorld, geomFromProtos, containerMats, portsOf, withComp,
+    get fleet() { return fleet; },
+  };
+}
+
 // ------------------------------------------------------------------ boot
 (async () => {
   try {
