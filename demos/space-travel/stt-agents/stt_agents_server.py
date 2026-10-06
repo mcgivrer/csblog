@@ -1575,6 +1575,10 @@ class TaskService:
         self._validator = stt_runner.Runner(self.state_dir, self.root)  # simple jeu de règles, aucun effet de bord
         self._create_lock = threading.Lock()
 
+    def prompt_phrase(self, task):
+        """Phrase passée à l'agent : chemin ABSOLU du prompt (checkout principal), calculé ici, jamais fourni par le client."""
+        return f"Exécute la tâche {task} : lis {os.path.abspath(os.path.join(self.prompts_dir, task + '.md'))}"
+
     def create_task(self, body):
         if not isinstance(body, dict):
             raise HttpError(400, "objet JSON attendu")
@@ -1655,7 +1659,7 @@ class TaskService:
         self.hub.notices.kanban_changes(out.get("changes"))
         if autostart:
             try:
-                self.runner.enqueue(tid, agent, model, perm, prio, wt, lot, None, budget)
+                self.runner.enqueue(tid, agent, model, perm, prio, wt, lot, self.prompt_phrase(tid), budget)
             except stt_runner.RunnerError as exc:
                 raise HttpError(409, f"tâche {tid} créée mais non mise en file : {exc}")
         return {"ok": True, "id": tid, "budget": budget, "prompt": rel}
@@ -1856,7 +1860,7 @@ class RunnerGlue(TaskService):
                         raise HttpError(400, "agent non lançable : " + str(row.get("agent")))
                     r.enqueue(task, row.get("agent"), row.get("model") or "sonnet", row.get("perm") or "acceptEdits",
                               prio if prio is not None else row.get("prio", 2), row.get("worktree") or None, row.get("lot"),
-                              None, row.get("budget") or row.get("est0"))
+                              self.prompt_phrase(task), row.get("budget") or row.get("est0"))
             except KanbanError as exc:
                 raise HttpError(400, str(exc))
         else:

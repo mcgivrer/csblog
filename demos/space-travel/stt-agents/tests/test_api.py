@@ -60,6 +60,7 @@ pd, task, fake = sys.argv[1], sys.argv[2], sys.argv[3]
 args = sys.argv[4:]
 prompt = ""
 if args and args[-1].startswith("Ex"):
+    open(os.path.join(pd, task + ".argv"), "w", encoding="utf-8").write(args[-1])
     args = args[:-1]
     try:
         prompt = open(os.path.join(pd, task + ".md"), encoding="utf-8").read()
@@ -410,6 +411,21 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(s.plan_row(tid)['runner'], 'auto')
         # agent cp : jamais lance
         self.assertEqual(s.call('POST', '/api/runner/T9.P/enqueue', {})[0], 400)
+
+    def test_prompt_chemin_absolu(self):
+        s = self.s
+        tid = s.create('SLEEP 0', autostart=True)
+        s.wait_state(tid, 'running')
+        argv = Path(s.prompts, tid + '.argv').read_text(encoding='utf-8')
+        expected = os.path.abspath(os.path.join(s.prompts, tid + '.md'))
+        self.assertIn(expected, argv)
+        self.assertTrue(os.path.isabs(expected) and os.path.isfile(expected))
+        # enqueue d'une tâche existante : même garantie
+        t2 = s.create('SLEEP 0', autostart=False)
+        s.call('POST', f'/api/runner/{t2}/enqueue', {})
+        s.wait_state(t2, 'running')
+        self.assertIn(os.path.abspath(os.path.join(s.prompts, t2 + '.md')),
+                      Path(s.prompts, t2 + '.argv').read_text(encoding='utf-8'))
 
     # -- terminal ---------------------------------------------------------------------
     def test_tty_flux_rejeu_et_echo(self):
