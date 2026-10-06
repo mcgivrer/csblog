@@ -1391,8 +1391,12 @@ def _apply_op(lines, op, now, log):
         n = op.get("n")
         if not isinstance(n, int) or not op.get("subject"):
             raise KanbanError("decision : n (entier) et subject obligatoires")
+        row = {"n": n, "subject": op["subject"], "status": op.get("status", "à valider")}
+        for k in ("ref", "reft"):   # ref : « chemin#ancre » relatif à demos/space-travel/ ; reft : libellé court du lien
+            if op.get(k):
+                row[k] = op[k]
         _with_comma(lines, b - 1)
-        lines.insert(b, _render_row({"n": n, "subject": op["subject"], "status": op.get("status", "à valider")}))
+        lines.insert(b, _render_row(row))
         log.append({"op": "decision", "n": n})
     elif kind == "journal":
         if not op.get("text"):

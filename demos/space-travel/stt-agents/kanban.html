@@ -84,6 +84,14 @@ section{margin:26px 0}
 .small{font-size:12px;color:var(--muted)}
 .lots{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}
 .lot{border:1px solid var(--line);background:var(--panel);padding:10px;cursor:pointer;text-align:left;color:var(--ink)}
+/* liste des lots compacte, fixée avec la barre haute */
+.topbar .lots{order:10;flex:1 0 100%;gap:4px;grid-template-columns:repeat(auto-fill,minmax(98px,1fr))}
+.topbar .lot{padding:3px 6px 4px;min-width:0;overflow:hidden}
+.topbar .lot .t{font:700 10.5px/1.25 var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .lot .s{font:9px/1.25 var(--mono);margin:0 0 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .lot .s:last-child{margin:2px 0 0}
+.topbar .lot .bar{height:4px}
+
 .lot[aria-pressed=true]{border-color:var(--amber);box-shadow:inset 0 0 0 1px var(--amber)}
 .lot .t{font:700 13px var(--mono)} .lot .s{font:11px var(--mono);color:var(--muted-2);margin:2px 0 6px}
 .filters{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
@@ -396,6 +404,7 @@ html.embed-board #topbar>.meta span{display:none}
       <button id="foldAll" title="Tout déplier / tout replier toutes les tâches (toutes colonnes)">Tout replier</button>
       <button id="reload" type="button"><span>Actualiser</span><i class="pg" aria-hidden="true"></i></button>
     </div>
+    <div class="lots v-board" id="lots" role="group" aria-label="Lots : filtre du tableau"></div>
   </div>
   <script>if(document.documentElement.classList.contains('embed-board')){var m=document.getElementById('meta');if(m)document.getElementById('topbar').appendChild(m)}</script>
 
@@ -424,10 +433,6 @@ html.embed-board #topbar>.meta span{display:none}
     <div class="panel calib" id="calib"></div>
   </section>
 
-  <section class="v-board" aria-labelledby="h-lots">
-    <h2 id="h-lots"><span class="n">01</span>Lots</h2>
-    <div class="lots" id="lots"></div>
-  </section>
 
   <section class="v-board" aria-labelledby="h-board">
     <h2 id="h-board"><span class="n">02</span>Tâches</h2>
@@ -644,7 +649,7 @@ html.embed-board #topbar>.meta span{display:none}
     tmBtns = Array.from(document.querySelectorAll('#tm .tmb')); layoutTm();
     $('lots').innerHTML = '<button class="lot" data-lot="all" aria-pressed="' + (view.lot === 'all') + '"><div class="t">Tous</div><div class="s">' + lots.length + ' lots</div>' + bar(totUsed, totBudget) + '</button>' +
       lots.map(l => { const u = lotUsed[l.id] || 0, pct = l.budget ? Math.round(100*u/l.budget) : 0;
-        return '<button class="lot" data-lot="' + esc(l.id) + '" aria-pressed="' + (view.lot === l.id) + '" title="' + esc(l.title) + '"><div class="t">' + esc(l.id) + ' · ' + esc(l.title) + '</div>' +
+        return '<button class="lot" data-lot="' + esc(l.id) + '" aria-pressed="' + (view.lot === l.id) + '" title="' + esc(l.id + ' · ' + l.title + ' — ' + (LOT_ST[l.status] || l.status) + (l.version ? ' · ' + l.version : '')) + '"><div class="t">' + esc(l.id) + ' · ' + esc(l.title) + '</div>' +
           '<div class="s">' + esc(LOT_ST[l.status] || l.status) + ' · ' + esc(l.version || '') + '</div>' + bar(u, l.budget) +
           '<div class="s" style="margin:4px 0 0">' + tok(u) + ' / ' + tok(l.budget) + (pct > 100 ? ' · +' + (pct - 100) + ' %' : '') + '</div></button>'; }).slice(0).join('');
     [1, 2, 3].forEach(i => { const b = document.querySelector('[data-agent=dev' + i + ']'); if(b) b.hidden = !tasks.some(t => instOf(t) === i); });
@@ -663,8 +668,11 @@ html.embed-board #topbar>.meta span{display:none}
       (totUsed ? ' · ' + Math.round(100*u/totUsed) + ' %' : '') + '</span></div>' + bar(u, mx, c) + '</div>';
     $('agents').innerHTML = profs.map(p => prow(p.label, p.cls, pu(p), maxA, p.k === 'cp' ? 'cy' : '')).join('') +
       '<div class="small">Modèles : ' + esc((P.models && [P.models.cp, P.models.archi, P.models.dev, P.models.revue || (profs.some(p => p.k === 'revue') ? 'REVUE Haiku' : '')].filter(Boolean).join(' · ')) || 'CP Sonnet · ARCHI Opus · DEV Sonnet') + '</div>';
-    $('decisions').innerHTML = '<tr><th>#</th><th>Sujet</th><th>Statut</th></tr>' + (P.decisions || []).map(d =>
-      '<tr><td class="mono">' + esc(d.n) + '</td><td>' + esc(d.subject) + '</td><td class="st ' + (/valid|retenu|ok/i.test(d.status) && !/à valider/i.test(d.status) ? 'ok' : 'wait') + '">' + esc(d.status) + '</td></tr>').join('');
+    // Référence : document (et section) qui a posé la question ; d.ref = « chemin#ancre » relatif à demos/space-travel/, d.reft = libellé court
+    const dref = d => { if(!d.ref) return '<span class="small">—</span>'; const f = String(d.ref).split('#')[0];
+      return '<a class="dref" href="' + esc(docHref(f) + (String(d.ref).split('#')[1] ? '#' + String(d.ref).split('#')[1] : '')) + '" data-pv="' + esc(d.ref) + '" data-ptitle="' + esc('Décision ' + d.n + ' — ' + (d.reft || f)) + '" target="_blank" rel="noopener">' + esc(d.reft || f.split('/').pop()) + '</a>'; };
+    $('decisions').innerHTML = '<tr><th>#</th><th>Sujet</th><th>Référence</th><th>Statut</th></tr>' + (P.decisions || []).map(d =>
+      '<tr><td class="mono">' + esc(d.n) + '</td><td>' + esc(d.subject) + '</td><td>' + dref(d) + '</td><td class="st ' + (/valid|retenu|ok/i.test(d.status) && !/à valider/i.test(d.status) ? 'ok' : 'wait') + '">' + esc(d.status) + '</td></tr>').join('');
     renderInd(tasks, lots, profs, totUsed);
     syncFold(); fitCols(); restoreCols();
     if(fl2){ const n = document.querySelector('#board .col[data-s="' + fl2 + '"] .list'); if(n) n.focus({ preventScroll:true }); }
@@ -1140,7 +1148,8 @@ html.embed-board #topbar>.meta span{display:none}
   }
   function fixHref(e){   // survol / focus : le href pointe sur l'URL réellement résolue (Ctrl/Cmd/clic milieu)
     const a = e.target && e.target.closest && e.target.closest('a[data-pv]'); if(!a) return;
-    resolveDoc(a.dataset.pv).then(r => { if(r.url && a.isConnected && a.href !== r.url) a.href = r.url; });
+    const h = a.dataset.pv.split('#');
+    resolveDoc(h[0]).then(r => { if(r.url && a.isConnected && a.href !== r.url + (h[1] ? '#' + h[1] : '')) a.href = r.url + (h[1] ? '#' + h[1] : ''); });
   }
   document.addEventListener('pointerover', fixHref); document.addEventListener('focusin', fixHref);
   function pv404(host, urls, detail){
@@ -1184,7 +1193,8 @@ html.embed-board #topbar>.meta span{display:none}
     const d = pvBuild(); pv.opener = a;
     pv.stack = []; pv.ttl = a.dataset.ptitle || '';
     if(!d.open){ pv.prevOv = document.documentElement.style.overflow; document.documentElement.style.overflow = 'hidden'; d.showModal(); }
-    pvGo(null, '', pv.ttl, a.dataset.pv);
+    const dv = a.dataset.pv.split('#');
+    pvGo(null, dv[1] || '', pv.ttl, dv[0]);
   }
   function pvGo(url, hash, ttl, f){
     const cur = pv.stack[pv.stack.length - 1];
