@@ -185,7 +185,9 @@
   .tabs button:hover{color:var(--ink)}
   .tabs button[aria-selected="true"]{color:var(--amber);border-color:var(--line);background:var(--panel)}
   #tab-kanban[hidden],#tab-agents[hidden]{display:none}
-  #kanbanFrame{display:block;width:100%;min-height:480px;border:1px solid var(--line);background:var(--panel)}
+  #kanbanSlot{position:relative;height:480px;border:1px solid var(--line);background:var(--panel)}
+  #kanbanFrame{position:absolute;left:0;top:0;width:100%;height:100%;border:0;background:transparent;color-scheme:normal}
+  #kanbanFrame.full,#kanbanKpis.full{position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:2000;clip-path:none}
   #kanbanMsg{padding:24px;border:1px solid var(--line);background:var(--panel);color:var(--muted)}
   /* ---------- en-tête compact : marque | indicateurs du Kanban | commandes ; puis onglets + liens + état ---------- */
   .wrap{max-width:1760px;padding:14px 20px 48px}
@@ -194,8 +196,11 @@
   .head-brand{flex:none}
   .site-brand{font-size:18px}
   .site-sub{margin-top:2px;font-size:11px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .head-kpis{flex:1;min-width:0}
-  #kanbanKpis{display:block;width:100%;height:92px;border:0;background:transparent;color-scheme:normal}
+  /* le cadre des indicateurs est plus haut que sa fenêtre visible (rognée par clip-path) : infobulles et dialogues ne sont plus coupés ;
+     il se dévoile (classe ov) quand le Kanban le demande (survol des tuiles, dialogue ouvert) */
+  .head-kpis{position:relative;flex:1;min-width:0;height:87px;z-index:50}
+  #kanbanKpis{position:absolute;left:0;top:0;width:100%;height:calc(100% + 780px);border:0;background:transparent;color-scheme:normal;clip-path:inset(0 0 780px 0)}
+  #kanbanKpis.ov{clip-path:none}
   .head-ctl{flex:none;display:flex;align-items:center;gap:6px}
   .themesw{display:inline-flex}
   .themesw button{font:11.5px 'JetBrains Mono',monospace;padding:5px 9px;color:var(--muted);background:none;border:1px solid var(--line);cursor:pointer}
@@ -402,7 +407,7 @@
 
   <div id="tab-kanban" role="tabpanel" aria-labelledby="tabBtnKanban" hidden>
     <div id="kanbanMsg" hidden></div>
-    <iframe id="kanbanFrame" title="Kanban des lots" hidden></iframe>
+    <div id="kanbanSlot"><iframe id="kanbanFrame" title="Kanban des lots" scrolling="no" hidden></iframe></div>
   </div>
 
   <footer class="site-footer">
@@ -521,6 +526,7 @@ function renderHeader(){
   $('#srcLine').textContent = [S.generated_at ? 'instantané ' + hhmm(S.generated_at, true) : '', rate ? `quota github ${rate.remaining}/${rate.limit}` : ''].filter(Boolean).join(' · ');
   const r = S.repo || {};
   $('#repoLine').textContent = `${r.github || REPO} · ${r.path ? r.path.replace(/\\/g, '/').split('/').slice(-3).join('/') : 'demos/space-travel'} · branche principale ${r.main || MAIN}`;
+  $('#repoLine').title = `${r.github || REPO} · ${r.path || 'demos/space-travel'} · branche principale ${r.main || MAIN}`;
 }
 
 function renderKpis(agents){
@@ -999,7 +1005,7 @@ boot();
   const put = v => { try { localStorage.setItem('stt-agents:tab', v); } catch {} };
   const AGENT_HASHES = ['agents', 'timeline', 'feed', 'delivery', 'worktrees'];
   let started = false;
-  function fit(){ if (!panel.kanban.hidden) frame.style.height = Math.max(480, innerHeight - frame.getBoundingClientRect().top - 12) + 'px'; }
+  function fit(){ if (window.sttSyncKanbanScroll) window.sttSyncKanbanScroll(); }
   async function startKanban(){
     if (started) return; started = true;
     try {
@@ -1054,10 +1060,34 @@ boot();
   }
   document.querySelectorAll('.themesw [data-theme-set]').forEach(b => b.addEventListener('click', () => setTheme(b.dataset.themeSet)));
   setTheme(read());
+  // protocole des cadres intégrés (voir kanban.html) : hauteur, plein écran temporaire, défilement de la barre haute
+  const slotK = document.querySelector('.head-kpis'), slotB = document.getElementById('kanbanSlot'), board = document.getElementById('kanbanFrame');
+  const origin = location.origin;
   addEventListener('message', e => {
-    if (e.origin !== location.origin || !e.data || e.data.type !== 'stt-kanban-kpis-height') return;
-    kpi.style.height = Math.max(60, Math.min(260, e.data.h + 2)) + 'px';
+    const d = e.origin === origin && e.data; if (!d) return;
+    if (d.type === 'stt-embed-height') {
+      if (d.embed === 'kpis') slotK.style.height = Math.max(60, Math.min(260, d.h + 2)) + 'px';
+      else { slotB.style.height = Math.max(320, d.h) + 'px'; syncScroll(); }
+    } else if (d.type === 'stt-embed-overlay') {
+      const kp = d.embed === 'kpis', frm = kp ? kpi : board, slot = kp ? slotK : slotB;
+      if (kp) kpi.classList.toggle('ov', !!d.on);               // indicateurs : cadre dévoilé (infobulles) tant que le pointeur est dessus
+      const full = !!(d.on && (d.full || !kp));                  // dialogue ouvert (ou tableau) : plein écran, contenu laissé à sa place
+      if (full && !frm.classList.contains('full')) { const r = slot.getBoundingClientRect(); frm.contentWindow.postMessage({ type: 'stt-embed-slot', x: r.left, y: r.top, w: r.width }, origin); frm.classList.add('full'); }
+      else if (!full && frm.classList.contains('full')) { frm.classList.remove('full'); frm.contentWindow.postMessage({ type: 'stt-embed-slot-off' }, origin); }
+    }
   });
+  // la barre haute du Kanban (cadre sans défilement interne) reste visible sous le ticker pendant le défilement de la page
+  let lastSy = -1, raf = 0;
+  function syncScroll(){
+    if (document.getElementById('tab-kanban').hidden || board.classList.contains('full') || !board.contentWindow) return;
+    const r = slotB.getBoundingClientRect(), tk = document.querySelector('.ticker'), top = tk ? tk.offsetHeight : 0;
+    const y = Math.round(Math.max(0, Math.min(top - r.top, r.height - 70))), key = y + ':' + innerHeight;
+    if (key !== lastSy) { lastSy = key; board.contentWindow.postMessage({ type: 'stt-embed-scroll', y, vh: innerHeight }, origin); }
+  }
+  window.sttSyncKanbanScroll = syncScroll;
+  const onScroll = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; syncScroll(); }); };
+  addEventListener('scroll', onScroll, { passive: true }); addEventListener('resize', onScroll);
+  board.addEventListener('load', () => { lastSy = -1; syncScroll(); });
   // les indicateurs ne s'affichent que si le serveur local sert le Kanban
   fetch('kanban/plan-status.js', { method: 'HEAD', cache: 'no-store' }).then(r => {
     if (!r.ok) throw 0;

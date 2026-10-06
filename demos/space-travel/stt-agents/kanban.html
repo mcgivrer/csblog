@@ -345,6 +345,12 @@ html.embed-kpis .kpi{padding:4px 8px 5px;gap:2px}
 html.embed-kpis .kpi .kc{display:none}
 html.embed-kpis .tm{height:54px!important;min-height:0}
 html.embed-board #kpis{display:none}
+html.embed,html.embed body{overflow:hidden}
+/* cadre du tableau : hauteur = contenu (pas d'ascenseur interne) ; la barre haute suit le défilement de la page hôte (--sy) ;
+   un dialogue ouvert fait passer le cadre en plein écran (classe ov) : le contenu reste à sa place grâce à --ox/--oy/--ow */
+html.embed-board .col{height:var(--colh,680px)}
+html.embed-board .topbar{position:relative;top:0;transform:translateY(var(--sy,0px))}
+html.ov .wrap{position:absolute;left:var(--ox,0);top:var(--oy,0);width:var(--ow,100%);margin:0}
 html.embed-board .site-header{display:none}
 html.embed-board #topbar>.meta{margin-left:auto;order:9;flex:0 0 auto;font-size:11px;white-space:nowrap}
 html.embed-board #topbar>.meta span{display:none}
@@ -681,7 +687,7 @@ html.embed-board #topbar>.meta span{display:none}
       need = Math.max(need, hs.reduce((x, y) => x + y, 0) + (hs.length - 1) * (parseFloat(st.rowGap) || 10) + parseFloat(st.paddingTop) + parseFloat(st.paddingBottom) + 4);
     });
     const hh = Math.max.apply(null, Array.from(b.querySelectorAll('.col>header')).map(h => h.offsetHeight).concat([0]));
-    b.style.setProperty('--colh', Math.ceil(Math.max(need, 0.6 * window.innerHeight) + hh + 2) + 'px');
+    b.style.setProperty('--colh', Math.ceil(Math.max(need, 0.6 * (window.hostVH || window.innerHeight)) + hh + 2) + 'px');
   }
   function restoreCols(){
     const b = $('board'); if(!b || !b.offsetParent) return;
@@ -1017,9 +1023,36 @@ html.embed-board #topbar>.meta span{display:none}
   syncThemeBtns();
   // intégré dans stt-agents/index.html : la page hôte pilote le thème et reçoit la hauteur des indicateurs
   addEventListener('message', e => { if(e.origin === location.origin && e.data && e.data.type === 'stt-theme' && e.data.theme !== themeNow()) setTheme(e.data.theme); });
-  if(window.parent !== window && document.documentElement.classList.contains('embed-kpis')){
-    const send = () => { const k = document.getElementById('kpis'); if(k) parent.postMessage({ type:'stt-kanban-kpis-height', h:Math.ceil(k.getBoundingClientRect().height) }, location.origin); };
-    new ResizeObserver(send).observe(document.documentElement); addEventListener('load', send); setTimeout(send, 600);
+  const EMB = document.documentElement.classList.contains('embed-kpis') ? 'kpis' : document.documentElement.classList.contains('embed-board') ? 'board' : '';
+  if(window.parent !== window && EMB){
+    const root = document.documentElement, wrap = document.querySelector('.wrap');
+    const post = o => parent.postMessage(Object.assign({ embed:EMB }, o), location.origin);
+    let lastH = -1, ovOn = false, fullOn = false, inKpis = false, leaveT = 0;
+    const sendH = () => {
+      const h = EMB === 'kpis' ? Math.ceil(document.getElementById('kpis').getBoundingClientRect().height) : Math.ceil(wrap.getBoundingClientRect().height) + 4;
+      if(h !== lastH){ lastH = h; post({ type:'stt-embed-height', h:h }); }
+    };
+    const dialogOpen = () => [...document.querySelectorAll('dialog')].some(d => d.open);
+    // plein écran demandé : un dialogue ouvert, ou (indicateurs) le pointeur sur les tuiles (infobulles qui dépassent du cadre)
+    const syncOv = () => { const full = dialogOpen(), want = full || (EMB === 'kpis' && inKpis); if(want !== ovOn || full !== fullOn){ ovOn = want; fullOn = full; post({ type:'stt-embed-overlay', on:want, full:full }); } };
+    new ResizeObserver(sendH).observe(EMB === 'kpis' ? document.getElementById('kpis') : wrap);
+    addEventListener('load', sendH); setTimeout(sendH, 600); setInterval(sendH, 1500);
+    new MutationObserver(syncOv).observe(document.body, { subtree:true, attributes:true, attributeFilter:['open'] });
+    document.addEventListener('close', syncOv, true);
+    if(EMB === 'kpis'){
+      const k = document.getElementById('kpis');
+      k.addEventListener('pointerenter', () => { clearTimeout(leaveT); inKpis = true; syncOv(); });
+      k.addEventListener('pointerleave', () => { clearTimeout(leaveT); leaveT = setTimeout(() => { inKpis = k.matches(':hover'); syncOv(); }, 220); });
+    }
+    addEventListener('message', e => {
+      const d = e.origin === location.origin && e.data; if(!d) return;
+      if(d.type === 'stt-embed-slot'){ root.style.setProperty('--ox', d.x + 'px'); root.style.setProperty('--oy', d.y + 'px'); root.style.setProperty('--ow', d.w + 'px'); root.classList.add('ov'); }
+      else if(d.type === 'stt-embed-slot-off') root.classList.remove('ov');
+      else if(d.type === 'stt-embed-scroll'){
+        root.style.setProperty('--sy', d.y + 'px');
+        if(d.vh && d.vh !== window.hostVH){ window.hostVH = d.vh; if(typeof fitCols === 'function') fitCols(); }   // hauteur réelle de la fenêtre de la page (celle du cadre = son contenu)
+      }
+    });
   }
   $('reload').addEventListener('click', reload);
   setInterval(function(){ if($('auto').checked) reload(); }, 30000);
