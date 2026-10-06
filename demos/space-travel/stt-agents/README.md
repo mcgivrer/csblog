@@ -27,7 +27,8 @@ Options utiles :
 | Option | Effet |
 |---|---|
 | `--repo CHEMIN` | Observer un autre clone (celui où les agents travaillent réellement). |
-| `--match MOTIF` | Ajouter des dossiers de `~/.claude/projects` dont le nom contient `MOTIF` (si les agents ont été lancés depuis un autre chemin). |
+| `--match MOTIF` | Ajouter des dossiers de `~/.claude/projects` dont le nom contient `MOTIF`. Par défaut, tout dossier contenant le nom du dépôt (`csblog`) et ceux des worktrees git (même hors du dépôt) sont déjà suivis. |
+| `--strict` | Ne suivre que le chemin exact du dépôt et de ses worktrees. |
 | `--claude-dir CHEMIN` | Dossier de configuration Claude Code (défaut `~/.claude`, ou `CLAUDE_CONFIG_DIR`). |
 | `--window 24` | Sessions prises en compte : actives dans les N dernières heures. |
 | `--port 8765` / `--host` | Port et interface d'écoute (127.0.0.1 par défaut). |
@@ -45,6 +46,20 @@ Options utiles :
 | **DÉMO** | aucune source joignable, ou `?demo` dans l'URL | Données **fictives**, signalées par un bandeau rouge. Sert d'aperçu. |
 
 Paramètres d'URL : `?repo=owner/nom` (autre dépôt GitHub), `?github=0` (pas d'appel GitHub), `?demo`.
+
+## Agents et sous-agents
+
+La section **01 · Agents & sous-agents** affiche par défaut un **arbre** : chaque session Claude Code (agent principal) suivie de **tous** ses sous-agents (PM, Architecte, Développeur, Explore…), en cours comme terminés, avec pour chacun son statut, son rôle, l'outil en cours ou son dernier message, sa durée, ses outils et tokens. Un clic sur une ligne déplie ses dernières actions, son dernier message, ses tâches et son identité (type, `agentId`, arrière-plan, modèle). Le bouton **Cartes** donne la vue détaillée par session. La chronologie a une piste par sous-agent.
+
+Formats de transcripts reconnus pour les sous-agents :
+
+| Format | Emplacement |
+|---|---|
+| Claude Code 2.1+ | `<projet>/<session>/subagents/agent-<id>.jsonl` |
+| Claude Code 2.0 | `<projet>/agent-<id>.jsonl` (rattaché à sa session par `sessionId`) |
+| Versions plus anciennes | lignes `isSidechain` dans le fichier de la session |
+
+Chaque appel `Task` / `Agent` est relié à son transcript par l'`agentId` renvoyé, puis par la consigne, puis par l'heure de lancement. Les sous-agents lancés **en arrière-plan** restent « en action » jusqu'à leur notification de fin ou leur rapport final.
 
 ## Comment les statuts sont déduits
 

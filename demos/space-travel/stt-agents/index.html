@@ -177,6 +177,53 @@
   .empty{border:1px dashed var(--line);padding:28px;text-align:center;color:var(--muted);font-size:14px;line-height:1.7}
   .empty b{color:var(--ink);font-family:'JetBrains Mono',monospace}
 
+  /* ---------- arbre agents / sous-agents ---------- */
+  .toolbar{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:-4px 0 14px}
+  .tree{border:1px solid var(--line);background:var(--panel)}
+  .tree details{border-bottom:1px solid #1a2844}
+  .tree details:last-child{border-bottom:none}
+  .tree summary{list-style:none;cursor:pointer}
+  .tree summary::-webkit-details-marker{display:none}
+  .node{display:grid;grid-template-columns:30px 132px 64px minmax(0,1.15fr) minmax(0,1.6fr) 112px 140px 96px;gap:10px;align-items:center;padding:9px 14px;min-height:46px}
+  .node:hover{background:rgba(94,234,212,.03)}
+  .node .g{font:13px 'JetBrains Mono',monospace;color:var(--muted-2);white-space:pre;padding-left:4px}
+  .node .role{justify-self:start}
+  .node .tm small{display:block;color:var(--muted-2);opacity:.8;margin-top:2px}
+  .node.main{background:var(--panel-2);border-left:3px solid var(--st-idle);padding-left:11px}
+  .node.main.s-run{border-left-color:var(--st-run)} .node.main.s-wait{border-left-color:var(--st-wait)} .node.main.s-perm{border-left-color:var(--st-perm)} .node.main.s-done{border-left-color:var(--st-done)}
+  .node .pill{justify-self:start;font-size:10px;padding:3px 7px}
+  .node .nm{min-width:0}
+  .node .nm b{display:block;font:700 13px 'JetBrains Mono',monospace;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .node.main .nm b{color:var(--cyan)}
+  .node .nm small{display:block;font:11px 'JetBrains Mono',monospace;color:var(--muted-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+  .node .act{min-width:0;font:12px 'JetBrains Mono',monospace;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .node .act b{color:var(--ink)} .node .act .arrow{color:var(--cyan)}
+  .node .act.txt{font:13px 'Inter',sans-serif;color:var(--muted)}
+  .node.s-wait .act.txt{color:var(--ink)}
+  .node .tm,.node .st{font:11px 'JetBrains Mono',monospace;color:var(--muted-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .node .st b{color:var(--muted);font-weight:500}
+  .node.sub.s-done,.node.sub.s-idle{opacity:.72}
+  .node.sub.s-done:hover,.node.sub.s-idle:hover{opacity:1}
+  .node svg{justify-self:end}
+  .detail{padding:4px 14px 14px 58px;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px;font-size:12.5px;color:var(--muted)}
+  .detail h4{margin:8px 0 6px;font:10.5px 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2);font-weight:400}
+  .detail ol{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+  .detail ol li{display:grid;grid-template-columns:62px minmax(0,1fr);gap:8px}
+  .detail ol li .t{font:11px 'JetBrains Mono',monospace;color:var(--cyan)}
+  .detail ol li span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .detail p{margin:0;line-height:1.6;color:var(--ink)}
+  .tree-note{padding:10px 14px;font:11.5px 'JetBrains Mono',monospace;color:var(--muted-2)}
+  @media (max-width:980px){
+    .node{grid-template-columns:28px 128px 58px minmax(0,1fr) 96px;grid-template-areas:"g p r n t" "g a a a a"}
+    .node .g{grid-area:g;align-self:start;padding-top:4px} .node .pill{grid-area:p} .node .role{grid-area:r} .node .nm{grid-area:n} .node .tm{grid-area:t;text-align:right}
+    .node .act{grid-area:a} .node .st,.node svg,.node .sp-x{display:none} .node .role-x{grid-area:r}
+    .detail{grid-template-columns:1fr;padding-left:20px}
+  }
+  @media (max-width:560px){
+    .node{grid-template-columns:22px auto minmax(0,1fr);grid-template-areas:"g p r" "g n n" "g a a" "g t t"}
+    .node .tm{text-align:left}
+  }
+
   /* ---------- chronologie ---------- */
   .tl-box{border:1px solid var(--line);background:var(--panel);padding:14px 16px 10px;overflow:hidden}
   .tl-box svg{display:block;width:100%}
@@ -268,9 +315,12 @@
   <section id="agents">
     <div class="section-head">
       <span class="section-num">01</span><h2 class="section-title">Agents</h2><span class="section-rule"></span>
-      <div class="chips" id="filters" role="group" aria-label="Filtrer les agents"></div>
+      <div class="chips" id="views" role="group" aria-label="Affichage">
+        <button type="button" class="chip" data-v="tree">Arbre</button><button type="button" class="chip" data-v="cards">Cartes</button>
+      </div>
     </div>
-    <div id="agentGrid" class="grid"></div>
+    <div class="toolbar"><div class="chips" id="filters" role="group" aria-label="Filtrer les agents"></div><span class="section-aside" id="treeAside"></span></div>
+    <div id="agentGrid"></div>
   </section>
 
   <section id="timeline">
@@ -319,6 +369,7 @@ const ROLE_TXT = {PM:'PM', ARCH:'ARCHI', DEV:'DÉV', EXPLORE:'EXPLO'};
 const STATE = {
   running:['s-run','En action'], tool:['s-run','Outil en cours'], thinking:['s-run','Réfléchit'],
   waiting:['s-wait','T’attend'], permission:['s-perm','Validation ?'], idle:['s-idle','Inactif'],
+  done:['s-done','Terminé'], error:['s-perm','Erreur'],
   review:['s-wait','PR ouverte'], pushed:['s-run','Branche poussée'], delivered:['s-done','Livré'], closed:['s-idle','Fermée'], stale:['s-idle','Inactive']
 };
 const GROUP = s => ['running','tool','thinking','pushed'].includes(s) ? 'run' : ['waiting','permission'].includes(s) ? 'you' : s === 'review' ? 'review' : s === 'delivered' ? 'done' : 'idle';
@@ -374,7 +425,7 @@ function deriveBranches(gh){
 }
 
 // ------------------------------------------------------------------ état & rendu
-let S = null, mode = null, filter = store.get('filter', 'all');
+let S = null, mode = null, filter = store.get('filter', 'all'), view = store.get('view', 'tree');
 const openDetails = new Set();
 let lastTopFeed = null, lastFeedKeys = new Set(), alerts = store.get('alerts', false), prevNeedYou = new Set(), firstRender = true;
 
@@ -427,11 +478,12 @@ function renderKpis(agents){
   const merged = prs.filter(p => p.merged && ms(p.merged_at) > day);
   const tokens = live ? agents.reduce((n, a) => n + (a.tokens?.output || 0), 0) : null;
   const silent = live ? agents.reduce((n, a) => n + (a.subagents || []).filter(s => s.silent).length, 0) : 0;
+  const silent = live ? agents.reduce((n, a) => n + (a.subagents || []).filter(x => x.silent).length, 0) : 0;
   const tile = (k, v, h, cls = '') => `<div class="kpi ${cls}"><div class="k">${k}</div><div class="v">${v}</div><div class="h">${h}</div></div>`;
   $('#kpis').innerHTML = [
-    tile('En action', live ? cnt('run') : '—', live ? (agents.filter(a => GROUP(a.state) === 'run').map(a => shortBranch(a.branch) || 'session').slice(0, 3).join(' · ') || 'aucun agent actif') : 'serveur local requis', live ? '' : 'na'),
+    tile('Agents en action', live ? cnt('run') : '—', live ? (agents.filter(a => GROUP(a.state) === 'run').map(a => shortBranch(a.branch) || 'session').slice(0, 3).join(' · ') || 'aucun agent actif') : 'serveur local requis', live ? '' : 'na'),
     tile('T’attendent', live ? need.length : '—', live ? (need.length ? need.map(a => shortBranch(a.branch) || 'session').slice(0, 3).join(' · ') : 'rien en attente') : 'serveur local requis', live ? (need.length ? 'alert' : '') : 'na'),
-    tile('Agents actifs', live ? subs : '—', live ? (silent ? `${silent} silencieux : à arrêter` : 'PM · Archi · Dév') : 'serveur local requis', live ? (silent ? 'alert' : '') : 'na'),
+    tile('Agents actifs', live ? subs : '—', live ? (agents.flatMap(a => (a.subagents || []).filter(x => x.status === 'running')).map(x => ROLE_TXT[x.role] || 'agent').slice(0, 4).join(' · ') || 'aucun en cours') + (silent ? ` · ${silent} silencieux : à arrêter` : '') : 'serveur local requis', live ? (silent ? 'alert' : '') : 'na'),
     tile('PR ouvertes', open.length, open.length ? open.slice(0, 2).map(p => '#' + p.number).join(' · ') : 'aucune', open.length ? 'alert' : ''),
     tile('Livrées · 24 h', merged.length, merged.length ? 'dernière ' + ago(merged[0].merged_at) : '—'),
     tile('Tokens produits', live ? kfmt(tokens) : '—', live ? 'sessions des dernières 24 h' : 'serveur local requis', live ? '' : 'na'),
@@ -450,13 +502,62 @@ function renderAgents(agents){
   const list = agents.filter(a => filter === 'all' || GROUP(a.state) === filter)
     .sort((a, b) => (ORDER[GROUP(a.state)] - ORDER[GROUP(b.state)]) || (ms(b.last_activity) - ms(a.last_activity)));
   const g = $('#agentGrid');
+  g.className = view === 'tree' ? 'tree' : 'grid';
+  document.querySelectorAll('#views [data-v]').forEach(b => { b.classList.toggle('on', b.dataset.v === view); b.setAttribute('aria-pressed', b.dataset.v === view); });
+  const nSubs = agents.reduce((n, a) => n + (a.subagents || []).length, 0), nRun = agents.reduce((n, a) => n + (a.subagents || []).filter(x => x.status === 'running').length, 0);
+  $('#treeAside').textContent = mode === 'github' ? 'agents : serveur local requis' : `${agents.length} agent${agents.length > 1 ? 's' : ''} · ${nSubs} sous-agent${nSubs > 1 ? 's' : ''} (${nRun} actif${nRun > 1 ? 's' : ''})`;
   if (!list.length) {
+    g.className = 'grid';
     g.innerHTML = `<div class="empty">${agents.length ? 'Aucun agent dans ce filtre.' : mode === 'github'
       ? 'Aucune branche d’agent active sur GitHub depuis 24 h.<br>Dernières livraisons ci-dessous.'
       : `Aucune session Claude Code sur ce dépôt depuis ${esc(S.sources?.claude?.error ? '' : '24 h')}.<br>${S.sources?.claude?.error ? '<b>' + esc(S.sources.claude.error) + '</b>' : 'Lancez un agent : il apparaîtra ici en moins de 2 secondes.'}`}</div>`;
     return;
   }
-  g.innerHTML = list.map(agentCard).join('');
+  g.innerHTML = view === 'tree' ? list.map(treeNode).join('') + (mode === 'github' ? '<div class="tree-note">Vue GitHub : les agents (PM, Architecte, Développeur…) ne sont visibles qu\u2019avec stt_agents_server.py.</div>' : '') : list.map(agentCard).join('');
+}
+
+// --- arbre : chaque agent principal suivi de tous ses sous-agents
+function actCell(x){
+  if (x.kind === 'branch') return `<span class="act">${x.pr ? `PR <b>#${x.pr.number}</b> · ${esc(x.pr.title)}` : `${x.pushes.length} push`}</span>`;
+  const c = x.current || (['running', 'tool', 'thinking'].includes(x.state) && x.last_tool && x.status !== 'done' ? x.last_tool : null);
+  if (c) return `<span class="act" title="${esc((c.tool || c.name) + ' · ' + (c.summary || ''))}"><span class="arrow">▸</span> <b>${esc(c.tool || c.name)}</b> ${esc(c.summary || '')}</span>`;
+  if (x.last_text) return `<span class="act txt" title="${esc(x.last_text)}">${esc(x.last_text)}</span>`;
+  const l = x.last_tool;
+  return l ? `<span class="act" style="opacity:.75" title="dernier outil">${esc(l.name || l.tool)} ${esc(l.summary || '')}</span>` : '<span class="act">—</span>';
+}
+function timeCell(x){
+  if (x.status === 'done' || x.status === 'error') return `<span class="tm">${x.ended ? `<span data-since="${esc(x.ended)}" data-prefix="il y a ">${ago(x.ended)}</span>` : 'terminé'}${x.duration_s != null ? `<small>durée ${dur(x.duration_s)}</small>` : ''}</span>`;
+  return `<span class="tm"><span data-since="${esc(x.since)}" data-prefix="depuis ">${ago(x.since, 'depuis ')}</span>${x.started && x.duration_s != null ? `<small>lancé il y a ${dur(x.duration_s)}</small>` : ''}</span>`;
+}
+const dur = s => s == null ? '' : s < 60 ? s + ' s' : s < 3600 ? Math.round(s / 60) + ' min' : Math.floor(s / 3600) + ' h ' + String(Math.floor(s % 3600 / 60)).padStart(2, '0');
+function statCell(x){
+  const tools = x.tool_count, out = x.tokens?.output ?? x.tokens_out ?? x.total_tokens;
+  return `<span class="st">${[tools != null ? `<b>${tools}</b> outil${tools > 1 ? 's' : ''}` : '', out != null ? `<b>${kfmt(out)}</b> tok` : ''].filter(Boolean).join(' · ')}</span>`;
+}
+function detailBlock(x){
+  const rec = x.recent || [];
+  const todos = x.todos || [];
+  return `<div class="detail"><div><h4>Dernières actions</h4>${rec.length ? `<ol>${rec.map(r => `<li><span class="t">${hhmm(r.ts, true)}</span><span title="${esc(r.text)}"><span class="kind ${esc(r.kind)}" style="font:10px 'JetBrains Mono',monospace;color:var(--muted-2);margin-right:6px;text-transform:uppercase">${esc(KIND[r.kind] || r.kind)}</span>${esc(r.text)}</span></li>`).join('')}</ol>` : '<p style="color:var(--muted-2)">Aucune action enregistrée.</p>'}</div>
+    <div>${x.last_text ? `<h4>Dernier message</h4><p>${esc(x.last_text)}</p>` : ''}${todos.length ? `<h4>Tâches</h4><ul class="todolist">${todos.map(t => `<li class="${esc(t.status)}">${esc(t.content)}</li>`).join('')}</ul>` : ''}
+    <h4>Identité</h4><p style="color:var(--muted);font:11.5px 'JetBrains Mono',monospace">${esc([x.type && x.type !== '?' ? 'type ' + x.type : '', x.agent_id ? 'agent ' + x.agent_id : '', x.bg ? 'arrière-plan' : '', x.model ? modelShort(x.model) : '', x.started ? 'lancé ' + hhmm(x.started, true) : ''].filter(Boolean).join(' · ') || '—')}</p></div></div>`;
+}
+function treeNode(a){
+  const [cls, short] = STATE[a.state] || STATE.idle;
+  const subs = (a.subagents || []);
+  const key = 'n:' + a.id;
+  let h = `<details data-k="${esc(key)}" ${openDetails.has(key) ? 'open' : ''}><summary class="node main ${cls}" title="Cliquer pour le détail">
+    <span class="g">${subs.length ? '▾' : '●'}</span><span class="pill ${cls}"><i></i>${esc(short)}</span>${role(a.role) || '<span class="role-x"></span>'}
+    <span class="nm"><b>${esc(a.branch && a.branch !== (S.repo?.main || MAIN) ? shortBranch(a.branch) : (a.branch || 'session'))}</b><small>${esc(a.state_label)}${a.title ? ' — ' + esc(a.title) : ''}</small></span>
+    ${actCell(a)}${timeCell(a)}${a.kind === 'branch' ? '<span class="st"></span>' : statCell(a)}${spark(a.spark) || '<span class="sp-x"></span>'}</summary>${a.kind === 'branch' ? '' : detailBlock(a)}</details>`;
+  subs.forEach((x, i) => {
+    const [c2, s2] = STATE[x.state] || STATE.idle, k2 = 's:' + a.id + ':' + x.id;
+    const meta = [x.type && x.type !== '?' && x.type !== 'general-purpose' ? x.type : '', x.bg ? 'arrière-plan' : '', x.has_transcript === false ? 'transcript introuvable' : ''].filter(Boolean).join(' · ');
+    h += `<details data-k="${esc(k2)}" ${openDetails.has(k2) ? 'open' : ''}><summary class="node sub ${c2}" title="${esc(x.state_label || '')}">
+      <span class="g">${i === subs.length - 1 ? '└─' : '├─'}</span><span class="pill ${c2}"><i></i>${esc(x.state === 'done' ? 'Terminé' : x.state === 'idle' ? 'Silencieux' : s2)}</span>${role(x.role) || '<span class="role">AGENT</span>'}
+      <span class="nm"><b style="font-weight:500">${esc(x.description)}</b><small>${esc(meta || x.state_label || '')}</small></span>
+      ${actCell(x)}${timeCell(x)}${statCell(x)}${spark(x.spark) || '<span class="sp-x"></span>'}</summary>${detailBlock(x)}</details>`;
+  });
+  return h;
 }
 
 function steps(phase){
@@ -492,13 +593,14 @@ function agentCard(a){
     }
     const subs = (a.subagents || []);
     if (subs.length) {
-      const shown = [...subs.filter(s => s.status === 'running'), ...subs.filter(s => s.status !== 'running').reverse()].slice(0, 4);
+      const shown = [...subs.filter(s => s.status === 'running'), ...subs.filter(s => s.status !== 'running').reverse()];
       body += `<ul class="subs">${shown.map(s => {
-        const st = s.status === 'running' ? (s.state === 'permission' ? ['perm', 'validation ?'] : ['run', s.last_tool ? s.last_tool.name : 'en cours']) : s.status === 'error' ? ['err', 'erreur'] : s.status === 'stopped' ? ['', 'arrêté ' + ago(s.ended)] : ['', 'rapport rendu ' + ago(s.ended)];
+        const st = s.status === 'running' ? (s.state === 'permission' ? ['perm', 'validation ?'] : s.state === 'idle' ? ['', 'silencieux'] : ['run', s.current ? s.current.tool : s.last_tool ? s.last_tool.name : 'en cours']) : s.status === 'error' ? ['err', 'erreur'] : s.status === 'stopped' ? ['', 'arrêté ' + ago(s.ended)] : ['', 'rapport rendu ' + ago(s.ended)];
         if (s.silent) st[1] = 'silencieux · à arrêter';
-        if (s.agent_id) st[1] += ' · ' + s.agent_id.slice(0, 6);
-        return `<li>${role(s.role) || '<span class="role">AGENT</span>'}<span class="d" title="${esc(s.description)}">${esc(s.description || s.type)} ${s.status === 'running' && s.last_tool?.summary ? `<em>· ${esc(s.last_tool.summary)}</em>` : ''}</span><span class="s ${st[0]}">${esc(st[1])}</span></li>`; }).join('')}</ul>`;
-      if (subs.length > 4) body += `<div class="since">+ ${subs.length - 4} agents plus anciens</div>`;
+        if (s.agent_id) st[1] += ' · ' + String(s.agent_id).slice(0, 6);
+        const lt = s.current || s.last_tool;
+        return `<li>${role(s.role) || '<span class="role">AGENT</span>'}<span class="d" title="${esc(s.description)}">${esc(s.description || s.type)}${s.bg ? ' <em>· arr.-plan</em>' : ''} ${s.status === 'running' && lt?.summary ? `<em>· ${esc(lt.summary)}</em>` : ''}</span><span class="s ${st[0]}">${esc(st[1])}</span></li>`; }).join('')}</ul>`;
+
     }
   }
   const gitb = a.git ? `${a.git.ahead != null ? `<span title="avance / retard sur ${esc(S.repo?.main || MAIN)}">git <b>+${a.git.ahead}/−${a.git.behind ?? 0}</b></span>` : ''}${a.git.dirty ? `<span title="${esc((a.git.files || []).join('\n'))}"><b>${a.git.dirty}</b> fichier${a.git.dirty > 1 ? 's' : ''} modifié${a.git.dirty > 1 ? 's' : ''}</span>` : ''}` : '';
@@ -532,7 +634,7 @@ function renderTimeline(agents){
     if (p.merged && ms(p.merged_at) > from) marks.push({t:ms(p.merged_at), c:'var(--st-done)', l:'#' + p.number + ' mergée', head:p.head});
   }
   $('#tlAside').textContent = `${lanes.length} piste${lanes.length > 1 ? 's' : ''} · ${hhmm(new Date(from).toISOString())} → ${hhmm(new Date(to).toISOString())}`;
-  const LW = W < 600 ? 92 : 150, top = 24, LH = 24, H = top + Math.max(1, lanes.length) * LH + 6, cw = (W - LW) / n;
+  const LW = W < 600 ? 112 : 190, top = 24, LH = 24, H = top + Math.max(1, lanes.length) * LH + 6, cw = (W - LW) / n;
   const x = t => LW + (t - from) / span * (W - LW);
   let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Chronologie de l'activité des agents sur 6 heures">`;
   for (let h = Math.ceil(from / 3600e3) * 3600e3; h <= to; h += 3600e3) {
@@ -541,8 +643,10 @@ function renderTimeline(agents){
   }
   if (!lanes.length) s += `<text x="${LW}" y="${top + 16}" fill="var(--muted-2)" font-family="JetBrains Mono" font-size="11.5">aucune activité sur la période</text>`;
   lanes.forEach((l, li) => {
-    const y = top + li * LH, max = Math.max(1, ...l.buckets);
-    s += `<text x="${LW - 10}" y="${y + 15}" fill="var(--ink)" font-family="JetBrains Mono" font-size="11" text-anchor="end">${esc(l.label.length > 18 ? l.label.slice(0, 17) + '…' : l.label)}</text>`;
+    const y = top + li * LH, max = Math.max(1, ...l.buckets), lim = l.sub ? 20 : 18;
+    const lab = (l.sub ? '› ' : '') + (l.label.length > lim ? l.label.slice(0, lim - 1) + '…' : l.label);
+    s += `<text x="${LW - 10}" y="${y + 15}" fill="${l.sub ? 'var(--muted)' : 'var(--ink)'}" font-family="JetBrains Mono" font-size="${l.sub ? 10 : 11}" text-anchor="end">${esc(lab)}</text>`;
+    if (l.sub && l.role) s += `<rect x="${LW - 6}" y="${y + 8}" width="4" height="8" fill="var(--r-${{PM:'pm', ARCH:'arch', DEV:'dev'}[l.role] || 'explo'})"/>`;
     s += `<rect x="${LW}" y="${y + 4}" width="${W - LW}" height="${LH - 8}" fill="#0b1426"/>`;
     l.buckets.forEach((v, i) => {
       if (!v) return;
@@ -664,6 +768,7 @@ $('#btnAlerts').addEventListener('click', async () => {
 paintAlertsBtn();
 
 // --- interactions
+$('#views').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (!b) return; view = b.dataset.v; store.set('view', view); render(); });
 $('#filters').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; filter = b.dataset.f; store.set('filter', filter); render(); });
 document.addEventListener('toggle', e => { const d = e.target; if (d.matches && d.matches('details[data-k]')) d.open ? openDetails.add(d.dataset.k) : openDetails.delete(d.dataset.k); }, true);
 let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => S && renderTimeline(agentsView()), 150); });
@@ -739,19 +844,52 @@ function startDemo(reason){
     thresholds:{active_s:90, fast_tool_wait_s:30, long_tool_wait_s:120},
     agents:[
       {id:'d1', branch:'worktree-lot2-scenes', title:'Plan Scènes — lot 2 (exemple)', state:'tool', state_label:'Bash en cours', since:iso(m(.4)), last_activity:iso(m(.1)),
-       model:'claude-sonnet-5-5', role:'DEV', phase:2, current:{tool:tools[tick % tools.length][0], summary:tools[tick % tools.length][1], since:iso(now() - (tick % 5) * 7e3)},
+       tool_count:57, model:'claude-sonnet-5-5', role:'DEV', phase:2, current:{tool:tools[tick % tools.length][0], summary:tools[tick % tools.length][1], since:iso(now() - (tick % 5) * 7e3)},
        todos:[{content:'T2.1 SCENES.register',status:'completed'},{content:'T2.2 transitions titre → vol',status:'completed'},{content:'T2.3 pause par scène',status:'completed'},{content:'T2.4 tests Playwright scènes',status:'in_progress',activeForm:'Écrit les tests Playwright des scènes'},{content:'Revue archi',status:'pending'},{content:'PR + rapport PM',status:'pending'}],
-       subagents:[{description:'Développeur lot 2', role:'DEV', status:'running', state:'tool', last_tool:{name:'Bash', summary:'python3 build.py test'}},{description:'Architecte : spec SCENES lot 2', role:'ARCH', status:'done', ended:iso(m(4))},{description:'PM : brief lot 2', role:'PM', status:'done', ended:iso(m(13))}],
+       subagents:[{description:'PM : brief lot 2', role:'PM', type:'general-purpose', status:'done', state:'done', state_label:'Terminé', bg:false, agent_id:null,
+         started:iso(m(16)), ended:iso(m(13)), since:iso(m(13)), duration_s:Math.round((16-13)*60),
+         current:null, last_tool:null, tool_count:6, tokens:{output:2100, context:8400}, spark:null, has_transcript:true,
+         recent:[{ts:iso(m(13.1)), kind:'tool', text:'PM : brief lot 2 · dernière action'}]},
+         {description:'Architecte : spec SCENES lot 2', role:'ARCH', type:'general-purpose', status:'done', state:'done', state_label:'Terminé', bg:false, agent_id:null,
+         started:iso(m(13)), ended:iso(m(4)), since:iso(m(4)), duration_s:Math.round((13-4)*60),
+         current:null, last_tool:null, tool_count:23, tokens:{output:8400, context:33600}, spark:null, has_transcript:true,
+         recent:[{ts:iso(m(4.1)), kind:'tool', text:'Architecte : spec SC · dernière action'}]},
+         {description:'Explorer ORDER.txt et les scènes', role:'EXPLORE', type:'Explore', status:'done', state:'done', state_label:'Terminé', bg:false, agent_id:'7f3a9c2e',
+         started:iso(m(12.5)), ended:iso(m(11)), since:iso(m(11)), duration_s:Math.round((12.5-11)*60),
+         current:null, last_tool:null, tool_count:9, tokens:{output:1300, context:5200}, spark:null, has_transcript:true,
+         recent:[{ts:iso(m(11.1)), kind:'tool', text:'Explorer ORDER.txt e · dernière action'}]},
+         {description:'Développeur lot 2', role:'DEV', type:'general-purpose', status:'running', state:'tool', state_label:'Bash en cours', bg:false, agent_id:null,
+         started:iso(m(4)), ended:null, since:iso(m(4)), duration_s:Math.round((4-0)*60),
+         current:{tool:tools[tick % tools.length][0], summary:tools[tick % tools.length][1], since:iso(now() - (tick % 5) * 7e3)}, last_tool:null, tool_count:41, tokens:{output:18200, context:72800}, spark:sp(1), has_transcript:true,
+         recent:[{ts:iso(m(0.1)), kind:'tool', text:'Développeur lot 2 · dernière action'}]},
+         {description:'Relecture des specs (arrière-plan)', role:'ARCH', type:'general-purpose', status:'running', state:'thinking', state_label:'Réfléchit…', bg:true, agent_id:'bgrev01',
+         started:iso(m(3)), ended:null, since:iso(m(3)), duration_s:Math.round((3-0)*60),
+         current:null, last_tool:{name:'Read', summary:'docs/specs/PLAN-scenes.md'}, tool_count:12, tokens:{output:3900, context:15600}, spark:sp(.5), has_transcript:true,
+         recent:[{ts:iso(m(0.1)), kind:'tool', text:'Relecture des specs  · dernière action'}]}],
        tokens:{output:48210, context:91400}, spark:sp(1.2), git:{ahead:3, behind:0, dirty:4, files:['src/JS/game/21-scenes.js','src/test/scenes_test.py']}, pr:null},
       {id:'d2', branch:'worktree-ports-orbitaux-docks', title:'Ports orbitaux : docks d’amarrage (exemple)', state:'waiting', state_label:'Attend ta réponse', since:iso(m(3.4)), last_activity:iso(m(3.4)),
        model:'claude-opus-5-5', role:'ARCH', phase:1, current:null, last_text:'Spec prête : trois options d’amarrage — A pontons fixes, B bras articulés, C champ tracteur. Je recommande A (coût faible, lisible en gros plan). Laquelle retiens-tu ?',
        todos:[{content:'Lire spec v2.16 ch. 24',status:'completed'},{content:'Rédiger options d’amarrage',status:'completed'},{content:'Valider l’option avec Frédéric',status:'in_progress',activeForm:'Attend le choix de l’option'}],
-       subagents:[], tokens:{output:22900, context:64300}, spark:sp(.4), git:{ahead:1, behind:2, dirty:1, files:['demos/space-travel/docs/specs/spec-ports-orbitaux-docks.md']}, pr:null},
+       subagents:[{description:'Explorer les ports existants', role:'EXPLORE', type:'Explore', status:'done', state:'done', state_label:'Terminé', bg:false, agent_id:'c41d0e77',
+         started:iso(m(9)), ended:iso(m(8.2)), since:iso(m(8.2)), duration_s:Math.round((9-8.2)*60),
+         current:null, last_tool:null, tool_count:4, tokens:{output:1100, context:4400}, spark:null, has_transcript:true,
+         recent:[{ts:iso(m(8.299999999999999)), kind:'tool', text:'Explorer les ports e · dernière action'}]}], tokens:{output:22900, context:64300}, spark:sp(.4), git:{ahead:1, behind:2, dirty:1, files:['demos/space-travel/docs/specs/spec-ports-orbitaux-docks.md']}, pr:null},
       {id:'d3', branch:'worktree-fix-camera-jitter', title:'Tressautement caméra en gros plan (exemple)', state:'permission', state_label:'Attend ta validation', since:iso(m(1.1)), last_activity:iso(m(1.1)),
        model:'claude-sonnet-5-5', role:'DEV', phase:2, current:{tool:'Edit', summary:'JS/game/20c-camera.js', since:iso(m(1.1))}, last_text:'Je lisse la position caméra sur un pas fixe (60 Hz) pour supprimer la saccade.',
        todos:[], subagents:[], tokens:{output:9100, context:38800}, spark:sp(.6), git:{ahead:0, behind:0, dirty:2, files:[]}, pr:null},
       {id:'d4', branch:'worktree-spec-012-hud', title:'SPEC-012 : HUD et panneaux (exemple)', state:'idle', state_label:'Livré', since:iso(m(170)), last_activity:iso(m(170)),
-       model:'claude-sonnet-5-5', role:'PM', phase:6, current:null, last_text:'PR #22 mergée. Rapport final envoyé.', todos:[], subagents:[], tokens:{output:31000, context:52000}, spark:new Array(30).fill(0), git:null,
+       model:'claude-sonnet-5-5', role:'PM', phase:6, current:null, last_text:'PR #22 mergée. Rapport final envoyé.', todos:[], subagents:[{description:'PM : brief SPEC-012', role:'PM', type:'general-purpose', status:'done', state:'done', state_label:'Terminé', bg:false, agent_id:null,
+         started:iso(m(230)), ended:iso(m(226)), since:iso(m(226)), duration_s:Math.round((230-226)*60),
+         current:null, last_tool:null, tool_count:4, tokens:{output:1800, context:7200}, spark:null, has_transcript:true,
+         recent:[{ts:iso(m(226.1)), kind:'tool', text:'PM : brief SPEC-012 · dernière action'}]},
+         {description:'Architecte : rédaction SPEC-012', role:'ARCH', type:'general-purpose', status:'done', state:'done', state_label:'Terminé', bg:false, agent_id:null,
+         started:iso(m(226)), ended:iso(m(190)), since:iso(m(190)), duration_s:Math.round((226-190)*60),
+         current:null, last_tool:null, tool_count:31, tokens:{output:12600, context:50400}, spark:null, has_transcript:true,
+         recent:[{ts:iso(m(190.1)), kind:'tool', text:'Architecte : rédacti · dernière action'}]},
+         {description:'PM : PR et rapport', role:'PM', type:'general-purpose', status:'done', state:'done', state_label:'Terminé', bg:false, agent_id:null,
+         started:iso(m(176)), ended:iso(m(170)), since:iso(m(170)), duration_s:Math.round((176-170)*60),
+         current:null, last_tool:null, tool_count:5, tokens:{output:1500, context:6000}, spark:null, has_transcript:true,
+         recent:[{ts:iso(m(170.1)), kind:'tool', text:'PM : PR et rapport · dernière action'}]}], tokens:{output:31000, context:52000}, spark:new Array(30).fill(0), git:null,
        pr:{number:22, title:'SPEC-012 : HUD et panneaux (exemple)', state:'closed', merged:true, url:'#', merged_at:iso(m(168))}}
     ],
     worktrees:[
@@ -762,7 +900,7 @@ function startDemo(reason){
     ],
     feed: feed0.slice().sort((a, b) => ms(b.ts) - ms(a.ts)),
     github:{prs:[{number:22, title:'SPEC-012 : HUD et panneaux (exemple)', state:'closed', merged:true, head:'worktree-spec-012-hud', updated_at:iso(m(168)), merged_at:iso(m(168)), created_at:iso(m(175)), url:'#'}], events:[], runs:[{name:'pages build and deployment', status:'completed', conclusion:'success', updated_at:iso(m(166))}]},
-    timeline:{to:iso(now()), lanes:[{agent_id:'d1', label:'lot2-scenes', buckets:lane(.9, 70, 0, 1.2)},{agent_id:'d2', label:'ports-orbitaux-docks', buckets:lane(.5, 50, 3)},{agent_id:'d3', label:'fix-camera-jitter', buckets:lane(1.3, 24, 1, .7)},{agent_id:'d4', label:'spec-012-hud', buckets:lane(.7, 230, 168)}]}
+    timeline:{to:iso(now()), lanes:[{agent_id:'d1', label:'lot2-scenes', buckets:lane(.9, 70, 0, .6)},{agent_id:'d1', sub:true, role:'ARCH', label:'Architecte : spec SCENES lot 2', buckets:lane(1.1, 13, 4)},{agent_id:'d1', sub:true, role:'DEV', label:'Développeur lot 2', buckets:lane(.8, 4, 0, 1.2)},{agent_id:'d1', sub:true, role:'ARCH', label:'Relecture des specs', buckets:lane(.6, 3, 0, .5)},{agent_id:'d2', label:'ports-orbitaux-docks', buckets:lane(.5, 50, 3)},{agent_id:'d3', label:'fix-camera-jitter', buckets:lane(1.3, 24, 1, .7)},{agent_id:'d4', label:'spec-012-hud', buckets:lane(.7, 230, 168)}]}
   });
   apply(demo(), 'demo');
   setInterval(() => { // un peu de vie : le développeur enchaîne les outils

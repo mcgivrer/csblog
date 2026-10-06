@@ -259,6 +259,9 @@ class Transcript:
         self.roles = []  # (ts, role, source)
         self.phase_start = 0
         self.errors = 0
+        self.agent_id = None      # identifiant de sous-agent (agentId)
+        self.tool_count = 0
+        self.ended_turn = False   # dernier message = texte final (rapport rendu)
 
     # -- lecture -----------------------------------------------------------
     def poll(self):
@@ -298,6 +301,10 @@ class Transcript:
 
     # -- interprétation ----------------------------------------------------
     def handle(self, e):
+        if e.get("isSidechain") and not self.is_sub and self.first_ts is None and not self.spawns:
+            self.is_sub = True  # fichier entier de sous-agent (agent-<id>.jsonl)
+        if e.get("agentId") and not self.agent_id:
+            self.agent_id = str(e["agentId"])
         if e.get("isSidechain") and not self.is_sub:
             running = [sid for sid in reversed(self.spawn_order) if self.spawns[sid]["status"] == "running"]
             key = running[0] if running else "_side"
@@ -320,7 +327,7 @@ class Transcript:
         msg = e.get("message") or {}
         if t == "queue-operation" and e.get("operation") == "enqueue" and isinstance(e.get("content"), str):
             if "<task-notification>" in e["content"]:  # fin d'un agent (completed / failed / killed)
-                self._agent_notification(e["content"], ts)
+                self._task_notification(e["content"], ts)
             return
         if t == "user":
             self._user(e, msg, ts)
@@ -341,19 +348,7 @@ class Transcript:
                 if b.get("is_error"):
                     self.errors += 1
                 if tid in self.spawns:
-                    sp = self.spawns[tid]
-                    txt = block_text(b.get("content"))
-                    m = re.search(r"agentId:\s*([0-9a-zA-Z]+)", txt)
-                    if m:
-                        sp["agent_id"] = m.group(1)
-                    if b.get("is_error"):
-                        sp["status"], sp["ended"] = "error", ts
-                        self.add_event(ts, "spawn_end", f"Agent en erreur · {sp['description']}")
-                    elif m and re.search(r"launched|background", txt, re.I):
-                        sp["background"] = True  # arrière-plan : reste actif jusqu'à sa notification de fin ou son arrêt
-                    else:
-                        sp["status"], sp["ended"] = "done", ts
-                        self.add_event(ts, "spawn_end", f"Agent terminé · {sp['description']}")
+                    self._spawn_result(self.spawns[tid], b, e.get("toolUseResult"), ts)
                 if tid in self.task_by_tool:
                     m = re.search(r"#(\d+)", block_text(b.get("content")))
                     if m:
@@ -361,7 +356,8 @@ class Transcript:
             elif bt == "text":
                 txt = b.get("text") or ""
                 if "<task-notification>" in txt:
-                    self._agent_notification(txt, ts)
+                    self._task_notification(txt, ts)
+                    continue
                 if e.get("isMeta") or is_noise_prompt(txt):
                     continue
                 if "[Request interrupted" in txt:
@@ -373,7 +369,7 @@ class Transcript:
                     self.add_event(ts, "compact", "Contexte compacté")
                     continue
                 for tid in list(self.pending):  # une nouvelle consigne clôt les outils restés sans réponse
-                    if tid in self.spawns and self.spawns[tid]["status"] == "running" and not self.spawns[tid].get("background"):
+                    if tid in self.spawns and self.spawns[tid]["status"] == "running" and not self.spawns[tid].get("bg"):
                         self.spawns[tid]["status"] = "done"
                     self.pending.pop(tid, None)
                 self.first_prompt = self.first_prompt or txt
@@ -383,31 +379,56 @@ class Transcript:
                     self.phase_start = len(self.roles)
                 self.add_event(ts, "prompt", first_line(txt))
 
-    def _spawn_by_agent_id(self, agent_id):
+    def _spawn_result(self, sp, block, tur, ts):
+        text = block_text(block.get("content"))
+        tur = tur if isinstance(tur, dict) else {}
+        aid = tur.get("agentId") or tur.get("agent_id")
+        if not aid:
+            m = re.search(r"agent[_ ]?id[\"']?\s*[:=]\s*[\"']?([A-Za-z0-9_-]{4,})", text, re.I)
+            aid = m.group(1) if m else None
+        if aid:
+            sp["agent_id"] = str(aid)
+        for k_src, k_dst in (("totalToolUseCount", "tool_count"), ("totalTokens", "total_tokens"), ("totalDurationMs", "duration_ms")):
+            if isinstance(tur.get(k_src), (int, float)):
+                sp[k_dst] = tur[k_src]
+        status = str(tur.get("status") or "").lower()
+        background = sp.get("bg") or status in ("async_launched", "running", "launched", "started") or (
+            not status and len(text) < 600 and re.search(r"(async|background|arri[èe]re-plan).{0,40}(launch|start|lanc)|launched in the background", text, re.I))
+        if block.get("is_error"):
+            sp["status"], sp["ended"] = "error", ts
+            self.add_event(ts, "spawn_end", f"Agent en erreur · {sp['description']}")
+        elif background and status not in ("completed", "done", "failed"):
+            sp["bg"] = True  # lancé en arrière-plan : il continue après ce résultat
+            self.add_event(ts, "spawn", f"Agent en arrière-plan · {sp['description']}")
+        else:
+            sp["status"], sp["ended"] = "done", ts
+            self.add_event(ts, "spawn_end", f"Agent terminé · {sp['description']}")
+
+    def _spawn_by_agent_id(self, key):
         for sp in self.spawns.values():
-            if agent_id and sp.get("agent_id") == agent_id:
+            if key and key in (sp.get("agent_id"), sp["id"]):
                 return sp
         return None
 
     def _end_agent(self, sp, status, ts, label):
+        """Fin de vie d'un agent (done | error | stopped) ; sans effet s'il n'est plus actif."""
         if sp["status"] == "running":
             sp["status"], sp["ended"] = status, ts
             self.add_event(ts, "spawn_end", f"{label} · {sp['description']}")
 
-    def _agent_notification(self, txt, ts):
-        """<task-notification> : fin réelle d'un agent (completed / failed / killed)."""
-        for blk in re.findall(r"<task-notification>(.*?)</task-notification>", txt, re.S):
-            m_id = re.search(r"<task-id>\s*([^<\s]+)", blk)
-            m_st = re.search(r"<status>\s*([^<\s]+)", blk)
-            sp = self._spawn_by_agent_id(m_id.group(1)) if m_id else None
-            if not sp or not m_st:
+    def _task_notification(self, txt, ts):
+        """Fin réelle d'un agent d'arrière-plan : <task-notification> (completed | failed | killed)."""
+        for blk in re.findall(r"<task-notification>(.*?)</task-notification>", txt, re.S) or [txt]:
+            tid, st = re.search(r"<task-id>\s*([^<\s]+)", blk), re.search(r"<status>\s*([^<\s]+)", blk)
+            sp = self._spawn_by_agent_id(tid.group(1) if tid else None)
+            if not sp:
                 continue
-            st = m_st.group(1).lower()
-            if st in ("killed", "stopped"):
+            status = st.group(1).lower() if st else "completed"
+            if status in ("killed", "stopped"):
                 self._end_agent(sp, "stopped", ts, "Agent arrêté")
-            elif st in ("failed", "error"):
+            elif status in ("failed", "error"):
                 self._end_agent(sp, "error", ts, "Agent en erreur")
-            elif st == "completed":
+            else:
                 self._end_agent(sp, "done", ts, "Agent terminé")
 
     def _assistant(self, msg, ts):
@@ -428,6 +449,7 @@ class Transcript:
                     continue
                 self.last_text = txt
                 self.last_kind = "text"
+                self.ended_turn = True
                 role = role_from_text(txt)
                 if role:
                     self.roles.append((ts, role, "marker"))
@@ -436,6 +458,8 @@ class Transcript:
                 tid, name, inp = b.get("id"), b.get("name") or "?", b.get("input") or {}
                 summ = summarize_tool(name, inp)
                 self.pending[tid] = {"name": name, "summary": summ, "ts": ts}
+                self.tool_count += 1
+                self.ended_turn = False
                 self.tool_names[tid] = name
                 self.last_tool = {"name": name, "summary": summ, "ts": ts}
                 self.last_kind = "tool_use"
@@ -481,7 +505,7 @@ class Transcript:
                     sp = {
                         "id": tid, "description": desc, "type": kind, "role": role_from_agent(kind, desc),
                         "prompt": inp.get("prompt") or "", "started": ts, "ended": None, "status": "running",
-                        "agent_id": None, "name": inp.get("name") or "", "background": False, "messages": 0,
+                        "bg": bool(inp.get("run_in_background")), "agent_id": None, "name": inp.get("name"),
                     }
                     self.spawns[tid] = sp
                     self.spawn_order.append(tid)
@@ -566,8 +590,13 @@ class Transcript:
             if wait < FAST_TOOL_WAIT_S:
                 return "tool", label, p["ts"]
             return "permission", "Attend ta validation", p["ts"]
+        bg_live = [sp for sp in self.spawns.values() if sp["status"] == "running" and sp.get("bg")]
+        if bg_live and sub_live and not any(p["name"] in SPAWN_TOOLS for p in pend):
+            return "running", f"Agents en arrière-plan ({len(sub_live)})", max(s.activity() for s in sub_live)
         if any(p["name"] in SPAWN_TOOLS for p in pend):
-            if sub_live or age < ACTIVE_S:
+            if sub_live:
+                return "running", f"Agents au travail ({len(sub_live)})", last
+            if age < ACTIVE_S:
                 return "running", "Agents au travail", last
             if age < WAITING_MAX_S:
                 return "running", "Agent silencieux (à arrêter ?)", last
@@ -594,19 +623,48 @@ class Transcript:
 # Collecte des sessions Claude Code
 # ---------------------------------------------------------------------------
 class ClaudeCollector:
-    def __init__(self, claude_dir, repo, window_s, extra_filters):
+    """Repère les sessions (agents principaux) et leurs sous-agents, quel que soit le format :
+    - <projet>/<session>.jsonl                       session principale
+    - <projet>/<session>/subagents/agent-<id>.jsonl  sous-agent (Claude Code 2.1+)
+    - <projet>/agent-<id>.jsonl                      sous-agent (Claude Code 2.0, sessionId = parent)
+    - lignes isSidechain dans le fichier principal   sous-agent (anciennes versions)
+    """
+
+    def __init__(self, claude_dir, repo, window_s, extra_filters, strict=False):
         self.projects = Path(claude_dir).expanduser() / "projects"
         self.repo = repo
-        self.prefix = claude_slug(repo).lower() if repo else None
+        self.prefixes = {claude_slug(repo).lower()} if repo else set()
+        self.base = Path(repo).name.lower() if repo and not strict else None
         self.filters = [f.lower() for f in extra_filters]
         self.window_s = window_s
-        self.mains = {}  # path -> Transcript
-        self.subs = {}   # path -> Transcript
-        self.status = {"ok": False, "dir": str(self.projects), "slug": self.prefix, "dirs": [], "sessions": 0, "error": None}
+        self.files = {}  # chemin -> Transcript
+        self.status = {"ok": False, "dir": str(self.projects), "slug": claude_slug(repo) if repo else None, "dirs": [],
+                       "sessions": 0, "subagents": 0, "error": None}
+
+    def add_worktrees(self, paths):
+        """Les worktrees peuvent vivre hors du dépôt (ex. app de bureau) : on suit aussi leurs slugs."""
+        for p in paths:
+            self.prefixes.add(claude_slug(p).lower())
 
     def _match(self, name):
         n = name.lower()
-        return (self.prefix and n.startswith(self.prefix)) or any(f in n for f in self.filters)
+        return any(n.startswith(p) for p in self.prefixes) or any(f in n for f in self.filters) or bool(self.base and self.base in n)
+
+    def _track(self, path, mtime, now, parent_sid=None):
+        tr = self.files.get(path)
+        if tr is None:
+            if now - mtime > self.window_s:
+                return None
+            tr = self.files[path] = Transcript(path, is_sub=bool(parent_sid) or os.path.basename(path).startswith("agent-"))
+        if parent_sid:
+            tr.parent_sid = parent_sid
+        tr.poll()
+        if tr.is_sub and not getattr(tr, "parent_sid", None):
+            tr.parent_sid = tr.session_id  # format 2.0 : sessionId = session parente
+        if tr.is_sub and not tr.agent_id:
+            stem = os.path.basename(path)[:-6]
+            tr.agent_id = stem[6:] if stem.startswith("agent-") else stem
+        return tr
 
     def refresh(self):
         now = time.time()
@@ -625,64 +683,85 @@ class ClaudeCollector:
             except OSError:
                 continue
             for f in entries:
-                if f.is_file() and f.name.endswith(".jsonl"):
-                    try:
-                        mt = f.stat().st_mtime
-                    except OSError:
-                        continue
-                    if now - mt > self.window_s and f.path not in self.mains:
-                        continue
-                    seen.add(f.path)
-                    tr = self.mains.get(f.path) or self.mains.setdefault(f.path, Transcript(f.path))
-                    tr.poll()
-                    sub_dir = os.path.join(d.path, f.name[:-6], "subagents")
-                    if os.path.isdir(sub_dir):
-                        for sf in os.scandir(sub_dir):
-                            if sf.name.endswith(".jsonl"):
-                                st = self.subs.get(sf.path) or self.subs.setdefault(sf.path, Transcript(sf.path, is_sub=True))
-                                st.parent = f.path
-                                st.poll()
-        for p in list(self.mains):  # oubli des sessions sorties de la fenêtre
-            if p not in seen and now - self.mains[p].activity() > self.window_s:
-                del self.mains[p]
-        for p in list(self.subs):
-            if getattr(self.subs[p], "parent", None) not in self.mains:
-                del self.subs[p]
+                try:
+                    if f.is_file() and f.name.endswith(".jsonl"):
+                        if self._track(f.path, f.stat().st_mtime, now):
+                            seen.add(f.path)
+                    elif f.is_dir():
+                        sub_dir = os.path.join(f.path, "subagents")
+                        if os.path.isdir(sub_dir):
+                            for sf in os.scandir(sub_dir):
+                                if sf.is_file() and sf.name.endswith(".jsonl"):
+                                    if self._track(sf.path, sf.stat().st_mtime, now, parent_sid=f.name):
+                                        seen.add(sf.path)
+                except OSError:
+                    continue
+        for p in list(self.files):  # oubli des transcripts sortis de la fenêtre
+            if p not in seen and now - self.files[p].activity() > self.window_s:
+                del self.files[p]
+        mains = self.mains()
         hint = None
-        if not dirs and self.projects.is_dir():
-            base = Path(self.repo).name.lower() if self.repo else ""
-            near = [d.name for d in os.scandir(self.projects) if d.is_dir() and base and base in d.name.lower()]
-            hint = f"Aucun dossier ne commence par « {self.prefix} »" + (f" ; proches : {', '.join(near[:4])} (utilisez --match)" if near else "")
-        self.status.update(ok=True, dirs=[d.name for d in dirs], sessions=len(self.mains), error=hint)
+        if not dirs:
+            hint = f"Aucun dossier de {self.projects} ne correspond au dépôt (préfixe « {self.status['slug']} ») : lancez les agents depuis ce clone, ou utilisez --repo / --match."
+        elif not mains:
+            hint = f"{len(dirs)} dossier(s) trouvé(s) mais aucune session active depuis {self.window_s / 3600:g} h (option --window)."
+        self.status.update(ok=True, dirs=[d.name for d in dirs], sessions=len(mains),
+                           subagents=sum(1 for t in self.files.values() if t.is_sub), error=hint)
+
+    def mains(self):
+        return [t for t in self.files.values() if not t.is_sub]
 
     def subagents_of(self, main):
-        """Associe chaque agent créé (appel Task/Agent) à son transcript."""
-        files = [s for s in self.subs.values() if getattr(s, "parent", None) == main.path]
-        by_prompt = {}
-        for s in files:
-            key = re.sub(r"\s+", " ", (s.first_prompt or "")).strip()[:160]
-            by_prompt.setdefault(key, []).append(s)
-        out, used = [], set()
-        for sid in main.spawn_order:
-            sp = main.spawns[sid]
-            key = re.sub(r"\s+", " ", sp["prompt"]).strip()[:160]
-            tr = None
-            for cand in by_prompt.get(key, []):
-                if id(cand) not in used:
-                    tr = cand
+        """Associe chaque appel Task/Agent à son transcript de sous-agent ; ajoute les orphelins."""
+        sid = main.session_id or Path(main.path).stem
+        files = [s for s in self.files.values() if s.is_sub and getattr(s, "parent_sid", None) == sid]
+        norm = lambda x: re.sub(r"\s+", " ", x or "").strip()[:160]
+        used, links = set(), {}
+        spawns = [main.spawns[k] for k in main.spawn_order]
+        for sp in spawns:  # 1. identifiant d'agent
+            for s in files:
+                if id(s) not in used and sp.get("agent_id") and s.agent_id and (s.agent_id == sp["agent_id"] or s.agent_id.endswith(sp["agent_id"])):
+                    links[sp["id"]] = s
+                    used.add(id(s))
                     break
-            if tr is None and sid in main.side:
-                tr = main.side[sid]
+        for sp in spawns:  # 2. consigne identique
+            if sp["id"] in links:
+                continue
+            for s in files:
+                if id(s) not in used and norm(s.first_prompt) and norm(s.first_prompt) == norm(sp["prompt"]):
+                    links[sp["id"]] = s
+                    used.add(id(s))
+                    break
+        for sp in spawns:  # 3. lignes isSidechain du fichier principal, 4. proximité temporelle
+            if sp["id"] in links:
+                continue
+            if sp["id"] in main.side:
+                links[sp["id"]] = main.side[sp["id"]]
+                continue
+            best = None
+            for s in files:
+                if id(s) in used or not s.first_ts or not sp["started"]:
+                    continue
+                gap = s.first_ts - sp["started"]
+                if -5 <= gap <= 60 and (best is None or gap < best[0]):
+                    best = (gap, s)
+            if best:
+                links[sp["id"]] = best[1]
+                used.add(id(best[1]))
+        out = []
+        for sp in spawns:
+            tr = links.get(sp["id"])
             if tr is not None:
-                used.add(id(tr))
                 tr.status_hint = sp["status"]
             out.append((sp, tr))
-        for s in files:  # transcripts orphelins (format inconnu)
+        for s in sorted(files, key=lambda t: t.first_ts or 0):  # sous-agents sans appel retrouvé
             if id(s) not in used:
-                desc = first_line(s.first_prompt or "", 60)
-                out.append(({"id": s.path, "description": desc, "type": "?", "role": role_from_agent("", desc),
-                             "prompt": "", "started": s.first_ts, "ended": None,
-                             "status": "running" if time.time() - s.activity() < ACTIVE_S else "done"}, s))
+                desc = first_line(s.first_prompt or "", 60) or "Agent"
+                age = time.time() - s.activity()
+                live = age < ACTIVE_S or (not s.ended_turn and age < WAITING_MAX_S)
+                out.append(({"id": s.path, "description": desc, "type": "?", "role": role_from_agent("", desc), "prompt": "",
+                             "started": s.first_ts, "ended": None if live else s.last_ts, "status": "running" if live else "done",
+                             "bg": False, "agent_id": s.agent_id, "name": None}, s))
         return out
 
 
@@ -865,13 +944,17 @@ class GitHubCollector:
         return True
 
 
+def recent_events(tr, n):
+    return [{"ts": iso(ts), "kind": k, "text": t} for ts, k, t in list(tr.events)[-n:]][::-1]
+
+
 # ---------------------------------------------------------------------------
 # Assemblage de l'état
 # ---------------------------------------------------------------------------
 class Hub:
     def __init__(self, args):
         self.args = args
-        self.claude = ClaudeCollector(args.claude_dir, args.repo, args.window * 3600, args.match)
+        self.claude = ClaudeCollector(args.claude_dir, args.repo, args.window * 3600, args.match, args.strict)
         self.git = GitCollector(args.repo)
         self.gh = GitHubCollector(None if args.no_github else args.github, os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN"))
         self.cond = threading.Condition()
@@ -887,7 +970,7 @@ class Hub:
         tl_n = TIMELINE_S // BUCKET_S
         sp_start = now - SPARK_MIN * 60
         lanes = []
-        for tr in sorted(self.claude.mains.values(), key=lambda t: -t.activity()):
+        for tr in sorted(self.claude.mains(), key=lambda t: -t.activity()):
             pairs = self.claude.subagents_of(tr)
             sub_trs = [s for _, s in pairs if s is not None]
             code, label, since = tr.state(now, sub_trs)
@@ -899,29 +982,7 @@ class Hub:
                 phase = 6 if pr["merged"] else max(phase, 5) if pr["state"] == "open" else phase
             if code == "idle" and pr and pr["merged"]:
                 label = "Livré"
-            subs = []
-            for sp, s in pairs:
-                st_code, st_label = (sp["status"] if sp["status"] in ("error", "stopped") else "done"), ""
-                if sp["status"] == "running":
-                    if s is not None:
-                        st_code, st_label, _ = s.state(now, [])
-                    else:
-                        st_code, st_label = "running", "En cours"
-                tok = s.tokens() if s else None
-                act = s.activity() if s else (sp["started"] or 0)
-                silent = sp["status"] == "running" and bool(act) and now - act > SILENT_S
-                lifecycle = {"running": "silencieux" if silent else "actif", "done": "rapport rendu",
-                             "stopped": "arrêté", "error": "erreur"}[sp["status"]]
-                subs.append({
-                    "agent_id": sp.get("agent_id"), "name": sp.get("name") or None, "lifecycle": lifecycle, "silent": silent,
-                    "background": bool(sp.get("background")), "messages": sp.get("messages", 0),
-                    "id": sp["id"], "description": sp["description"], "type": sp["type"],
-                    "role": sp["role"] or (s.current_role() if s else None), "status": sp["status"],
-                    "state": st_code, "state_label": st_label, "started": iso(sp["started"]), "ended": iso(sp["ended"]),
-                    "last_tool": dict(s.last_tool, ts=iso(s.last_tool["ts"])) if s and s.last_tool else None,
-                    "last_text": shorten(plain(s.last_text), 200) if s and s.last_text else None,
-                    "tokens_out": tok["output"] if tok else None, "last_activity": iso(s.activity()) if s else None,
-                })
+            subs = [self.sub_view(sp, st, now, sp_start) for sp, st in pairs]
             registry = {k: sum(1 for x in subs if x["lifecycle"] == v) for k, v in
                         (("actifs", "actif"), ("silencieux", "silencieux"), ("termines", "rapport rendu"),
                          ("arretes", "arrêté"), ("erreurs", "erreur"))}
@@ -946,23 +1007,32 @@ class Hub:
                 "current": cur, "last_text": shorten(plain(tr.last_text), 320) if tr.last_text else None,
                 "last_prompt": shorten(tr.last_prompt, 200) if tr.last_prompt else None,
                 "todos": tr.todo_list()[:30], "subagents": subs, "registry": registry, "tokens": tr.tokens(), "errors": tr.errors,
+                "tool_count": tr.tool_count, "recent": recent_events(tr, 8),
+                "subagents_running": sum(1 for x in subs if x["status"] == "running"),
                 "spark": tr.counts(now, sp_start, 60, SPARK_MIN),
                 "git": {k: wt[k] for k in ("ahead", "behind", "dirty", "files", "head", "last_commit")} if wt else None,
                 "pr": pr,
             }
             agents.append(agent)
             short = branch.replace("worktree-", "") if branch and branch != self.git.main else first_line(label_title, 28)
-            trs = [(tr, None)] + [(s, sp) for sp, s in pairs if s is not None]
-            buckets = [0] * tl_n
-            for t, sp in trs:
-                for i, v in enumerate(t.counts(now, tl_start, BUCKET_S, tl_n)):
-                    buckets[i] += v
+            main_buckets = tr.counts(now, tl_start, BUCKET_S, tl_n)
+            sub_lanes = []
+            for (sp, st), sv in zip(pairs, subs):
+                if st is None:
+                    continue
+                bk = st.counts(now, tl_start, BUCKET_S, tl_n)
+                if any(bk):
+                    sub_lanes.append({"agent_id": aid, "sub_id": sp["id"], "sub": True, "label": shorten(sp["description"] or sp["type"], 26),
+                                      "role": sv["role"], "state": sv["state"], "buckets": bk})
+            if any(main_buckets) or sub_lanes:
+                lanes.append({"agent_id": aid, "label": short, "state": code, "role": tr.current_role(), "buckets": main_buckets})
+                lanes.extend(sub_lanes)
+            for t, sp in [(tr, None)] + [(st, sp) for sp, st in pairs if st is not None]:
                 for ts, kind, text in list(t.events)[-80:]:
                     if now - ts < TIMELINE_S:
                         feed.append({"ts": ts, "agent_id": aid, "agent": short, "sub": sp["description"] if sp else None,
+                                     "sub_id": sp["id"] if sp else None,
                                      "role": (sp or {}).get("role") or tr.current_role(), "kind": kind, "text": text})
-            if any(buckets):
-                lanes.append({"agent_id": aid, "label": short, "state": code, "buckets": buckets})
         feed.sort(key=lambda x: x["ts"], reverse=True)
         for f in feed:
             f["ts"] = iso(f["ts"])
@@ -977,9 +1047,53 @@ class Hub:
             "sources": {"claude": self.claude.status, "git": self.git.status, "github": self.gh.status},
             "agents": agents, "worktrees": worktrees, "branches": self.git.branches[:20],
             "feed": feed[:120], "github": self.gh.data,
-            "timeline": {"from": iso(tl_start), "to": iso(now), "bucket_s": BUCKET_S, "lanes": lanes[:14]},
+            "timeline": {"from": iso(tl_start), "to": iso(now), "bucket_s": BUCKET_S, "lanes": lanes[:32]},
             "thresholds": {"active_s": ACTIVE_S, "fast_tool_wait_s": FAST_TOOL_WAIT_S, "long_tool_wait_s": LONG_TOOL_WAIT_S,
                            "waiting_max_s": WAITING_MAX_S},
+        }
+
+    @staticmethod
+    def sub_view(sp, s, now, sp_start):
+        """Vue d'un sous-agent : statut propre, outil en cours, derniers messages, tokens."""
+        status = sp["status"]
+        if status == "running" and s is not None:
+            code, label, since = s.state(now, [])
+            if code == "waiting":  # un sous-agent ne s'adresse pas à l'utilisateur : texte final = rapport rendu
+                code, label = "done", "Rapport rendu"
+                status = "done" if sp.get("bg") else status
+            elif code == "idle":
+                code, label = "idle", "Silencieux"
+        elif status == "running":
+            code, label, since = "running", "Démarre…", sp["started"]
+        elif status == "error":
+            code, label, since = "error", "En erreur", sp["ended"]
+        elif status == "stopped":
+            code, label, since = "stopped", "Arrêté", sp["ended"]
+        else:
+            code, label, since = "done", "Terminé", sp["ended"] or (s.last_ts if s else None)
+        cur = None
+        if s is not None and s.pending and status == "running":
+            p = sorted(s.pending.values(), key=lambda x: x["ts"] or 0)[-1]
+            cur = {"tool": tool_label(p["name"]), "summary": p["summary"], "since": iso(p["ts"])}
+        end = sp["ended"] or (now if status == "running" else (s.last_ts if s else None))
+        tok = s.tokens() if s else None
+        act = s.activity() if s else (sp["started"] or 0)
+        silent = status == "running" and bool(act) and now - act > SILENT_S   # sans sortie depuis SILENT_S : à arrêter
+        lifecycle = {"running": "silencieux" if silent else "actif", "done": "rapport rendu", "stopped": "arrêté", "error": "erreur"}.get(status, status)
+        return {
+            "lifecycle": lifecycle, "silent": silent, "messages": sp.get("messages", 0),
+            "id": sp["id"], "agent_id": sp.get("agent_id") or (s.agent_id if s else None), "name": sp.get("name"),
+            "description": sp["description"] or sp["type"], "type": sp["type"],
+            "role": sp["role"] or (s.current_role() if s else None), "status": status, "bg": bool(sp.get("bg")),
+            "state": code, "state_label": label, "since": iso(since), "started": iso(sp["started"]), "ended": iso(sp["ended"]),
+            "duration_s": round(end - sp["started"]) if end and sp["started"] else None,
+            "current": cur, "last_tool": dict(s.last_tool, ts=iso(s.last_tool["ts"])) if s and s.last_tool else None,
+            "last_text": shorten(plain(s.last_text), 240) if s and s.last_text else None,
+            "tool_count": s.tool_count if s else sp.get("tool_count"),
+            "tokens": {"output": tok["output"], "context": tok["context"]} if tok else None, "total_tokens": sp.get("total_tokens"),
+            "model": s.model if s else None, "spark": s.counts(now, sp_start, 60, SPARK_MIN) if s else None,
+            "todos": s.todo_list()[:20] if s else [], "recent": recent_events(s, 6) if s else [],
+            "has_transcript": s is not None, "last_activity": iso(s.activity()) if s else iso(sp["ended"] or sp["started"]),
         }
 
     def tick(self):
@@ -1004,6 +1118,7 @@ class Hub:
                 try:
                     if t0 - last_git >= 5:
                         self.git.refresh()
+                        self.claude.add_worktrees(w["path"] for w in self.git.worktrees)
                         last_git = t0
                     self.tick()
                 except Exception as exc:  # ne jamais tuer la boucle
@@ -1502,6 +1617,7 @@ def main():
     ap.add_argument("--repo", help="racine du dépôt observé (défaut : dépôt contenant ce script)")
     ap.add_argument("--claude-dir", default=os.environ.get("CLAUDE_CONFIG_DIR") or "~/.claude", help="dossier de config Claude Code (défaut ~/.claude)")
     ap.add_argument("--match", action="append", default=[], help="motif supplémentaire de dossier ~/.claude/projects (répétable)")
+    ap.add_argument("--strict", action="store_true", help="ne suivre que les dossiers de sessions du chemin exact du dépôt et de ses worktrees")
     ap.add_argument("--github", help="owner/dépôt GitHub (défaut : remote origin)")
     ap.add_argument("--no-github", action="store_true", help="désactive la source GitHub")
     ap.add_argument("--window", type=float, default=24, help="sessions actives dans les N dernières heures (défaut 24)")
@@ -1538,6 +1654,7 @@ def main():
 
     if args.once:
         hub.git.refresh()
+        hub.claude.add_worktrees(w["path"] for w in hub.git.worktrees)
         hub.gh.refresh()
         hub.claude.refresh()
         sys.stdout.reconfigure(encoding="utf-8") if hasattr(sys.stdout, "reconfigure") else None
@@ -1552,7 +1669,7 @@ def main():
     url = f"http://{'127.0.0.1' if local else args.host}:{args.port}/"
     print(f"STT · agents — {url}")
     print(f"  dépôt   : {args.repo or '?'}")
-    print(f"  sessions: {hub.claude.projects}  (préfixe {hub.claude.prefix})")
+    print(f"  sessions: {hub.claude.projects}  (préfixe {hub.claude.status['slug']}{'' if args.strict else ', et tout dossier contenant « ' + str(hub.claude.base) + ' »'})")
     print(f"  GitHub  : {args.github or 'désactivé'}{' (jeton)' if hub.gh.token else ''}")
     print(f"  Kanban  : {url}kanban/  ·  données {args.kanban or '?'}  (POST /api/kanban, X-STT-Kanban: 1)")
     print(f"  Documents du Kanban : {', '.join(repr(r) for r in KANBAN_DOC_ROOTS)} (KANBAN_DOC_ROOTS)")
