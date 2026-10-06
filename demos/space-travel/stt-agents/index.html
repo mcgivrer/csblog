@@ -212,6 +212,34 @@
   .tabs .site-nav{margin-left:14px;align-self:center}
   .tabs .site-nav a{padding:5px 10px}
   .tabs .status{margin-left:auto;align-self:center;display:flex;gap:14px;font:10.5px 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2)}
+
+  /* ---------- toasts & réglages des alertes (T2.2) ---------- */
+  #toasts{position:fixed;top:104px;right:14px;z-index:1000;width:min(360px,calc(100vw - 28px));display:flex;flex-direction:column;gap:8px;pointer-events:none}
+  .toast{--acc:var(--cyan);position:relative;pointer-events:auto;cursor:pointer;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-left:3px solid var(--acc);padding:9px 34px 9px 12px;box-shadow:0 6px 22px rgba(0,0,0,.35);animation:toastIn .18s ease-out}
+  .toast::before,.toast::after{content:"";position:absolute;width:8px;height:8px;border:0 solid var(--amber);pointer-events:none}
+  .toast::before{top:-1px;left:-3px;border-top-width:2px;border-left-width:2px}
+  .toast::after{bottom:-1px;right:-1px;border-bottom-width:2px;border-right-width:2px}
+  .toast.sev-attention{--acc:var(--amber)} .toast.sev-info{--acc:var(--cyan)} .toast.sev-error{--acc:var(--st-perm)} .toast.sev-success{--acc:var(--st-done)}
+  .toast .t-meta{font:700 10.5px 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--acc)}
+  .toast .t-title{font-weight:700;font-size:13.5px;margin-top:2px;overflow-wrap:anywhere}
+  .toast .t-body{color:var(--muted);font-size:12.5px;margin-top:2px;overflow-wrap:anywhere}
+  .toast .t-close{position:absolute;top:4px;right:4px;width:24px;height:24px;border:1px solid transparent;background:none;color:var(--muted);cursor:pointer;font:16px/1 'JetBrains Mono',monospace}
+  .toast .t-close:hover{color:var(--amber);border-color:var(--line)}
+  @keyframes toastIn{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){.toast{animation:none}}
+  .agent.hl,.node.hl,details.hl>summary{outline:2px solid var(--amber);outline-offset:2px}
+  #alertsPop{position:fixed;z-index:1100;width:300px;max-width:calc(100vw - 20px);background:var(--panel);border:1px solid var(--line);padding:12px 14px;box-shadow:0 8px 28px rgba(0,0,0,.4);font-size:13px}
+  #alertsPop[hidden]{display:none}
+  #alertsPop::before,#alertsPop::after{content:"";position:absolute;width:8px;height:8px;border:0 solid var(--amber)}
+  #alertsPop::before{top:-1px;left:-1px;border-top-width:2px;border-left-width:2px}
+  #alertsPop::after{bottom:-1px;right:-1px;border-bottom-width:2px;border-right-width:2px}
+  #alertsPop h3{margin:0 0 8px;font:700 11px 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--amber)}
+  #alertsPop label{display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer}
+  #alertsPop input[type=checkbox]{accent-color:var(--amber)}
+  #alertsPop .sub{margin:8px 0 2px;font:10.5px 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2)}
+  #alertsPop .perm{font:11px 'JetBrains Mono',monospace;color:var(--cyan);margin-left:auto}
+  #alertsPop .btn{margin-top:10px;font:11.5px 'JetBrains Mono',monospace;padding:5px 10px;color:var(--amber);border:1px solid var(--amber-dim);background:none;cursor:pointer}
+  .head-ctl #btnAlerts.on{color:var(--amber);border-color:var(--amber-dim)}
   /* ---------- thème clair (le même interrupteur pilote le Kanban intégré) ---------- */
   :root[data-theme="light"]{color-scheme:light;
     --bg:#f3f6fb; --bg-2:#e8eef7; --panel:#ffffff; --panel-2:#eef2f9; --line:#b9c6dc;
@@ -337,6 +365,9 @@
   <div class="ticker-viewport"><div class="ticker-track" id="ticker"></div></div>
 </div>
 
+<div id="toasts" role="log" aria-live="polite" aria-label="Notifications"></div>
+<div id="alertsPop" role="dialog" aria-label="Réglages des alertes" hidden></div>
+
 <div class="wrap">
   <header class="site-header">
     <div class="site-header-main">
@@ -349,7 +380,7 @@
         <div class="themesw" role="group" aria-label="Thème de la page">
           <button type="button" data-theme-set="light" aria-pressed="false" title="Thème clair">☀ Clair</button><button type="button" data-theme-set="dark" aria-pressed="true" title="Thème sombre">☾ Sombre</button>
         </div>
-        <button id="btnAlerts" type="button" title="Notification du navigateur quand un agent t'attend">Alertes : off</button>
+        <button id="btnAlerts" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="alertsPop" title="Réglages des alertes (toasts, notifications du bureau)">Alertes : off</button>
       </div>
     </div>
   </header>
@@ -494,7 +525,7 @@ function deriveBranches(gh){
 // ------------------------------------------------------------------ état & rendu
 let S = null, mode = null, filter = store.get('filter', 'all'), view = store.get('view', 'tree');
 const openDetails = new Set();
-let lastTopFeed = null, lastFeedKeys = new Set(), alerts = store.get('alerts', false), prevNeedYou = new Set(), firstRender = true;
+let lastTopFeed = null, lastFeedKeys = new Set(), prevNeedYou = new Set(), firstRender = true;
 
 function agentsView(){
   if (!S) return [];
@@ -830,22 +861,135 @@ function renderFooter(){
   $('#verFooter').textContent = `stt-agents ${S.version || ''} · ${mode}`;
 }
 
-// --- alertes
+// --- alertes : toasts, notifications du bureau, réglages (T2.2)
 function notify(agents){
   const need = new Set(agents.filter(a => GROUP(a.state) === 'you' && mode !== 'github').map(a => a.id));
   document.title = (need.size ? `(${need.size}) ` : '') + 'STT · Agents en direct';
-  if (alerts && !firstRender && 'Notification' in window && Notification.permission === 'granted') {
-    for (const a of agents) if (need.has(a.id) && !prevNeedYou.has(a.id))
-      try { new Notification(`STT · ${shortBranch(a.branch) || 'agent'} t’attend`, {body:`${a.state_label}${a.last_text ? ' — ' + a.last_text.slice(0, 140) : ''}`, tag:'stt-' + a.id}); } catch {}
-  }
   prevNeedYou = need;
 }
-function paintAlertsBtn(){ const b = $('#btnAlerts'); b.textContent = 'Alertes : ' + (alerts ? 'on' : 'off'); b.classList.toggle('on', alerts); b.setAttribute('aria-pressed', alerts); }
-$('#btnAlerts').addEventListener('click', async () => {
-  if (!alerts && 'Notification' in window && Notification.permission !== 'granted') { try { await Notification.requestPermission(); } catch {} }
-  alerts = !alerts && (!('Notification' in window) || Notification.permission === 'granted');
-  store.set('alerts', alerts); paintAlertsBtn();
+const CATS = [['attention','Attend / validation','ATTEND'],['agents','Agents','AGENTS'],['kanban','Kanban','KANBAN'],['pr','Livraisons','LIVRAISONS'],['runner','Lanceur','LANCEUR']];
+const CAT_LABEL = Object.fromEntries(CATS.map(c => [c[0], c[2]]));
+const DEF_SET = {on:true, toasts:true, desktop:false, always:false, cats:{attention:true, agents:true, kanban:true, pr:true, runner:true}};
+let cfg = (() => { let v = null; try { v = JSON.parse(localStorage.getItem('stt-agents:notify')); } catch {} v = v && typeof v === 'object' ? v : {};
+  return {...DEF_SET, ...v, cats:{...DEF_SET.cats, ...(v.cats || {})}}; })();
+const saveCfg = () => { try { localStorage.setItem('stt-agents:notify', JSON.stringify(cfg)); } catch {} };
+const permState = () => 'Notification' in window ? Notification.permission : 'unsupported';
+const TOAST_MS = P.get('debug') === '1' ? 1500 : 8000;
+
+let iconUrl = null;
+function noticeIcon(){
+  if (iconUrl !== null) return iconUrl;
+  try {
+    const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+    g.fillStyle = '#0b1220'; g.fillRect(0, 0, 128, 128);
+    g.strokeStyle = '#ffb454'; g.lineWidth = 6; g.beginPath();
+    g.moveTo(10, 40); g.lineTo(10, 10); g.lineTo(40, 10); g.moveTo(88, 118); g.lineTo(118, 118); g.lineTo(118, 88); g.stroke();
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = "700 40px 'JetBrains Mono',monospace"; g.fillStyle = '#ffb454'; g.fillText('STT', 64, 56);
+    g.font = "700 30px 'JetBrains Mono',monospace"; g.fillStyle = '#5eead4'; g.fillText('//', 64, 94);
+    iconUrl = c.toDataURL('image/png');
+  } catch { iconUrl = ''; }
+  return iconUrl;
+}
+
+function goTab(name){ const b = document.getElementById('tabBtn' + name); if (b) b.click(); }
+function navigate(t){
+  if (!t) return;
+  if (t.type === 'agent') {
+    goTab('Agents');
+    setTimeout(() => {
+      const id = String(t.id), el = [...document.querySelectorAll('[data-id]')].find(e => e.dataset.id === id || e.dataset.id === 'n:' + id);
+      if (!el) return;
+      el.scrollIntoView({block:'center', behavior:'smooth'}); el.classList.add('hl'); setTimeout(() => el.classList.remove('hl'), 3000);
+    }, 50);
+  } else if (t.type === 'task') goTab('Kanban');
+  else if (t.type === 'pr') {
+    const pr = (S?.github?.prs || []).find(p => String(p.number) === String(t.id));
+    if (pr && pr.url) window.open(pr.url, '_blank', 'noopener'); else goTab('Delivery');
+  }
+}
+
+const toastsEl = $('#toasts');
+function closeToast(el){ if (!el || !el.isConnected) return; clearTimeout(el._t); el.remove(); }
+function showToast(n){
+  const el = document.createElement('div');
+  el.className = 'toast sev-' + (n.severity || 'info'); el.dataset.sev = n.severity || 'info'; el.dataset.cat = n.cat || ''; el.dataset.kind = n.kind || '';
+  el.tabIndex = 0;
+  el.innerHTML = `<div class="t-meta">${esc(CAT_LABEL[n.cat] || String(n.cat || '').toUpperCase())} · ${hhmm(n.ts)}</div><div class="t-title">${esc(n.title)}</div>${n.body ? `<div class="t-body">${esc(n.body)}</div>` : ''}<button type="button" class="t-close" aria-label="Fermer la notification">×</button>`;
+  el.addEventListener('click', e => { if (e.target.closest('.t-close')) { closeToast(el); return; } closeToast(el); navigate(n.target); });
+  el.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target === el) { closeToast(el); navigate(n.target); } });
+  const sticky = n.severity === 'attention' || n.severity === 'error';
+  const arm = () => { clearTimeout(el._t); if (!sticky) el._t = setTimeout(() => closeToast(el), TOAST_MS); };
+  el.addEventListener('mouseenter', () => clearTimeout(el._t)); el.addEventListener('mouseleave', arm); el.addEventListener('focusin', () => clearTimeout(el._t)); el.addEventListener('focusout', arm);
+  toastsEl.appendChild(el);
+  while (toastsEl.children.length > 5) closeToast(toastsEl.firstElementChild);
+  arm();
+}
+addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (!$('#alertsPop').hidden) { closePop(); return; }
+  const last = toastsEl.lastElementChild; if (last) closeToast(last);
 });
+
+function desktopNotice(n){
+  if (!cfg.desktop || permState() !== 'granted') return;
+  if (!document.hidden && !cfg.always) return;
+  try {
+    const x = new Notification('STT · ' + n.title, {body:n.body || '', tag:n.key || ('stt-' + n.id), icon:noticeIcon() || undefined, requireInteraction:n.severity === 'attention' || n.severity === 'error'});
+    x.onclick = () => { try { window.focus(); } catch {} navigate(n.target); x.close(); };
+  } catch {}
+}
+function present(n){
+  if (!cfg.on || !n || cfg.cats[n.cat] === false) return;
+  if (cfg.toasts) showToast(n);
+  desktopNotice(n);
+}
+let lastSeq = null;
+function handleNotices(st){
+  if (!st || typeof st.notice_seq !== 'number') return;
+  if (lastSeq === null) { lastSeq = st.notice_seq; return; }
+  const fresh = (st.notices || []).filter(n => n.id > lastSeq).sort((a, b) => a.id - b.id);
+  lastSeq = Math.max(lastSeq, st.notice_seq, ...fresh.map(n => n.id));
+  fresh.forEach(present);
+}
+if (P.get('debug') === '1') window.sttNotify = {push:present, settings:() => cfg};
+
+// popover de réglages
+const btnA = $('#btnAlerts'), pop = $('#alertsPop');
+function paintAlertsBtn(){ btnA.textContent = 'Alertes : ' + (cfg.on ? 'on' : 'off'); btnA.classList.toggle('on', cfg.on); btnA.setAttribute('aria-pressed', cfg.on); }
+function permLabel(){ return {granted:'accordée', denied:'refusée', default:'à demander', unsupported:'indisponible'}[permState()] || permState(); }
+function paintPop(){
+  const ck = (k, v, t, extra = '') => `<label><input type="checkbox" data-k="${k}"${v ? ' checked' : ''}> ${t}${extra}</label>`;
+  pop.innerHTML = `<h3>Alertes</h3>${ck('on', cfg.on, 'Alertes activées')}${ck('toasts', cfg.toasts, 'Toasts dans la page')}${ck('desktop', cfg.desktop, 'Notifications du bureau', `<span class="perm" id="permState">${permLabel()}</span>`)}${ck('always', cfg.always, 'Notifier même onglet visible')}
+    <div class="sub">Catégories</div>${CATS.map(c => ck('cat:' + c[0], cfg.cats[c[0]] !== false, c[1])).join('')}
+    <button type="button" class="btn" id="alertsTest">Tester</button>`;
+}
+function placePop(){ const r = btnA.getBoundingClientRect(); pop.style.top = (r.bottom + 6) + 'px'; pop.style.left = Math.max(10, Math.min(r.right - 300, innerWidth - 310)) + 'px'; }
+function openPop(){ paintPop(); pop.hidden = false; placePop(); btnA.setAttribute('aria-expanded', 'true'); const f = pop.querySelector('input'); if (f) f.focus(); }
+function closePop(){ if (pop.hidden) return; pop.hidden = true; btnA.setAttribute('aria-expanded', 'false'); btnA.focus(); }
+btnA.addEventListener('click', () => pop.hidden ? openPop() : closePop());
+pop.addEventListener('change', async e => {
+  const k = e.target.dataset.k; if (!k) return;
+  if (k.startsWith('cat:')) cfg.cats[k.slice(4)] = e.target.checked; else cfg[k] = e.target.checked;
+  if (k === 'desktop' && e.target.checked) {
+    if (!('Notification' in window)) { cfg.desktop = false; e.target.checked = false; }
+    else if (Notification.permission !== 'granted') {
+      try { await Notification.requestPermission(); } catch {}
+      if (Notification.permission !== 'granted') { cfg.desktop = false; e.target.checked = false; }
+    }
+    const ps = $('#permState'); if (ps) ps.textContent = permLabel();
+  }
+  saveCfg(); paintAlertsBtn();
+});
+pop.addEventListener('click', e => {
+  if (!e.target.closest('#alertsTest')) return;
+  const now = new Date().toISOString();
+  [['info','Test · information','Notice de sévérité info.'],['success','Test · succès','Notice de sévérité succès.'],['attention','Test · à relire','Notice de sévérité attention.'],['error','Test · erreur','Notice de sévérité erreur.']]
+    .forEach(([sev, title, body], i) => present({id:'test' + i, ts:now, kind:'test', cat:'agents', severity:sev, title, body, target:null, key:'stt-test-' + sev}));
+});
+pop.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); closePop(); } });
+document.addEventListener('mousedown', e => { if (!pop.hidden && !pop.contains(e.target) && !btnA.contains(e.target)) { pop.hidden = true; btnA.setAttribute('aria-expanded', 'false'); } });
+addEventListener('resize', () => { if (!pop.hidden) placePop(); });
 paintAlertsBtn();
 
 // --- interactions
@@ -866,7 +1010,7 @@ setInterval(() => { // horloges relatives sans re-rendu complet
 
 // ------------------------------------------------------------------ sources
 let stale = false, lastMsg = 0;
-function apply(state, m){ S = state; mode = m; stale = false; lastMsg = Date.now(); render(); }
+function apply(state, m){ S = state; mode = m; stale = false; lastMsg = Date.now(); render(); handleNotices(state); }
 const timeout = (p, t) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('délai dépassé')), t))]);
 
 function startLive(){
