@@ -27,7 +27,7 @@ Hors noyau (restent dans l'éditeur) : rendu, VFX, marqueurs, glisser-déposer (
 
 ## 2. Fichiers et `ORDER.txt`
 
-- `shared/sttcomp.js` (nouveau, ~500 l, ≤ 30 Ko) : `/* @provides STTCOMP */`, aucun `@requires`. `ORDER.txt` : ligne `shared/sttcomp.js` **juste après `sim/03-save.js`** (ligne 7), seule modification d'`ORDER.txt` du lot. Fin de fichier : `if (typeof module !== 'undefined') module.exports = STTCOMP;` (aucun effet dans le build concaténé ni dans le navigateur).
+- `shared/sttcomp.js` (nouveau, ~500 l, ≤ 30 Ko visés ; **relevé à ≤ 35 Ko le 07/10/2026** : 32 Ko mesurés après L2a.5, code lisible non compacté, le build obfusqué le réduit ; le critère du lot reste ≤ 60 Ko ajoutés au HTML) : `/* @provides STTCOMP */`, aucun `@requires`. `ORDER.txt` : ligne `shared/sttcomp.js` **juste après `sim/03-save.js`** (ligne 7), seule modification d'`ORDER.txt` du lot. Fin de fichier : `if (typeof module !== 'undefined') module.exports = STTCOMP;` (aucun effet dans le build concaténé ni dans le navigateur).
 - `sources/src/data/modules-geom.json` (nouveau, produit, ≤ 25 Ko compact) : embarqué **sans modifier `build.py`** (la fonction `data()` reprend tout `src/data/*.json` hors `compositions/`) ; lu en L2 par `DATA.get('modules-geom')`.
 - `STT_modules/build_modules_geom.py` (nouveau, Python 3 stdlib) ; `STT_modules/build_game_pack.py` : option `--geom <fichier>` qui l'appelle sur la même entrée `--glb`.
 - Tests : `sources/src/test/unit/_sttcomp.mjs` (chargeur vm : `shared/sttcomp.js` + `modules-geom.json` + `src/assets/stt_fleet.json`), `sttcomp-mat4.test.mjs`, `sttcomp-graph.test.mjs`, `sttcomp-checks.test.mjs`, `sttcomp-io.test.mjs`, `modules-geom.test.mjs`, `sttcomp-golden.test.mjs` + `fixtures/sttcomp-golden.json`. `_load.mjs` **non modifié**.
@@ -62,7 +62,7 @@ Matrices : `Float64Array(16)` ou tableau de 16 nombres, **colonne-major** (même
 
 - **Éditeur autonome (r169)** : charge `<script src="../../shared/sttcomp.js"></script>` avant le module ; construit `geom` **depuis ses prototypes three** par un adaptateur `geomFromProtos()` (~40 l, réutilise `relMatrix`/`hullBox`/`fullBox` existants) → aucune dépendance au JSON, comportement identique hors ligne ; les fonctions du § 1 deviennent des enveloppes (`toast`, `commit`, `sel`) autour de `STTCOMP`. Il doit être servi depuis `demos/space-travel/` (`/STT_modules/sources/`), plus depuis `sources/` seul. L'autonome `chantier_naval_stt_autonome.html` est produit par `~/Documents/Blender/space-travel/scripts/build_viewer_standalone.py` (hors dépôt), qui retire l'importmap et n'intègre que le `<script type="module">` : il **doit apprendre à intégrer `sttcomp.js`** (voir points à trancher).
 - **Démo « Observation des étoiles »** : `build/build.py` et `build_min.js` listent leurs modules en dur ; `sttcomp` n'y est pas → **aucun rebuild, aucune version `ode_`**. Seule la doc (`CLAUDE.md`, en-tête de `CODEMAP.md` « shared = aussi utilisé par la démo ») précise l'exception.
-- **Jeu** : +`sttcomp.js` (≤ 30 Ko) et +`modules-geom.json` (≤ 25 Ko) → ≤ 60 Ko ; code non appelé avant L2.
+- **Jeu** : +`sttcomp.js` (≤ 35 Ko, voir § 2) et +`modules-geom.json` (≤ 25 Ko) → ≤ 60 Ko ; code non appelé avant L2.
 
 ## 6. Tâches
 
