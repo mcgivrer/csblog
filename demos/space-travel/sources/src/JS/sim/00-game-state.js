@@ -5,6 +5,7 @@
 /* @provides GAME */
 const GAME = (function(){
   const LEDGER_MAX = 200;                   // entrées conservées dans state.ledger (les plus anciennes sont écartées)
+  const JOURNAL_SAVED_MAX = 100;            // événements conservés dans state.journal (les plus anciens sont écartés)
   let state = null;                         // null = Partie libre
   const listeners = Object.create(null);    // événement -> [{ fn, off }]
 
@@ -47,6 +48,7 @@ const GAME = (function(){
       credits: credits,
       rp: 0,
       ledger: [],
+      journal: [],
       flagship: 's1',
       ships: [{ id: 's1', name: o.name || 'STT Courlis', comp: o.starter || 'stt-courlis', wear: 0, fuel: 1, at: null, order: null, crew: [] }],
       blueprints: {},
@@ -83,6 +85,16 @@ const GAME = (function(){
       if(state.ledger.length > LEDGER_MAX) state.ledger.splice(0, state.ledger.length - LEDGER_MAX);
       emit('credits', { credits: state.credits, delta: delta, reason: reason });
       return state.credits;
+    },
+    /* { e:[t, code, a, b] } : ajoute un événement du Journal à state.journal (champ additif de v:1) */
+    'journal.push': function(a){
+      const e = a.e;
+      if(!Array.isArray(e) || typeof e[1] !== 'string') throw new Error('journal_invalide');
+      if(!Array.isArray(state.journal)) state.journal = [];
+      state.journal.push([e[0], e[1], e[2] === undefined ? null : e[2], e[3] === undefined ? null : e[3]]);
+      if(state.journal.length > JOURNAL_SAVED_MAX) state.journal.splice(0, state.journal.length - JOURNAL_SAVED_MAX);
+      emit('journal', { e: state.journal[state.journal.length - 1] });
+      return state.journal.length;
     }
   };
 

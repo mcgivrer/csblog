@@ -1,6 +1,6 @@
 /* Chargeur des tests unitaires de la couche sim/ : reproduit le build (scripts classiques, portée globale commune,
    « use strict » en tête) dans un contexte vm avec bouchons (location, document, stockage en mémoire).
-   Usage : const t = load({ search: '?seed=ABC' }); t.GAME, t.RNG, t.DATA, t.SAVE, t.SEED, t.xmur3, t.mulberry32 */
+   Usage : const t = load({ search: '?seed=ABC' }); t.GAME, t.RNG, t.DATA, t.SAVE, t.JOURNAL, t.SEED, t.xmur3, t.mulberry32 */
 import vm from 'node:vm';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 const ICI = path.dirname(fileURLToPath(import.meta.url));
 export const JS_DIR = path.resolve(ICI, '../../JS');
 export const SIM_DIR = path.join(JS_DIR, 'sim');
+export const UI_DIR = path.join(JS_DIR, 'ui');
 export const PRNG_FILE = path.join(JS_DIR, 'game', '02-prng-seede-tout-l.js');
 export const ECONOMY_FILE = path.resolve(ICI, '../../data/economy.json');
 
@@ -33,7 +34,8 @@ export function memoryStorage(){
 
 /* opts : search ('' par défaut), data (contenu de #sttData), document (membres ajoutés au bouchon),
           setup(sandbox) avant création du contexte, headless (retire document et localStorage après le PRNG),
-          concat (un seul script, comme le build) */
+          concat (un seul script, comme le build),
+          ui (fichiers de src/JS/ui/ chargés après sim/, ex. ['50-console.js'] ; t.CONSOLE si présent) */
 export function load(opts = {}){
   const logs = [];
   const localStorage = memoryStorage();
@@ -66,14 +68,15 @@ export function load(opts = {}){
   const sims = simFiles();
   if(opts.concat) exec('sim-concat.js', sims.map(lire).join('\n'));
   else sims.forEach(f => exec(f, lire(f)));
+  (opts.ui || []).forEach(n => { const f = path.join(UI_DIR, n); exec(f, lire(f)); });
   const apresSim = Object.getOwnPropertyNames(ctx);
 
   const get = nom => vm.runInContext(nom, ctx);
   return {
     ctx, logs, timers, elements, localStorage, plain,
     run: code => vm.runInContext(code, ctx),
-    GAME: get('GAME'), RNG: get('RNG'), DATA: get('DATA'), SAVE: get('SAVE'),
-    SEED: get('SEED'), xmur3: get('xmur3'), mulberry32: get('mulberry32'),
+    GAME: get('GAME'), RNG: get('RNG'), DATA: get('DATA'), SAVE: get('SAVE'), JOURNAL: get('JOURNAL'),
+    SEED: get('SEED'), CONSOLE: (opts.ui || []).includes('50-console.js') ? get('CONSOLE') : undefined, xmur3: get('xmur3'), mulberry32: get('mulberry32'),
     /* propriétés globales ajoutées par les fichiers sim/ (doit rester vide : les consts ne sont pas des propriétés) */
     nouvellesGlobales: apresSim.filter(n => !apresPrng.has(n) && !(opts.headless && (n === 'document' || n === 'localStorage'))),
     globalesPrng: [...apresPrng].filter(n => !avant.has(n))

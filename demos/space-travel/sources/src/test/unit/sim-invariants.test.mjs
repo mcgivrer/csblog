@@ -9,12 +9,13 @@ const ATTENDU = {
   '00-game-state.js': { header: '/* @provides GAME */', global: 'GAME' },
   '01-rng-game.js': { header: '/* @provides RNG @requires GAME @requires-engine xmur3, mulberry32, SEED */', global: 'RNG' },
   '02-data.js': { header: '/* @provides DATA */', global: 'DATA' },
-  '03-save.js': { header: '/* @provides SAVE @requires GAME */', global: 'SAVE' }
+  '03-save.js': { header: '/* @provides SAVE @requires GAME */', global: 'SAVE' },
+  '04-journal.js': { header: '/* @provides JOURNAL @requires GAME */', global: 'JOURNAL' }
 };
 const sansCommentaires = src => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 const fichiers = () => simFiles().map(f => [path.basename(f), fs.readFileSync(f, 'utf8')]);
 
-test('sim/ contient exactement les quatre fichiers du contrat L0.5', () => {
+test('sim/ contient exactement les fichiers du contrat (L0.5 + 04-journal)', () => {
   assert.deepEqual(fichiers().map(([n]) => n), Object.keys(ATTENDU));
 });
 
@@ -51,11 +52,11 @@ test('aucun Math.random, THREE ni window dans sim/ ; document seulement garde pa
   assert.doesNotMatch(save.slice(0, save.indexOf('function exportFile')), /\bdocument\./, 'SAVE : document. seulement dans exportFile');
 });
 
-test('chargement : aucune propriété globale ajoutée par sim/, seules les quatre consts existent', () => {
+test('chargement : aucune propriété globale ajoutée par sim/, seules les cinq consts existent', () => {
   const t = load();
   assert.deepEqual(t.nouvellesGlobales, []);
   assert.deepEqual(t.globalesPrng.sort(), ['mulberry32', 'rngFor', 'xmur3']);
-  for(const n of ['GAME', 'RNG', 'DATA', 'SAVE']) assert.equal(t.run('typeof ' + n), 'object', n);
+  for(const n of ['GAME', 'RNG', 'DATA', 'SAVE', 'JOURNAL']) assert.equal(t.run('typeof ' + n), 'object', n);
   assert.equal(t.run('typeof THREE'), 'undefined');
 });
 

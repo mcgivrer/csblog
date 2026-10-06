@@ -226,11 +226,11 @@ const BRIDGE = (function(){
     linked = true;
     /* crédits : addCredits reste l'unique point d'écriture du moteur ; GAME.state suit */
     const addCredits0 = addCredits;
-    addCredits = function(amount){
-      addCredits0(amount);
+    addCredits = function(amount, reason){
+      addCredits0(amount, reason);
       const st = GAME.state;
       if(!st || st.credits === credits) return;
-      try{ GAME.cmd('credits.set', { credits: credits, reason: 'jeu' }); }catch(err){ console.error('[BRIDGE] crédits :', err); }
+      try{ GAME.cmd('credits.set', { credits: credits, reason: reason || 'jeu' }); }catch(err){ console.error('[BRIDGE] crédits :', err); }
     };
     /* horloge : secondes de jeu actif (ni avant le départ, ni en pause) */
     setInterval(function(){ if(GAME.state && gameStarted && !gamePaused) GAME.tick(1); }, 1000);

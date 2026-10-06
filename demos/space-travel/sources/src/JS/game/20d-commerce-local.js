@@ -165,7 +165,7 @@ const LOCAL = (function(){
   document.getElementById('shipyardList').addEventListener('click', function(e){
     const b = e.target.closest('.board-row-btn'); if(!b || b.classList.contains('port-disabled')) return;
     const price = +b.dataset.price; if(credits < price) return;
-    addCredits(-price);
+    addCredits(-price, 'yard');
     installShip(b.dataset.id, {});
     closeShipyard(); refreshShipyardRow(); refreshPortPanel();
   });
@@ -176,6 +176,7 @@ const LOCAL = (function(){
   document.querySelectorAll('[data-panel-cls="__contracts__"]').forEach(function(b){ b.addEventListener('click', closeContractBoard); });
 
   return { buildStations: buildStations, updateStations: updateStations, disposeStations: disposeStations,
-    refreshShipyardRow: refreshShipyardRow, openContractBoard: openContractBoard };
+    refreshShipyardRow: refreshShipyardRow, openContractBoard: openContractBoard, closeContractBoard: closeContractBoard,
+    openShipyard: openShipyard, closeShipyard: closeShipyard };
 })();
 function buildStations(leg){ LOCAL.buildStations(leg); }

@@ -14,7 +14,7 @@ test('newCampaign : forme de l\'état SPEC-010 § 2.5', () => {
   assert.deepEqual(plain(s), {
     v: 1, mode: 'campaign', seed: 'ABC', clock: 0,
     company: { name: 'STT', mark: 'STT', livery_hex: '#2d6cdf', emblem: 'star4', reputation: 0 },
-    credits: 4000, rp: 0, ledger: [], flagship: 's1',
+    credits: 4000, rp: 0, ledger: [], journal: [], flagship: 's1',
     ships: [{ id: 's1', name: 'Courlis I', comp: 'stt-courlis', wear: 0, fuel: 1, at: null, order: null, crew: [] }],
     blueprints: {}, crew: [], tech: { done: [], queue: [] }, stations: [],
     missions: { active: null, serial: 0 }, flags: {}

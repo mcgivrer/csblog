@@ -1,5 +1,5 @@
 /* =========================================================================
-   ITINÉRAIRE + POINT DE LAGRANGE (§ amélioration v2.4)
+   ITINÉRAIRE (§ amélioration v2.4)
    ========================================================================= */
 
 /* Pastilles de la piste — régénérées seulement quand ROUTE.index change
@@ -45,44 +45,4 @@ function updateItineraryShip(){
   const localIdx = THREE.MathUtils.clamp(idx-start, 0, count-1);
   const frac = count>1 ? (localIdx+legFrac)/(count-1) : 0;
   ship.style.left = (THREE.MathUtils.clamp(frac,0,1)*100)+'%';
-}
-
-/* Point de Lagrange approximatif (L1) de l'étape en cours : sur l'axe
-   étoile→planète cible, à 92% de la distance en partant de l'étoile — une
-   approximation assumée (cf. commentaire CSS de .hud-lagrange), pas un
-   calcul à N corps : les planètes générées n'ont pas de masse simulée dont
-   tirer un vrai point de libration. */
-const LAGRANGE_FRACTION = 0.92;
-function computeLagrangePoint(leg){
-  if(!leg || !leg.planet || !leg.starPosition) return null;
-  const dir = leg.planet.position.clone().sub(leg.starPosition);
-  const dist = dir.length();
-  if(dist < 1) return leg.planet.position.clone();
-  dir.normalize();
-  return leg.starPosition.clone().addScaledVector(dir, dist*LAGRANGE_FRACTION);
-}
-const _lagTmp = new THREE.Vector3();
-function updateLagrangePanel(){
-  const panel = document.querySelector('.hud-lagrange');
-  if(!panel || panel.classList.contains('panel-hidden')) return;
-  const distEl = document.getElementById('lagrangeDist');
-  const nameEl = document.getElementById('lagrangeName');
-  const needle = document.getElementById('lagrangeNeedle');
-  if(!distEl || !nameEl || !needle) return;
-  const leg = ROUTE.legs[ROUTE.index];
-  const lp = computeLagrangePoint(leg);
-  if(!lp){
-    distEl.textContent = '—';
-    nameEl.textContent = t('noRoute');
-    return;
-  }
-  const forward = new THREE.Vector3(0,0,-1).applyQuaternion(shipRig.quaternion);
-  const heading = ((Math.atan2(forward.x, -forward.z)*180/Math.PI)+360)%360;
-  _lagTmp.copy(lp).sub(shipRig.position);
-  const dist = _lagTmp.length();
-  const targetHeading = ((Math.atan2(_lagTmp.x, -_lagTmp.z)*180/Math.PI)+360)%360;
-  const relBearing = (targetHeading-heading+360)%360;
-  needle.style.transform = 'rotate('+relBearing.toFixed(1)+'deg)';
-  distEl.textContent = Math.round(dist)+' u';
-  nameEl.textContent = 'L1 · '+leg.name;
 }
