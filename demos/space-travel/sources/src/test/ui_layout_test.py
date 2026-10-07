@@ -25,11 +25,10 @@ if os.path.isdir("/opt/pw-browsers"): os.environ.setdefault("PLAYWRIGHT_BROWSERS
 
 # défaut -> tâche qui le corrige (§ 3 du contrat). Retirer l'entrée quand la tâche est livrée.
 PENDING = {
-    "D1": "U1.1", "D2": "U1.1", "D3": "U1.1", "D24": "U1.1",
+    "D2": "U1.1",
     "D4": "U1.2", "D12": "U1.2", "D13": "U1.2", "D14": "U1.2", "D15": "U1.2", "D16": "U1.2", "D25": "U1.2",
     "D4p": "U1.3", "D5": "U1.3", "D6": "U1.3", "D8": "U1.3", "D9": "U1.3",
     "D7": "U1.4", "D10": "U1.4", "D17": "U1.4",
-    "D26": "U1.1",
     "D18": "U1.5", "D19": "U1.5", "D21": "U1.5", "D22": "U1.5",
     "D11": "U1.6", "D20": "U1.6",
 }
