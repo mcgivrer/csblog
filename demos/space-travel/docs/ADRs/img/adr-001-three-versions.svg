@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 360" font-family="system-ui, sans-serif" font-size="13">
+<title>ADR-001 : version de Three.js par composant, avant et après la migration r186</title>
+<desc>Matrice composant par version. Avant : jeu, présentation, modules partagés et démo en r128, éditeur en r169 chargé par import map. Après : une seule version épinglée r186 (0.186.1) fournie par packages/three ; la démo cinématique reste gelée en r128 et les modules partagés passent par l'adaptateur __STTGL pendant la transition.</desc>
+<rect width="960" height="360" fill="#f6f5f0"/>
+<text x="480" y="30" text-anchor="middle" font-size="18" font-weight="700" fill="#141413">Three.js par composant : avant et après (cible épinglée r186 = 0.186.1)</text>
+<g fill="#141413" font-weight="700"><text x="20" y="66">Composant</text><text x="270" y="66">Avant</text><text x="620" y="66">Après (proposé)</text></g>
+<line x1="20" y1="76" x2="940" y2="76" stroke="#333" stroke-width="2"/>
+<g stroke="#555" stroke-width="1">
+<rect x="260" y="88" width="330" height="40" rx="6" fill="#fbe5ec"/><rect x="610" y="88" width="330" height="40" rx="6" fill="#e4f4e4"/>
+<rect x="260" y="140" width="330" height="40" rx="6" fill="#fbe5ec"/><rect x="610" y="140" width="330" height="40" rx="6" fill="#e4f4e4"/>
+<rect x="260" y="192" width="330" height="40" rx="6" fill="#fbe5ec"/><rect x="610" y="192" width="330" height="40" rx="6" fill="#fdf0d5"/>
+<rect x="260" y="244" width="330" height="40" rx="6" fill="#fbe5ec"/><rect x="610" y="244" width="330" height="40" rx="6" fill="#ececec"/>
+<rect x="260" y="296" width="330" height="40" rx="6" fill="#e3effa"/><rect x="610" y="296" width="330" height="40" rx="6" fill="#e4f4e4"/>
+</g>
+<g fill="#141413">
+<text x="20" y="113" font-weight="700">Jeu (sources/)</text>
+<text x="272" y="113">r128 : vendor UMD + GLTFLoader non module</text>
+<text x="622" y="113">r186 : bundle IIFE de packages/three</text>
+<text x="20" y="165" font-weight="700">Présentation</text>
+<text x="272" y="165">r128 : emprunte le vendor du jeu</text>
+<text x="622" y="165">r186 : même bundle packages/three</text>
+<text x="20" y="217" font-weight="700">Modules partagés</text>
+<text x="272" y="217">r128 (jeu et démo)</text>
+<text x="622" y="217">r186 et r128 via l'adaptateur __STTGL</text>
+<text x="20" y="269" font-weight="700">Démo cinématique</text>
+<text x="272" y="269">r128 dans engine/game.html (v2.15)</text>
+<text x="622" y="269">r128 gelée (recommandé, question 7)</text>
+<text x="20" y="321" font-weight="700">Éditeur de modules</text>
+<text x="272" y="321">r169 : modules ES, import map CDN</text>
+<text x="622" y="321">r186 : import map épinglée 0.186.1</text>
+</g>
+</svg>
