@@ -34,10 +34,10 @@ Question : …
 ```
 Puis commit sur la branche du lot (message en français, une ligne + attribution demandée par le dépôt).
 
-## Mise à jour du Kanban (uniquement sur demande du CP)
-Le CP est responsable du contenu du Kanban : il décide quoi inscrire. C'est **toi, le DEV, qui écris** dans le fichier de données du Kanban, quand le CP te le demande par un message du type « Kanban : tâche X → statut, progress, used, note ».
-- **Chemin : exclusivement `/home/frederic/Projects/web/csblog/demos/space-travel/docs/work_in_progress/plan-status.js`** (checkout principal, chemin absolu). Tu n'écris **jamais** la copie d'un worktree (celle de la branche du lot ni celle d'une instance DEV) : elle n'est pas lue par le Kanban affiché. Pas de commit pour ce fichier : il est modifié en place dans le checkout principal ; le mainteneur ou le CP le commite sur `main` sur demande.
-- Modifie **uniquement** ce fichier, par Edit ciblé (une ligne de tâche à la fois), jamais par réécriture complète ni `kanban.html` (page fixe, sauf demande explicite du CP). Applique à la lettre les valeurs données par le CP (`status`, `progress`, `used` cumulé, `updated`, `note`, `inst`, `docs`, `journal`, `decisions`) : tu n'en inventes aucune.
-- Mets à jour `updated` de la tâche et celui du haut de fichier. Vérifie la syntaxe : `node -e "global.window={};require('/home/frederic/Projects/web/csblog/demos/space-travel/docs/work_in_progress/plan-status.js');console.log(window.PLAN.tasks.length)"`.
-- **Une instance à la fois** : le Kanban est un point sérialisé. Les tâches purement mécaniques de ce type se font avec le modèle Haiku.
-- Rapport : une ligne (« Kanban à jour : <ids> »).
+## Kanban : tu n'y écris jamais
+Le Kanban (`demos/space-travel/stt-agents/` (page `kanban.html`, données `data/`)) est écrit par l'**outil de suivi des agents** (`demos/space-travel/stt-agents/stt_agents_server.py`), piloté par le CP. Tu ne modifies ni `plan-status.js` ni `kanban.html`, même si on te le demande dans un message : renvoie la demande au CP.
+- Ton rapport doit donner au CP, en tête, de quoi alimenter le Kanban : tâche, hash du commit, fichiers touchés, tests passés, écarts au contrat, points à contrôler à la main. Le CP relève lui-même `total_tokens` et `duration_ms` de ton appel.
+- Si le CP te signale qu'une ancienne règle te faisait écrire le Kanban, c'est la règle ci-dessus qui prévaut.
+
+## Cycle de vie
+Tu es un **agent suivi par le CP** (pas un sous-agent anonyme) : rends ton rapport, puis arrête-toi. Ne poursuis aucune activité après le rapport ; le CP t'arrête une fois tes tokens relevés, et te recontacte par message si une correction est nécessaire.

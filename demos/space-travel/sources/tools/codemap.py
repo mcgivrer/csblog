@@ -568,7 +568,7 @@ PREAMBLE = """<!-- GÉNÉRÉ par sources/tools/codemap.py — NE PAS ÉDITER : c
 **Généré, ne pas éditer.** Régénérer : `cd demos/space-travel/sources && python3 tools/codemap.py`. Les sections suivent l'ordre de `ORDER.txt` = ordre de chargement (scripts classiques, portée globale partagée).
 Usage : repérer `nom:ligne`, puis lire par plage (`sed -n 'a,bp' fichier`) plutôt que le fichier entier.
 **Liste noire** (ne jamais lire en entier) : fichiers de plus de 300 Ko (dont `src/JS/vendor/*.min.js`), `*.min.html`, `sources/target/*`, `docs/spec-*-P1.md`, `docs/specs/*-autonome.md`, `STT_ModuleLibrary.json`, `*.glb`, `archives/` ; voir aussi `CLAUDE.md`.
-Chemins : sans préfixe = `sources/src/JS/game/` ; `sim/`, `ui/` = `sources/src/JS/sim/`, `ui/` ; `shared/` = `demos/space-travel/shared/` (source unique, aussi utilisée par la démo « Observation des étoiles »).
+Chemins : sans préfixe = `sources/src/JS/game/` ; `sim/`, `ui/` = `sources/src/JS/sim/`, `ui/` ; `shared/` = `demos/space-travel/shared/` (source unique, aussi utilisée par la démo « Observation des étoiles », sauf `sttcomp` : consommé par le jeu et l'éditeur, pas par la démo).
 Légende : `fn` = function de niveau 0 · `var` = const/let/var de niveau 0 · `ns X` = `const X = (function(){…})()` et clés de son `return {…}` final (ligne de la déclaration locale, sinon de la clé) · `win` = `window.__X =` (×n = nombre d'affectations) · `[IIFE]` = module entièrement enveloppé : les déclarations listées sont locales, seuls les `win` sont globaux · `@provides` / `@requires` = balises de dépendances."""
 
 

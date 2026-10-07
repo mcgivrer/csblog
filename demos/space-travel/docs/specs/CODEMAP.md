@@ -4,9 +4,9 @@
 **Généré, ne pas éditer.** Régénérer : `cd demos/space-travel/sources && python3 tools/codemap.py`. Les sections suivent l'ordre de `ORDER.txt` = ordre de chargement (scripts classiques, portée globale partagée).
 Usage : repérer `nom:ligne`, puis lire par plage (`sed -n 'a,bp' fichier`) plutôt que le fichier entier.
 **Liste noire** (ne jamais lire en entier) : fichiers de plus de 300 Ko (dont `src/JS/vendor/*.min.js`), `*.min.html`, `sources/target/*`, `docs/spec-*-P1.md`, `docs/specs/*-autonome.md`, `STT_ModuleLibrary.json`, `*.glb`, `archives/` ; voir aussi `CLAUDE.md`.
-Chemins : sans préfixe = `sources/src/JS/game/` ; `sim/`, `ui/` = `sources/src/JS/sim/`, `ui/` ; `shared/` = `demos/space-travel/shared/` (source unique, aussi utilisée par la démo « Observation des étoiles »).
+Chemins : sans préfixe = `sources/src/JS/game/` ; `sim/`, `ui/` = `sources/src/JS/sim/`, `ui/` ; `shared/` = `demos/space-travel/shared/` (source unique, aussi utilisée par la démo « Observation des étoiles », sauf `sttcomp` : consommé par le jeu et l'éditeur, pas par la démo).
 Légende : `fn` = function de niveau 0 · `var` = const/let/var de niveau 0 · `ns X` = `const X = (function(){…})()` et clés de son `return {…}` final (ligne de la déclaration locale, sinon de la clé) · `win` = `window.__X =` (×n = nombre d'affectations) · `[IIFE]` = module entièrement enveloppé : les déclarations listées sont locales, seuls les `win` sont globaux · `@provides` / `@requires` = balises de dépendances.
-Source de l'ordre : `src/JS/game/ORDER.txt` (77 entrées). 77 fichiers lus (0 absents ou ignorés) · 15931 lignes · 291 fn · 419 var · 23 ns · 26 window.__.
+Source de l'ordre : `src/JS/game/ORDER.txt` (81 entrées). 82 fichiers lus (0 absents ou ignorés) · 17642 lignes · 320 fn · 465 var · 25 ns · 27 window.__.
 
 ## Modules
 ### 00-prologue.js · 1 l
@@ -16,8 +16,8 @@ Source de l'ordre : `src/JS/game/ORDER.txt` (77 entrées). 77 fichiers lus (0 ab
 ### 02-prng-seede-tout-l.js · 30 l — 1. PRNG SEEDÉ — tout l'univers découle d'une seule graine
 - fn: xmur3:4, mulberry32:17, rngFor:25
 - var: SEED:28
-### sim/00-game-state.js · 112 l — CAMPAGNE 1. ÉTAT DE PARTIE — GAME : état SPEC-010 § 2.5, événements, commandes, horloge
-- ns GAME:6: state:108, newCampaign:38, load:63, reset:70, mode:71, on:15, emit:28, cmd:89, tick:98
+### sim/00-game-state.js · 124 l — CAMPAGNE 1. ÉTAT DE PARTIE — GAME : état SPEC-010 § 2.5, événements, commandes, horloge
+- ns GAME:6: state:120, newCampaign:39, load:65, reset:72, mode:73, on:16, emit:29, cmd:101, tick:110
 - @provides GAME
 ### sim/01-rng-game.js · 13 l — CAMPAGNE 2. ALÉA DE LA SIMULATION — RNG.game(tag) : suites déterministes dérivées de la graine de la partie
 - ns RNG:6: game:8
@@ -28,6 +28,12 @@ Source de l'ordre : `src/JS/game/ORDER.txt` (77 entrées). 77 fichiers lus (0 ab
 ### sim/03-save.js · 100 l — CAMPAGNE 4. SAUVEGARDE — SAVE : sérialisation versionnée, stockage local, export / import de fichier
 - ns SAVE:7: VERSION:94, KEYS:8, MIGRATIONS:9, serialize:17, parse:23, write:42, read:54, has:63, setStorage:71, exportFile:74, importText:89
 - @provides SAVE · @requires GAME
+### shared/sttcomp.js · 531 l
+- ns STTCOMP:10: m4:25, v3:14, PORT_PREF:84, FAMILIES:87, ARCH_AUTO:88, CREW:89, autoGame:90, cleanGame:95, create:111
+- @provides STTCOMP
+### sim/04-journal.js · 164 l — CAMPAGNE 1b. JOURNAL — radio, grand livre et événements de bord : anneau de 300 entrées, lecture fusionnée, d…
+- ns JOURNAL:23: RING_MAX:24, add:66, list:93, ledgerRows:80, unread:106, markRead:111, on:35, now:56, tickFree:57, detect:128, restore:115, _reset:154
+- @provides JOURNAL · @requires GAME
 ### 03-generateur-de-noms-melange.js · 34 l — 2. GÉNÉRATEUR DE NOMS — mélange de racines grecques, latines, hindi,
 - fn: cap:17, toRoman:21, generateName:22
 - var: LANG_BANKS:5, LANG_KEYS:16, ROMAN_NUMERALS:20
@@ -115,17 +121,17 @@ Source de l'ordre : `src/JS/game/ORDER.txt` (77 entrées). 77 fichiers lus (0 ab
 - fn: shadeHex:9, buildHullPanelTexture:15, buildRingTexture:86, buildPlanetSystemMeshes:119, disposePlanetGroup:230, ensureSystemsBuilt:245, findNextWaypoint:253, planRoute:286,
   buildRouteCurve:337, buildRouteGates:350, refreshRoutePanel:504
 - var: HOP_MIN:249, HOP_MAX:249, GATE_SPACING:334, GATE_HALF:335
-### 17-itineraire-point-de-lagrange.js · 88 l — ITINÉRAIRE + POINT DE LAGRANGE (§ amélioration v2.4)
-- fn: refreshItineraryDots:10, updateItineraryShip:33, computeLagrangePoint:56, updateLagrangePanel:65
-- var: ITIN_WINDOW:9, LAGRANGE_FRACTION:55, _lagTmp:64
+### 17-itineraire-point-de-lagrange.js · 48 l — ITINÉRAIRE (§ amélioration v2.4)
+- fn: refreshItineraryDots:10, updateItineraryShip:33
+- var: ITIN_WINDOW:9
 ### shared/planets.js · 538 l [IIFE] — PLANÈTES DÉTAILLÉES — surface procédurale à détail adaptatif,
 - fn: auroraGeometry:420, prng:442, randDir:443
 - var: PL:8, PIX:9, NOISE:13, CLOUDS:91, SURF_VERT:131, SURF_FRAG:139, CLOUD_FRAG:322, ATM_VERT:350, ATM_FRAG:351, AUR_VERT:384, AUR_FRAG:399, AUR_GEO:428, AURORA_ALL:429, H:431, KIND_ID:433,
   COVER:434, ATMO:435, _q:509, _v:509, _sun:510, _white:510
 - win: __PLANETS:8
-### shared/asteroids.js · 241 l [IIFE] — ASTÉROÏDES TEXTURÉS — générés au démarrage
-- fn: hash3:14, vnoise3:15, fbm3:22, tnoise:24, tfbm:30, prng:31, icosphere:34, rockGeometry:48, makeTextures:82, makeMaterial:159
-- var: AST:11, FAMILIES:76, TRI_VERT_PARS:126, TRI_VERT:127, TRI_FRAG_PARS:134
+### shared/asteroids.js · 242 l [IIFE] — ASTÉROÏDES TEXTURÉS — générés au démarrage
+- fn: hash3:14, vnoise3:15, fbm3:22, tnoise:24, tfbm:30, prng:31, icosphere:34, rockGeometry:48, makeTextures:83, makeMaterial:160
+- var: AST:11, FAMILIES:77, TRI_VERT_PARS:127, TRI_VERT:128, TRI_FRAG_PARS:135
 - win: __AST:11
 ### shared/stars.js · 368 l [IIFE] — ÉTOILES DE SYSTÈME — rendu « cinéma »
 - fn: activity:17, stripGeometry:215, prng:222, randDir:223, circleOverlap:293
@@ -172,8 +178,8 @@ Source de l'ordre : `src/JS/game/ORDER.txt` (77 entrées). 77 fichiers lus (0 ab
 - var: JUMP_GRID:93, WARP_STREAKS:93, WARP_STREAK_OFF:93, _jgUp:94, _wsFwd:94, _wsU:94, _wsY:94
 ### 22-commandes-de-vol-derive.js · 5 l — 8. COMMANDES DE VOL — dérive automatique par défaut, prise de contrôle
 - var: AXIS_X:5, AXIS_Y:5, AXIS_Z:5
-### 23-planification-relance-d-itineraire.js · 389 l — PLANIFICATION / RELANCE D'ITINÉRAIRE
-- fn: computeRoute:9, toggleRadioPanel:357, nextCameraMode:362, toggleVoiceMute:366, toggleAudioPanel:372
+### 23-planification-relance-d-itineraire.js · 384 l — PLANIFICATION / RELANCE D'ITINÉRAIRE
+- fn: computeRoute:9, toggleRadioPanel:352, nextCameraMode:357, toggleVoiceMute:361, toggleAudioPanel:367
 - var: keys:232
 ### 24-mode-pause-11-de.js · 234 l — MODE PAUSE — §11 de la spec v2.1.
 - fn: pickCinematicTarget:27, updateTitleCinematic:58, enterPause:94, resumeGame:107, quitToTitle:117, pickDistantShot:153, flashCameraModeLabel:183
@@ -181,10 +187,10 @@ Source de l'ordre : `src/JS/game/ORDER.txt` (77 entrées). 77 fichiers lus (0 ab
   lastPX:130, lastPY:130, dragYaw:130, dragPitch:130, touchLookHeld:135, camOrbitYaw:145, camOrbitPitch:145, ctrlDownAt:146, ctrlDragged:146, CAMERA_MODES:147, cameraMode:148,
   distantShotState:152, cameraModeFlashTimer:182
 ### 25-controle-tactile-15-de.js · 7 l — CONTRÔLE TACTILE — §15 de la spec v2.1. Détection par capacité de
-### 26-barre-d-icones-du.js · 420 l — BARRE D'ICÔNES DU HUD — §12 de la spec v2.1. Un mécanisme UNIQUE pour le
-- fn: isNearPortService:89, activateHudBarItem:102, refreshHudIconBar:138, buildHelpGrid:192, effectiveCruiseSpeed:415, speedUpgradeCost:418
-- var: HUD_ICONS:10, HUD_BAR_ITEMS:47, manual:395, lastInputTime:396, rcsDemand:398, rcsLevel:400, IDLE_MS:401, CRUISE_SPEED_BASE:402, BOOST_MULT:402, currentSpeed:406, speedUpgradeLevel:412,
-  SPEED_UPGRADE_STEP:413, SPEED_UPGRADE_MAX:414
+### 26-barre-d-icones-du.js · 415 l — BARRE D'ICÔNES DU HUD — §12 de la spec v2.1. Un mécanisme UNIQUE pour le
+- fn: isNearPortService:84, activateHudBarItem:97, refreshHudIconBar:133, buildHelpGrid:187, effectiveCruiseSpeed:410, speedUpgradeCost:413
+- var: HUD_ICONS:10, HUD_BAR_ITEMS:43, manual:390, lastInputTime:391, rcsDemand:393, rcsLevel:395, IDLE_MS:396, CRUISE_SPEED_BASE:397, BOOST_MULT:397, currentSpeed:401, speedUpgradeLevel:407,
+  SPEED_UPGRADE_STEP:408, SPEED_UPGRADE_MAX:409
 ### 27-carburant-22-jauge-consommation.js · 35 l — CARBURANT (§22) — jauge, consommation liée au régime moteur,
 - fn: fuelRefuelCost:33
 - var: FUEL_CAPACITY:10, fuel:11, FUEL_CONSUMPTION_EXPONENT:19, FUEL_EMPTY_SPEED_SCALE:27, FUEL_PRICE_PER_UNIT:30, FUEL_WARN_RATIO:32, FUEL_CRIT_RATIO:32
@@ -196,10 +202,10 @@ Source de l'ordre : `src/JS/game/ORDER.txt` (77 entrées). 77 fichiers lus (0 ab
 ### 29-economie-credits.js · 47 l — ÉCONOMIE — crédits
 - fn: formatCredits:12, refreshCreditsDisplay:16, addCredits:26
 - var: credits:10, creditsFlashTimer:11, orbitState:32
-### 30-canal-radio-echanges-equipage.js · 315 l — CANAL RADIO — échanges équipage / contrôle du port pendant l'approche
+### 30-canal-radio-echanges-equipage.js · 305 l — CANAL RADIO — échanges équipage / contrôle du port pendant l'approche
 - fn: showWelcomeMessage:12, buildRadioScript:25, repositionRadioPanel:59, repositionPortPanel:74, repositionRoutePanel:99, repositionAllPanels:109, repositionCornerBottomPanels:137,
-  refreshPortPanel:201, refreshFuelPortRow:225, refreshJumpPortRow:244, buySpeedUpgrade:260, buyFuel:268, buyQuantumJump:276, appendRadioLine:299
-- var: RADIO_AVATARS:292
+  refreshPortPanel:191, refreshFuelPortRow:215, refreshJumpPortRow:234, buySpeedUpgrade:250, buyFuel:258, buyQuantumJump:266, appendRadioLine:289
+- var: RADIO_AVATARS:282
 ### 31-son-et-voix-du.js · 12 l — SON ET VOIX DU CANAL RADIO
 - var: radioMuted:12
 ### 32-musique-de-fond-et.js · 118 l — MUSIQUE DE FOND ET RÉGLAGE DES VOLUMES (demande utilisateur)
@@ -224,7 +230,7 @@ Source de l'ordre : `src/JS/game/ORDER.txt` (77 entrées). 77 fichiers lus (0 ab
 ### 38-dialogue-de-telemetrie-commandes.js · 37 l — DIALOGUE DE TÉLÉMÉTRIE — commandes d'allumage/puissance envoyées aux
 - fn: updateTelemetryPanel:8
 - var: lastTmUpdate:7
-### 39-temperature-moteur-simulation-simple.js · 126 l — TEMPÉRATURE MOTEUR — simulation simple : chaque réacteur chauffe avec sa
+### 39-temperature-moteur-simulation-simple.js · 124 l — TEMPÉRATURE MOTEUR — simulation simple : chaque réacteur chauffe avec sa
 - fn: updateEngineTemps:8, updateHud:30
 - var: engineTemps:6, lastTempUpdate:7
 ### 40-boucle-principale.js · 5 l — 10. BOUCLE PRINCIPALE
@@ -239,11 +245,15 @@ Source de l'ordre : `src/JS/game/ORDER.txt` (77 entrées). 77 fichiers lus (0 ab
 ### 45-campaign-bridge.js · 286 l — CAMPAGNE 5. PONT — BRIDGE : choix du mode, reprise, synchro crédits / horloge, sauvegarde automatique, menu p…
 - ns BRIDGE:7: chooseMode:90, resume:173
 - @provides BRIDGE · @requires GAME, SAVE, DATA · @requires-engine addCredits, credits, refreshCreditsDisplay, MODSHIP, MISSIONS, SHIPGEN, SEED, LANG, t, gameStarted, gamePaused, jumpState
-### ui/50-console.js · 210 l — CAMPAGNE 1. CONSOLE DE BORD — CONSOLE : modèle des onglets, événements, table des touches (L1)
-- ns CONSOLE:6: register:57, tabs:200, visibleTabs:52, current:202, last:203, isOpen:204, open:85, close:105, toggle:116, refresh:122, badge:138, badges:149, on:18, keyAction:155, _reset:191
+### 46-journal-sources.js · 82 l [IIFE] — CAMPAGNE 1b. SOURCES DU JOURNAL — adaptateur : radio, finances (avec motif) et événements de bord
+- fn: snapshot:39, sample:57, reset:74
+- var: PERIOD:7, prev:8
+- @provides JOURNAL.sources · @requires JOURNAL, GAME · @requires-engine addCredits, credits, appendRadioLine, REAL, MISSIONS, fuel, FUEL_CAPACITY, FUEL_WARN_RATIO, FUEL_CRIT_RATIO, jumpState, isNearPortService, gameStarted, gamePaused
+### ui/50-console.js · 217 l — CAMPAGNE 1. CONSOLE DE BORD — CONSOLE : modèle des onglets, événements, table des touches (L1)
+- ns CONSOLE:6: register:57, tabs:207, visibleTabs:52, current:209, last:210, isOpen:211, open:86, close:106, toggle:117, refresh:123, badge:139, badges:150, on:18, keyAction:157, _reset:198
 - @provides CONSOLE
-### ui/51-console-view.js · 231 l [IIFE] — CAMPAGNE 1. CONSOLE DE BORD — vue : cadre #sttConsole, CSS, hébergement des overlays, clavier minimal (L1)
-- fn: label:63, panelFor:68, buttonFor:82, render:99, ensure:122, sync:152, onMutation:159, attach:169, host:179, typing:190, eat:198, onKeyDown:200, onKeyUp:216
+### ui/51-console-view.js · 232 l [IIFE] — CAMPAGNE 1. CONSOLE DE BORD — vue : cadre #sttConsole, CSS, hébergement des overlays, clavier minimal (L1)
+- fn: label:63, panelFor:68, buttonFor:82, render:99, ensure:122, sync:152, onMutation:159, attach:169, host:179, typing:190, eat:198, onKeyDown:200, onKeyUp:217
 - var: CSS:8, hosts:59, root:60, tabsEl:60, titleEl:60, closeEl:60, bodyEl:60, escHeld:61, TEXT_INPUT:189
 - @provides CONSOLE.view · @requires CONSOLE · @requires-engine t, gameStarted, gamePaused, activateHudBarItem, HUD_BAR_ITEMS
 ### ui/52-tab-aide.js · 54 l [IIFE] — CAMPAGNE 1. CONSOLE DE BORD — onglet Aide · Réglages (#helpOverlay puis #audioOverlay) (L1.3)
@@ -265,3 +275,16 @@ Source de l'ordre : `src/JS/game/ORDER.txt` (77 entrées). 77 fichiers lus (0 ab
 - fn: shown:8, ensureHost:11
 - var: hosted:10
 - @provides CONSOLE.yard · @requires CONSOLE, CONSOLE.view · @requires-engine isNearPortService, LOCAL
+### ui/57-tab-journal.js · 249 l [IIFE] — CAMPAGNE 1b. CONSOLE DE BORD — onglet Journal (touche L) : radio, finances, événements de bord (L1.14)
+- fn: pad:60, stamp:61, has:65, reasonLabel:67, eventText:73, span:84, rowFor:91, ensureRoot:119, render:156, markCursor:177, setFilter:187, scroller:194, onKey:196, isCurrent:216,
+  syncBadge:217
+- var: CSS:9, FILTERS:40, ICONS:46, EVT_KEY:47, MAX_LINES:49, st:51, filter:56, cursor:57, root:58, barEl:58, noteEl:58, listEl:58, emptyEl:58
+- @provides CONSOLE.journal · @requires CONSOLE, CONSOLE.view, JOURNAL · @requires-engine t, formatCredits
+## Hors ORDER.txt (non assemblés)
+### shared/cosmos.js · 726 l [IIFE] — COSMOS — moteur allégé de l'univers, sans vaisseau (lot P1 de la présentation)
+- fn: xmur3:26, mulberry32:31, generateName:52, pickWeighted:82, blackbodyRGB:83, luminosityFromMass:95, apparentMagnitude:97, generateStar:98, makeGlowTexture:138, makeNoiseTexture:145,
+  buildRingGeometry:225, buildRingTexture:236, scoreSystem:251
+- var: CO:15, V3:16, clamp:17, smooth:18, RSUN:21, REARTH:21, AU:21, GRAV:21, LY:21, PC:21, UNIT_GAL:22, rngFor:34, LANG_BANKS:37, LANG_KEYS:48, cap:49, ROMAN:50, toRoman:51,
+  SPECTRAL_CLASSES:65, LUMINOSITY_CLASSES:74, T_SUN:81, MBOL_SUN:81, radiusFromLT:96, NEBULA_TYPES:115, PLANET_KINDS:126, HABITABLE_KIND_COUNT:134, glow:172, STAR_VERT:180, STAR_FRAG:183,
+  POINTS_VERT:203, POINTS_FRAG:205, NEBULA_VERT:207, NEBULA_FRAG:218, PUFF_CORNERS:222
+- win: __COSMOS:15

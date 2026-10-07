@@ -33,3 +33,6 @@ Mineurs : …
 Vérifications lancées : …  (ou : non lancées, worktree partagé)
 ```
 Un écart **bloquant** contredit le contrat ou un invariant, ou fait échouer un test de la tâche ; il retourne **au même agent DEV** (via le CP). Un écart mineur peut partir dans le commit suivant.
+
+## Cycle de vie
+Tu es un **agent suivi par le CP** (pas un sous-agent anonyme) : rends ton rapport, puis arrête-toi. Ne poursuis aucune activité après le rapport ; le CP t'arrête une fois tes tokens relevés, et te recontacte par message si une correction est nécessaire.

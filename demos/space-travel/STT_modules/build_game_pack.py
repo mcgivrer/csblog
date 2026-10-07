@@ -12,6 +12,7 @@ Usage (from ~/Documents/Blender/space-travel):
 Options:
   --glb  export/modules/STT_ModuleLibrary.glb   (or the viewer's STT_ModuleLibrary.json, with its lib/ images)
   --fleet fleet.json   --tex viewer/tex   --gltfpack "npx --yes gltfpack@0.21"
+  --geom sources/src/data/modules-geom.json  (also writes the module geometry, see build_modules_geom.py)
   --max-tile 512  (side of the tiling MLI textures)   --max-decal 1024  (side of decal atlases)
 
 Notes
@@ -142,7 +143,11 @@ def main():
     ap.add_argument("--gltfpack", default="npx --yes gltfpack@0.21")
     ap.add_argument("--max-tile", type=int, default=512)
     ap.add_argument("--max-decal", type=int, default=1024)
+    ap.add_argument("--geom", help="also write modules-geom.json (module geometry, from the same --glb)")
     a = ap.parse_args()
+    if a.geom:
+        import build_modules_geom
+        build_modules_geom.write(a.glb, a.geom)
     os.makedirs(os.path.join(a.out, "img"), exist_ok=True)
     if Image is None:
         print("Pillow not found: images are copied without resizing")
