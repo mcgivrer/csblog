@@ -2360,13 +2360,13 @@ function create(env) {
     return { version: 1, class: 'ship', family, tier, ftl: g.ftl ?? (tier === 'III' || tier === 'IV'), crew: g.crew || CREW[tier], arch: g.arch || ARCH_AUTO[family], description: g.description || '' };
   }
   /* utilise core.toExport (L2a.5) ; erreurs en codes : empty | has_errors (+ issue) | no_prop | no_export */
-  function gameExport(c, analysis) {
+  function gameExport(c, analysis, opts) {
     const errs = analysis.issues.filter((i) => i.sev === 'err');
     if (!c.parts.length) return { error: 'empty' };
     if (errs.length) return { error: 'has_errors', issue: errs[0] };
     if (c.type === 'ship' && !c.parts.some((p) => p.key === 'PROP')) return { error: 'no_prop' };
     if (!core.toExport) return { error: 'no_export' };
-    const o = core.toExport(c);
+    const o = core.toExport(c, Object.assign({}, opts, { stats: analysis.stats }));
     o.game = resolvedGame(c, analysis.stats);
     o.stats = analysis.stats;
     return { data: o, warn: analysis.issues.filter((i) => i.sev === 'warn').length };
