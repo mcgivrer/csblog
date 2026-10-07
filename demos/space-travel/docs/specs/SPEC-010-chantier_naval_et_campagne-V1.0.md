@@ -2,7 +2,7 @@
 
 2026-10-05 · Frédéric Delorme · réponse à SPEC-010 « arbre des technologies et missions »
 
-> Version de travail pour les agents (CP, ARCHI, DEV). Relecture et commentaires : [Claude Doc](https://claude.ai/code/artifact/852ce71b-afb7-44ba-b78d-b41981473f89). Modèle d'équilibrage : `sources/tools/eco_sim.py`. Suivi : `docs/work_in_progress/kanban.html`. Maquettes : `img/spec010/`.
+> Version de travail pour les agents (CP, ARCHI, DEV). Relecture et commentaires : [Claude Doc](https://claude.ai/code/artifact/852ce71b-afb7-44ba-b78d-b41981473f89). Modèle d'équilibrage : `sources/tools/eco_sim.py`. Suivi : `stt-agents/kanban.html`. Maquettes : `img/spec010/`.
 
 Cette proposition intègre l'éditeur STT\_Modules dans *Space Travel & Transport* sous le nom **Chantier Naval STT**, et en fait le cœur d'une campagne de gestion : modules achetés, flotte, équipages, technologies, puis première station.
 
@@ -595,7 +595,7 @@ Le plan prolonge le mode *chef de projet / architecte / développeur* déjà dé
 
 | Rôle | Où | Modèle | Lit | Produit | Ne fait jamais |
 | --- | --- | --- | --- | --- | --- |
-| **CP** | session principale (`stt-cp`) | Sonnet, ou Haiku pour le suivi courant | `work_in_progress/plan-status.js`, fiche de lot, rapports | fiches de lot, affectations, suivi, rapport final | coder, relire du code |
+| **CP** | session principale (`stt-cp`) | Sonnet, ou Haiku pour le suivi courant | `stt-agents/data/plan-status.js`, fiche de lot, rapports | fiches de lot, affectations, suivi, rapport final | coder, relire du code |
 | **ARCHI** | sous-agent `stt-archi` | Opus | `CODEMAP.md`, plages de fichiers ciblées, diffs | contrat de lot, découpage en tâches, revue | implémenter |
 | **DEV** | sous-agent `stt-dev` | Sonnet (Haiku pour les tâches mécaniques : traductions, JSON) | la tâche et sa section du contrat | code, tests, rapport court | changer le périmètre ou la conception |
 
@@ -614,7 +614,7 @@ Un sous-agent ne peut pas en lancer un autre : le CP est donc la **session princ
 9. **Sorties de commandes bornées.** `build.py compile | tail -5`, tests en mode silencieux, `grep -m`. Captures seulement pour les tâches visuelles, à 960 px de large.
 10. **Données plutôt que code.** Prix, technos, métiers, textes et équilibrage sont en JSON : petits diffs, modifiables par le mainteneur sans agent.
 11. **Préfixe stable.** Fichiers d'agents et `CLAUDE.md` stables pour profiter du cache de prompt ; la fiche de lot vient en fin de message.
-12. **Budget par lot** suivi `sur le Kanban (docs/work_in_progress/)` ; au-delà de +30 %, le CP s'arrête et demande.
+12. **Budget par lot** suivi `sur le Kanban (kanban/)` ; au-delà de +30 %, le CP s'arrête et demande.
 13. **Points de conflit sérialisés.** `ORDER.txt`, `index.template.html` et `I18N` ne sont modifiés que par une tâche à la fois ; deux lots ne tournent en parallèle que s'ils ne les touchent pas.
 
 ### 3.3 Lots
@@ -696,7 +696,7 @@ Question : …
 ### 3.7 Fichiers d'agents fournis
 
 - `.claude/agents/stt-cp.md`, `stt-archi.md`, `stt-dev.md`, à la racine du dépôt `csblog`.
-- `demos/space-travel/docs/`work\_in\_progress/kanban.html et plan-status.js : Kanban des tâches des agents (avancement, tokens consommés), tenu à jour par le CP à chaque transition ; la page ne change jamais, seul plan-status.js est modifié.
+- `demos/space-travel/stt-agents/kanban.html` et `plan-status.js` : Kanban des tâches des agents (avancement, tokens consommés), tenu à jour à chaque transition par l'outil de suivi des agents (`stt-agents`) sur ordre du CP ; la page ne change jamais, seul `plan-status.js` est modifié.
 - Usage : lancer la session principale avec l'agent CP (`claude --agent stt-cp`, ou la consigne « agis en CP selon `.claude/agents/stt-cp.md` »), puis « démarre le lot L0 ».
 
 ### 3.8 Premier pas
