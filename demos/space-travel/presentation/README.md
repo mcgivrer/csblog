@@ -120,6 +120,7 @@ direction photo) passe derrière le texte ou l'illustration.
 | `N` | système suivant |
 | `P` | effets de la direction photo (comparaison) |
 | `A` | ambiance imposée à toutes les slides, en boucle, puis retour à celle de chaque slide |
+| `Q` | qualité fixe (pleine résolution, tous les effets) ou automatique ; aussi le bouton « qualité fixe » en haut à gauche, à côté des images par seconde |
 | `?` | aide · `Échap` : fermer, annuler un export |
 
 Paramètres : `#3` (slide), `?seed=` (univers), `?rz=` (montage reproductible), `?look=` (une ambiance pour toutes les slides),

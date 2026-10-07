@@ -1,0 +1,2 @@
+"""STT pipeline, embedded copy of the project scripts (tools/sync_pipeline.py). Do not edit here."""
+MODULES = ['ao', 'assembly', 'decals', 'export_glb', 'fleet', 'gen_fleet_decals', 'gen_station_decals', 'gen_textures', 'kit_preview', 'materials', 'mod_bay', 'mod_cargo', 'mod_cargo_star', 'mod_command', 'mod_connectors', 'mod_energy', 'mod_passengers', 'mod_propulsion', 'mod_shuttle', 'mod_tanks', 'scene_setup', 'stations', 'stt_core', 'stt_kit', 'stt_render']

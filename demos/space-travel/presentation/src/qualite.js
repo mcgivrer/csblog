@@ -5,6 +5,8 @@
    Q.lock(w, h) / Q.unlock() : taille de rendu figée (export de clip). Voir docs/SPEC-P4-lecteur.md.
    Stabilité : un changement décidé attend la prochaine coupe (ou un noir) pour être appliqué, où il ne se voit pas ;
    au plus 1,5 s pour une baisse (aucune attente sous 30 i/s), 3 s pour une hausse.
+   Q.setHold(true) : qualité fixe choisie par le spectateur (pleine résolution, tous les effets), plus d'adaptation ;
+   Q.setHold(false) : retour à la qualité automatique.
    ===================================================================== */
 (function(){
 'use strict';
@@ -12,7 +14,7 @@ const QU = window.__QUALITE = {};
 QU.create = function(renderer, PH, opts){
   opts = opts || {};
   const MIN = opts.min || .5, MAXPX = opts.maxPixels || 2.2e6, SLOW = opts.slow || 1/45.5, FAST = opts.fast || 1/55.5;
-  const Q = { scale: 1, tier: 0, fixed: !!opts.fixed, locked: null, state: {} };
+  const Q = { scale: 1, tier: 0, fixed: !!opts.fixed, hold: false, locked: null, state: {} };
   let ema = 1/60, slowT = 0, fastT = 0, cool = 0, probe = 0, holdUp = 0, applied = '', pending = null, lastCut = null;
   /* une coupe (nouveau plan, nouveau système) ou un noir : le moment où un changement de résolution ne se voit pas */
   function atCut(){
@@ -43,13 +45,17 @@ QU.create = function(renderer, PH, opts){
   Q.resize = () => apply(true);
   Q.lock = (w, h) => { Q.locked = { w, h }; apply(true); };
   Q.unlock = () => { Q.locked = null; apply(true); ema = 1/60; slowT = fastT = 0; cool = 1; };
+  Q.setHold = on => {
+    Q.hold = !!on; pending = null; slowT = fastT = 0; cool = 1; holdUp = 0; probe = 0;
+    if(Q.hold && !Q.fixed){ Q.scale = 1; Q.tier = 0; tiers(); apply(); }
+  };
   /* une image : dt = intervalle réel entre deux images (s) */
   Q.frame = function(dt){
     if(!(dt > 0)) return;
     ema += (Math.min(dt, .25) - ema)*.1;
-    Q.state = { scale: Q.scale, tier: Q.tier, ms: +(ema*1000).toFixed(1), base: +base().toFixed(3) };
+    Q.state = { scale: Q.scale, tier: Q.tier, ms: +(ema*1000).toFixed(1), base: +base().toFixed(3), hold: Q.hold };
     const cut = atCut();
-    if(Q.fixed || Q.locked){ pending = null; return; }
+    if(Q.fixed || Q.locked || Q.hold){ pending = null; return; }
     if(pending){                                      /* changement en attente : appliqué sur la coupe */
       pending.t += dt;
       if(cut || pending.t > (pending.down ? 1.5 : 3)){ Q.scale = pending.scale; if(pending.tier !== Q.tier){ Q.tier = pending.tier; tiers(); } apply(); pending = null; cool = 1.2; }

@@ -160,6 +160,14 @@
   body:not(.barres-texte) #barre-haut{ top:var(--bar); } body:not(.barres-texte) #barre-bas{ bottom:var(--bar); }
   .direct{ color:var(--cyan); } .direct::before{ content:"●"; margin-right:6px; animation:clignote 1.8s steps(1) infinite; }
   .barre .ambre{ color:var(--amber); }
+  /* images par seconde et qualité fixe, en haut à gauche, en tout petit */
+  .barre .gauche{ display:flex; align-items:center; gap:14px; min-width:0; }
+  #perf{ display:flex; align-items:center; gap:6px; flex:none; font-size:10px; letter-spacing:.06em; text-transform:none; color:var(--muted-2); pointer-events:auto; }
+  #fps{ font-variant-numeric:tabular-nums; min-width:5.4em; }
+  #b-qualite{ font-size:10px; line-height:1.4; letter-spacing:.04em; padding:1px 6px; color:var(--muted-2); background:transparent; border:1px solid var(--line); }
+  #b-qualite[aria-pressed="true"]{ color:var(--amber); border-color:var(--amber); }
+  #b-qualite:disabled{ cursor:default; opacity:.6; }
+  body.sans-webgl #perf{ display:none; }
   #progression{ position:fixed; left:0; bottom:var(--bar); height:1px; width:0; background:var(--amber); transition:width .6s cubic-bezier(.2,.7,.2,1); pointer-events:none; }
   body.sans-ui .barre, body.sans-ui #progression, body.sans-ui #commandes{ opacity:0; }
 
@@ -547,7 +555,7 @@
 </main>
 </div>
 
-<div id="barre-haut" class="barre"><span class="direct" id="hud-systeme">En direct</span><span id="hud-plan"></span></div>
+<div id="barre-haut" class="barre"><span class="gauche"><span id="perf"><span id="fps" title="Images par seconde">— FPS</span><button type="button" id="b-qualite" aria-pressed="false" title="Qualité fixe : pleine résolution et tous les effets, sans adaptation automatique (touche Q)">qualité fixe</button></span><span class="direct" id="hud-systeme">En direct</span></span><span id="hud-plan"></span></div>
 <div id="barre-bas" class="barre"><span id="hud-slide"></span><span id="hud-num" class="ambre"></span></div>
 <div id="progression"></div>
 <div id="noir" aria-hidden="true"></div>
@@ -584,6 +592,7 @@
     <dt>N</dt><dd>système suivant</dd>
     <dt>P</dt><dd>effets de la direction photo</dd>
     <dt>A</dt><dd>ambiance de l'image : forcée pour toutes les slides, en boucle, puis celle de chaque slide</dd>
+    <dt>Q</dt><dd>qualité fixe (pleine résolution, tous les effets) ou automatique</dd>
     <dt>Échap</dt><dd>fermer ce panneau, annuler un export</dd>
   </dl>
 </div>

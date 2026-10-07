@@ -26,7 +26,7 @@ function inert(){
     D: { meta, framing: 'auto', seq: 0, update: () => meta, cut: noop, nextSystem: noop, play: () => false, setFraming(f){ this.framing = f || 'auto'; } },
     PH: { enabled: false, state: { letter: 0, pending: false }, quality: {}, grainScale: 1, crtChance: 0, setVeil: noop, setLetterbox: noop, update: noop, render: noop,
       setLook: noop, queueLook: () => false },
-    Q: { locked: null, scale: 1, resize: noop, frame: noop, lock: noop, unlock: noop },
+    Q: { locked: null, scale: 1, hold: false, resize: noop, frame: noop, lock: noop, unlock: noop, setHold: noop },
     CL: { supported: false, offline: false, live: { supported: false }, ready: Promise.resolve() } };
 }
 let renderer, camera, W, D, PH, Q, CL, GL = true;
@@ -252,6 +252,7 @@ function onKey(e){
   else if(/^[nN]$/.test(k)) D.nextSystem();
   else if(/^[pP]$/.test(k)) PH.enabled = !PH.enabled;
   else if(/^[aA]$/.test(k)) cycleAmbiance();
+  else if(/^[qQ]$/.test(k)) setQualite(!Q.hold);
   else if(/^[sS]$/.test(k)) L.togglePresenter();
   else if(k === '?') togglePanel('aide');
 }
@@ -267,6 +268,26 @@ document.addEventListener('touchend', e => {
 let idle = null;
 document.addEventListener('mousemove', () => { document.body.classList.add('souris'); clearTimeout(idle); idle = setTimeout(() => document.body.classList.remove('souris'), 2500); });
 const fmtLook = () => (PH.state.look ? PH.state.look.label : '');
+/* qualité fixe (bouton ou touche Q) : pleine résolution, tous les effets, sans adaptation ; le choix est retenu */
+const QKEY = 'voyage-spatial.qualite';
+function setQualite(on, quiet){
+  if(!GL || Q.fixed) return;
+  Q.setHold(on); const b = $('b-qualite'); b.setAttribute('aria-pressed', String(!!Q.hold));
+  try{ localStorage.setItem(QKEY, Q.hold ? 'fixe' : 'auto'); }catch(e){}
+  if(!quiet) toast(Q.hold ? 'Qualité fixe : pleine résolution, tous les effets' : 'Qualité automatique : la résolution suit la machine');
+}
+$('b-qualite').addEventListener('click', e => { e.stopPropagation(); setQualite(!Q.hold); });
+if(Q.fixed){ const b = $('b-qualite'); b.disabled = true; b.setAttribute('aria-pressed', 'true'); b.title = 'Qualité fixée par l\'adresse (?quality=fixed)'; }
+else { let s = null; try{ s = localStorage.getItem(QKEY); }catch(e){} if(s === 'fixe') setQualite(true, true); }
+/* images par seconde : mesurées sur 0,5 s de temps réel (images rendues seulement) */
+let fpsN = 0, fpsT = 0;
+function fps(raw){
+  fpsN++; fpsT += raw; if(fpsT < .5) return;
+  const f = fpsN/fpsT, el = $('fps'); fpsN = 0; fpsT = 0;
+  el.textContent = Math.round(f) + ' FPS';
+  const b = new THREE.Vector2(); if(GL) renderer.getDrawingBufferSize(b);
+  el.title = 'Images par seconde · rendu ' + b.x + ' × ' + b.y + (Q.hold || Q.fixed ? ' · qualité fixe' : ' · qualité automatique (' + Math.round(Q.scale*100) + ' %)');
+}
 /* touche A : ambiance imposée à toutes les slides, en boucle, puis retour à celle de chaque slide ; tout de suite, sans coupe */
 function cycleAmbiance(){
   if(!GL) return toast('Ambiances indisponibles sans WebGL');
@@ -362,6 +383,7 @@ function frame(){
   else PH.update(D.meta, dt);
   bars();
   Q.frame(raw);
+  fps(raw);
   hud(dt);
 }
 layout();

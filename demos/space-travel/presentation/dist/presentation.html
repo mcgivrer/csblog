@@ -160,6 +160,14 @@
   body:not(.barres-texte) #barre-haut{ top:var(--bar); } body:not(.barres-texte) #barre-bas{ bottom:var(--bar); }
   .direct{ color:var(--cyan); } .direct::before{ content:"●"; margin-right:6px; animation:clignote 1.8s steps(1) infinite; }
   .barre .ambre{ color:var(--amber); }
+  /* images par seconde et qualité fixe, en haut à gauche, en tout petit */
+  .barre .gauche{ display:flex; align-items:center; gap:14px; min-width:0; }
+  #perf{ display:flex; align-items:center; gap:6px; flex:none; font-size:10px; letter-spacing:.06em; text-transform:none; color:var(--muted-2); pointer-events:auto; }
+  #fps{ font-variant-numeric:tabular-nums; min-width:5.4em; }
+  #b-qualite{ font-size:10px; line-height:1.4; letter-spacing:.04em; padding:1px 6px; color:var(--muted-2); background:transparent; border:1px solid var(--line); }
+  #b-qualite[aria-pressed="true"]{ color:var(--amber); border-color:var(--amber); }
+  #b-qualite:disabled{ cursor:default; opacity:.6; }
+  body.sans-webgl #perf{ display:none; }
   #progression{ position:fixed; left:0; bottom:var(--bar); height:1px; width:0; background:var(--amber); transition:width .6s cubic-bezier(.2,.7,.2,1); pointer-events:none; }
   body.sans-ui .barre, body.sans-ui #progression, body.sans-ui #commandes{ opacity:0; }
 
@@ -547,7 +555,7 @@
 </main>
 </div>
 
-<div id="barre-haut" class="barre"><span class="direct" id="hud-systeme">En direct</span><span id="hud-plan"></span></div>
+<div id="barre-haut" class="barre"><span class="gauche"><span id="perf"><span id="fps" title="Images par seconde">— FPS</span><button type="button" id="b-qualite" aria-pressed="false" title="Qualité fixe : pleine résolution et tous les effets, sans adaptation automatique (touche Q)">qualité fixe</button></span><span class="direct" id="hud-systeme">En direct</span></span><span id="hud-plan"></span></div>
 <div id="barre-bas" class="barre"><span id="hud-slide"></span><span id="hud-num" class="ambre"></span></div>
 <div id="progression"></div>
 <div id="noir" aria-hidden="true"></div>
@@ -584,6 +592,7 @@
     <dt>N</dt><dd>système suivant</dd>
     <dt>P</dt><dd>effets de la direction photo</dd>
     <dt>A</dt><dd>ambiance de l'image : forcée pour toutes les slides, en boucle, puis celle de chaque slide</dd>
+    <dt>Q</dt><dd>qualité fixe (pleine résolution, tous les effets) ou automatique</dd>
     <dt>Échap</dt><dd>fermer ce panneau, annuler un export</dd>
   </dl>
 </div>
@@ -7539,6 +7548,8 @@ PHO.create = function(renderer, opts){
    Q.lock(w, h) / Q.unlock() : taille de rendu figée (export de clip). Voir docs/SPEC-P4-lecteur.md.
    Stabilité : un changement décidé attend la prochaine coupe (ou un noir) pour être appliqué, où il ne se voit pas ;
    au plus 1,5 s pour une baisse (aucune attente sous 30 i/s), 3 s pour une hausse.
+   Q.setHold(true) : qualité fixe choisie par le spectateur (pleine résolution, tous les effets), plus d'adaptation ;
+   Q.setHold(false) : retour à la qualité automatique.
    ===================================================================== */
 (function(){
 'use strict';
@@ -7546,7 +7557,7 @@ const QU = window.__QUALITE = {};
 QU.create = function(renderer, PH, opts){
   opts = opts || {};
   const MIN = opts.min || .5, MAXPX = opts.maxPixels || 2.2e6, SLOW = opts.slow || 1/45.5, FAST = opts.fast || 1/55.5;
-  const Q = { scale: 1, tier: 0, fixed: !!opts.fixed, locked: null, state: {} };
+  const Q = { scale: 1, tier: 0, fixed: !!opts.fixed, hold: false, locked: null, state: {} };
   let ema = 1/60, slowT = 0, fastT = 0, cool = 0, probe = 0, holdUp = 0, applied = '', pending = null, lastCut = null;
   /* une coupe (nouveau plan, nouveau système) ou un noir : le moment où un changement de résolution ne se voit pas */
   function atCut(){
@@ -7577,13 +7588,17 @@ QU.create = function(renderer, PH, opts){
   Q.resize = () => apply(true);
   Q.lock = (w, h) => { Q.locked = { w, h }; apply(true); };
   Q.unlock = () => { Q.locked = null; apply(true); ema = 1/60; slowT = fastT = 0; cool = 1; };
+  Q.setHold = on => {
+    Q.hold = !!on; pending = null; slowT = fastT = 0; cool = 1; holdUp = 0; probe = 0;
+    if(Q.hold && !Q.fixed){ Q.scale = 1; Q.tier = 0; tiers(); apply(); }
+  };
   /* une image : dt = intervalle réel entre deux images (s) */
   Q.frame = function(dt){
     if(!(dt > 0)) return;
     ema += (Math.min(dt, .25) - ema)*.1;
-    Q.state = { scale: Q.scale, tier: Q.tier, ms: +(ema*1000).toFixed(1), base: +base().toFixed(3) };
+    Q.state = { scale: Q.scale, tier: Q.tier, ms: +(ema*1000).toFixed(1), base: +base().toFixed(3), hold: Q.hold };
     const cut = atCut();
-    if(Q.fixed || Q.locked){ pending = null; return; }
+    if(Q.fixed || Q.locked || Q.hold){ pending = null; return; }
     if(pending){                                      /* changement en attente : appliqué sur la coupe */
       pending.t += dt;
       if(cut || pending.t > (pending.down ? 1.5 : 3)){ Q.scale = pending.scale; if(pending.tier !== Q.tier){ Q.tier = pending.tier; tiers(); } apply(); pending = null; cool = 1.2; }
@@ -7758,7 +7773,7 @@ function inert(){
     D: { meta, framing: 'auto', seq: 0, update: () => meta, cut: noop, nextSystem: noop, play: () => false, setFraming(f){ this.framing = f || 'auto'; } },
     PH: { enabled: false, state: { letter: 0, pending: false }, quality: {}, grainScale: 1, crtChance: 0, setVeil: noop, setLetterbox: noop, update: noop, render: noop,
       setLook: noop, queueLook: () => false },
-    Q: { locked: null, scale: 1, resize: noop, frame: noop, lock: noop, unlock: noop },
+    Q: { locked: null, scale: 1, hold: false, resize: noop, frame: noop, lock: noop, unlock: noop, setHold: noop },
     CL: { supported: false, offline: false, live: { supported: false }, ready: Promise.resolve() } };
 }
 let renderer, camera, W, D, PH, Q, CL, GL = true;
@@ -7984,6 +7999,7 @@ function onKey(e){
   else if(/^[nN]$/.test(k)) D.nextSystem();
   else if(/^[pP]$/.test(k)) PH.enabled = !PH.enabled;
   else if(/^[aA]$/.test(k)) cycleAmbiance();
+  else if(/^[qQ]$/.test(k)) setQualite(!Q.hold);
   else if(/^[sS]$/.test(k)) L.togglePresenter();
   else if(k === '?') togglePanel('aide');
 }
@@ -7999,6 +8015,26 @@ document.addEventListener('touchend', e => {
 let idle = null;
 document.addEventListener('mousemove', () => { document.body.classList.add('souris'); clearTimeout(idle); idle = setTimeout(() => document.body.classList.remove('souris'), 2500); });
 const fmtLook = () => (PH.state.look ? PH.state.look.label : '');
+/* qualité fixe (bouton ou touche Q) : pleine résolution, tous les effets, sans adaptation ; le choix est retenu */
+const QKEY = 'voyage-spatial.qualite';
+function setQualite(on, quiet){
+  if(!GL || Q.fixed) return;
+  Q.setHold(on); const b = $('b-qualite'); b.setAttribute('aria-pressed', String(!!Q.hold));
+  try{ localStorage.setItem(QKEY, Q.hold ? 'fixe' : 'auto'); }catch(e){}
+  if(!quiet) toast(Q.hold ? 'Qualité fixe : pleine résolution, tous les effets' : 'Qualité automatique : la résolution suit la machine');
+}
+$('b-qualite').addEventListener('click', e => { e.stopPropagation(); setQualite(!Q.hold); });
+if(Q.fixed){ const b = $('b-qualite'); b.disabled = true; b.setAttribute('aria-pressed', 'true'); b.title = 'Qualité fixée par l\'adresse (?quality=fixed)'; }
+else { let s = null; try{ s = localStorage.getItem(QKEY); }catch(e){} if(s === 'fixe') setQualite(true, true); }
+/* images par seconde : mesurées sur 0,5 s de temps réel (images rendues seulement) */
+let fpsN = 0, fpsT = 0;
+function fps(raw){
+  fpsN++; fpsT += raw; if(fpsT < .5) return;
+  const f = fpsN/fpsT, el = $('fps'); fpsN = 0; fpsT = 0;
+  el.textContent = Math.round(f) + ' FPS';
+  const b = new THREE.Vector2(); if(GL) renderer.getDrawingBufferSize(b);
+  el.title = 'Images par seconde · rendu ' + b.x + ' × ' + b.y + (Q.hold || Q.fixed ? ' · qualité fixe' : ' · qualité automatique (' + Math.round(Q.scale*100) + ' %)');
+}
 /* touche A : ambiance imposée à toutes les slides, en boucle, puis retour à celle de chaque slide ; tout de suite, sans coupe */
 function cycleAmbiance(){
   if(!GL) return toast('Ambiances indisponibles sans WebGL');
@@ -8094,6 +8130,7 @@ function frame(){
   else PH.update(D.meta, dt);
   bars();
   Q.frame(raw);
+  fps(raw);
   hud(dt);
 }
 layout();

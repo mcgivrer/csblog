@@ -135,3 +135,17 @@ puis, en temps réel, export d'un clip (durée et taille vérifiées par `ffprob
   prochaine coupe (ou un noir), où il ne se voit pas ; au plus 1,5 s pour une baisse (aucune attente sous 30 i/s),
   3 s pour une hausse. Les mouvements de caméra ont été mesurés sur les 21 slides (5 040 images) : aucun à-coup.
 - Ambiances : le flottement du film est réduit (Super 8 : 0,2 % de l'image, sépia : 0,07 %).
+
+### Images par seconde et qualité fixe (07/10/2026)
+
+- Demande de l'auteur : afficher les FPS en haut à gauche, en tout petit (police 10), et un petit bouton « fixed
+  quality » pour garder une qualité constante.
+- Bande du haut, à gauche : `NN FPS` (police 10 px, mesuré sur 0,5 s de temps réel, images rendues seulement ; la
+  bulle donne la taille de rendu et la qualité) et le bouton « qualité fixe » (ambre quand il est actif), avant
+  « En direct ». Masqués avec l'interface (`H`) et pendant un export ; absents sans WebGL.
+- Qualité fixe (bouton ou touche `Q`) : `Q.setHold(true)` met tout de suite la pleine résolution et tous les effets
+  (MSAA, profondeur de champ, flare) et arrête l'adaptation ; le choix est retenu dans le navigateur
+  (`localStorage`). `?quality=fixed` (tests) garde son sens : le bouton est alors grisé.
+- Test `lecteur_test.py` : FPS affichés (60 puis 20 i/s), pleine qualité gardée à 20 i/s avec le bouton, sans changer
+  de slide ; touche `Q` : retour à l'automatique, choix retenu.
+

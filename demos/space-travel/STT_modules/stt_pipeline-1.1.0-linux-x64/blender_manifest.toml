@@ -1,0 +1,25 @@
+schema_version = "1.0.0"
+
+id = "stt_pipeline"
+version = "1.1.0"
+name = "STT Pipeline"
+tagline = "Modules STT : export GLB, viewer autonome, pack du jeu"
+maintainer = "Frédéric Delorme <frederic.delorme@gmail.com>"
+type = "add-on"
+website = "https://claude.ai/artifact/M7ZN5iEYiZMQU9kmj98gfm"
+tags = ["Import-Export", "Pipeline", "Game Engine"]
+
+blender_version_min = "4.2.0"
+
+license = ["SPDX:GPL-3.0-or-later"]
+copyright = ["2026 Frédéric Delorme", "2017 The Barlow Project Authors (fonts, SIL OFL 1.1)", "2019 IBM Corp. (IBM Plex fonts, SIL OFL 1.1)", "2010-2024 three.js authors (MIT)"]
+
+# Pillow sert aux textures et aux décals générés dans Blender (atlas des compagnies personnalisées, images WebP).
+wheels = ["./wheels/pillow-12.3.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl"]
+platforms = ["linux-x64"]
+
+[permissions]
+files = "Lit et écrit le projet STT et le dépôt du jeu"
+
+[build]
+paths_exclude_pattern = ["__pycache__/", "/.git/", "*.zip"]
