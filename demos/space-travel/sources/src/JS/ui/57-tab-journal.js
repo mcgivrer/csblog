@@ -7,7 +7,9 @@
   'use strict';
 
   const CSS = [
-    '#sttConsole .jrn-bar{ position:sticky; top:-10px; z-index:2; display:flex; flex-wrap:wrap; gap:6px; margin:-10px -14px 8px; padding:10px 14px 8px; background:rgba(11,18,32,0.98); border-bottom:1px solid var(--line); }',
+    /* collée au bord haut du défileur (.con-panel) : décalages = rembourrage du panneau */
+    '#sttConsole .jrn-bar{ position:sticky; top:calc(-1 * var(--con-pad-y)); z-index:2; display:flex; flex-wrap:wrap; gap:6px;',
+    '  margin:calc(-1 * var(--con-pad-y)) calc(-1 * var(--con-pad-x)) 8px; padding:var(--con-pad-y) var(--con-pad-x) 8px; background:rgba(11,18,32,0.98); border-bottom:1px solid var(--line); }',
     '#sttConsole .jrn-chip{ min-height:36px; padding:4px 14px; background:none; border:1px solid var(--line); color:var(--muted); font:inherit; font-size:12px; letter-spacing:0.06em; text-transform:uppercase; cursor:pointer; }',
     '#sttConsole .jrn-chip:hover{ color:var(--ink); }',
     '#sttConsole .jrn-chip[aria-pressed="true"]{ color:var(--amber); border-color:var(--amber); background:rgba(255,180,84,0.08); }',
@@ -191,7 +193,7 @@
     render();
   }
 
-  function scroller(){ return root ? root.parentNode.parentNode : null; }   // .con-body
+  function scroller(){ return root ? root.parentNode : null; }   // .con-panel : seul défileur de l'onglet
 
   function onKey(code){
     if(!root) return;

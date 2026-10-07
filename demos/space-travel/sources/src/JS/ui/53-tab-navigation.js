@@ -9,10 +9,12 @@
      sur la fenêtre : 95vw × 92vh) ; son canevas mesure .view, d'où le resize après ouverture. */
   const st = document.createElement('style');
   st.textContent = [
-    '#sttConsole .con-panel[data-tab="nav"]{ padding:0; height:100%; }',
+    '#sttConsole .con-panel[data-tab="nav"]{ padding:0; overflow:hidden; }',
     '#sttConsole #stmMap.con-hosted{ height:100% !important; }',
     '#sttConsole #stmMap.con-hosted.on{ display:block; }',
     '#sttConsole #stmMap .p{ width:100%; height:100%; border:0; }',
+    /* coins du module partagé posés à -1px : ils débordaient d'1 px (D4) ; le cadre de la console porte déjà les siens */
+    '#sttConsole #stmMap .p::before, #sttConsole #stmMap .p::after{ display:none; }',
     '#sttConsole #stmMap .x{ display:none; }'
   ].join('\n');
   document.head.appendChild(st);
