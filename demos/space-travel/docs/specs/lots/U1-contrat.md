@@ -60,7 +60,7 @@ Sans défaut propre (M) : le **redimensionnement**. La carte se recale de 1083×
 | U1.3 | Neutralisation complète des hôtes : largeur, hauteur, bordure, coins, croix (D4-D6, D8, D9) ; style en ligne des Missions → classe | `ui/51-console-view.js`, `game/20q-missions.js:131`, `css/main.css` | U1.2 | DEV Sonnet, cx 2 | 45 k |
 | U1.4 | Port en grille, Réglages en section alignée, titres `.con-h` (D7, D10, D17) | `css/main.css`, `ui/52-tab-aide.js` (CSS injecté), au besoin `html/index.template.html` (classes) | U1.3 | DEV Sonnet, cx 2 | 55 k |
 | U1.5 | Typographie et contrôles sur les variables (D18, D19, D21, D22) | `css/main.css`, CSS injecté par `51`, `54`, `57` | U1.4 | DEV Sonnet, cx 2 | 50 k |
-| U1.6 | Aide : clé `lblStarMapTitle` et `hk_skip`/`hk_pause` dans les 4 langues ; casse uniforme (D11, D20) | `game/01-…anglais.js`, `game/26-barre-d-icones-du.js` | — | DEV Sonnet, cx 1 | 25 k |
+| U1.6 | Aide : clé `lblStarMapTitle` et `hk_skip`/`hk_pause` dans les 4 langues ; casse uniforme (D11, D20) | `game/01-…anglais.js`, `game/26-barre-d-icones-du.js`, `css/main.css`, `test/aide_i18n_test.py` | — | DEV Sonnet, cx 1 | 25 k |
 | U1.7 | Recompilation, suite complète, captures avant/après (mêmes 10 vues), mise à jour de `CODEMAP` | `target/`, `docs/specs/CODEMAP.md` | toutes | CP | 30 k |
 
 **Total ≈ 395 k tokens.** Conflits : U1.1, U1.3, U1.4 et U1.5 modifient `css/main.css` ; U1.2 et U1.3 modifient `51-console-view.js`. Ces tâches restent donc **séquentielles** (U1.1 → U1.2 → U1.3 → U1.4 → U1.5). **Parallélisables** : U1.0 et U1.6 (fichiers disjoints ; U1.6 est la seule tâche à toucher `I18N`, aucun conflit de clés).
@@ -96,7 +96,9 @@ Vérification de chaque tâche : `ui_layout_test.py` (assertions de la tâche pa
 
 D23 (micro-polices du HUD, 7,5 à 8,5 px : lot HUD distinct), contenu et rédaction de l'aide au-delà de D11 et D20, thème clair, espagnol non mesuré (mêmes règles, longueurs proches du français), écrans de titre et de démarrage (`#boot`, `#titleScreen`), l'éditeur `STT_modules`, tactile au-delà du maintien des tests existants, accessibilité (contraste, focus).
 
-## 7. Décisions demandées au mainteneur
+## 7. Décisions validées par le mainteneur le 07/10
+
+D-A à D-D : validées par le mainteneur le 07/10 (options recommandées).
 
 - **D-A Taille de la console** : (1) fluide, de la barre du haut jusqu'au-dessus de la barre d'icônes, largeur `min(1400px, 100vw − 48px)` (recommandé ; corrige D12 et D16) ; ou (2) taille actuelle 1100×760, sans chevaucher la barre d'icônes.
 - **D-B Largeur des listes** (Missions, Chantier, Contrats) : pleine largeur comme le Journal (recommandé), ou colonne de lecture d'au plus 960 px **alignée à gauche**.

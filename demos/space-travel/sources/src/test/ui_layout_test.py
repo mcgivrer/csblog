@@ -7,16 +7,21 @@ ascenseurs (ignore_default_args=["--hide-scrollbars"]) : par défaut Playwright 
 Décisions du mainteneur : D-A console fluide (largeur min(1400px, 100vw − 48px), hauteur = fenêtre − barre du haut − barre d'icônes) ;
 D-B listes en pleine largeur de l'onglet ; D-C un seul style de titre interne (.con-h) ; D-D réglages en section pleine largeur.
 
-MÉCANISME « EN ATTENTE » : PENDING rattache chaque défaut connu à la tâche U1.x qui le corrige. Une assertion en échec dont tous les
-défauts sont dans PENDING s'affiche « PENDING (U1.x) » et ne fait pas échouer ; hors PENDING, elle fait échouer (exit 1). Un défaut de PENDING
+MÉCANISME « EN ATTENTE » : PENDING rattache chaque défaut connu à la tâche U1.x qui le corrige. Une assertion en échec s'affiche
+« PENDING (U1.x) » (sans faire échouer) si AU MOINS UN de ses défauts candidats est encore dans PENDING ; elle ne devient FAIL (exit 1) que
+lorsque TOUS ses candidats sont retirés de PENDING (échec franc : défaut non attribuable, ou régression). Ainsi, quand U1.1 retire D2,
+`b:missions@resize-1024x640-*` (candidats D2 et D6) reste PENDING (D6) jusqu'à U1.3. Un défaut de PENDING
 dont toutes les assertions passent s'affiche « CORRIGÉ : retirer Dn de PENDING ». Chaque tâche U1.x retire ses défauts de PENDING.
+Non couvert par ce test : D23 (hors lot) ; D25 est mesuré par `p:jrn-bar` (barre de filtres collée au bord du défileur, sans dépasser) ;
+D26 par `q:ss-panel` (dialogue de sélection du vaisseau ouvert à 700x600, coins hors d'une boîte qui défile).
+Variable d'environnement UI_LAYOUT_INJECT_CSS : CSS injecté dans la page après le chargement, pour vérifier le test lui-même (défaut volontaire).
 
 Matrice : {1920x1080, 1366x768, 1024x768} x {fr, de}, plus 800x600 (barre d'onglets et cadre), plus 1366x768 -> 1024x640 -> retour.
 Les deux langues tournent dans deux processus parallèles (--worker fr|de), le processus père agrège.
 Usage : python3 src/test/ui_layout_test.py target/space-travel.html
 """
 import os, re, sys, json, time, subprocess
-if os.path.isdir("/opt/pw-browsers"): os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers")   # bac a sable d origine ; ailleurs, emplacement par defaut de Playwright
+if os.path.isdir("/opt/pw-browsers"): os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/opt/pw-browsers")   # bac à sable d'origine ; ailleurs, emplacement par défaut de Playwright
 
 # défaut -> tâche qui le corrige (§ 3 du contrat). Retirer l'entrée quand la tâche est livrée.
 PENDING = {
@@ -24,6 +29,7 @@ PENDING = {
     "D4": "U1.2", "D12": "U1.2", "D13": "U1.2", "D14": "U1.2", "D15": "U1.2", "D16": "U1.2", "D25": "U1.2",
     "D4p": "U1.3", "D5": "U1.3", "D6": "U1.3", "D8": "U1.3", "D9": "U1.3",
     "D7": "U1.4", "D10": "U1.4", "D17": "U1.4",
+    "D26": "U1.1",
     "D18": "U1.5", "D19": "U1.5", "D21": "U1.5", "D22": "U1.5",
     "D11": "U1.6", "D20": "U1.6",
 }
@@ -90,15 +96,40 @@ MEASURE = r"""(rootSel) => {
         const kr = kid ? kid.getBoundingClientRect() : null;
         const panelLike = [h, ...h.querySelectorAll('.board-panel, .audio-panel, .help-panel')].filter(vis);
         return { id: h.id, w: hr.width, inner, kid: kid ? d(kid) : null, kw: kr ? kr.width : null, hin, l: hr.left, kl: kr ? kr.left : null,
-          borders: panelLike.map(x => ({ d: d(x), bw: px(getComputedStyle(x).borderTopWidth) })) };
+          borders: panelLike.map(x => ({ d: d(x), bw: px(getComputedStyle(x).borderTopWidth) })),
+          corners: [h, ...h.querySelectorAll('.board-panel, .audio-panel, .panel')].filter(vis).flatMap(x => {
+            let clip = false; for(let a = x; a && a !== root.parentElement; a = a.parentElement) if(/auto|scroll/.test(getComputedStyle(a).overflowY + getComputedStyle(a).overflowX)) clip = true;
+            return ['::before', '::after'].map(ps => { const c = getComputedStyle(x, ps);
+              if(c.content === 'none' || c.display === 'none' || c.position !== 'absolute') return null;
+              const neg = ['top', 'left', 'right', 'bottom'].map(k => [k, px(c[k])]).filter(kv => /px$/.test(c[kv[0]]) && kv[1] < 0);
+              return neg.length && clip ? { d: d(x) + ps, off: neg.map(kv => kv[0] + ':' + kv[1]).join(',') } : null; }).filter(Boolean); }) };
       });
     }
   }
   return out;
 }"""
 
-def js_arg(sel): return sel
 
+# D25 : la barre de filtres du Journal reste collée au bord haut du défileur (défilé au maximum) et couvre toute sa largeur, sans le dépasser.
+JRN_BAR = r"""() => {
+  const bar = document.querySelector('#sttConsole .jrn-bar'); if(!bar || !bar.getClientRects().length) return null;
+  let sc = bar.parentElement; while(sc && !/auto|scroll/.test(getComputedStyle(sc).overflowY)) sc = sc.parentElement;
+  if(!sc) return { ok: false, info: 'aucun défileur' };
+  const before = sc.scrollTop; sc.scrollTop = sc.scrollHeight; const sr = sc.getBoundingClientRect(), br = bar.getBoundingClientRect(), cs = getComputedStyle(sc);
+  const bl = sr.left + parseFloat(cs.borderLeftWidth || 0), brt = sr.right - parseFloat(cs.borderRightWidth || 0) - (sc.offsetWidth - sc.clientWidth - parseFloat(cs.borderLeftWidth || 0) - parseFloat(cs.borderRightWidth || 0));
+  const bt = sr.top + parseFloat(cs.borderTopWidth || 0);
+  const r = { dt: br.top - bt, dl: br.left - bl, dr: br.right - brt, scrolled: sc.scrollTop > 0 }; sc.scrollTop = before;
+  return { ok: Math.abs(r.dt) <= 1 && Math.abs(r.dl) <= 1 && Math.abs(r.dr) <= 1, info: 'écart haut ' + r.dt.toFixed(1) + ', gauche ' + r.dl.toFixed(1) + ', droite ' + r.dr.toFixed(1) + (r.scrolled ? '' : ' (sans défilement)') };
+}"""
+# D26 : dialogue de sélection du vaisseau ouvert en écran bas (≤ 760 px) ; coins positionnés hors de la boîte qui défile.
+SS_PANEL = r"""() => {
+  const el = document.getElementById('shipSelect'), p = el && el.querySelector('.ss-panel'); if(!p) return null;
+  const was = el.classList.contains('open'); el.classList.add('open');
+  const cs = getComputedStyle(p), scrolls = /auto|scroll/.test(cs.overflowY + cs.overflowX);
+  const neg = [...p.querySelectorAll('.ss-c')].map(c => { const k = getComputedStyle(c); return ['top', 'left', 'right', 'bottom'].filter(s => /px$/.test(k[s]) && parseFloat(k[s]) < 0).map(s => c.className.replace('ss-c ', '') + ':' + s + ' ' + k[s]); }).flat();
+  const r = { ok: !(scrolls && neg.length), info: 'overflow ' + cs.overflowY + ', coins hors boîte : ' + (neg.slice(0, 4).join('; ') || 'aucun') };
+  if(!was) el.classList.remove('open'); return r;
+}"""
 
 # ---------------------------------------------------------------- enregistrement des résultats (processus travailleur)
 RESULTS = []
@@ -147,7 +178,8 @@ def eval_scene(m, scene, tag, console=True):
                   f"hôte {h['w']:.0f}/{h['inner']:.0f}, {h['kid']} {h['kw']:.0f}/{h['hin']:.0f}", [dfe], [dfe])
         # (k) D9 : plus de cadre dans le cadre (bordure des panneaux hébergés)
         bd = [b for b in h["borders"] if b["bw"] > 0]
-        check(f"k:{scene}:{h['id']}@{tag}", not bd, [f"{b['d']} bordure {b['bw']}px" for b in bd], ["D9"], ["D9"])
+        pc = h.get("corners") or []
+        check(f"k:{scene}:{h['id']}@{tag}", not bd and not pc, [f"{b['d']} bordure {b['bw']}px" for b in bd] + [f"{c['d']} coin {c['off']} dans une boîte qui défile" for c in pc], ["D9"], ["D9"])
         if h["id"] == "portPanel":
             wide = [c for c in m["controls"] if c["role"] == "bouton-port" and c["w"] > 420]
             check(f"n:{scene}@{tag}", not wide, [f"{c['cls']} {c['w']:.0f}px" for c in wide][:3], ["D10"], ["D10"])
@@ -158,8 +190,8 @@ def eval_scene(m, scene, tag, console=True):
     # (i) contrôles de même rôle de même hauteur ; polices dans l'échelle --fs-*
     hs = {}
     for c in m["controls"]: hs.setdefault(c["role"], []).append(c["h"])
-    allh = [h for v in hs.values() for h in v]
-    check(f"i:ctl:{scene}@{tag}", not allh or max(allh) - min(allh) <= 1, {r: sorted(set(round(x) for x in v)) for r, v in hs.items()}, ["D18"], ["D18"])
+    badr = {r: sorted(set(round(x) for x in v)) for r, v in hs.items() if max(v) - min(v) > 1}   # écart de hauteur À L'INTÉRIEUR d'un même rôle
+    check(f"i:ctl:{scene}@{tag}", not badr, badr or {r: sorted(set(round(x) for x in v)) for r, v in hs.items()}, ["D18"], ["D18"])
     bad = {k: v for k, v in m["fonts"].items() if round(float(k)) not in FS_SET or abs(float(k) - round(float(k))) > 0.01}
     check(f"i:fs:{scene}@{tag}", not bad, {k: f"{v['n']}x {v['ex']}" for k, v in sorted(bad.items(), key=lambda kv: float(kv[0]))}, ["D19"], ["D19"])
     # (o) ascenseurs thémés
@@ -188,12 +220,14 @@ def worker(lang, page_path):
         ctx.route(re.compile(r"fonts\.(googleapis|gstatic)\.com"), lambda r: r.fulfill(status=200, body="", content_type="text/css"))
         ctx.route(re.compile(r"\.(mp3|ogg|wav)$"), lambda r: r.fulfill(status=404, body=""))
         pg = ctx.new_page(); pg.on("pageerror", lambda e: errors.append(str(e)[:200]))
-        pg.goto(URL, timeout=90000); pg.wait_for_timeout(600); pg.click("#boot")
+        pg.goto(URL, timeout=90000); pg.wait_for_selector("#boot", state="visible", timeout=30000); pg.click("#boot")
         pg.wait_for_function("() => typeof worldReadyForCinematic !== 'undefined' && worldReadyForCinematic === true", timeout=90000, polling=250)
         if os.environ.get("UI_LAYOUT_INJECT_CSS"): pg.add_style_tag(content=os.environ["UI_LAYOUT_INJECT_CSS"])   # vérification du test lui-même : défaut injecté
         pg.click(f'.lang-btn[data-lang="{lang}"]')
         pg.wait_for_function("() => document.getElementById('modeSelect') && document.getElementById('modeSelect').classList.contains('open')", timeout=30000, polling=100)
-        def size(w, h): pg.set_viewport_size({"width": w, "height": h}); pg.wait_for_timeout(150)
+        def size(w, h):
+            pg.set_viewport_size({"width": w, "height": h})
+            pg.wait_for_function("([w, h]) => innerWidth === w && innerHeight === h && document.body.offsetHeight >= 0", arg=[w, h], timeout=10000, polling=20)
         def measure(sel): return pg.evaluate(MEASURE, sel)
         # ---- Mode de jeu (avant le démarrage : il est ouvert)
         for (w, h) in SIZES:
@@ -217,7 +251,7 @@ def worker(lang, page_path):
               if(sc === 'contracts'){ LOCAL.openContractBoard(); }
               if(sc === 'helpAudio'){ CONSOLE.open('help'); CONSOLE.help.toggleAudio(); }
               else CONSOLE.open({ nav: 'nav', missions: 'missions', contracts: 'missions', port: 'port', yard: 'yard', journal: 'journal', help: 'help' }[sc]); }""", sc)
-            pg.wait_for_timeout(120)
+            pg.wait_for_function("(t) => { const p = document.querySelector('#sttConsole .con-panel:not([hidden])'); return !!p && p.getAttribute('data-tab') === t && p.getClientRects().length > 0; }", arg=CONSOLE_TAB[sc], timeout=10000, polling=20)
         rects = {}
         for (w, h) in SIZES:
             size(w, h); tag = f"{w}x{h}-{lang}"
@@ -228,6 +262,9 @@ def worker(lang, page_path):
                 eval_scene(m, sc, tag)
                 if (w, h) == (1366, 768): rects[sc] = (m["fill"]["pw"], m["fill"]["ph"])
                 if sc == "missions": eval_frame(m, tag, w, h)
+                if sc == "journal":
+                    jb = pg.evaluate(JRN_BAR)
+                    if jb: check(f"p:jrn-bar@{tag}", jb["ok"], jb["info"], ["D25"], ["D25"])
                 if sc == "helpAudio":
                     hp = pg.evaluate("() => { const a = document.querySelector('#audioOverlay .audio-panel'), p = document.querySelector('#helpOverlay .help-panel'); if(!a || !p) return null;"
                                      " const ar = a.getBoundingClientRect(), pr = p.getBoundingClientRect(); return [ar.left, ar.width, pr.left, pr.width]; }")
@@ -248,7 +285,8 @@ def worker(lang, page_path):
                 for t in m["titles"]: sigs.setdefault(t["sig"], []).append(f"{sc}:{t['d']}")
             check(f"l:titres@{tag}", len(sigs) <= 1, {k: v[:2] for k, v in sigs.items()}, ["D17"], ["D17"])
             # ---- Pause
-            pg.evaluate("() => { CONSOLE.close('user'); enterPause(); }"); pg.wait_for_timeout(120)
+            pg.evaluate("() => { CONSOLE.close('user'); enterPause(); }")
+            pg.wait_for_function("() => { const o = document.getElementById('pauseOverlay'); return !!o && o.getClientRects().length > 0 && !!o.querySelector('.pause-btn'); }", timeout=10000, polling=20)
             m = measure("#pauseOverlay"); off = m["scrollers"]
             check(f"a:pause@{tag}", not [s for s in off if s["h"]], [f"{s['d']} s{s['sw']}>c{s['cw']}" for s in off], [scroller_defect(s["path"], "pause") for s in off], [])
             check(f"c:pause@{tag}", not off, [f"{s['d']}" for s in off], [scroller_defect(s["path"], "pause") for s in off], [])
@@ -262,6 +300,9 @@ def worker(lang, page_path):
             if m.get("tabs"):
                 check(f"g:{sc}@{tag}", m["tabs"]["sw"] <= m["tabs"]["cw"], f"s{m['tabs']['sw']} c{m['tabs']['cw']}", ["D15"], ["D15"])
             if sc == "missions": eval_frame(m, tag, 800, 600)
+        # ---- D26 : sélection du vaisseau en écran bas (@media max-width:760px)
+        size(700, 600); sp = pg.evaluate(SS_PANEL)
+        if sp: check(f"q:ss-panel@700x600-{lang}", sp["ok"], sp["info"], ["D26"], ["D26"])
         # ---- redimensionnement 1366x768 -> 1024x640 -> retour : (a), (b), (d) aux deux tailles
         for sc in ("nav", "missions", "journal"):
             ref = None
@@ -297,11 +338,11 @@ def parent(page_path):
             npass += 1
             for d in r["hint"]: defect_state[d]["pass"] += 1
             continue
-        unknown = [d for d in r["defects"] if d is None or d not in PENDING]
         known = sorted(set(d for d in r["defects"] if d in PENDING))
+        unknown = [d for d in r["defects"] if d is None or d not in PENDING]   # candidats hors PENDING
         for d in r["defects"]:
             if d: defect_state.setdefault(d, {"pass": 0, "fail": 0})["fail"] += 1
-        if unknown or not r["defects"]:
+        if not known:   # PENDING dès qu'un candidat l'est encore ; FAIL seulement si tous les candidats sont retirés (ou aucun attribuable)
             nfail += 1; print(f"    FAIL    {r['id']}  — {r['info'][:230]}" + (f"  [hors PENDING : {sorted(set(d for d in unknown if d)) or 'non attribuable'}]"))
         else:
             npend += 1; tasks = sorted(set(PENDING[d] for d in known))
