@@ -3,10 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="stt-token" content="">
 <title>STT · Agents en direct</title>
 <meta name="description" content="Tableau de bord temps réel des agents Claude Code travaillant sur Space Travel &amp; Transport.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script>(function(){var t='dark';try{var v=localStorage.getItem('kanbanTheme');if(v==='light')t=v}catch(e){}document.documentElement.setAttribute('data-theme',t)})();</script>
 <style>
   :root{
     /* charte McGivrer (web, sombre) */
@@ -177,6 +179,158 @@
   .empty{border:1px dashed var(--line);padding:28px;text-align:center;color:var(--muted);font-size:14px;line-height:1.7}
   .empty b{color:var(--ink);font-family:'JetBrains Mono',monospace}
 
+  /* ---------- onglets : Agents | Kanban ---------- */
+  .tabs{display:flex;gap:4px;margin:0 0 18px;border-bottom:1px solid var(--line)}
+  .tabs button{font:13px 'JetBrains Mono',monospace;padding:9px 18px;color:var(--muted);background:none;border:1px solid transparent;border-bottom:0;cursor:pointer;position:relative;top:1px}
+  .tabs button:hover{color:var(--ink)}
+  .tabs button[aria-selected="true"]{color:var(--amber);border-color:var(--line);background:var(--panel)}
+  #tab-kanban[hidden],#tab-agents[hidden]{display:none}
+  #kanbanSlot{position:relative;height:480px;border:1px solid var(--line);background:var(--panel)}
+  #kanbanFrame{position:absolute;left:0;top:0;width:100%;height:100%;border:0;background:transparent;color-scheme:normal}
+  #kanbanFrame.full,#kanbanKpis.full{position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:2000;clip-path:none}
+  #kanbanMsg{padding:24px;border:1px solid var(--line);background:var(--panel);color:var(--muted)}
+  /* ---------- en-tête compact : marque | indicateurs du Kanban | commandes ; puis onglets + liens + état ---------- */
+  .wrap{max-width:1760px;padding:14px 20px 48px}
+  .site-header{margin-bottom:8px}
+  .site-header-main{display:flex;align-items:center;gap:14px;padding:5px 12px;flex-wrap:nowrap}
+  .head-brand{flex:none}
+  .site-brand{font-size:18px}
+  .site-sub{margin-top:2px;font-size:11px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* le cadre des indicateurs est plus haut que sa fenêtre visible (rognée par clip-path) : infobulles et dialogues ne sont plus coupés ;
+     il se dévoile (classe ov) quand le Kanban le demande (survol des tuiles, dialogue ouvert) */
+  .head-kpis{position:relative;flex:1;min-width:0;height:87px;z-index:50}
+  #kanbanKpis{position:absolute;left:0;top:0;width:100%;height:calc(100% + 780px);border:0;background:transparent;color-scheme:normal;clip-path:inset(0 0 780px 0)}
+  #kanbanKpis.ov{clip-path:none}
+  .head-ctl{flex:none;display:flex;align-items:center;gap:6px}
+  .themesw{display:inline-flex}
+  .themesw button{font:11.5px 'JetBrains Mono',monospace;padding:5px 9px;color:var(--muted);background:none;border:1px solid var(--line);cursor:pointer}
+  .themesw button+button{border-left:0}
+  .themesw button[aria-pressed="true"]{color:var(--amber);background:rgba(255,180,84,.08)}
+  .head-ctl #btnAlerts{font:11.5px 'JetBrains Mono',monospace;padding:5px 9px;color:var(--muted);border:1px solid var(--line);background:none;cursor:pointer}
+  @media (max-width:1100px){.site-header-main{flex-wrap:wrap}.head-kpis{order:3;flex:1 0 100%}}
+  .tabs{align-items:flex-end;margin-bottom:12px}
+  .tabs .site-nav{margin-left:14px;align-self:center}
+  .tabs .site-nav a{padding:5px 10px}
+  .tabs .status{margin-left:auto;align-self:center;display:flex;gap:14px;font:10.5px 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2)}
+
+  /* ---------- toasts & réglages des alertes (T2.2) ---------- */
+  #toasts{position:fixed;bottom:16px;right:14px;z-index:1000;width:min(360px,calc(100vw - 28px));display:flex;flex-direction:column-reverse;gap:8px;pointer-events:none}
+  .toast{--acc:var(--cyan);position:relative;pointer-events:auto;cursor:pointer;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-left:3px solid var(--acc);padding:9px 34px 9px 12px;box-shadow:0 6px 22px rgba(0,0,0,.35);animation:toastIn .18s ease-out}
+  .toast::before,.toast::after{content:"";position:absolute;width:8px;height:8px;border:0 solid var(--amber);pointer-events:none}
+  .toast::before{top:-1px;left:-3px;border-top-width:2px;border-left-width:2px}
+  .toast::after{bottom:-1px;right:-1px;border-bottom-width:2px;border-right-width:2px}
+  .toast.sev-attention{--acc:var(--amber)} .toast.sev-info{--acc:var(--cyan)} .toast.sev-error{--acc:var(--st-perm)} .toast.sev-success{--acc:var(--st-done)}
+  .toast .t-meta{font:700 10.5px 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--acc)}
+  .toast .t-title{font-weight:700;font-size:13.5px;margin-top:2px;overflow-wrap:anywhere}
+  .toast .t-body{color:var(--muted);font-size:12.5px;margin-top:2px;overflow-wrap:anywhere}
+  .toast .t-close{position:absolute;top:4px;right:4px;width:24px;height:24px;border:1px solid transparent;background:none;color:var(--muted);cursor:pointer;font:16px/1 'JetBrains Mono',monospace}
+  .toast .t-close:hover{color:var(--amber);border-color:var(--line)}
+  @keyframes toastIn{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){.toast{animation:none}}
+
+  /* ---------- lanceur : contrôles et terminal (T1.6) ---------- */
+  .rctl{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font:11.5px 'JetBrains Mono',monospace}
+  .rctl.tree{padding:6px 14px;border-bottom:1px solid #1a2844;background:var(--panel-2)}
+  article.agent>.rctl{margin-top:8px}
+  .rbadge{padding:2px 7px;border:1px solid var(--amber-dim);color:var(--amber);font-size:10.5px;letter-spacing:.04em;text-transform:uppercase}
+  .rst{padding:2px 7px;border:1px solid var(--line);color:var(--muted);font-size:11px}
+  .rst.rs-running,.rst.rs-starting{color:var(--st-run);border-color:var(--st-run)} .rst.rs-waiting,.rst.rs-paused,.rst.rs-queued{color:var(--amber);border-color:var(--amber-dim)}
+  .rst.rs-failed,.rst.rs-killed,.rst.rs-orphan{color:var(--st-perm);border-color:var(--st-perm)}
+  .rnote{color:var(--muted-2);font:11px 'JetBrains Mono',monospace}
+  .rb{font:11.5px 'JetBrains Mono',monospace;padding:4px 9px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;min-height:26px}
+  .rb:hover:not(:disabled){border-color:var(--amber);color:var(--amber)}
+  .rb.danger:hover:not(:disabled){border-color:var(--st-perm);color:var(--st-perm)}
+  .rb:disabled{opacity:.4;cursor:not-allowed}
+  .rb.busy{opacity:.7;cursor:progress;animation:blink 1s infinite}
+  .runner-off{margin:8px 0 0;font:11.5px 'JetBrains Mono',monospace;color:var(--muted-2)}
+  table.rq{width:100%;border-collapse:collapse;font-size:12.5px} table.rq th{text-align:left;font:10.5px 'JetBrains Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2);padding:6px 10px;border-bottom:1px solid var(--line)} table.rq td{padding:6px 10px;border-bottom:1px solid var(--line)}
+  #runnerQueue{margin-top:24px}
+  #ttyDlg{width:min(1100px,94vw);height:min(720px,88vh);padding:0;border:1px solid var(--line);background:var(--panel);color:var(--ink);box-shadow:0 12px 48px rgba(0,0,0,.55)}
+  #ttyDlg[open]{display:flex;flex-direction:column}
+  #ttyDlg::backdrop{background:rgba(5,9,18,.6)}
+  .tty-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel-2)}
+  .tty-head h3{margin:0;font:700 12px 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--amber)}
+  .tty-ctl{margin-left:auto}
+  .tty-conn{font:11px 'JetBrains Mono',monospace;color:var(--muted-2)}
+  #ttyBody{flex:1;min-height:0;padding:8px;display:flex;flex-direction:column;background:var(--panel)}
+  #ttyBody .xterm{flex:1;min-height:0}
+  #ttyBody pre{flex:1;min-height:0;margin:0;overflow:auto;padding:8px;border:1px solid var(--line);font:12.5px/1.45 'JetBrains Mono',monospace;white-space:pre-wrap;word-break:break-all}
+  #ttyForm{display:flex;gap:8px;align-items:center;margin-top:8px} #ttyForm label{font:11px 'JetBrains Mono',monospace;color:var(--muted)}
+  #ttyForm input{flex:1;font:13px 'JetBrains Mono',monospace;padding:5px 8px;background:var(--bg);color:var(--ink);border:1px solid var(--line)}
+  .tty-help{padding:4px 12px 8px;font-size:12px;color:var(--muted)} .tty-help summary{cursor:pointer;font:11px 'JetBrains Mono',monospace} .tty-help p{margin:6px 0 0}
+  .tty-help kbd{font:11px 'JetBrains Mono',monospace;border:1px solid var(--line);padding:0 4px}
+  .agent.hl,.node.hl,details.hl>summary{outline:2px solid var(--amber);outline-offset:2px}
+  #alertsPop{position:fixed;z-index:1100;width:300px;max-width:calc(100vw - 20px);background:var(--panel);border:1px solid var(--line);padding:12px 14px;box-shadow:0 8px 28px rgba(0,0,0,.4);font-size:13px}
+  #alertsPop[hidden]{display:none}
+  #alertsPop::before,#alertsPop::after{content:"";position:absolute;width:8px;height:8px;border:0 solid var(--amber)}
+  #alertsPop::before{top:-1px;left:-1px;border-top-width:2px;border-left-width:2px}
+  #alertsPop::after{bottom:-1px;right:-1px;border-bottom-width:2px;border-right-width:2px}
+  #alertsPop h3{margin:0 0 8px;font:700 11px 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--amber)}
+  #alertsPop label{display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer}
+  #alertsPop input[type=checkbox]{accent-color:var(--amber)}
+  #alertsPop .sub{margin:8px 0 2px;font:10.5px 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2)}
+  #alertsPop .perm{font:11px 'JetBrains Mono',monospace;color:var(--cyan);margin-left:auto}
+  #alertsPop .btn{margin-top:10px;font:11.5px 'JetBrains Mono',monospace;padding:5px 10px;color:var(--amber);border:1px solid var(--amber-dim);background:none;cursor:pointer}
+  .head-ctl #btnAlerts.on{color:var(--amber);border-color:var(--amber-dim)}
+  /* ---------- thème clair (le même interrupteur pilote le Kanban intégré) ---------- */
+  :root[data-theme="light"]{color-scheme:light;
+    --bg:#f3f6fb; --bg-2:#e8eef7; --panel:#ffffff; --panel-2:#eef2f9; --line:#b9c6dc;
+    --ink:#0e1b3d; --muted:#3b4d73; --muted-2:#4a5d85; --amber:#8a4b00; --amber-dim:#7a5200; --cyan:#0b6b66;
+    --st-run:#0b6b66; --st-wait:#8a4b00; --st-perm:#b3261e; --st-idle:#5d6f92; --st-done:#1b6b2c}
+  :root[data-theme="light"] body::before{display:none}
+  :root[data-theme="light"] .ticker{background:#e8eef7}
+  :root[data-theme="light"] .ticker-label{color:#fff}
+  :root[data-theme="light"] .agent.s-wait,:root[data-theme="light"] .agent.s-perm{border-color:#d9c9a0}
+  :root[data-theme="light"] .bar{background:#d5deee}
+  :root[data-theme="light"] .tree details,:root[data-theme="light"] .prs li{border-bottom-color:#d5deee}
+  :root[data-theme="light"] .site-header{background:var(--panel)}
+  /* ---------- arbre agents / sous-agents ---------- */
+  .toolbar{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:-4px 0 14px}
+  .tree{border:1px solid var(--line);background:var(--panel)}
+  .tree details{border-bottom:1px solid #1a2844}
+  .tree details:last-child{border-bottom:none}
+  .tree summary{list-style:none;cursor:pointer}
+  .tree summary::-webkit-details-marker{display:none}
+  .node{display:grid;grid-template-columns:30px 132px 64px minmax(0,1.15fr) minmax(0,1.6fr) 112px 140px 96px;gap:10px;align-items:center;padding:9px 14px;min-height:46px}
+  .node:hover{background:rgba(94,234,212,.03)}
+  .node .g{font:13px 'JetBrains Mono',monospace;color:var(--muted-2);white-space:pre;padding-left:4px}
+  .node .role{justify-self:start}
+  .node .tm small{display:block;color:var(--muted-2);opacity:.8;margin-top:2px}
+  .node.main{background:var(--panel-2);border-left:3px solid var(--st-idle);padding-left:11px}
+  .node.main.s-run{border-left-color:var(--st-run)} .node.main.s-wait{border-left-color:var(--st-wait)} .node.main.s-perm{border-left-color:var(--st-perm)} .node.main.s-done{border-left-color:var(--st-done)}
+  .node .pill{justify-self:start;font-size:10px;padding:3px 7px}
+  .node .nm{min-width:0}
+  .node .nm b{display:block;font:700 13px 'JetBrains Mono',monospace;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .node.main .nm b{color:var(--cyan)}
+  .node .nm small{display:block;font:11px 'JetBrains Mono',monospace;color:var(--muted-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+  .node .act{min-width:0;font:12px 'JetBrains Mono',monospace;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .node .act b{color:var(--ink)} .node .act .arrow{color:var(--cyan)}
+  .node .act.txt{font:13px 'Inter',sans-serif;color:var(--muted)}
+  .node.s-wait .act.txt{color:var(--ink)}
+  .node .tm,.node .st{font:11px 'JetBrains Mono',monospace;color:var(--muted-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .node .st b{color:var(--muted);font-weight:500}
+  .node.sub.s-done,.node.sub.s-idle{opacity:.72}
+  .node.sub.s-done:hover,.node.sub.s-idle:hover{opacity:1}
+  .node svg{justify-self:end}
+  .detail{padding:4px 14px 14px 58px;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px;font-size:12.5px;color:var(--muted)}
+  .detail h4{margin:8px 0 6px;font:10.5px 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2);font-weight:400}
+  .detail ol{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+  .detail ol li{display:grid;grid-template-columns:62px minmax(0,1fr);gap:8px}
+  .detail ol li .t{font:11px 'JetBrains Mono',monospace;color:var(--cyan)}
+  .detail ol li span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .detail p{margin:0;line-height:1.6;color:var(--ink)}
+  .tree-note{padding:10px 14px;font:11.5px 'JetBrains Mono',monospace;color:var(--muted-2)}
+  @media (max-width:980px){
+    .node{grid-template-columns:28px 128px 58px minmax(0,1fr) 96px;grid-template-areas:"g p r n t" "g a a a a"}
+    .node .g{grid-area:g;align-self:start;padding-top:4px} .node .pill{grid-area:p} .node .role{grid-area:r} .node .nm{grid-area:n} .node .tm{grid-area:t;text-align:right}
+    .node .act{grid-area:a} .node .st,.node svg,.node .sp-x{display:none} .node .role-x{grid-area:r}
+    .detail{grid-template-columns:1fr;padding-left:20px}
+  }
+  @media (max-width:560px){
+    .node{grid-template-columns:22px auto minmax(0,1fr);grid-template-areas:"g p r" "g n n" "g a a" "g t t"}
+    .node .tm{text-align:left}
+  }
+
   /* ---------- chronologie ---------- */
   .tl-box{border:1px solid var(--line);background:var(--panel);padding:14px 16px 10px;overflow:hidden}
   .tl-box svg{display:block;width:100%}
@@ -191,6 +345,9 @@
   .feed li:last-child{border-bottom:none}
   .feed li.fresh{animation:fresh 2.4s ease-out}
   @keyframes fresh{from{background:rgba(94,234,212,.10)}to{background:transparent}}
+  @keyframes agflash{0%,55%{box-shadow:0 0 0 2px var(--amber),0 0 14px var(--amber)}100%{box-shadow:0 0 0 0 transparent}}
+  .agent-flash{animation:agflash 2.4s ease-out}
+  @media (prefers-reduced-motion:reduce){.agent-flash{animation:none;outline:2px solid var(--amber)}}
   .feed .t{font:11.5px 'JetBrains Mono',monospace;color:var(--cyan)}
   .feed .who{font:11.5px 'JetBrains Mono',monospace;color:var(--ink);white-space:nowrap;display:flex;gap:6px;align-items:center}
   .feed .msg{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -243,24 +400,38 @@
   <div class="ticker-viewport"><div class="ticker-track" id="ticker"></div></div>
 </div>
 
+<div id="toasts" role="log" aria-live="polite" aria-label="Notifications"></div>
+<div id="alertsPop" role="dialog" aria-label="Réglages des alertes" hidden></div>
+<dialog id="ttyDlg" aria-labelledby="ttyTitle">
+  <div class="tty-head"><h3 id="ttyTitle">Terminal</h3><span class="rst" id="ttyState"></span><span class="tty-conn" id="ttyConn" role="status"></span><span class="tty-ctl rctl" id="ttyCtl"></span>
+    <button type="button" class="rb" id="ttyClose" aria-label="Fermer le terminal (le run continue)">Fermer</button></div>
+  <div id="ttyBody"></div>
+  <details class="tty-help"><summary>Aide</summary><p>Le terminal se ferme avec <b>Fermer</b> ou <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>W</kbd> ; <kbd>Échap</kbd> est envoyé au programme quand le focus est dans le terminal (ailleurs, il ferme le dialogue). Fermer ne stoppe pas le run.</p></details>
+</dialog>
+
 <div class="wrap">
   <header class="site-header">
-    <div class="site-header-top">
-      <span class="conn" id="conn">connexion…</span>
-      <span id="srcLine"></span>
-    </div>
     <div class="site-header-main">
-      <div>
+      <div class="head-brand">
         <a class="site-brand" href="#">STT<span class="slash"> // </span>agents<span class="cursor"></span></a>
         <div class="site-sub" id="repoLine">Space Travel &amp; Transport · agents Claude Code</div>
       </div>
-      <nav class="site-nav" aria-label="Sections">
-        <a href="#agents">Agents</a><a href="#timeline">Chronologie</a><a href="#feed">Flux</a><a href="#delivery">Livraisons</a>
-        <button id="btnAlerts" type="button" title="Notification du navigateur quand un agent t'attend">Alertes : off</button>
-      </nav>
+      <div class="head-kpis"><iframe id="kanbanKpis" title="Indicateurs du Kanban" hidden></iframe></div>
+      <div class="head-ctl">
+        <div class="themesw" role="group" aria-label="Thème de la page">
+          <button type="button" data-theme-set="light" aria-pressed="false" title="Thème clair">☀ Clair</button><button type="button" data-theme-set="dark" aria-pressed="true" title="Thème sombre">☾ Sombre</button>
+        </div>
+        <button id="btnAlerts" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="alertsPop" title="Réglages des alertes (toasts, notifications du bureau)">Alertes : off</button>
+      </div>
     </div>
   </header>
 
+  <div class="tabs" role="tablist" aria-label="Vues">
+    <button type="button" role="tab" id="tabBtnKanban" data-tab="kanban" aria-controls="tab-kanban" aria-selected="true">Kanban</button><button type="button" role="tab" id="tabBtnAgents" data-tab="agents" aria-controls="tab-agents" aria-selected="false" tabindex="-1">Agents</button><button type="button" role="tab" id="tabBtnTimeline" data-tab="timeline" aria-controls="tab-timeline" aria-selected="false" tabindex="-1">Chronologie</button><button type="button" role="tab" id="tabBtnFeed" data-tab="feed" aria-controls="tab-feed" aria-selected="false" tabindex="-1">Flux</button><button type="button" role="tab" id="tabBtnDelivery" data-tab="delivery" aria-controls="tab-delivery" aria-selected="false" tabindex="-1">Livraisons</button>
+    <div class="status"><span class="conn" id="conn">connexion…</span><span id="srcLine"></span></div>
+  </div>
+
+  <div id="tab-agents" role="tabpanel" aria-labelledby="tabBtnAgents">
   <div id="banner"></div>
 
   <div class="kpis" id="kpis"></div>
@@ -268,11 +439,28 @@
   <section id="agents">
     <div class="section-head">
       <span class="section-num">01</span><h2 class="section-title">Agents</h2><span class="section-rule"></span>
-      <div class="chips" id="filters" role="group" aria-label="Filtrer les agents"></div>
+      <div class="chips" id="views" role="group" aria-label="Affichage">
+        <button type="button" class="chip" data-v="tree">Arbre</button><button type="button" class="chip" data-v="cards">Cartes</button>
+      </div>
     </div>
-    <div id="agentGrid" class="grid"></div>
+    <div class="toolbar"><div class="chips" id="filters" role="group" aria-label="Filtrer les agents"></div><span class="section-aside" id="treeAside"></span></div>
+    <div class="toolbar"><span class="section-aside">Agents créés</span><div class="chips" id="subfilters" role="group" aria-label="Filtrer les agents créés par état"></div></div>
+    <div id="agentGrid"></div>
   </section>
 
+  <section id="runnerQueue" hidden aria-label="File du lanceur"></section>
+  <p id="runnerOff" class="runner-off" hidden></p>
+
+
+
+  <section id="worktrees">
+    <div class="section-head"><span class="section-num">05</span><h2 class="section-title" id="wtTitle">Worktrees</h2><span class="section-rule"></span><span class="section-aside" id="wtAside"></span></div>
+    <div class="box tbl-wrap" id="wtBox"></div>
+  </section>
+
+  </div>
+
+  <div id="tab-timeline" role="tabpanel" aria-labelledby="tabBtnTimeline" hidden>
   <section id="timeline">
     <div class="section-head">
       <span class="section-num">02</span><h2 class="section-title">Chronologie · 6 h</h2><span class="section-rule"></span>
@@ -282,22 +470,26 @@
       <div class="tl-legend"><span><i style="background:var(--cyan)"></i>actions de l'agent (intensité / 5 min)</span><span><i style="background:var(--amber)"></i>PR ouverte</span><span><i style="background:var(--st-done)"></i>PR mergée</span></div>
     </div>
   </section>
+  </div>
 
-  <div class="two">
+  <div id="tab-feed" role="tabpanel" aria-labelledby="tabBtnFeed" hidden>
     <section id="feed">
       <div class="section-head"><span class="section-num">03</span><h2 class="section-title">Flux en direct</h2><span class="section-rule"></span></div>
       <div class="box"><ul class="feed" id="feedList" aria-live="polite"></ul></div>
     </section>
+  </div>
+
+  <div id="tab-delivery" role="tabpanel" aria-labelledby="tabBtnDelivery" hidden>
     <section id="delivery">
       <div class="section-head"><span class="section-num">04</span><h2 class="section-title">Livraisons GitHub</h2><span class="section-rule"></span></div>
       <div class="box"><div class="box-head"><span id="ghHead">pull requests</span><span id="pagesState"></span></div><ul class="prs" id="prList"></ul></div>
     </section>
   </div>
 
-  <section id="worktrees">
-    <div class="section-head"><span class="section-num">05</span><h2 class="section-title" id="wtTitle">Worktrees</h2><span class="section-rule"></span><span class="section-aside" id="wtAside"></span></div>
-    <div class="box tbl-wrap" id="wtBox"></div>
-  </section>
+  <div id="tab-kanban" role="tabpanel" aria-labelledby="tabBtnKanban" hidden>
+    <div id="kanbanMsg" hidden></div>
+    <div id="kanbanSlot"><iframe id="kanbanFrame" title="Kanban des lots" scrolling="no" hidden></iframe></div>
+  </div>
 
   <footer class="site-footer">
     <div class="src" id="srcFooter"></div>
@@ -319,9 +511,10 @@ const ROLE_TXT = {PM:'PM', ARCH:'ARCHI', DEV:'DÉV', EXPLORE:'EXPLO'};
 const STATE = {
   running:['s-run','En action'], tool:['s-run','Outil en cours'], thinking:['s-run','Réfléchit'],
   waiting:['s-wait','T’attend'], permission:['s-perm','Validation ?'], idle:['s-idle','Inactif'],
+  done:['s-done','Terminé'], error:['s-perm','Erreur'],
   review:['s-wait','PR ouverte'], pushed:['s-run','Branche poussée'], delivered:['s-done','Livré'], closed:['s-idle','Fermée'], stale:['s-idle','Inactive']
 };
-const GROUP = s => ['running','tool','thinking','pushed'].includes(s) ? 'run' : ['waiting','permission'].includes(s) ? 'you' : s === 'review' ? 'review' : s === 'delivered' ? 'done' : 'idle';
+const GROUP = s => ['running','tool','thinking','pushed'].includes(s) ? 'run' : ['waiting','permission'].includes(s) ? 'you' : s === 'review' ? 'review' : ['delivered', 'done'].includes(s) ? 'done' : 'idle';
 const store = { get(k, d){ try { const v = localStorage.getItem('stt-agents:' + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
                 set(k, v){ try { localStorage.setItem('stt-agents:' + k, JSON.stringify(v)); } catch {} } };
 
@@ -374,13 +567,23 @@ function deriveBranches(gh){
 }
 
 // ------------------------------------------------------------------ état & rendu
-let S = null, mode = null, filter = store.get('filter', 'all');
+let S = null, mode = null, filter = store.get('filter', 'all'), view = store.get('view', 'tree');
 const openDetails = new Set();
-let lastTopFeed = null, lastFeedKeys = new Set(), alerts = store.get('alerts', false), prevNeedYou = new Set(), firstRender = true;
+let lastTopFeed = null, lastFeedKeys = new Set(), prevNeedYou = new Set(), firstRender = true;
 
+// Une session lancée par le serveur dont le processus est fini n'attend plus rien : « Terminé » / « Arrêté » / « Échec » au lieu de « T'attend »
+// (son dernier message est du texte, ce que la lecture du transcript prend pour une attente).
+function withRunStates(list){
+  const runs = (S.runner && S.runner.enabled && S.runner.runs) || [];
+  const lab = { done: ['done', 'Terminé · lancé par le serveur'], stopped: ['done', 'Arrêté · lancé par le serveur'], failed: ['error', 'Échec · lancé par le serveur'], killed: ['error', 'Tué · lancé par le serveur'] };
+  const m = new Map(runs.filter(r => lab[r.state] && r.session).map(r => [r.session, r]));
+  if (!m.size) return list;
+  return list.map(a => { const r = m.get(a.id); if (!r || !['waiting', 'permission', 'thinking', 'idle'].includes(a.state)) return a;
+    const [st, label] = lab[r.state]; return Object.assign({}, a, { state: st, state_label: label + (r.state === 'failed' && r.exit != null ? ' (code ' + r.exit + ')' : '') }); });
+}
 function agentsView(){
   if (!S) return [];
-  if (S.mode !== 'github') return S.agents || [];
+  if (S.mode !== 'github') return withRunStates(S.agents || []);
   // mode GitHub : une « carte » par branche d'agent récente
   const day = Date.now() - 24 * 3600e3;
   return deriveBranches(S.github).filter(b => b.state === 'review' || b.state === 'pushed' || (b.state === 'delivered' && ms(b.pr.merged_at) > day))
@@ -393,7 +596,7 @@ function agentsView(){
 function render(){
   if (!S) return;
   const agents = agentsView();
-  renderBanner(); renderHeader(); renderKpis(agents); renderFilters(agents); renderAgents(agents);
+  renderBanner(); renderHeader(); renderKpis(agents); renderFilters(agents); renderAgents(agents); renderQueue(agents); paintTty();
   renderTimeline(agents); renderFeed(); renderPRs(); renderWorktrees(); renderFooter(); notify(agents);
   firstRender = false;
 }
@@ -414,6 +617,7 @@ function renderHeader(){
   $('#srcLine').textContent = [S.generated_at ? 'instantané ' + hhmm(S.generated_at, true) : '', rate ? `quota github ${rate.remaining}/${rate.limit}` : ''].filter(Boolean).join(' · ');
   const r = S.repo || {};
   $('#repoLine').textContent = `${r.github || REPO} · ${r.path ? r.path.replace(/\\/g, '/').split('/').slice(-3).join('/') : 'demos/space-travel'} · branche principale ${r.main || MAIN}`;
+  $('#repoLine').title = `${r.github || REPO} · ${r.path || 'demos/space-travel'} · branche principale ${r.main || MAIN}`;
 }
 
 function renderKpis(agents){
@@ -426,11 +630,12 @@ function renderKpis(agents){
   const day = Date.now() - 24 * 3600e3;
   const merged = prs.filter(p => p.merged && ms(p.merged_at) > day);
   const tokens = live ? agents.reduce((n, a) => n + (a.tokens?.output || 0), 0) : null;
+  const silent = live ? agents.reduce((n, a) => n + (a.subagents || []).filter(s => s.silent).length, 0) : 0;
   const tile = (k, v, h, cls = '') => `<div class="kpi ${cls}"><div class="k">${k}</div><div class="v">${v}</div><div class="h">${h}</div></div>`;
   $('#kpis').innerHTML = [
-    tile('En action', live ? cnt('run') : '—', live ? (agents.filter(a => GROUP(a.state) === 'run').map(a => shortBranch(a.branch) || 'session').slice(0, 3).join(' · ') || 'aucun agent actif') : 'serveur local requis', live ? '' : 'na'),
+    tile('Agents en action', live ? cnt('run') : '—', live ? (agents.filter(a => GROUP(a.state) === 'run').map(a => shortBranch(a.branch) || 'session').slice(0, 3).join(' · ') || 'aucun agent actif') : 'serveur local requis', live ? '' : 'na'),
     tile('T’attendent', live ? need.length : '—', live ? (need.length ? need.map(a => shortBranch(a.branch) || 'session').slice(0, 3).join(' · ') : 'rien en attente') : 'serveur local requis', live ? (need.length ? 'alert' : '') : 'na'),
-    tile('Sous-agents actifs', live ? subs : '—', live ? 'PM · Archi · Dév' : 'serveur local requis', live ? '' : 'na'),
+    tile('Agents actifs', live ? subs : '—', live ? (agents.flatMap(a => (a.subagents || []).filter(x => x.status === 'running')).map(x => ROLE_TXT[x.role] || 'agent').slice(0, 4).join(' · ') || 'aucun en cours') + (silent ? ` · ${silent} silencieux : à arrêter` : '') : 'serveur local requis', live ? (silent ? 'alert' : '') : 'na'),
     tile('PR ouvertes', open.length, open.length ? open.slice(0, 2).map(p => '#' + p.number).join(' · ') : 'aucune', open.length ? 'alert' : ''),
     tile('Livrées · 24 h', merged.length, merged.length ? 'dernière ' + ago(merged[0].merged_at) : '—'),
     tile('Tokens produits', live ? kfmt(tokens) : '—', live ? 'sessions des dernières 24 h' : 'serveur local requis', live ? '' : 'na'),
@@ -442,6 +647,20 @@ function renderFilters(agents){
   const n = g => g === 'all' ? agents.length : agents.filter(a => GROUP(a.state) === g).length;
   $('#filters').innerHTML = defs.filter(([g]) => g === 'all' || n(g) || g === filter)
     .map(([g, l]) => `<button type="button" class="chip ${filter === g ? 'on' : ''}" data-f="${g}" aria-pressed="${filter === g}">${l}<span class="n">${n(g)}</span></button>`).join('');
+  renderSubFilters(agents);
+}
+
+// Filtre des agents créés (sous les sessions) : par défaut seuls les actifs sont montrés ; « rapport rendu », « arrêté » et « erreur » sont décochés.
+const SUBF = [['actif','Actif'], ['silencieux','Silencieux'], ['rapport rendu','Terminé'], ['arrêté','Arrêté'], ['erreur','Erreur']];
+let subFilter = new Set(store.get('subfilter', ['actif', 'silencieux']));
+const lifeOf = x => x.lifecycle || (x.status === 'running' ? 'actif' : x.status === 'error' ? 'erreur' : x.status === 'stopped' ? 'arrêté' : 'rapport rendu');
+const visibleSubs = a => (a.subagents || []).filter(x => subFilter.has(lifeOf(x)));
+function renderSubFilters(agents){
+  const all = agents.flatMap(a => a.subagents || []);
+  $('#subfilters').innerHTML = SUBF.map(([k, l]) => {
+    const on = subFilter.has(k), c = all.filter(x => lifeOf(x) === k).length;
+    return `<button type="button" class="chip ${on ? 'on' : ''}" data-sf="${k}" role="checkbox" aria-checked="${on}">${on ? '☑' : '☐'} ${l}<span class="n">${c}</span></button>`;
+  }).join('');
 }
 
 const ORDER = {you:0, run:1, review:2, done:3, idle:4};
@@ -449,14 +668,284 @@ function renderAgents(agents){
   const list = agents.filter(a => filter === 'all' || GROUP(a.state) === filter)
     .sort((a, b) => (ORDER[GROUP(a.state)] - ORDER[GROUP(b.state)]) || (ms(b.last_activity) - ms(a.last_activity)));
   const g = $('#agentGrid');
+  g.className = view === 'tree' ? 'tree' : 'grid';
+  document.querySelectorAll('#views [data-v]').forEach(b => { b.classList.toggle('on', b.dataset.v === view); b.setAttribute('aria-pressed', b.dataset.v === view); });
+  const nSubs = agents.reduce((n, a) => n + (a.subagents || []).length, 0), nRun = agents.reduce((n, a) => n + (a.subagents || []).filter(x => x.status === 'running').length, 0);
+  $('#treeAside').textContent = mode === 'github' ? 'agents : serveur local requis' : `${agents.length} session${agents.length > 1 ? 's' : ''} · ${nSubs} agent${nSubs > 1 ? 's' : ''} créé${nSubs > 1 ? 's' : ''} (${nRun} actif${nRun > 1 ? 's' : ''}) · ${agents.reduce((n, a) => n + visibleSubs(a).length, 0)} affiché${agents.reduce((n, a) => n + visibleSubs(a).length, 0) > 1 ? 's' : ''}`;
   if (!list.length) {
+    g.className = 'grid';
     g.innerHTML = `<div class="empty">${agents.length ? 'Aucun agent dans ce filtre.' : mode === 'github'
       ? 'Aucune branche d’agent active sur GitHub depuis 24 h.<br>Dernières livraisons ci-dessous.'
       : `Aucune session Claude Code sur ce dépôt depuis ${esc(S.sources?.claude?.error ? '' : '24 h')}.<br>${S.sources?.claude?.error ? '<b>' + esc(S.sources.claude.error) + '</b>' : 'Lancez un agent : il apparaîtra ici en moins de 2 secondes.'}`}</div>`;
     return;
   }
-  g.innerHTML = list.map(agentCard).join('');
+  g.innerHTML = view === 'tree' ? list.map(treeNode).join('') + (mode === 'github' ? '<div class="tree-note">Vue GitHub : les agents (PM, Architecte, Développeur…) ne sont visibles qu\u2019avec stt_agents_server.py.</div>' : '') : list.map(agentCard).join('');
 }
+
+// --- arbre : chaque agent principal suivi de tous ses sous-agents
+function actCell(x){
+  if (x.kind === 'branch') return `<span class="act">${x.pr ? `PR <b>#${x.pr.number}</b> · ${esc(x.pr.title)}` : `${x.pushes.length} push`}</span>`;
+  const c = x.current || (['running', 'tool', 'thinking'].includes(x.state) && x.last_tool && x.status !== 'done' ? x.last_tool : null);
+  if (c) return `<span class="act" title="${esc((c.tool || c.name) + ' · ' + (c.summary || ''))}"><span class="arrow">▸</span> <b>${esc(c.tool || c.name)}</b> ${esc(c.summary || '')}</span>`;
+  if (x.last_text) return `<span class="act txt" title="${esc(x.last_text)}">${esc(x.last_text)}</span>`;
+  const l = x.last_tool;
+  return l ? `<span class="act" style="opacity:.75" title="dernier outil">${esc(l.name || l.tool)} ${esc(l.summary || '')}</span>` : '<span class="act">—</span>';
+}
+function timeCell(x){
+  if (x.status === 'done' || x.status === 'error') return `<span class="tm">${x.ended ? `<span data-since="${esc(x.ended)}" data-prefix="il y a ">${ago(x.ended)}</span>` : 'terminé'}${x.duration_s != null ? `<small>durée ${dur(x.duration_s)}</small>` : ''}</span>`;
+  return `<span class="tm"><span data-since="${esc(x.since)}" data-prefix="depuis ">${ago(x.since, 'depuis ')}</span>${x.started && x.duration_s != null ? `<small>lancé il y a ${dur(x.duration_s)}</small>` : ''}</span>`;
+}
+const dur = s => s == null ? '' : s < 60 ? s + ' s' : s < 3600 ? Math.round(s / 60) + ' min' : Math.floor(s / 3600) + ' h ' + String(Math.floor(s % 3600 / 60)).padStart(2, '0');
+function statCell(x){
+  const tools = x.tool_count, out = x.tokens?.output ?? x.tokens_out ?? x.total_tokens;
+  return `<span class="st">${[tools != null ? `<b>${tools}</b> outil${tools > 1 ? 's' : ''}` : '', out != null ? `<b>${kfmt(out)}</b> tok` : ''].filter(Boolean).join(' · ')}</span>`;
+}
+function detailBlock(x){
+  const rec = x.recent || [];
+  const todos = x.todos || [];
+  return `<div class="detail"><div><h4>Dernières actions</h4>${rec.length ? `<ol>${rec.map(r => `<li><span class="t">${hhmm(r.ts, true)}</span><span title="${esc(r.text)}"><span class="kind ${esc(r.kind)}" style="font:10px 'JetBrains Mono',monospace;color:var(--muted-2);margin-right:6px;text-transform:uppercase">${esc(KIND[r.kind] || r.kind)}</span>${esc(r.text)}</span></li>`).join('')}</ol>` : '<p style="color:var(--muted-2)">Aucune action enregistrée.</p>'}</div>
+    <div>${x.last_text ? `<h4>Dernier message</h4><p>${esc(x.last_text)}</p>` : ''}${todos.length ? `<h4>Tâches</h4><ul class="todolist">${todos.map(t => `<li class="${esc(t.status)}">${esc(t.content)}</li>`).join('')}</ul>` : ''}
+    <h4>Identité</h4><p style="color:var(--muted);font:11.5px 'JetBrains Mono',monospace">${esc([x.type && x.type !== '?' ? 'type ' + x.type : '', x.agent_id ? 'agent ' + x.agent_id : '', x.bg ? 'arrière-plan' : '', x.model ? modelShort(x.model) : '', x.started ? 'lancé ' + hhmm(x.started, true) : '', observedNote(x)].filter(Boolean).join(' · ') || '—')}</p></div></div>`;
+}
+function treeNode(a){
+  const [cls, short] = STATE[a.state] || STATE.idle;
+  const subs = visibleSubs(a);
+  const key = 'n:' + a.id;
+  let h = `<details data-k="${esc(key)}" ${openDetails.has(key) ? 'open' : ''}><summary class="node main ${cls}" title="Cliquer pour le détail">
+    <span class="g">${subs.length ? '▾' : '●'}</span><span class="pill ${cls}"><i></i>${esc(short)}</span>${role(a.role) || '<span class="role-x"></span>'}
+    <span class="nm"><b>${esc(a.branch && a.branch !== (S.repo?.main || MAIN) ? shortBranch(a.branch) : (a.branch || 'session'))}</b><small>${esc(a.state_label)}${a.title ? ' — ' + esc(a.title) : ''}</small></span>
+    ${actCell(a)}${timeCell(a)}${a.kind === 'branch' ? '<span class="st"></span>' : statCell(a)}${spark(a.spark) || '<span class="sp-x"></span>'}</summary>${a.kind === 'branch' ? '' : detailBlock(a)}</details>${runCtl(a, 'tree')}`;
+  subs.forEach((x, i) => {
+    const [c2, s2] = STATE[x.state] || STATE.idle, k2 = 's:' + a.id + ':' + x.id;
+    const meta = [x.type && x.type !== '?' && x.type !== 'general-purpose' ? x.type : '', x.bg ? 'arrière-plan' : '', x.has_transcript === false ? 'transcript introuvable' : ''].filter(Boolean).join(' · ');
+    h += `<details data-k="${esc(k2)}" ${openDetails.has(k2) ? 'open' : ''}><summary class="node sub ${c2}" title="${esc(x.state_label || '')}">
+      <span class="g">${i === subs.length - 1 ? '└─' : '├─'}</span><span class="pill ${c2}"><i></i>${esc(x.state === 'done' ? 'Terminé' : x.state === 'idle' ? 'Silencieux' : s2)}</span>${role(x.role) || '<span class="role">AGENT</span>'}
+      <span class="nm"><b style="font-weight:500">${esc(x.description)}</b><small>${esc(meta || x.state_label || '')}</small></span>
+      ${actCell(x)}${timeCell(x)}${statCell(x)}${spark(x.spark) || '<span class="sp-x"></span>'}</summary>${detailBlock(x)}</details>`;
+  });
+  return h;
+}
+
+// ------------------------------------------------------------------ lanceur : contrôles des agents lancés (T1.6)
+const RUN_LBL = {queued:'en file', starting:'démarrage', running:'en cours', waiting:'attend', paused:'en pause', stopping:'arrêt en cours', stopped:'arrêté', killed:'tué', done:'terminé', failed:'échec', orphan:'orphelin'};
+const RUN_ALIVE = ['starting','running','waiting','paused','stopping','orphan'];
+// Règles des boutons (contrat T1 § 7) : orphelin => Killer seul.
+function runRules(run){
+  const s = run && run.state, orphan = !!run && (s === 'orphan' || run.controllable === false);
+  const ok = (...l) => !orphan && l.includes(s);
+  return {
+    terminal: ok('starting','running','waiting','paused'), pause: ok('running','waiting'), resume: ok('paused'),
+    stop: ok('running','waiting','paused'), kill: !!run && (RUN_ALIVE.includes(s) || orphan), retry: ok('stopped','killed','failed'), cancel: ok('queued'), orphan
+  };
+}
+window.sttRunRules = runRules;
+const runnerOn = () => !!(S && mode === 'live' && S.runner && S.runner.enabled);
+const runOf = a => runnerOn() && a && a.kind !== 'branch' ? (S.runner.runs || []).find(r => r.session === a.id) || null : null;
+const runPending = new Map(); // tâche -> action en cours
+const RA = {terminal:['Terminal', '⌨', 'Ouvrir le terminal'], pause:['Pause', '⏸', 'Mettre en pause'], resume:['Reprendre', '▶', 'Reprendre'], stop:['Stopper', '⏹', 'Arrêter proprement'], kill:['Killer', '✖', 'Tuer immédiatement'], retry:['Relancer', '↻', 'Relancer'], cancel:['Annuler', '×', 'Annuler la mise en file']};
+function rbtn(act, run){
+  const r = runRules(run), pend = runPending.get(run.task) === act, busy = runPending.has(run.task);
+  const [lbl, ico, tip] = RA[act], icon = act === 'terminal';
+  return `<button type="button" class="rb${act === 'kill' ? ' danger' : ''}${pend ? ' busy' : ''}" data-ra="${act}" data-task="${esc(run.task)}" ${r[act] && !busy ? '' : 'disabled'} ${pend ? 'aria-busy="true"' : ''} aria-label="${esc(tip + ' · ' + run.task)}" title="${esc(tip)}"><span aria-hidden="true">${ico}</span>${icon ? '' : ' ' + lbl}</button>`;
+}
+function runBar(run, acts){
+  const r = runRules(run);
+  return `<span class="rbadge" title="Ce run a été lancé par le serveur local">lancé par le serveur</span><span class="rst rs-${esc(run.state)}" data-rstate>${esc(RUN_LBL[run.state] || run.state)}</span>${r.orphan ? '<span class="rnote">orphelin : kill seul</span>' : ''}${acts.map(a => rbtn(a, run)).join('')}`;
+}
+const CARD_ACTS = ['terminal','pause','resume','stop','kill','retry'];
+const runCtl = (a, cls = '') => { const run = runOf(a); return run ? `<div class="rctl ${cls}" role="group" aria-label="Contrôles du run ${esc(run.task)}" data-task="${esc(run.task)}">${runBar(run, CARD_ACTS)}</div>` : ''; };
+const observedNote = x => runnerOn() && x.kind !== 'branch' && !runOf(x) ? 'observé · non pilotable' : '';
+
+function renderQueue(agents){
+  const box = $('#runnerQueue'), off = $('#runnerOff');
+  const on = runnerOn();
+  off.hidden = !(S && mode === 'live' && S.runner && !S.runner.enabled);
+  off.textContent = 'lanceur désactivé : relancer stt_agents_server.py avec --runner';
+  const ids = new Set(agents.map(a => a.id));
+  const rows = on ? (S.runner.runs || []).filter(r => r.state === 'queued' || (RUN_ALIVE.includes(r.state) && !ids.has(r.session))).sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99)) : [];
+  box.hidden = !rows.length;
+  if (!rows.length) { box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="section-head"><span class="section-num">··</span><h2 class="section-title">File du lanceur</h2><span class="section-rule"></span><span class="section-aside">${rows.length} run${rows.length > 1 ? 's' : ''}</span></div>
+    <div class="box tbl-wrap"><table class="rq"><thead><tr><th>Tâche</th><th>Profil</th><th>Rang</th><th>Priorité</th><th>État</th><th>Actions</th></tr></thead><tbody>${rows.map(r =>
+      `<tr data-task="${esc(r.task)}"><td><b>${esc(r.task)}</b></td><td>${esc(r.agent || '')}${r.model ? ' · ' + esc(r.model) : ''}</td><td>${r.state === 'queued' && r.rank != null ? '#' + esc(r.rank) : '—'}</td><td>${esc(r.prio ?? '—')}</td>
+      <td><span class="rst rs-${esc(r.state)}">${esc(RUN_LBL[r.state] || r.state)}</span></td><td><div class="rctl">${r.state === 'queued' ? rbtn('cancel', r) : runBar(r, CARD_ACTS)}</div></td></tr>`).join('')}</tbody></table></div>`;
+}
+
+let tokenCache = null;
+const tok = () => tokenCache ??= (document.querySelector('meta[name="stt-token"]')?.content || '');
+async function rapi(task, act, body){
+  const r = await fetch(`api/runner/${encodeURIComponent(task)}/${act}`, {method:'POST', headers:{'Content-Type':'application/json', 'X-STT-Token':tok()}, body:JSON.stringify(body || {})});
+  let j = null; try { j = await r.json(); } catch {}
+  if (!r.ok) throw new Error((j && j.error) || ('HTTP ' + r.status));
+  return j || {};
+}
+function runToast(sev, title, body){ showToast({severity:sev, cat:'runner', kind:'runner-ui', ts:new Date().toISOString(), title, body}); }
+const API_ACT = {retry:'enqueue'};
+function focusKey(){ const e = document.activeElement; return e && e.dataset && e.dataset.ra && !e.closest('#ttyDlg') ? e.dataset.ra + '|' + e.dataset.task : null; }
+function restoreFocus(k){ if (!k) return; const [a, t] = k.split('|'); const b = [...document.querySelectorAll('button[data-ra]')].find(x => x.dataset.ra === a && x.dataset.task === t && !x.closest('#ttyDlg') && !x.disabled); if (b) b.focus(); }
+async function runAction(task, act){
+  if (runPending.has(task)) return;
+  if (act === 'kill' && !confirm(`Killer le run ${task} ? Le processus est tué immédiatement (SIGKILL), sans arrêt propre.`)) return;
+  runPending.set(task, act); repaintRuns();
+  try {
+    const out = await rapi(task, API_ACT[act] || act);
+    const run = S && S.runner && (S.runner.runs || []).find(x => x.task === task);
+    if (run && out.state) run.state = out.state;
+  } catch (e) {
+    runToast('error', `${RA[act][0]} · ${task}`, e.message);
+  } finally { runPending.delete(task); repaintRuns(); }
+}
+function repaintRuns(){ if (S) { const k = focusKey(); renderAgents(agentsView()); renderQueue(agentsView()); restoreFocus(k); } paintTty(); }
+document.addEventListener('click', e => {
+  const b = e.target.closest('button[data-ra]'); if (!b || b.disabled) return;
+  const task = b.dataset.task, act = b.dataset.ra;
+  if (act === 'terminal') openTty(task, b); else runAction(task, act);
+});
+
+// ---- terminal (dialogue plein écran partiel ; xterm.js 5 + addon fit, repli <pre> sans CDN)
+const XT = {
+  js:['https://cdnjs.cloudflare.com/ajax/libs/xterm/5.5.0/xterm.js', 'sha384-M169f14mRZOXm3hD/v2Ti0ThIT/RnAQagXA9nlE15yHAtrW19gdePJh/HaTzUOe/'],
+  css:['https://cdnjs.cloudflare.com/ajax/libs/xterm/5.5.0/xterm.min.css', 'sha384-PeNPV+nPJpP/217k5ixNFwzAOwAqvSXPFyA7ouS19oSSVCmMWtBoKpO43UrUmA0k'],
+  fit:['https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js', 'sha384-iF+jqbuti4XlB64clWgFWYEscb+UnSRv3VgVikGYZu+otNFnSHr7y7NcKfBnGizn']
+};
+let xtLoad = null;
+function loadXterm(){
+  if (xtLoad) return xtLoad;
+  const add = (tag, [url, sri], attrs) => new Promise((ok, ko) => { const el = document.createElement(tag); Object.assign(el, attrs); el.integrity = sri; el.crossOrigin = 'anonymous'; el.onload = ok; el.onerror = () => ko(new Error(url)); document.head.appendChild(el); });
+  xtLoad = Promise.race([
+    Promise.all([add('link', XT.css, {rel:'stylesheet', href:XT.css[0]}), add('script', XT.js, {src:XT.js[0]})]).then(() => add('script', XT.fit, {src:XT.fit[0]})).then(() => { if (!window.Terminal || !window.FitAddon) throw new Error('xterm absent'); return true; }),
+    new Promise((_, ko) => setTimeout(() => ko(new Error('délai CDN')), 8000))
+  ]).catch(() => { xtLoad = Promise.resolve(false); return false; });
+  return xtLoad;
+}
+const tty = {task:null, gen:0, since:0, term:null, fit:null, state:null, ac:null, opener:null, pre:null, dec:null, inBuf:'', inT:0, inQ:Promise.resolve(), rzT:0, ro:null};
+const dlg = $('#ttyDlg');
+const TERMINAL_STATES = ['done','failed','stopped','killed'];
+function xtTheme(){
+  const cs = getComputedStyle(document.documentElement), v = n => cs.getPropertyValue(n).trim();
+  const light = document.documentElement.getAttribute('data-theme') === 'light';
+  return {background:v('--panel') || '#0f1a30', foreground:v('--ink') || '#e8edf5', cursor:v('--amber') || '#ffb454', cursorAccent:v('--panel'), selectionBackground:light ? 'rgba(57,135,229,.30)' : 'rgba(94,234,212,.28)',
+    black:light ? '#1a2336' : '#0b1220', red:v('--st-perm'), green:v('--st-done'), yellow:v('--amber'), blue:v('--r-arch'), magenta:v('--r-dev'), cyan:light ? '#0d7c70' : v('--cyan'), white:v('--muted')};
+}
+new MutationObserver(() => { if (tty.term) tty.term.options.theme = xtTheme(); }).observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
+const ttyRun = () => S && S.runner && (S.runner.runs || []).find(r => r.task === tty.task) || null;
+function paintTty(){
+  if (!dlg.open || !tty.task) return;
+  const run = ttyRun() || {task:tty.task, state:tty.state || '?', controllable:true};
+  // l'état poussé par le flux du terminal est plus frais que l'état global : on le préfère s'il est terminal
+  const shown = Object.assign({}, run, tty.state && TERMINAL_STATES.includes(tty.state) ? {state:tty.state} : {});
+  $('#ttyTitle').textContent = 'Terminal · ' + tty.task;
+  const el = $('#ttyState'); el.className = 'rst rs-' + shown.state; el.textContent = RUN_LBL[shown.state] || shown.state;
+  const ctl = $('#ttyCtl'), fa = document.activeElement && ctl.contains(document.activeElement) ? document.activeElement.dataset.ra : null;
+  ctl.innerHTML = ['pause','resume','stop','kill','retry'].map(a => rbtn(a, shown)).join('');
+  if (fa) { const b = ctl.querySelector(`button[data-ra="${fa}"]`); if (b && !b.disabled) b.focus(); else $('#ttyClose').focus(); }
+}
+function ttyConnLabel(t){ $('#ttyConn').textContent = t || ''; }
+function ttyWrite(bytes){
+  if (tty.term) { tty.term.write(bytes); return; }
+  if (!tty.pre) return;
+  const txt = tty.dec.decode(bytes, {stream:true}).replace(/\x1b\][^\x07\x1b]*(\x07|\x1b\\)/g, '').replace(/\x1b\[[0-9;?]*[ -\/]*[@-~]/g, '').replace(/\x1b[()][A-Za-z0-9]/g, '').replace(/\r\n/g, '\n').replace(/[^\n\t\x20-￿]/g, '');
+  const near = tty.pre.scrollTop + tty.pre.clientHeight >= tty.pre.scrollHeight - 8;
+  tty.pre.textContent = (tty.pre.textContent + txt).slice(-200000);
+  if (near) tty.pre.scrollTop = tty.pre.scrollHeight;
+}
+function ttySend(data){
+  tty.inBuf += data;
+  if (tty.inT) return;
+  tty.inT = setTimeout(() => {
+    tty.inT = 0;
+    const task = tty.task; let buf = tty.inBuf; tty.inBuf = '';
+    while (buf) { const part = buf.slice(0, 16000); buf = buf.slice(16000); tty.inQ = tty.inQ.then(() => rapi(task, 'input', {data:part})).catch(e => ttyConnLabel('saisie refusée : ' + e.message)); }
+  }, 15);
+}
+function ttyResize(){
+  if (!tty.term) return;
+  try { tty.fit.fit(); } catch {}
+  clearTimeout(tty.rzT);
+  tty.rzT = setTimeout(() => { if (tty.term && tty.task) rapi(tty.task, 'resize', {cols:tty.term.cols, rows:tty.term.rows}).catch(() => {}); }, 200);
+}
+function sseEvents(buf, cb){
+  let i; while ((i = buf.indexOf('\n\n')) >= 0) {
+    const blk = buf.slice(0, i); buf = buf.slice(i + 2);
+    let ev = 'message', data = '';
+    blk.split('\n').forEach(l => { if (l.startsWith('event:')) ev = l.slice(6).trim(); else if (l.startsWith('data:')) data += l.slice(5).replace(/^ /, ''); });
+    cb(ev, data);
+  }
+  return buf;
+}
+async function ttyStream(gen){
+  let delay = 500;
+  while (gen === tty.gen) {
+    const ac = tty.ac = new AbortController();
+    let final = false, fatal = null;
+    try {
+      const r = await fetch(`api/runner/${encodeURIComponent(tty.task)}/tty?since=${tty.since}`, {headers:{'X-STT-Token':tok()}, signal:ac.signal, cache:'no-store'});
+      if (!r.ok) { let m = ''; try { m = (await r.json()).error || ''; } catch {} if (r.status === 404 || r.status === 409) fatal = m || ('HTTP ' + r.status); else throw new Error('HTTP ' + r.status); }
+      else {
+        ttyConnLabel('connecté'); delay = 500;
+        const rd = r.body.getReader(), td = new TextDecoder(); let buf = '';
+        for (;;) {
+          const {done, value} = await rd.read(); if (done) break;
+          buf = sseEvents(buf + td.decode(value, {stream:true}).replace(/\r\n/g, '\n'), (ev, data) => {
+            let j = null; try { j = JSON.parse(data); } catch { return; }
+            if (ev === 'out') {
+              const bin = atob(j.b64), bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+              const end = j.seq + bytes.length; if (end <= tty.since) return;
+              ttyWrite(j.seq < tty.since ? bytes.subarray(tty.since - j.seq) : bytes); tty.since = end;
+            } else if (ev === 'state') { tty.state = j.state; if (TERMINAL_STATES.includes(j.state)) final = true; paintTty(); }
+          });
+        }
+      }
+    } catch (e) { if (gen !== tty.gen) return; }
+    if (gen !== tty.gen) return;
+    if (fatal) { ttyConnLabel(fatal); return; }
+    if (final) { ttyConnLabel('flux terminé'); return; }
+    ttyConnLabel('reconnexion…');
+    await new Promise(ok => setTimeout(ok, delay)); delay = Math.min(delay * 2, 4000);
+  }
+}
+async function openTty(task, opener){
+  if (dlg.open) ttyClose(true);
+  Object.assign(tty, {task, since:0, state:ttyRun()?.state || null, opener:opener || null, inBuf:'', term:null, fit:null, pre:null});
+  const gen = ++tty.gen, body = $('#ttyBody');
+  body.innerHTML = ''; ttyConnLabel('chargement…');
+  dlg.dataset.mode = ''; dlg.showModal(); paintTty();
+  const xt = await loadXterm();
+  if (gen !== tty.gen) return;
+  if (xt) {
+    dlg.dataset.mode = 'xterm';
+    const t = tty.term = new window.Terminal({cursorBlink:true, fontFamily:"'JetBrains Mono',ui-monospace,monospace", fontSize:13, theme:xtTheme(), scrollback:5000});
+    tty.fit = new window.FitAddon.FitAddon(); t.loadAddon(tty.fit);
+    t.open(body);
+    t.attachCustomKeyEventHandler(ev => !(ev.ctrlKey && ev.altKey && ev.code === 'KeyW'));
+    t.onData(ttySend); t.onResize(() => ttyResize());
+    tty.ro = new ResizeObserver(() => ttyResize()); tty.ro.observe(body);
+    ttyResize(); t.focus();
+  } else {
+    dlg.dataset.mode = 'pre';
+    tty.dec = new TextDecoder();
+    body.innerHTML = '<pre id="ttyPre" tabindex="0" aria-label="Sortie du terminal (lecture seule)"></pre><form id="ttyForm"><label for="ttyIn">Saisie</label><input id="ttyIn" type="text" autocomplete="off" spellcheck="false" placeholder="Texte envoyé au programme, puis Entrée"><button type="submit" class="rb">Envoyer</button></form>';
+    tty.pre = $('#ttyPre');
+    $('#ttyForm').addEventListener('submit', e => { e.preventDefault(); const i = $('#ttyIn'); ttySend(i.value + '\n'); i.value = ''; });
+    $('#ttyIn').focus();
+  }
+  ttyStream(gen);
+}
+function ttyClose(quiet){
+  tty.gen++; try { tty.ac && tty.ac.abort(); } catch {}
+  clearTimeout(tty.rzT); clearTimeout(tty.inT); tty.inT = 0; tty.inBuf = '';
+  if (tty.ro) { tty.ro.disconnect(); tty.ro = null; }
+  if (tty.term) { try { tty.term.dispose(); } catch {} tty.term = null; }
+  tty.pre = null; $('#ttyBody').innerHTML = '';
+  const o = tty.opener; tty.task = null;
+  if (dlg.open) dlg.close();
+  if (!quiet && o && o.isConnected) o.focus();
+}
+dlg.addEventListener('cancel', e => { e.preventDefault(); if (!$('#ttyBody').contains(document.activeElement)) ttyClose(); });
+document.addEventListener('keydown', e => { if (dlg.open && e.ctrlKey && e.altKey && e.code === 'KeyW') { e.preventDefault(); ttyClose(); } }, true);
+$('#ttyClose').addEventListener('click', () => ttyClose());
+dlg.addEventListener('close', () => { if (tty.task) ttyClose(true); });
+if (P.get('debug') === '1') window.sttTty = tty;
 
 function steps(phase){
   return `<ol class="steps" aria-label="Étape du flux PM → Archi → Dév">${STEPS.map(([l, who], i) =>
@@ -489,13 +978,16 @@ function agentCard(a){
       body += `<div class="todo"><span class="bar" role="progressbar" aria-valuenow="${done}" aria-valuemax="${todos.length}"><span style="width:${(done / todos.length * 100).toFixed(0)}%"></span></span><span>${done}/${todos.length}</span><span class="cur">${esc(cur ? (cur.activeForm || cur.content) : done === todos.length ? 'Tout est coché' : '')}</span></div>
         <details class="more" data-k="todo:${key}" ${openDetails.has('todo:' + a.id) ? 'open' : ''}><summary>liste des tâches</summary><ul class="todolist">${todos.map(t => `<li class="${esc(t.status)}">${esc(t.content)}</li>`).join('')}</ul></details>`;
     }
-    const subs = (a.subagents || []);
+    const subs = visibleSubs(a);
     if (subs.length) {
-      const shown = [...subs.filter(s => s.status === 'running'), ...subs.filter(s => s.status !== 'running').reverse()].slice(0, 4);
+      const shown = [...subs.filter(s => s.status === 'running'), ...subs.filter(s => s.status !== 'running').reverse()];
       body += `<ul class="subs">${shown.map(s => {
-        const st = s.status === 'running' ? (s.state === 'permission' ? ['perm', 'validation ?'] : ['run', s.last_tool ? s.last_tool.name : 'en cours']) : s.status === 'error' ? ['err', 'erreur'] : ['', 'terminé ' + ago(s.ended)];
-        return `<li>${role(s.role) || '<span class="role">AGENT</span>'}<span class="d" title="${esc(s.description)}">${esc(s.description || s.type)} ${s.status === 'running' && s.last_tool?.summary ? `<em>· ${esc(s.last_tool.summary)}</em>` : ''}</span><span class="s ${st[0]}">${esc(st[1])}</span></li>`; }).join('')}</ul>`;
-      if (subs.length > 4) body += `<div class="since">+ ${subs.length - 4} sous-agents plus anciens</div>`;
+        const st = s.status === 'running' ? (s.state === 'permission' ? ['perm', 'validation ?'] : s.state === 'idle' ? ['', 'silencieux'] : ['run', s.current ? s.current.tool : s.last_tool ? s.last_tool.name : 'en cours']) : s.status === 'error' ? ['err', 'erreur'] : s.status === 'stopped' ? ['', 'arrêté ' + ago(s.ended)] : ['', 'rapport rendu ' + ago(s.ended)];
+        if (s.silent) st[1] = 'silencieux · à arrêter';
+        if (s.agent_id) st[1] += ' · ' + String(s.agent_id).slice(0, 6);
+        const lt = s.current || s.last_tool;
+        return `<li>${role(s.role) || '<span class="role">AGENT</span>'}<span class="d" title="${esc(s.description)}">${esc(s.description || s.type)}${s.bg ? ' <em>· arr.-plan</em>' : ''} ${s.status === 'running' && lt?.summary ? `<em>· ${esc(lt.summary)}</em>` : ''}</span><span class="s ${st[0]}">${esc(st[1])}</span></li>`; }).join('')}</ul>`;
+
     }
   }
   const gitb = a.git ? `${a.git.ahead != null ? `<span title="avance / retard sur ${esc(S.repo?.main || MAIN)}">git <b>+${a.git.ahead}/−${a.git.behind ?? 0}</b></span>` : ''}${a.git.dirty ? `<span title="${esc((a.git.files || []).join('\n'))}"><b>${a.git.dirty}</b> fichier${a.git.dirty > 1 ? 's' : ''} modifié${a.git.dirty > 1 ? 's' : ''}</span>` : ''}` : '';
@@ -507,7 +999,8 @@ function agentCard(a){
     <h3>${title}<small>${esc(a.state_label)}${a.title && a.kind !== 'branch' ? ' — ' + esc(a.title) : a.kind === 'branch' ? ' — ' + esc(a.title) : ''}</small></h3>
     ${steps(a.phase ?? -1)}
     ${body}
-    <div class="agent-foot">${gitb}${pr}${tok}${a.errors ? `<span title="résultats d'outils en erreur">${a.errors} err.</span>` : ''}${spark(a.spark)}</div>
+    ${runCtl(a)}
+    <div class="agent-foot">${gitb}${pr}${tok}${observedNote(a) ? `<span class="rnote">${observedNote(a)}</span>` : ''}${a.errors ? `<span title="résultats d'outils en erreur">${a.errors} err.</span>` : ''}${spark(a.spark)}</div>
   </article>`;
 }
 
@@ -529,7 +1022,7 @@ function renderTimeline(agents){
     if (p.merged && ms(p.merged_at) > from) marks.push({t:ms(p.merged_at), c:'var(--st-done)', l:'#' + p.number + ' mergée', head:p.head});
   }
   $('#tlAside').textContent = `${lanes.length} piste${lanes.length > 1 ? 's' : ''} · ${hhmm(new Date(from).toISOString())} → ${hhmm(new Date(to).toISOString())}`;
-  const LW = W < 600 ? 92 : 150, top = 24, LH = 24, H = top + Math.max(1, lanes.length) * LH + 6, cw = (W - LW) / n;
+  const LW = W < 600 ? 112 : 190, top = 24, LH = 24, H = top + Math.max(1, lanes.length) * LH + 6, cw = (W - LW) / n;
   const x = t => LW + (t - from) / span * (W - LW);
   let s = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Chronologie de l'activité des agents sur 6 heures">`;
   for (let h = Math.ceil(from / 3600e3) * 3600e3; h <= to; h += 3600e3) {
@@ -538,9 +1031,11 @@ function renderTimeline(agents){
   }
   if (!lanes.length) s += `<text x="${LW}" y="${top + 16}" fill="var(--muted-2)" font-family="JetBrains Mono" font-size="11.5">aucune activité sur la période</text>`;
   lanes.forEach((l, li) => {
-    const y = top + li * LH, max = Math.max(1, ...l.buckets);
-    s += `<text x="${LW - 10}" y="${y + 15}" fill="var(--ink)" font-family="JetBrains Mono" font-size="11" text-anchor="end">${esc(l.label.length > 18 ? l.label.slice(0, 17) + '…' : l.label)}</text>`;
-    s += `<rect x="${LW}" y="${y + 4}" width="${W - LW}" height="${LH - 8}" fill="#0b1426"/>`;
+    const y = top + li * LH, max = Math.max(1, ...l.buckets), lim = l.sub ? 20 : 18;
+    const lab = (l.sub ? '› ' : '') + (l.label.length > lim ? l.label.slice(0, lim - 1) + '…' : l.label);
+    s += `<text x="${LW - 10}" y="${y + 15}" fill="${l.sub ? 'var(--muted)' : 'var(--ink)'}" font-family="JetBrains Mono" font-size="${l.sub ? 10 : 11}" text-anchor="end">${esc(lab)}</text>`;
+    if (l.sub && l.role) s += `<rect x="${LW - 6}" y="${y + 8}" width="4" height="8" fill="var(--r-${{PM:'pm', ARCH:'arch', DEV:'dev'}[l.role] || 'explo'})"/>`;
+    s += `<rect x="${LW}" y="${y + 4}" width="${W - LW}" height="${LH - 8}" style="fill:var(--bg-2)"/>`;
     l.buckets.forEach((v, i) => {
       if (!v) return;
       const t0 = new Date(from + i * bucket), t1 = new Date(from + (i + 1) * bucket);
@@ -574,7 +1069,7 @@ function feedItems(){
   const pr = ghFeed(Date.now() - 6 * 3600e3).filter(f => f.kind === 'PullRequestEvent');
   return [...(S.feed || []), ...pr].sort((a, b) => ms(b.ts) - ms(a.ts)).slice(0, 80);
 }
-const KIND = {tool:'outil', text:'message', prompt:'demande', spawn:'sous-agent', spawn_end:'fin agent', interrupt:'interrompu', compact:'compactage',
+const KIND = {tool:'outil', text:'message', prompt:'demande', spawn:'agent créé', spawn_end:'fin d\'agent', interrupt:'interrompu', compact:'compactage',
   PushEvent:'push', CreateEvent:'création', PullRequestEvent:'pr', DeleteEvent:'suppr.'};
 function renderFeed(){
   const items = feedItems(), ul = $('#feedList');
@@ -642,28 +1137,177 @@ function renderFooter(){
   $('#verFooter').textContent = `stt-agents ${S.version || ''} · ${mode}`;
 }
 
-// --- alertes
+// --- alertes : toasts, notifications du bureau, réglages (T2.2)
 function notify(agents){
   const need = new Set(agents.filter(a => GROUP(a.state) === 'you' && mode !== 'github').map(a => a.id));
   document.title = (need.size ? `(${need.size}) ` : '') + 'STT · Agents en direct';
-  if (alerts && !firstRender && 'Notification' in window && Notification.permission === 'granted') {
-    for (const a of agents) if (need.has(a.id) && !prevNeedYou.has(a.id))
-      try { new Notification(`STT · ${shortBranch(a.branch) || 'agent'} t’attend`, {body:`${a.state_label}${a.last_text ? ' — ' + a.last_text.slice(0, 140) : ''}`, tag:'stt-' + a.id}); } catch {}
-  }
   prevNeedYou = need;
 }
-function paintAlertsBtn(){ const b = $('#btnAlerts'); b.textContent = 'Alertes : ' + (alerts ? 'on' : 'off'); b.classList.toggle('on', alerts); b.setAttribute('aria-pressed', alerts); }
-$('#btnAlerts').addEventListener('click', async () => {
-  if (!alerts && 'Notification' in window && Notification.permission !== 'granted') { try { await Notification.requestPermission(); } catch {} }
-  alerts = !alerts && (!('Notification' in window) || Notification.permission === 'granted');
-  store.set('alerts', alerts); paintAlertsBtn();
+const CATS = [['attention','Attend / validation','ATTEND'],['agents','Agents','AGENTS'],['kanban','Kanban','KANBAN'],['pr','Livraisons','LIVRAISONS'],['runner','Lanceur','LANCEUR']];
+const CAT_LABEL = Object.fromEntries(CATS.map(c => [c[0], c[2]]));
+const DEF_SET = {on:true, toasts:true, desktop:false, always:false, cats:{attention:true, agents:true, kanban:true, pr:true, runner:true}};
+let cfg = (() => { let v = null; try { v = JSON.parse(localStorage.getItem('stt-agents:notify')); } catch {} v = v && typeof v === 'object' ? v : {};
+  return {...DEF_SET, ...v, cats:{...DEF_SET.cats, ...(v.cats || {})}}; })();
+const saveCfg = () => { try { localStorage.setItem('stt-agents:notify', JSON.stringify(cfg)); } catch {} };
+const permState = () => 'Notification' in window ? Notification.permission : 'unsupported';
+const TOAST_MS = P.get('debug') === '1' ? 1500 : 8000;
+
+let iconUrl = null;
+function noticeIcon(){
+  if (iconUrl !== null) return iconUrl;
+  try {
+    const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+    g.fillStyle = '#0b1220'; g.fillRect(0, 0, 128, 128);
+    g.strokeStyle = '#ffb454'; g.lineWidth = 6; g.beginPath();
+    g.moveTo(10, 40); g.lineTo(10, 10); g.lineTo(40, 10); g.moveTo(88, 118); g.lineTo(118, 118); g.lineTo(118, 88); g.stroke();
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = "700 40px 'JetBrains Mono',monospace"; g.fillStyle = '#ffb454'; g.fillText('STT', 64, 56);
+    g.font = "700 30px 'JetBrains Mono',monospace"; g.fillStyle = '#5eead4'; g.fillText('//', 64, 94);
+    iconUrl = c.toDataURL('image/png');
+  } catch { iconUrl = ''; }
+  return iconUrl;
+}
+
+function goTab(name){ const b = document.getElementById('tabBtn' + name); if (b) b.click(); }
+function navigate(t){
+  if (!t) return;
+  if (t.type === 'agent') {
+    goTab('Agents');
+    setTimeout(() => {
+      const id = String(t.id), el = [...document.querySelectorAll('[data-id]')].find(e => e.dataset.id === id || e.dataset.id === 'n:' + id);
+      if (!el) return;
+      el.scrollIntoView({block:'center', behavior:'smooth'}); el.classList.add('hl'); setTimeout(() => el.classList.remove('hl'), 3000);
+    }, 50);
+  } else if (t.type === 'task') goTab('Kanban');
+  else if (t.type === 'pr') {
+    const pr = (S?.github?.prs || []).find(p => String(p.number) === String(t.id));
+    if (pr && pr.url) window.open(pr.url, '_blank', 'noopener'); else goTab('Delivery');
+  }
+}
+
+const toastsEl = $('#toasts');
+function closeToast(el){ if (!el || !el.isConnected) return; clearTimeout(el._t); el.remove(); }
+function showToast(n){
+  const el = document.createElement('div');
+  el.className = 'toast sev-' + (n.severity || 'info'); el.dataset.sev = n.severity || 'info'; el.dataset.cat = n.cat || ''; el.dataset.kind = n.kind || '';
+  el.tabIndex = 0;
+  el.innerHTML = `<div class="t-meta">${esc(CAT_LABEL[n.cat] || String(n.cat || '').toUpperCase())} · ${hhmm(n.ts)}</div><div class="t-title">${esc(n.title)}</div>${n.body ? `<div class="t-body">${esc(n.body)}</div>` : ''}<button type="button" class="t-close" aria-label="Fermer la notification">×</button>`;
+  el.addEventListener('click', e => { if (e.target.closest('.t-close')) { closeToast(el); return; } closeToast(el); navigate(n.target); });
+  el.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target === el) { closeToast(el); navigate(n.target); } });
+  const sticky = n.severity === 'attention' || n.severity === 'error';
+  const arm = () => { clearTimeout(el._t); if (!sticky) el._t = setTimeout(() => closeToast(el), TOAST_MS); };
+  el.addEventListener('mouseenter', () => clearTimeout(el._t)); el.addEventListener('mouseleave', arm); el.addEventListener('focusin', () => clearTimeout(el._t)); el.addEventListener('focusout', arm);
+  toastsEl.appendChild(el);
+  while (toastsEl.children.length > 5) closeToast(toastsEl.firstElementChild);
+  arm();
+}
+addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || $('#ttyDlg').open) return;
+  if (!$('#alertsPop').hidden) { closePop(); return; }
+  const last = toastsEl.lastElementChild; if (last) closeToast(last);
 });
+
+function desktopNotice(n){
+  if (!cfg.desktop || permState() !== 'granted') return;
+  if (!document.hidden && !cfg.always) return;
+  try {
+    const x = new Notification('STT · ' + n.title, {body:n.body || '', tag:n.key || ('stt-' + n.id), icon:noticeIcon() || undefined, requireInteraction:n.severity === 'attention' || n.severity === 'error'});
+    x.onclick = () => { try { window.focus(); } catch {} navigate(n.target); x.close(); };
+  } catch {}
+}
+function present(n){
+  if (!cfg.on || !n || cfg.cats[n.cat] === false) return;
+  if (cfg.toasts) showToast(n);
+  desktopNotice(n);
+}
+let lastSeq = null;
+function handleNotices(st){
+  if (!st || typeof st.notice_seq !== 'number') return;
+  if (lastSeq === null) { lastSeq = st.notice_seq; return; }
+  const fresh = (st.notices || []).filter(n => n.id > lastSeq).sort((a, b) => a.id - b.id);
+  lastSeq = Math.max(lastSeq, st.notice_seq, ...fresh.map(n => n.id));
+  fresh.forEach(present);
+}
+if (P.get('debug') === '1') window.sttNotify = {push:present, settings:() => cfg};
+// --- depuis le Kanban : ouvrir l'onglet Agents sur l'agent qui traite une tâche en cours
+function focusAgentFor(task, session){
+  const agents = agentsView(), esc2 = task.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), re = new RegExp('(^|[^A-Za-z0-9.])' + esc2 + '($|[^A-Za-z0-9])');
+  let key = null, parent = null;
+  if (session) { const a = agents.find(x => x.id === session); if (a) key = parent = 'n:' + a.id; }   // tâche lancée par le serveur : session = carte
+  if (!key) for (const a of agents) { const x = (a.subagents || []).find(s => s.status === 'running' && re.test(s.description || '')); if (x) { key = 's:' + a.id + ':' + x.id; parent = 'n:' + a.id; break; } }
+  if (!key) { present({ id: 'goto-' + task + '-' + Date.now(), ts: new Date().toISOString(), kind: 'agent_notfound', cat: 'agents', severity: 'info', title: 'Agent introuvable', body: 'Aucun agent actif ne traite ' + task + ' (le suivi se fait par l’identifiant dans la description de l’agent).', target: {type: 'task', id: task}, key: 'goto:' + task }); return false; }
+  if (filter !== 'all') { filter = 'all'; store.set('filter', 'all'); }
+  ['actif', 'silencieux'].forEach(k => subFilter.add(k)); store.set('subfilter', [...subFilter]);
+  render();
+  requestAnimationFrame(() => {
+    const find = k => document.querySelector('[data-k="' + CSS.escape(k) + '"], [data-id="' + CSS.escape(k) + '"]');
+    const el = find(key) || find(parent); if (!el) return;
+    if (el.tagName === 'DETAILS') el.open = true;
+    const t = el.querySelector && el.querySelector('summary') || el;
+    t.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    t.classList.remove('agent-flash'); void t.offsetWidth; t.classList.add('agent-flash'); setTimeout(() => t.classList.remove('agent-flash'), 2600);
+  });
+  return true;
+}
+window.sttFocusAgent = focusAgentFor;
+// Kanban ouvert seul : lien /#agent=<tâche>[&session=<id>]
+function hashFocus(){
+  const m = /^#agent=([^&]+)(?:&session=(.+))?$/.exec(location.hash); if (!m) return;
+  const task = decodeURIComponent(m[1]), ses = m[2] ? decodeURIComponent(m[2]) : '';
+  if (window.sttShowTab) window.sttShowTab('agents', { hash: false });
+  let n = 0; const tm = setInterval(() => { if ((S && focusAgentFor(task, ses)) || ++n > 40) { clearInterval(tm); history.replaceState(null, '', location.pathname + location.search); } }, 250);
+}
+addEventListener('hashchange', hashFocus); hashFocus();
+
+// popover de réglages
+const btnA = $('#btnAlerts'), pop = $('#alertsPop');
+function paintAlertsBtn(){ btnA.textContent = 'Alertes : ' + (cfg.on ? 'on' : 'off'); btnA.classList.toggle('on', cfg.on); btnA.setAttribute('aria-pressed', cfg.on); }
+function permLabel(){ return {granted:'accordée', denied:'refusée', default:'à demander', unsupported:'indisponible'}[permState()] || permState(); }
+function paintPop(){
+  const ck = (k, v, t, extra = '') => `<label><input type="checkbox" data-k="${k}"${v ? ' checked' : ''}> ${t}${extra}</label>`;
+  pop.innerHTML = `<h3>Alertes</h3>${ck('on', cfg.on, 'Alertes activées')}${ck('toasts', cfg.toasts, 'Toasts dans la page')}${ck('desktop', cfg.desktop, 'Notifications du bureau', `<span class="perm" id="permState">${permLabel()}</span>`)}${ck('always', cfg.always, 'Notifier même onglet visible')}
+    <div class="sub">Catégories</div>${CATS.map(c => ck('cat:' + c[0], cfg.cats[c[0]] !== false, c[1])).join('')}
+    <button type="button" class="btn" id="alertsTest">Tester</button>`;
+}
+function placePop(){ const r = btnA.getBoundingClientRect(); pop.style.top = (r.bottom + 6) + 'px'; pop.style.left = Math.max(10, Math.min(r.right - 300, innerWidth - 310)) + 'px'; }
+function openPop(){ paintPop(); pop.hidden = false; placePop(); btnA.setAttribute('aria-expanded', 'true'); const f = pop.querySelector('input'); if (f) f.focus(); }
+function closePop(){ if (pop.hidden) return; pop.hidden = true; btnA.setAttribute('aria-expanded', 'false'); btnA.focus(); }
+btnA.addEventListener('click', () => pop.hidden ? openPop() : closePop());
+pop.addEventListener('change', async e => {
+  const k = e.target.dataset.k; if (!k) return;
+  if (k.startsWith('cat:')) cfg.cats[k.slice(4)] = e.target.checked; else cfg[k] = e.target.checked;
+  if (k === 'desktop' && e.target.checked) {
+    if (!('Notification' in window)) { cfg.desktop = false; e.target.checked = false; }
+    else if (Notification.permission !== 'granted') {
+      try { await Notification.requestPermission(); } catch {}
+      if (Notification.permission !== 'granted') { cfg.desktop = false; e.target.checked = false; }
+    }
+    const ps = $('#permState'); if (ps) ps.textContent = permLabel();
+  }
+  saveCfg(); paintAlertsBtn();
+});
+pop.addEventListener('click', e => {
+  if (!e.target.closest('#alertsTest')) return;
+  const now = new Date().toISOString();
+  [['info','Test · information','Notice de sévérité info.'],['success','Test · succès','Notice de sévérité succès.'],['attention','Test · à relire','Notice de sévérité attention.'],['error','Test · erreur','Notice de sévérité erreur.']]
+    .forEach(([sev, title, body], i) => present({id:'test' + i, ts:now, kind:'test', cat:'agents', severity:sev, title, body, target:null, key:'stt-test-' + sev}));
+});
+pop.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); closePop(); } });
+document.addEventListener('mousedown', e => { if (!pop.hidden && !pop.contains(e.target) && !btnA.contains(e.target)) { pop.hidden = true; btnA.setAttribute('aria-expanded', 'false'); } });
+addEventListener('resize', () => { if (!pop.hidden) placePop(); });
 paintAlertsBtn();
 
 // --- interactions
+$('#views').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (!b) return; view = b.dataset.v; store.set('view', view); render(); });
+$('#subfilters').addEventListener('click', e => {
+  const b = e.target.closest('[data-sf]'); if (!b) return;
+  subFilter.has(b.dataset.sf) ? subFilter.delete(b.dataset.sf) : subFilter.add(b.dataset.sf);
+  store.set('subfilter', [...subFilter]); render();
+});
 $('#filters').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; filter = b.dataset.f; store.set('filter', filter); render(); });
 document.addEventListener('toggle', e => { const d = e.target; if (d.matches && d.matches('details[data-k]')) d.open ? openDetails.add(d.dataset.k) : openDetails.delete(d.dataset.k); }, true);
 let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => S && renderTimeline(agentsView()), 150); });
+addEventListener('stt-tab', e => { if (e.detail === 'timeline' && S) requestAnimationFrame(() => renderTimeline(agentsView())); });
 setInterval(() => { // horloges relatives sans re-rendu complet
   document.querySelectorAll('[data-since]').forEach(el => { el.textContent = ago(el.dataset.since, el.dataset.prefix ?? ''); });
   if (S) renderHeader();
@@ -671,7 +1315,7 @@ setInterval(() => { // horloges relatives sans re-rendu complet
 
 // ------------------------------------------------------------------ sources
 let stale = false, lastMsg = 0;
-function apply(state, m){ S = state; mode = m; stale = false; lastMsg = Date.now(); render(); }
+function apply(state, m){ S = state; mode = m; stale = false; lastMsg = Date.now(); render(); handleNotices(state); }
 const timeout = (p, t) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error('délai dépassé')), t))]);
 
 function startLive(){
@@ -724,8 +1368,8 @@ function startDemo(reason){
   push(.2, 'lot2-scenes', 'DEV', 'tool', 'Bash · python3 build.py test', 'Développeur lot 2');
   push(1.1, 'fix-camera-jitter', 'DEV', 'tool', 'Edit · JS/game/20c-camera.js');
   push(3.4, 'ports-orbitaux-docks', 'ARCH', 'text', 'Spec prête : trois options d’amarrage (A, B, C). Laquelle retiens-tu ?');
-  push(4, 'lot2-scenes', 'ARCH', 'spawn_end', 'Sous-agent terminé · Architecte : spec SCENES lot 2');
-  push(6, 'lot2-scenes', 'DEV', 'spawn', 'Lance un sous-agent · Développeur lot 2');
+  push(4, 'lot2-scenes', 'ARCH', 'spawn_end', 'Agent terminé · Architecte : spec SCENES lot 2');
+  push(6, 'lot2-scenes', 'DEV', 'spawn', 'Crée un agent · Développeur lot 2');
   push(9, 'ports-orbitaux-docks', 'ARCH', 'tool', 'Write · docs/specs/spec-ports-orbitaux-docks.md');
   push(14, 'lot2-scenes', 'PM', 'text', 'Brief : lot 2 du plan Scènes — T2.1 à T2.4, critères d’acceptation listés');
   push(22, 'fix-camera-jitter', 'PM', 'prompt', 'Corrige le tressautement de la caméra en gros plan (cargo et navette)');
@@ -736,19 +1380,52 @@ function startDemo(reason){
     thresholds:{active_s:90, fast_tool_wait_s:30, long_tool_wait_s:120},
     agents:[
       {id:'d1', branch:'worktree-lot2-scenes', title:'Plan Scènes — lot 2 (exemple)', state:'tool', state_label:'Bash en cours', since:iso(m(.4)), last_activity:iso(m(.1)),
-       model:'claude-sonnet-5-5', role:'DEV', phase:2, current:{tool:tools[tick % tools.length][0], summary:tools[tick % tools.length][1], since:iso(now() - (tick % 5) * 7e3)},
+       tool_count:57, model:'claude-sonnet-5-5', role:'DEV', phase:2, current:{tool:tools[tick % tools.length][0], summary:tools[tick % tools.length][1], since:iso(now() - (tick % 5) * 7e3)},
        todos:[{content:'T2.1 SCENES.register',status:'completed'},{content:'T2.2 transitions titre → vol',status:'completed'},{content:'T2.3 pause par scène',status:'completed'},{content:'T2.4 tests Playwright scènes',status:'in_progress',activeForm:'Écrit les tests Playwright des scènes'},{content:'Revue archi',status:'pending'},{content:'PR + rapport PM',status:'pending'}],
-       subagents:[{description:'Développeur lot 2', role:'DEV', status:'running', state:'tool', last_tool:{name:'Bash', summary:'python3 build.py test'}},{description:'Architecte : spec SCENES lot 2', role:'ARCH', status:'done', ended:iso(m(4))},{description:'PM : brief lot 2', role:'PM', status:'done', ended:iso(m(13))}],
+       subagents:[{description:'PM : brief lot 2', role:'PM', type:'general-purpose', status:'done', state:'done', state_label:'Terminé', bg:false, agent_id:null,
+         started:iso(m(16)), ended:iso(m(13)), since:iso(m(13)), duration_s:Math.round((16-13)*60),
+         current:null, last_tool:null, tool_count:6, tokens:{output:2100, context:8400}, spark:null, has_transcript:true,
+         recent:[{ts:iso(m(13.1)), kind:'tool', text:'PM : brief lot 2 · dernière action'}]},
+         {description:'Architecte : spec SCENES lot 2', role:'ARCH', type:'general-purpose', status:'done', state:'done', state_label:'Terminé', bg:false, agent_id:null,
+         started:iso(m(13)), ended:iso(m(4)), since:iso(m(4)), duration_s:Math.round((13-4)*60),
+         current:null, last_tool:null, tool_count:23, tokens:{output:8400, context:33600}, spark:null, has_transcript:true,
+         recent:[{ts:iso(m(4.1)), kind:'tool', text:'Architecte : spec SC · dernière action'}]},
+         {description:'Explorer ORDER.txt et les scènes', role:'EXPLORE', type:'Explore', status:'done', state:'done', state_label:'Terminé', bg:false, agent_id:'7f3a9c2e',
+         started:iso(m(12.5)), ended:iso(m(11)), since:iso(m(11)), duration_s:Math.round((12.5-11)*60),
+         current:null, last_tool:null, tool_count:9, tokens:{output:1300, context:5200}, spark:null, has_transcript:true,
+         recent:[{ts:iso(m(11.1)), kind:'tool', text:'Explorer ORDER.txt e · dernière action'}]},
+         {description:'Développeur lot 2', role:'DEV', type:'general-purpose', status:'running', state:'tool', state_label:'Bash en cours', bg:false, agent_id:null,
+         started:iso(m(4)), ended:null, since:iso(m(4)), duration_s:Math.round((4-0)*60),
+         current:{tool:tools[tick % tools.length][0], summary:tools[tick % tools.length][1], since:iso(now() - (tick % 5) * 7e3)}, last_tool:null, tool_count:41, tokens:{output:18200, context:72800}, spark:sp(1), has_transcript:true,
+         recent:[{ts:iso(m(0.1)), kind:'tool', text:'Développeur lot 2 · dernière action'}]},
+         {description:'Relecture des specs (arrière-plan)', role:'ARCH', type:'general-purpose', status:'running', state:'thinking', state_label:'Réfléchit…', bg:true, agent_id:'bgrev01',
+         started:iso(m(3)), ended:null, since:iso(m(3)), duration_s:Math.round((3-0)*60),
+         current:null, last_tool:{name:'Read', summary:'docs/specs/PLAN-scenes.md'}, tool_count:12, tokens:{output:3900, context:15600}, spark:sp(.5), has_transcript:true,
+         recent:[{ts:iso(m(0.1)), kind:'tool', text:'Relecture des specs  · dernière action'}]}],
        tokens:{output:48210, context:91400}, spark:sp(1.2), git:{ahead:3, behind:0, dirty:4, files:['src/JS/game/21-scenes.js','src/test/scenes_test.py']}, pr:null},
       {id:'d2', branch:'worktree-ports-orbitaux-docks', title:'Ports orbitaux : docks d’amarrage (exemple)', state:'waiting', state_label:'Attend ta réponse', since:iso(m(3.4)), last_activity:iso(m(3.4)),
        model:'claude-opus-5-5', role:'ARCH', phase:1, current:null, last_text:'Spec prête : trois options d’amarrage — A pontons fixes, B bras articulés, C champ tracteur. Je recommande A (coût faible, lisible en gros plan). Laquelle retiens-tu ?',
        todos:[{content:'Lire spec v2.16 ch. 24',status:'completed'},{content:'Rédiger options d’amarrage',status:'completed'},{content:'Valider l’option avec Frédéric',status:'in_progress',activeForm:'Attend le choix de l’option'}],
-       subagents:[], tokens:{output:22900, context:64300}, spark:sp(.4), git:{ahead:1, behind:2, dirty:1, files:['demos/space-travel/docs/specs/spec-ports-orbitaux-docks.md']}, pr:null},
+       subagents:[{description:'Explorer les ports existants', role:'EXPLORE', type:'Explore', status:'done', state:'done', state_label:'Terminé', bg:false, agent_id:'c41d0e77',
+         started:iso(m(9)), ended:iso(m(8.2)), since:iso(m(8.2)), duration_s:Math.round((9-8.2)*60),
+         current:null, last_tool:null, tool_count:4, tokens:{output:1100, context:4400}, spark:null, has_transcript:true,
+         recent:[{ts:iso(m(8.299999999999999)), kind:'tool', text:'Explorer les ports e · dernière action'}]}], tokens:{output:22900, context:64300}, spark:sp(.4), git:{ahead:1, behind:2, dirty:1, files:['demos/space-travel/docs/specs/spec-ports-orbitaux-docks.md']}, pr:null},
       {id:'d3', branch:'worktree-fix-camera-jitter', title:'Tressautement caméra en gros plan (exemple)', state:'permission', state_label:'Attend ta validation', since:iso(m(1.1)), last_activity:iso(m(1.1)),
        model:'claude-sonnet-5-5', role:'DEV', phase:2, current:{tool:'Edit', summary:'JS/game/20c-camera.js', since:iso(m(1.1))}, last_text:'Je lisse la position caméra sur un pas fixe (60 Hz) pour supprimer la saccade.',
        todos:[], subagents:[], tokens:{output:9100, context:38800}, spark:sp(.6), git:{ahead:0, behind:0, dirty:2, files:[]}, pr:null},
       {id:'d4', branch:'worktree-spec-012-hud', title:'SPEC-012 : HUD et panneaux (exemple)', state:'idle', state_label:'Livré', since:iso(m(170)), last_activity:iso(m(170)),
-       model:'claude-sonnet-5-5', role:'PM', phase:6, current:null, last_text:'PR #22 mergée. Rapport final envoyé.', todos:[], subagents:[], tokens:{output:31000, context:52000}, spark:new Array(30).fill(0), git:null,
+       model:'claude-sonnet-5-5', role:'PM', phase:6, current:null, last_text:'PR #22 mergée. Rapport final envoyé.', todos:[], subagents:[{description:'PM : brief SPEC-012', role:'PM', type:'general-purpose', status:'done', state:'done', state_label:'Terminé', bg:false, agent_id:null,
+         started:iso(m(230)), ended:iso(m(226)), since:iso(m(226)), duration_s:Math.round((230-226)*60),
+         current:null, last_tool:null, tool_count:4, tokens:{output:1800, context:7200}, spark:null, has_transcript:true,
+         recent:[{ts:iso(m(226.1)), kind:'tool', text:'PM : brief SPEC-012 · dernière action'}]},
+         {description:'Architecte : rédaction SPEC-012', role:'ARCH', type:'general-purpose', status:'done', state:'done', state_label:'Terminé', bg:false, agent_id:null,
+         started:iso(m(226)), ended:iso(m(190)), since:iso(m(190)), duration_s:Math.round((226-190)*60),
+         current:null, last_tool:null, tool_count:31, tokens:{output:12600, context:50400}, spark:null, has_transcript:true,
+         recent:[{ts:iso(m(190.1)), kind:'tool', text:'Architecte : rédacti · dernière action'}]},
+         {description:'PM : PR et rapport', role:'PM', type:'general-purpose', status:'done', state:'done', state_label:'Terminé', bg:false, agent_id:null,
+         started:iso(m(176)), ended:iso(m(170)), since:iso(m(170)), duration_s:Math.round((176-170)*60),
+         current:null, last_tool:null, tool_count:5, tokens:{output:1500, context:6000}, spark:null, has_transcript:true,
+         recent:[{ts:iso(m(170.1)), kind:'tool', text:'PM : PR et rapport · dernière action'}]}], tokens:{output:31000, context:52000}, spark:new Array(30).fill(0), git:null,
        pr:{number:22, title:'SPEC-012 : HUD et panneaux (exemple)', state:'closed', merged:true, url:'#', merged_at:iso(m(168))}}
     ],
     worktrees:[
@@ -759,7 +1436,7 @@ function startDemo(reason){
     ],
     feed: feed0.slice().sort((a, b) => ms(b.ts) - ms(a.ts)),
     github:{prs:[{number:22, title:'SPEC-012 : HUD et panneaux (exemple)', state:'closed', merged:true, head:'worktree-spec-012-hud', updated_at:iso(m(168)), merged_at:iso(m(168)), created_at:iso(m(175)), url:'#'}], events:[], runs:[{name:'pages build and deployment', status:'completed', conclusion:'success', updated_at:iso(m(166))}]},
-    timeline:{to:iso(now()), lanes:[{agent_id:'d1', label:'lot2-scenes', buckets:lane(.9, 70, 0, 1.2)},{agent_id:'d2', label:'ports-orbitaux-docks', buckets:lane(.5, 50, 3)},{agent_id:'d3', label:'fix-camera-jitter', buckets:lane(1.3, 24, 1, .7)},{agent_id:'d4', label:'spec-012-hud', buckets:lane(.7, 230, 168)}]}
+    timeline:{to:iso(now()), lanes:[{agent_id:'d1', label:'lot2-scenes', buckets:lane(.9, 70, 0, .6)},{agent_id:'d1', sub:true, role:'ARCH', label:'Architecte : spec SCENES lot 2', buckets:lane(1.1, 13, 4)},{agent_id:'d1', sub:true, role:'DEV', label:'Développeur lot 2', buckets:lane(.8, 4, 0, 1.2)},{agent_id:'d1', sub:true, role:'ARCH', label:'Relecture des specs', buckets:lane(.6, 3, 0, .5)},{agent_id:'d2', label:'ports-orbitaux-docks', buckets:lane(.5, 50, 3)},{agent_id:'d3', label:'fix-camera-jitter', buckets:lane(1.3, 24, 1, .7)},{agent_id:'d4', label:'spec-012-hud', buckets:lane(.7, 230, 168)}]}
   });
   apply(demo(), 'demo');
   setInterval(() => { // un peu de vie : le développeur enchaîne les outils
@@ -771,6 +1448,107 @@ function startDemo(reason){
 }
 
 boot();
+})();
+</script>
+<script>
+/* Onglets Agents | Chronologie | Flux | Livraisons | Kanban. Le Kanban est la page kanban.html servie par stt_agents_server.py (/kanban/), chargée à la première ouverture. */
+(() => {
+  const $ = id => document.getElementById(id);
+  const tabs = [...document.querySelectorAll('.tabs [data-tab]')];
+  const panel = Object.fromEntries(tabs.map(t => [t.dataset.tab, $('tab-' + t.dataset.tab)]));
+  const frame = $('kanbanFrame'), msg = $('kanbanMsg');
+  const get = () => { try { return localStorage.getItem('stt-agents:tab'); } catch { return null; } };
+  const put = v => { try { localStorage.setItem('stt-agents:tab', v); } catch {} };
+  let started = false;
+  function fit(){ if (window.sttSyncKanbanScroll) window.sttSyncKanbanScroll(); }
+  async function startKanban(){
+    if (started) return; started = true;
+    try {
+      const r = await fetch('kanban/plan-status.js', { method: 'HEAD', cache: 'no-store' });
+      if (!r.ok) throw new Error(r.status);
+      frame.hidden = true; msg.hidden = true;
+      frame.addEventListener('load', () => { frame.hidden = false; fit(); }, { once: true });
+      frame.src = 'kanban/?embed=board';
+    } catch {
+      started = false; frame.hidden = true; msg.hidden = false;
+      msg.innerHTML = 'Le Kanban est servi par <code>stt_agents_server.py</code> (<code>/kanban/</code>) : lancez le serveur local pour l\u2019afficher ici.';
+    }
+  }
+  function show(name, opts = {}){
+    if (!panel[name]) name = 'agents';
+    tabs.forEach(t => { const on = t.dataset.tab === name; t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1; });
+    Object.entries(panel).forEach(([k, p]) => { p.hidden = k !== name; });
+    put(name);
+    if (opts.hash !== false) history.replaceState(null, '', name === 'agents' ? location.pathname + location.search : '#' + name);
+    if (name === 'kanban') { startKanban().then(fit); fit(); }
+    dispatchEvent(new CustomEvent('stt-tab', { detail: name }));   // la page redessine ce qui dépend de la largeur (chronologie)
+  }
+  window.sttShowTab = show;
+  tabs.forEach(t => {
+    t.addEventListener('click', () => show(t.dataset.tab));
+    t.addEventListener('keydown', e => {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      const n = tabs[(tabs.indexOf(t) + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+      n.focus(); show(n.dataset.tab); e.preventDefault();
+    });
+  });
+  addEventListener('hashchange', () => { const n = location.hash.slice(1); if (panel[n]) show(n, { hash: false }); });
+  addEventListener('resize', fit);
+  const h0 = location.hash.slice(1);
+  show(panel[h0] ? h0 : panel[get()] ? get() : 'kanban', { hash: !!panel[h0] });
+})();
+</script>
+<script>
+/* Thème global (page + Kanban intégré) et indicateurs du Kanban dans l'en-tête. */
+(() => {
+  const root = document.documentElement, kpi = document.getElementById('kanbanKpis');
+  const read = () => { try { const v = localStorage.getItem('kanbanTheme'); return v === 'light' ? 'light' : 'dark'; } catch { return 'dark'; } };
+  const frames = () => [kpi, document.getElementById('kanbanFrame')].filter(f => f && f.contentWindow);
+  function setTheme(t){
+    root.setAttribute('data-theme', t);
+    try { localStorage.setItem('kanbanTheme', t); } catch {}
+    document.querySelectorAll('.themesw [data-theme-set]').forEach(b => b.setAttribute('aria-pressed', b.dataset.themeSet === t));
+    frames().forEach(f => f.contentWindow.postMessage({ type: 'stt-theme', theme: t }, location.origin));
+  }
+  document.querySelectorAll('.themesw [data-theme-set]').forEach(b => b.addEventListener('click', () => setTheme(b.dataset.themeSet)));
+  setTheme(read());
+  // protocole des cadres intégrés (voir kanban.html) : hauteur, plein écran temporaire, défilement de la barre haute
+  const slotK = document.querySelector('.head-kpis'), slotB = document.getElementById('kanbanSlot'), board = document.getElementById('kanbanFrame');
+  const origin = location.origin;
+  addEventListener('message', e => {
+    const d = e.origin === origin && e.data; if (!d) return;
+    if (d.type === 'stt-embed-height') {
+      if (d.embed === 'kpis') slotK.style.height = Math.max(60, Math.min(260, d.h + 2)) + 'px';
+      else { slotB.style.height = Math.max(320, d.h) + 'px'; syncScroll(); }
+    } else if (d.type === 'stt-goto-agent') {
+      if (window.sttShowTab) window.sttShowTab('agents');
+      if (window.sttFocusAgent) window.sttFocusAgent(String(d.task || ''), String(d.session || ''));
+    } else if (d.type === 'stt-embed-overlay') {
+      const kp = d.embed === 'kpis', frm = kp ? kpi : board, slot = kp ? slotK : slotB;
+      if (kp) kpi.classList.toggle('ov', !!d.on);               // indicateurs : cadre dévoilé (infobulles) tant que le pointeur est dessus
+      const full = !!(d.on && (d.full || !kp));                  // dialogue ouvert (ou tableau) : plein écran, contenu laissé à sa place
+      if (full && !frm.classList.contains('full')) { const r = slot.getBoundingClientRect(); frm.contentWindow.postMessage({ type: 'stt-embed-slot', x: r.left, y: r.top, w: r.width }, origin); frm.classList.add('full'); }
+      else if (!full && frm.classList.contains('full')) { frm.classList.remove('full'); frm.contentWindow.postMessage({ type: 'stt-embed-slot-off' }, origin); }
+    }
+  });
+  // la barre haute du Kanban (cadre sans défilement interne) reste visible sous le ticker pendant le défilement de la page
+  let lastSy = -1, raf = 0;
+  function syncScroll(){
+    if (document.getElementById('tab-kanban').hidden || board.classList.contains('full') || !board.contentWindow) return;
+    const r = slotB.getBoundingClientRect(), tk = document.querySelector('.ticker'), top = tk ? tk.offsetHeight : 0;
+    const y = Math.round(Math.max(0, Math.min(top - r.top, r.height - 70))), key = y + ':' + innerHeight;
+    if (key !== lastSy) { lastSy = key; board.contentWindow.postMessage({ type: 'stt-embed-scroll', y, vh: innerHeight }, origin); }
+  }
+  window.sttSyncKanbanScroll = syncScroll;
+  const onScroll = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; syncScroll(); }); };
+  addEventListener('scroll', onScroll, { passive: true }); addEventListener('resize', onScroll);
+  board.addEventListener('load', () => { lastSy = -1; syncScroll(); });
+  // les indicateurs ne s'affichent que si le serveur local sert le Kanban
+  fetch('kanban/plan-status.js', { method: 'HEAD', cache: 'no-store' }).then(r => {
+    if (!r.ok) throw 0;
+    kpi.addEventListener('load', () => { kpi.hidden = false; kpi.contentWindow.postMessage({ type: 'stt-theme', theme: read() }, location.origin); }, { once: true });
+    kpi.src = 'kanban/?embed=kpis';
+  }).catch(() => { document.querySelector('.head-kpis').hidden = true; });
 })();
 </script>
 </body>
