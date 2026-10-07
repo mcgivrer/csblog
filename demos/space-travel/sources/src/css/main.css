@@ -216,9 +216,11 @@
     background:var(--stt-corners), linear-gradient(180deg, rgba(94,234,212,0.05), transparent 60%), rgba(15,26,48,0.94);
     padding:26px 34px 20px; max-width:920px; width:92vw; max-height:82vh; overflow:auto;
   }
-  .help-title{
-    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:15px;
-    letter-spacing:0.14em; color:var(--amber); margin-bottom:16px; text-align:center;
+  /* U1.4 (D17, D-C) : un seul style de titre interne pour Aide, Réglages, Missions, Chantier, Contrats et Port */
+  .con-h, .help-title, .board-title, .port-title, .audio-title{
+    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:14px; line-height:1.3;
+    letter-spacing:0.12em; text-transform:uppercase; color:var(--amber); text-align:left;
+    margin:0 0 12px; padding:0; border:none;
   }
   /* aide sur 2 colonnes (demande explicite) : répartition équilibrée en CSS
      pur (column-count), pas un découpage manuel du tableau en JS — chaque
@@ -275,10 +277,7 @@
     padding:26px 30px 22px; width:min(560px, 92vw); max-height:82vh; overflow:auto;
   }
   .board-panel.board-panel-wide{ max-width:760px; width:92vw; }   /* U1.3 : ex-style en ligne des Missions */
-  .board-title{
-    font-weight:700; font-size:14px; letter-spacing:0.1em; color:var(--ink); text-align:center; margin-bottom:6px;
-  }
-  .board-sub{ font-size:11px; color:var(--muted-2); text-align:center; margin-bottom:16px; line-height:1.5; }
+  .board-sub{ font-size:11px; color:var(--muted-2); text-align:left; margin-bottom:16px; line-height:1.5; }
   .board-list{ display:flex; flex-direction:column; gap:10px; }
   .board-row{
     display:flex; justify-content:space-between; align-items:center; gap:12px;
@@ -324,18 +323,20 @@
     position:relative; border:1px solid var(--line);
     background:var(--stt-corners), rgba(15,26,48,0.96);
     padding:26px 30px 18px; width:340px;
+    /* U1.4 (D7, D-D) : grille libellé / curseur / valeur ; les rangées se fondent dans la grille (display:contents) */
+    display:grid; grid-template-columns:max-content 1fr auto; gap:14px 16px; align-items:center;
   }
-  .audio-title{
-    font-weight:700; font-size:15px; letter-spacing:0.12em; color:var(--amber);
-    text-align:center; margin-bottom:20px;
-  }
-  .audio-row{ display:flex; align-items:center; gap:12px; margin-bottom:16px; }
-  .audio-label{ width:70px; font-size:12px; color:var(--ink); flex:none; }
-  .audio-pct{ width:38px; font-size:11px; color:var(--muted); text-align:right; flex:none; }
+  .audio-panel > .con-h, .audio-foot{ grid-column:1 / -1; }
+  .audio-panel > .con-h{ margin-bottom:0; }
+  .audio-row{ display:contents; }
+  .audio-label{ font-size:12px; color:var(--ink); }
+  .audio-pct{ min-width:38px; font-size:11px; color:var(--muted); text-align:right; }
   .audio-row input[type="range"]{
-    flex:1; accent-color:var(--amber); height:4px; cursor:pointer;
+    width:100%; min-width:0; accent-color:var(--amber); height:4px; cursor:pointer;
   }
-  .audio-foot{ margin-top:8px; text-align:center; font-size:10px; color:var(--muted-2); letter-spacing:0.05em; }
+  /* hébergé dans la console : section pleine largeur, alignée sur l'aide (même boîte que .help-panel) */
+  #sttConsole .con-hosted#audioOverlay .audio-panel{ width:100%; padding:18px 0 0; box-sizing:border-box; background:none; }
+  .audio-foot{ margin-top:0; text-align:center; font-size:10px; color:var(--muted-2); letter-spacing:0.05em; }
   /* étiquettes de la carte stellaire : noms d'étoiles (discrets, la
      sphère+halo déjà colorée est le repère principal) et lettres de
      grille (repères de coordonnées, cf. demande utilisateur) */
@@ -516,18 +517,15 @@
   .hud-port{
     position:absolute; right:18px; top:230px; width:300px;
     padding:10px 12px 12px;
-    display:none; flex-direction:column; gap:9px;
-    opacity:0; transition:opacity .5s ease;
+    display:none; opacity:0; transition:opacity .5s ease;
   }
-  .hud-port.visible{ display:flex; opacity:1; }
-  .port-title{
-    font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted-2);
-    border-bottom:1px solid var(--line); padding-bottom:6px;
-  }
-  .port-row{ display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--ink); }
+  /* U1.4 (D10) : grille 3 colonnes (service, état, bouton de largeur fixe) ; chaque rangée se fond dans la grille */
+  .hud-port.visible{ display:grid; opacity:1; grid-template-columns:max-content 1fr 180px; gap:12px 20px; align-items:center; align-content:start; }
+  .hud-port > .port-title{ grid-column:1 / -1; margin-bottom:0; }
+  .port-row{ display:contents; font-size:12px; color:var(--ink); }
   .port-dots{ color:var(--cyan); letter-spacing:0.12em; font-size:12px; }
   .port-buy-btn{
-    pointer-events:auto; cursor:pointer; width:100%;
+    pointer-events:auto; cursor:pointer; width:100%; box-sizing:border-box;
     background:none; border:1px solid var(--amber-dim); color:var(--amber);
     font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.05em;
     padding:8px 6px; transition:border-color .15s ease, background .15s ease;

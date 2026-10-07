@@ -37,6 +37,8 @@ with sync_playwright() as pw:
         if lang != "fr":
             fr = [r for r in rows if "ESPACE / ENTR" in r or "ÉCHAP" in r]
             check(f"{lang} : « ESPACE / ENTRÉE » et « ÉCHAP » absents", fr == [], fr)
+        ttl = pg.evaluate("() => [document.getElementById('lblHelpTitle').textContent.trim(), t('lblHelpTitle'), document.getElementById('lblHelpFoot').textContent.trim(), t('lblHelpFoot')]")
+        check(f"{lang} : titre et pied de l'aide traduits (U1.4)", ttl[0] == ttl[1] and ttl[2] == ttl[3] and (lang == "fr" or "COMMANDES" not in ttl[0]), ttl)
         cases = pg.evaluate("() => [...new Set([...document.querySelectorAll('#helpGrid .hv')].map(e => getComputedStyle(e).textTransform))]")
         check(f"{lang} : casse uniforme (text-transform unique : uppercase)", cases == ["uppercase"], cases)
         pg.evaluate("() => CONSOLE.close('user')")

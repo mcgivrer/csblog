@@ -307,7 +307,7 @@ function applyLanguage(){
     lblRadioChannel:'lblRadioChannel', creditsLabel:'creditsLabel',
     lblPortServices:'lblPortServices', lblSpeedUpgrade:'lblSpeedUpgrade', lblFuelService:'lblFuelService', lblFuel:'lblFuel',
     lblJumpService:'lblJumpService',
-    lblAudioTitle:'lblAudioTitle', lblMusicVolume:'lblMusicVolume', lblVoiceVolume:'lblVoiceVolume', lblAudioFoot:'lblAudioFoot',
+    lblHelpTitle:'lblHelpTitle', lblHelpFoot:'lblHelpFoot', lblAudioTitle:'lblAudioTitle', lblMusicVolume:'lblMusicVolume', lblVoiceVolume:'lblVoiceVolume', lblAudioFoot:'lblAudioFoot',
     lblShipyardService:'lblShipyardService', lblShipyardTitle:'lblShipyardTitle', lblShipyardSub:'lblShipyardSub',
     lblContractsTitle:'lblContractsTitle', lblContractsSub:'lblContractsSub'
   };
