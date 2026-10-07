@@ -13,6 +13,7 @@
     '#sttConsole #stmMap.con-hosted{ height:100% !important; }',
     '#sttConsole #stmMap.con-hosted.on{ display:block; }',
     '#sttConsole #stmMap .p{ width:100%; height:100%; border:0; }',
+    '#sttConsole #stmMap .zm button{ width:var(--ctl-h); height:var(--ctl-h); font-size:var(--fs-lg); }',
     /* coins du module partagé posés à -1px : ils débordaient d'1 px (D4) ; le cadre de la console porte déjà les siens */
     '#sttConsole #stmMap .p::before, #sttConsole #stmMap .p::after{ display:none; }',
     '#sttConsole #stmMap .x{ display:none; }'

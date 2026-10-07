@@ -135,7 +135,7 @@ function ensureDom(){
   h.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);top:10px;z-index:6;display:none;font-size:11px;letter-spacing:.06em;padding:6px 12px;border:1px solid #25375c;background:rgba(15,26,48,.88);color:#e8edf5;pointer-events:none';
   document.body.appendChild(h); S.hud = h;
 }
-function riskTag(l){ const c = ['#5eead4', '#ffb454', '#ff6b57', '#ff2d55'][l]; return "<span style='font-size:9.5px;padding:2px 6px;border:1px solid " + c + ";color:" + c + "'>" + tx().risk[l] + '</span>'; }
+function riskTag(l){ const c = ['#5eead4', '#ffb454', '#ff6b57', '#ff2d55'][l]; return "<span style='font-size:var(--fs-xs);padding:2px 6px;border:1px solid " + c + ";color:" + c + "'>" + tx().risk[l] + '</span>'; }
 function openBoard(recall){
   ensureDom(); const T = tx(), leg = REAL.leg;
   if(!recall || !S.offers.length) S.offers = generate();   /* rappel (touche J) : mêmes offres, pas un nouveau tirage */

@@ -218,7 +218,7 @@
   }
   /* U1.4 (D17, D-C) : un seul style de titre interne pour Aide, Réglages, Missions, Chantier, Contrats et Port */
   .con-h, .help-title, .board-title, .port-title, .audio-title{
-    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:14px; line-height:1.3;
+    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:var(--fs-lg); line-height:1.3;
     letter-spacing:0.12em; text-transform:uppercase; color:var(--amber); text-align:left;
     margin:0 0 12px; padding:0; border:none;
   }
@@ -227,7 +227,7 @@
      ligne [touche, description] reste un bloc insécable (break-inside:avoid)
      pour ne jamais couper une touche de sa description entre les deux
      colonnes. Gagne environ moitié moins de hauteur qu'une colonne unique. */
-  .help-grid{ column-count:2; column-gap:28px; font-size:12px; }
+  .help-grid{ column-count:2; column-gap:28px; font-size:var(--fs-md); }
   /* repli une colonne sous 680px : repéré sur émulation iPhone — de force,
      deux colonnes étroites font se chevaucher touche et description plutôt
      que de gagner de la place (texte plus long que la colonne, §17.2 pour
@@ -242,7 +242,7 @@
     border:1px solid var(--line); border-radius:3px; padding:1px 7px; text-align:center; height:fit-content;
   }
   .help-grid .hv{ color:var(--ink); align-self:center; text-transform:uppercase; }
-  .help-foot{ margin-top:16px; text-align:center; font-size:10px; color:var(--muted-2); letter-spacing:0.05em; }
+  .help-foot{ margin-top:16px; text-align:center; font-size:var(--fs-xs); color:var(--muted-2); letter-spacing:0.05em; }
 
   /* ---------- carte stellaire (§23) — même famille visuelle que Pause/
      Aide (fond assombri, coins ambrés), plein écran plutôt qu'un panneau
@@ -277,24 +277,24 @@
     padding:26px 30px 22px; width:min(560px, 92vw); max-height:82vh; overflow:auto;
   }
   .board-panel.board-panel-wide{ max-width:760px; width:92vw; }   /* U1.3 : ex-style en ligne des Missions */
-  .board-sub{ font-size:11px; color:var(--muted-2); text-align:left; margin-bottom:16px; line-height:1.5; }
+  .board-sub{ font-size:var(--fs-sm); color:var(--muted-2); text-align:left; margin-bottom:16px; line-height:1.5; }
   .board-list{ display:flex; flex-direction:column; gap:10px; }
   .board-row{
     display:flex; justify-content:space-between; align-items:center; gap:12px;
     border:1px dashed var(--line); padding:10px 12px;
   }
   .board-row-info{ display:flex; flex-direction:column; gap:2px; min-width:0; }
-  .board-row-name{ font-size:12.5px; color:var(--ink); }
-  .board-row-meta{ font-size:10.5px; color:var(--muted-2); }
+  .board-row-name{ font-size:var(--fs-md); color:var(--ink); }
+  .board-row-meta{ font-size:var(--fs-sm); color:var(--muted-2); }
   .board-row-btn{
     flex:none; pointer-events:auto; cursor:pointer;
     background:none; border:1px solid var(--amber-dim); color:var(--amber);
-    font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.04em;
-    padding:8px 12px; white-space:nowrap; transition:border-color .15s ease, background .15s ease;
+    font-family:'JetBrains Mono',monospace; font-size:var(--fs-sm); letter-spacing:0.04em;
+    padding:0 12px; min-height:var(--ctl-h); white-space:nowrap; transition:border-color .15s ease, background .15s ease;
   }
   .board-row-btn:hover{ border-color:var(--amber); background:rgba(255,180,84,0.12); }
   .board-row-btn.port-disabled{ cursor:default; color:var(--muted-2); border-color:var(--line); background:none; }
-  .board-empty{ font-size:11.5px; color:var(--muted-2); text-align:center; padding:14px 0; }
+  .board-empty{ font-size:var(--fs-md); color:var(--muted-2); text-align:center; padding:14px 0; }
 
   
 
@@ -329,14 +329,14 @@
   .audio-panel > .con-h, .audio-foot{ grid-column:1 / -1; }
   .audio-panel > .con-h{ margin-bottom:0; }
   .audio-row{ display:contents; }
-  .audio-label{ font-size:12px; color:var(--ink); }
-  .audio-pct{ min-width:38px; font-size:11px; color:var(--muted); text-align:right; }
+  .audio-label{ font-size:var(--fs-md); color:var(--ink); }
+  .audio-pct{ min-width:38px; font-size:var(--fs-sm); color:var(--muted); text-align:right; }
   .audio-row input[type="range"]{
     width:100%; min-width:0; accent-color:var(--amber); height:4px; cursor:pointer;
   }
   /* hébergé dans la console : section pleine largeur, alignée sur l'aide (même boîte que .help-panel) */
   #sttConsole .con-hosted#audioOverlay .audio-panel{ width:100%; padding:18px 0 0; box-sizing:border-box; background:none; }
-  .audio-foot{ margin-top:0; text-align:center; font-size:10px; color:var(--muted-2); letter-spacing:0.05em; }
+  .audio-foot{ margin-top:0; text-align:center; font-size:var(--fs-xs); color:var(--muted-2); letter-spacing:0.05em; }
   /* étiquettes de la carte stellaire : noms d'étoiles (discrets, la
      sphère+halo déjà colorée est le repère principal) et lettres de
      grille (repères de coordonnées, cf. demande utilisateur) */
@@ -467,13 +467,13 @@
   }
   .hud-radio.visible{ display:flex; opacity:1; }
   .radio-title{
-    font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted-2);
+    font-size:var(--fs-xs); letter-spacing:0.12em; text-transform:uppercase; color:var(--muted-2);
     border-bottom:1px solid var(--line); padding-bottom:6px; margin-bottom:6px;
     display:flex; justify-content:space-between; align-items:center;
   }
   .radio-title .dot{ color:var(--cyan); animation:blink 1.8s infinite; }
   .llm-indicator{
-    display:inline-block; position:relative; margin-right:7px; font-size:12px;
+    display:inline-block; position:relative; margin-right:7px; font-size:var(--fs-md);
     opacity:0.35; filter:grayscale(1); transition:opacity .3s ease, filter .3s ease;
     pointer-events:auto; cursor:default;
   }
@@ -488,13 +488,13 @@
   .radio-mute{
     pointer-events:auto; cursor:pointer;
     background:none; border:1px solid var(--line); color:var(--muted-2);
-    font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1;
+    font-family:'JetBrains Mono',monospace; font-size:var(--fs-sm); line-height:1;
     padding:3px 6px; margin-left:8px;
   }
   .radio-mute:hover{ border-color:var(--cyan); color:var(--cyan); }
   .radio-log{ display:flex; flex-direction:column; gap:7px; max-height:270px; overflow:hidden; }
   .radio-line{
-    font-size:10.5px; line-height:1.4;
+    font-size:var(--fs-sm); line-height:1.4;
     opacity:0; transform:translateY(4px);
     animation:radioIn .4s ease forwards;
     display:flex; align-items:flex-start; gap:6px;
@@ -522,13 +522,13 @@
   /* U1.4 (D10) : grille 3 colonnes (service, état, bouton de largeur fixe) ; chaque rangée se fond dans la grille */
   .hud-port.visible{ display:grid; opacity:1; grid-template-columns:max-content 1fr 180px; gap:12px 20px; align-items:center; align-content:start; }
   .hud-port > .port-title{ grid-column:1 / -1; margin-bottom:0; }
-  .port-row{ display:contents; font-size:12px; color:var(--ink); }
-  .port-dots{ color:var(--cyan); letter-spacing:0.12em; font-size:12px; }
+  .port-row{ display:contents; font-size:var(--fs-md); color:var(--ink); }
+  .port-dots{ color:var(--cyan); letter-spacing:0.12em; font-size:var(--fs-md); }
   .port-buy-btn{
     pointer-events:auto; cursor:pointer; width:100%; box-sizing:border-box;
     background:none; border:1px solid var(--amber-dim); color:var(--amber);
-    font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.05em;
-    padding:8px 6px; transition:border-color .15s ease, background .15s ease;
+    font-family:'JetBrains Mono',monospace; font-size:var(--fs-sm); letter-spacing:0.05em;
+    padding:0 6px; min-height:var(--ctl-h); transition:border-color .15s ease, background .15s ease;
   }
   .port-buy-btn:hover{ border-color:var(--amber); background:rgba(255,180,84,0.12); }
   .port-buy-btn.port-disabled{
@@ -561,7 +561,7 @@
   .star-label .star-text{
     position:absolute; left:0; top:-20px; transform:translate(-50%,-100%);
     font-family:'JetBrains Mono',monospace;
-    font-size:11px;
+    font-size:var(--fs-sm);
     letter-spacing:0.06em;
     text-transform:uppercase;
     color:var(--cyan);
@@ -715,15 +715,15 @@
     font-family:'JetBrains Mono',monospace; font-weight:700; font-size:26px;
     letter-spacing:0.16em; color:var(--amber);
   }
-  .pause-sub{ font-size:12px; color:var(--muted); letter-spacing:0.05em; margin-top:-8px; }
+  .pause-sub{ font-size:var(--fs-md); color:var(--muted); letter-spacing:0.05em; margin-top:-8px; }
   .pause-btn{
-    width:100%; padding:11px 20px; background:none; border:1px solid var(--line); color:var(--ink);
-    font-family:'JetBrains Mono',monospace; font-size:13px; letter-spacing:0.08em; cursor:pointer;
+    width:100%; height:var(--ctl-h-lg); box-sizing:border-box; padding:0 20px; background:none; border:1px solid var(--line); color:var(--ink);
+    font-family:'JetBrains Mono',monospace; font-size:var(--fs-lg); letter-spacing:0.08em; cursor:pointer;
     transition:border-color .15s ease, background .15s ease; text-align:center;
   }
   .pause-btn:hover{ border-color:var(--cyan); background:rgba(94,234,212,0.1); color:var(--cyan); }
   .pause-btn-quit:hover{ border-color:#ff6b57; background:rgba(255,107,87,0.1); color:#ff6b57; }
-  .pause-hint{ font-size:10px; color:var(--muted-2); letter-spacing:0.04em; margin-top:4px; }
+  .pause-hint{ font-size:var(--fs-xs); color:var(--muted-2); letter-spacing:0.04em; margin-top:4px; }
   .pause-save-msg{ margin-top:0; text-align:center; color:var(--cyan); }
   .pause-save-msg:empty{ display:none; }
 
@@ -867,13 +867,13 @@
   .ms-title{ margin:0; font:700 20px 'JetBrains Mono', monospace; letter-spacing:0.16em; color:var(--amber); }
   .ms-list{ display:flex; flex-direction:column; gap:10px; }
   .ms-opt{ display:flex; flex-direction:column; gap:4px; text-align:left; background:none; border:1px solid var(--line); color:var(--ink);
-    padding:12px 16px; font-family:'JetBrains Mono', monospace; cursor:pointer; transition:border-color .15s ease, background .15s ease; }
-  .ms-lbl{ font-size:14px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; }
-  .ms-sub{ font-size:11.5px; line-height:1.35; color:var(--muted); }
+    padding:12px 16px; font:inherit; cursor:pointer; transition:border-color .15s ease, background .15s ease; }
+  .ms-lbl{ font-size:var(--fs-lg); font-weight:700; letter-spacing:0.08em; text-transform:uppercase; }
+  .ms-sub{ font-size:var(--fs-md); line-height:1.35; color:var(--muted); }
   .ms-opt:hover:not(:disabled), .ms-opt:focus{ outline:none; border-color:var(--cyan); background:rgba(94,234,212,0.1); }
   .ms-opt:hover:not(:disabled) .ms-lbl, .ms-opt:focus .ms-lbl{ color:var(--cyan); }
   .ms-opt:disabled{ opacity:0.4; cursor:not-allowed; }
-  .ms-msg{ font-size:11.5px; color:#ff6b57; }
+  .ms-msg{ font-size:var(--fs-md); color:#ff6b57; }
   .ms-msg:empty{ display:none; }
   .ms-row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
   .ms-btn{ font:700 13px 'JetBrains Mono', monospace; letter-spacing:0.08em; text-transform:uppercase; background:none; border:1px solid var(--line); color:var(--ink);
