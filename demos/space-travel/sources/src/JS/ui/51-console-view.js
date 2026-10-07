@@ -36,6 +36,13 @@
     '  background:none !important; backdrop-filter:none !important; box-shadow:none !important; opacity:1 !important; pointer-events:auto !important; transition:none !important; }',
     '#sttConsole .con-hosted:not([data-con-shown]){ display:none !important; }',
     '#sttConsole .con-hosted .help-panel{ flex:1 1 auto; width:auto; max-width:none; max-height:none; border:none; background:none; padding:0; }',
+    /* U1.3 : tout panneau hébergé est neutralisé (largeur, hauteur, bordure, coins, croix) ; les mêmes panneaux hors console gardent leur aspect */
+    '#sttConsole .con-hosted .board-panel, #sttConsole .con-hosted .audio-panel, #sttConsole .con-hosted .help-panel, #sttConsole .con-hosted.panel, #sttConsole #portPanel{',
+    '  --stt-corners:none; width:auto; max-width:none; max-height:none; overflow:visible; border:none; }',
+    '#sttConsole .con-hosted .board-panel::before, #sttConsole .con-hosted .board-panel::after, #sttConsole .con-hosted .audio-panel::before, #sttConsole .con-hosted .audio-panel::after,',
+    '  #sttConsole .con-hosted .help-panel::before, #sttConsole .con-hosted .help-panel::after, #sttConsole #portPanel::before, #sttConsole #portPanel::after{ content:none; display:none; }',
+    '#sttConsole .con-hosted .board-panel{ width:100%; }',   /* l'hôte est un conteneur flex centré : width:auto réduirait le tableau à son contenu */
+    '#sttConsole .con-hosted .panel-close-btn{ display:none; }',
     /* ≤ 900 px de large : titre masqué, onglets compacts, la barre tient sans ascenseur horizontal */
     '@media (max-width:900px){',
     '  #sttConsole .con-head{ gap:8px; padding:6px 8px; }',

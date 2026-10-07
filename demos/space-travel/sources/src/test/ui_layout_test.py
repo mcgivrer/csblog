@@ -25,11 +25,8 @@ if os.path.isdir("/opt/pw-browsers"): os.environ.setdefault("PLAYWRIGHT_BROWSERS
 
 # défaut -> tâche qui le corrige (§ 3 du contrat). Retirer l'entrée quand la tâche est livrée.
 PENDING = {
-    "D2": "U1.1",
-    "D4p": "U1.3", "D5": "U1.3", "D6": "U1.3", "D8": "U1.3", "D9": "U1.3",
     "D7": "U1.4", "D10": "U1.4", "D17": "U1.4",
     "D18": "U1.5", "D19": "U1.5", "D21": "U1.5", "D22": "U1.5",
-    "D11": "U1.6", "D20": "U1.6",
 }
 SIZES = [(1920, 1080), (1366, 768), (1024, 768)]
 FS_SET = {10, 11, 12, 14, 16}                                   # --fs-xs .. --fs-xl
