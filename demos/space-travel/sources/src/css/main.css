@@ -211,7 +211,7 @@
     font-family:'JetBrains Mono',monospace; color:var(--cyan); white-space:nowrap;
     border:1px solid var(--line); border-radius:3px; padding:1px 7px; text-align:center; height:fit-content;
   }
-  .help-grid .hv{ color:var(--ink); align-self:center; }
+  .help-grid .hv{ color:var(--ink); align-self:center; text-transform:uppercase; }
   .help-foot{ margin-top:16px; text-align:center; font-size:10px; color:var(--muted-2); letter-spacing:0.05em; }
 
   /* ---------- carte stellaire (§23) — même famille visuelle que Pause/

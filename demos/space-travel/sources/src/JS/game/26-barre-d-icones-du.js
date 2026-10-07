@@ -207,8 +207,8 @@ function buildHelpGrid(){
   rows.push(['1 \u2013 8', t('hlp_hudAlt')]);
   rows.push(['X', t('hlp_brake')]);
   rows.push(['F10', t('hlp_voice')]);
-  rows.push(['ESPACE / ENTR\u00c9E', t('hlp_skip')]);
-  rows.push(['\u00c9CHAP / P', t('hlp_pause')]);
+  rows.push([t('hk_skip'), t('hlp_skip')]);
+  rows.push([t('hk_pause'), t('hlp_pause')]);
   rows.push(['H', t('hlp_help')]);
   grid.innerHTML = rows.map(function(r){
     return '<div class="help-row"><div class="hk">'+r[0]+'</div><div class="hv">'+r[1]+'</div></div>';
