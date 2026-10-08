@@ -128,14 +128,14 @@ function ensureDom(){
   if(S.el) return;
   const el = document.createElement('div'); el.id = 'missionBoardOverlay'; el.className = 'mono';
   el.style.cssText = 'position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:6;background:rgba(2,5,12,.45)';
-  el.innerHTML = "<div class='board-panel' style='max-width:760px;width:92vw'><button class='panel-close-btn' data-panel-cls='__missions__' title='' id='missionClose'>×</button><div class='board-title' id='missionTitle'></div><div class='board-sub' id='missionSub'></div><div class='board-list' id='missionList'></div></div>";
+  el.innerHTML = "<div class='board-panel board-panel-wide'><button class='panel-close-btn' data-panel-cls='__missions__' title='' id='missionClose'>×</button><div class='board-title' id='missionTitle'></div><div class='board-sub' id='missionSub'></div><div class='board-list' id='missionList'></div></div>";
   document.body.appendChild(el); S.el = el;
   el.querySelector('#missionList').addEventListener('click', e => { const b = e.target.closest('button[data-i]'); if(b && b.dataset.act === 'accept') accept(+b.dataset.i); });
   const h = document.createElement('div'); h.id = 'missionHud'; h.className = 'mono';
   h.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);top:10px;z-index:6;display:none;font-size:11px;letter-spacing:.06em;padding:6px 12px;border:1px solid #25375c;background:rgba(15,26,48,.88);color:#e8edf5;pointer-events:none';
   document.body.appendChild(h); S.hud = h;
 }
-function riskTag(l){ const c = ['#5eead4', '#ffb454', '#ff6b57', '#ff2d55'][l]; return "<span style='font-size:9.5px;padding:2px 6px;border:1px solid " + c + ";color:" + c + "'>" + tx().risk[l] + '</span>'; }
+function riskTag(l){ const c = ['#5eead4', '#ffb454', '#ff6b57', '#ff2d55'][l]; return "<span style='font-size:var(--fs-xs);padding:2px 6px;border:1px solid " + c + ";color:" + c + "'>" + tx().risk[l] + '</span>'; }
 function openBoard(recall){
   ensureDom(); const T = tx(), leg = REAL.leg;
   if(!recall || !S.offers.length) S.offers = generate();   /* rappel (touche J) : mêmes offres, pas un nouveau tirage */
@@ -146,7 +146,7 @@ function openBoard(recall){
   S.el.querySelector('#missionList').innerHTML = S.offers.length ? S.offers.map((o, i) =>
     "<div class='board-row' data-mission='" + i + "'><div class='board-row-info'><div class='board-row-name'>" + o.dest.name + (o.inter ? ' (' + o.dest.name + ')' : '') + "</div>" +
     "<div class='board-row-meta'>" + swatches(o) + ' ' + cargoLabel(o) + ' · ' + distLabel(o) + '</div></div>' +
-    "<div style='text-align:right;min-width:190px'><div style='color:#ffb454;font-size:12px'>" + o.reward.toLocaleString('fr-FR') + " CR</div><div style='margin:5px 0'>" + riskTag(o.risk) + '</div>' +
+    "<div style='text-align:right;min-width:190px'><div style='color:#ffb454;font-size:var(--fs-md)'>" + o.reward.toLocaleString('fr-FR') + " CR</div><div style='margin:5px 0'>" + riskTag(o.risk) + '</div>' +
     "<button class='board-row-btn' data-act='accept' data-i='" + i + "'>" + T.accept + "</button> <button class='board-row-btn' disabled title='" + T.negoSoon + "' style='opacity:.45'>" + T.negotiate + '</button></div></div>').join('')
     : "<div class='board-empty'>" + T.empty + '</div>';
   S.el.style.display = 'flex'; S.shownKey = keyNow();
