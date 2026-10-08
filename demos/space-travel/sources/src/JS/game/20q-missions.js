@@ -146,7 +146,7 @@ function openBoard(recall){
   S.el.querySelector('#missionList').innerHTML = S.offers.length ? S.offers.map((o, i) =>
     "<div class='board-row' data-mission='" + i + "'><div class='board-row-info'><div class='board-row-name'>" + o.dest.name + (o.inter ? ' (' + o.dest.name + ')' : '') + "</div>" +
     "<div class='board-row-meta'>" + swatches(o) + ' ' + cargoLabel(o) + ' · ' + distLabel(o) + '</div></div>' +
-    "<div style='text-align:right;min-width:190px'><div style='color:#ffb454;font-size:12px'>" + o.reward.toLocaleString('fr-FR') + " CR</div><div style='margin:5px 0'>" + riskTag(o.risk) + '</div>' +
+    "<div style='text-align:right;min-width:190px'><div style='color:#ffb454;font-size:var(--fs-md)'>" + o.reward.toLocaleString('fr-FR') + " CR</div><div style='margin:5px 0'>" + riskTag(o.risk) + '</div>' +
     "<button class='board-row-btn' data-act='accept' data-i='" + i + "'>" + T.accept + "</button> <button class='board-row-btn' disabled title='" + T.negoSoon + "' style='opacity:.45'>" + T.negotiate + '</button></div></div>').join('')
     : "<div class='board-empty'>" + T.empty + '</div>';
   S.el.style.display = 'flex'; S.shownKey = keyNow();

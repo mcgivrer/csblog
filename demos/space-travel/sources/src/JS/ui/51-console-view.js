@@ -9,7 +9,7 @@
     '#sttConsole{ position:fixed; inset:0; z-index:6; display:flex; align-items:center; justify-content:center; box-sizing:border-box; padding:var(--hud-top) 0 var(--hud-bottom); pointer-events:none; font-family:"JetBrains Mono",monospace; }',
     '#sttConsole[hidden]{ display:none; }',
     '#sttConsole .con-frame{ position:relative; pointer-events:auto; display:flex; flex-direction:column; box-sizing:border-box; width:var(--con-max-w);',
-    '  height:min(var(--con-max-h), calc(100vh - var(--hud-top) - var(--hud-bottom))); border:1px solid var(--line);',
+    '  height:var(--con-max-h); border:1px solid var(--line);',
     '  background:linear-gradient(180deg, rgba(94,234,212,0.05), transparent 60%), rgba(11,18,32,0.96); backdrop-filter:blur(2px); color:var(--ink); }',
     '#sttConsole .con-frame::before, #sttConsole .con-frame::after{ content:""; position:absolute; width:14px; height:14px; border:1.5px solid var(--amber); pointer-events:none; }',
     '#sttConsole .con-frame::before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }',
