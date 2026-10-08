@@ -6,7 +6,7 @@ Usage : repérer `nom:ligne`, puis lire par plage (`sed -n 'a,bp' fichier`) plut
 **Liste noire** (ne jamais lire en entier) : fichiers de plus de 300 Ko (dont `src/JS/vendor/*.min.js`), `*.min.html`, `sources/target/*`, `docs/spec-*-P1.md`, `docs/specs/*-autonome.md`, `STT_ModuleLibrary.json`, `*.glb`, `archives/` ; voir aussi `CLAUDE.md`.
 Chemins : sans préfixe = `sources/src/JS/game/` ; `sim/`, `ui/` = `sources/src/JS/sim/`, `ui/` ; `shared/` = `demos/space-travel/shared/` (source unique, aussi utilisée par la démo « Observation des étoiles », sauf `sttcomp` : consommé par le jeu et l'éditeur, pas par la démo).
 Légende : `fn` = function de niveau 0 · `var` = const/let/var de niveau 0 · `ns X` = `const X = (function(){…})()` et clés de son `return {…}` final (ligne de la déclaration locale, sinon de la clé) · `win` = `window.__X =` (×n = nombre d'affectations) · `[IIFE]` = module entièrement enveloppé : les déclarations listées sont locales, seuls les `win` sont globaux · `@provides` / `@requires` = balises de dépendances.
-Source de l'ordre : `src/JS/game/ORDER.txt` (81 entrées). 82 fichiers lus (0 absents ou ignorés) · 17642 lignes · 320 fn · 465 var · 25 ns · 27 window.__.
+Source de l'ordre : `src/JS/game/ORDER.txt` (81 entrées). 82 fichiers lus (0 absents ou ignorés) · 17663 lignes · 320 fn · 465 var · 25 ns · 27 window.__.
 
 ## Modules
 ### 00-prologue.js · 1 l
@@ -252,16 +252,16 @@ Source de l'ordre : `src/JS/game/ORDER.txt` (81 entrées). 82 fichiers lus (0 ab
 ### ui/50-console.js · 217 l — CAMPAGNE 1. CONSOLE DE BORD — CONSOLE : modèle des onglets, événements, table des touches (L1)
 - ns CONSOLE:6: register:57, tabs:207, visibleTabs:52, current:209, last:210, isOpen:211, open:86, close:106, toggle:117, refresh:123, badge:139, badges:150, on:18, keyAction:157, _reset:198
 - @provides CONSOLE
-### ui/51-console-view.js · 232 l [IIFE] — CAMPAGNE 1. CONSOLE DE BORD — vue : cadre #sttConsole, CSS, hébergement des overlays, clavier minimal (L1)
-- fn: label:63, panelFor:68, buttonFor:82, render:99, ensure:122, sync:152, onMutation:159, attach:169, host:179, typing:190, eat:198, onKeyDown:200, onKeyUp:217
-- var: CSS:8, hosts:59, root:60, tabsEl:60, titleEl:60, closeEl:60, bodyEl:60, escHeld:61, TEXT_INPUT:189
+### ui/51-console-view.js · 248 l [IIFE] — CAMPAGNE 1. CONSOLE DE BORD — vue : cadre #sttConsole, CSS, hébergement des overlays, clavier minimal (L1)
+- fn: label:79, panelFor:84, buttonFor:98, render:115, ensure:138, sync:168, onMutation:175, attach:185, host:195, typing:206, eat:214, onKeyDown:216, onKeyUp:233
+- var: CSS:8, hosts:75, root:76, tabsEl:76, titleEl:76, closeEl:76, bodyEl:76, escHeld:77, TEXT_INPUT:205
 - @provides CONSOLE.view · @requires CONSOLE · @requires-engine t, gameStarted, gamePaused, activateHudBarItem, HUD_BAR_ITEMS
 ### ui/52-tab-aide.js · 54 l [IIFE] — CAMPAGNE 1. CONSOLE DE BORD — onglet Aide · Réglages (#helpOverlay puis #audioOverlay) (L1.3)
 - fn: node:8, shown:9, isOn:10, toggleAudio:36
 - @provides CONSOLE.help · @requires CONSOLE, CONSOLE.view
-### ui/53-tab-navigation.js · 53 l [IIFE] — CAMPAGNE 1. CONSOLE DE BORD — onglet Navigation (#stmMap, carte de l'univers) (L1.4)
-- fn: shown:21, ensureHost:23
-- var: st:10, hosted:20
+### ui/53-tab-navigation.js · 56 l [IIFE] — CAMPAGNE 1. CONSOLE DE BORD — onglet Navigation (#stmMap, carte de l'univers) (L1.4)
+- fn: shown:24, ensureHost:26
+- var: st:10, hosted:23
 - @provides CONSOLE.nav · @requires CONSOLE, CONSOLE.view · @requires-engine gameStarted, openStarMap, closeStarMap
 ### ui/54-tab-missions.js · 58 l [IIFE] — CAMPAGNE 1. CONSOLE DE BORD — onglet Missions (#missionBoardOverlay, #contractBoardOverlay) (L1.5)
 - fn: node:16, missionShown:17, contractShown:18, isUp:19, ensureHosts:23
@@ -275,10 +275,10 @@ Source de l'ordre : `src/JS/game/ORDER.txt` (81 entrées). 82 fichiers lus (0 ab
 - fn: shown:8, ensureHost:11
 - var: hosted:10
 - @provides CONSOLE.yard · @requires CONSOLE, CONSOLE.view · @requires-engine isNearPortService, LOCAL
-### ui/57-tab-journal.js · 249 l [IIFE] — CAMPAGNE 1b. CONSOLE DE BORD — onglet Journal (touche L) : radio, finances, événements de bord (L1.14)
-- fn: pad:60, stamp:61, has:65, reasonLabel:67, eventText:73, span:84, rowFor:91, ensureRoot:119, render:156, markCursor:177, setFilter:187, scroller:194, onKey:196, isCurrent:216,
-  syncBadge:217
-- var: CSS:9, FILTERS:40, ICONS:46, EVT_KEY:47, MAX_LINES:49, st:51, filter:56, cursor:57, root:58, barEl:58, noteEl:58, listEl:58, emptyEl:58
+### ui/57-tab-journal.js · 251 l [IIFE] — CAMPAGNE 1b. CONSOLE DE BORD — onglet Journal (touche L) : radio, finances, événements de bord (L1.14)
+- fn: pad:62, stamp:63, has:67, reasonLabel:69, eventText:75, span:86, rowFor:93, ensureRoot:121, render:158, markCursor:179, setFilter:189, scroller:196, onKey:198, isCurrent:218,
+  syncBadge:219
+- var: CSS:9, FILTERS:42, ICONS:48, EVT_KEY:49, MAX_LINES:51, st:53, filter:58, cursor:59, root:60, barEl:60, noteEl:60, listEl:60, emptyEl:60
 - @provides CONSOLE.journal · @requires CONSOLE, CONSOLE.view, JOURNAL · @requires-engine t, formatCredits
 ## Hors ORDER.txt (non assemblés)
 ### shared/cosmos.js · 726 l [IIFE] — COSMOS — moteur allégé de l'univers, sans vaisseau (lot P1 de la présentation)
