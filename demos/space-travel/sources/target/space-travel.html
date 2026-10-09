@@ -50,7 +50,45 @@
        qui ne se confonde pas avec les accents de marque déjà en usage. */
     --nav-upcoming:#4ade80;
     --nav-done:#5b9dff;
+    /* U1.1 : échelle typographique, espacements, contrôles, console, coins (consommés par U1.2 à U1.5) */
+    --fs-xs:10px; --fs-sm:11px; --fs-md:12px; --fs-lg:14px; --fs-xl:16px;
+    --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px;
+    --ctl-h:32px; --ctl-h-lg:40px;
+    --con-pad-y:10px; --con-pad-x:14px;
+    --hud-top:34px; --hud-bottom:70px;
+    --con-max-w:min(1400px, calc(100vw - 48px));
+    --con-max-h:calc(100vh - var(--hud-top) - var(--hud-bottom));
+    --corner:14px; --corner-w:1.5px;
   }
+  @media (pointer:coarse){ :root{ --ctl-h:44px; --ctl-h-lg:48px; } }
+  /* U1.1 : coins ambrés dessinés en fond (aucun élément positionné hors d'une boîte qui défile) ;
+     --stt-corners est consommé par la propriété background de chaque boîte */
+  .stt-corners, .panel, .help-panel, .board-panel, .audio-panel, .pause-panel{
+    --stt-corners:
+      linear-gradient(var(--amber),var(--amber)) 0 0/var(--corner) var(--corner-w) no-repeat border-box,
+      linear-gradient(var(--amber),var(--amber)) 0 0/var(--corner-w) var(--corner) no-repeat border-box,
+      linear-gradient(var(--amber),var(--amber)) 100% 100%/var(--corner) var(--corner-w) no-repeat border-box,
+      linear-gradient(var(--amber),var(--amber)) 100% 100%/var(--corner-w) var(--corner) no-repeat border-box;
+  }
+  .ss-panel, .ms-panel{ --stt-corners:
+      linear-gradient(var(--amber),var(--amber)) 0 0/var(--corner) var(--corner-w) no-repeat border-box,
+      linear-gradient(var(--amber),var(--amber)) 0 0/var(--corner-w) var(--corner) no-repeat border-box,
+      linear-gradient(var(--amber),var(--amber)) 100% 0/var(--corner) var(--corner-w) no-repeat border-box,
+      linear-gradient(var(--amber),var(--amber)) 100% 0/var(--corner-w) var(--corner) no-repeat border-box,
+      linear-gradient(var(--amber),var(--amber)) 0 100%/var(--corner) var(--corner-w) no-repeat border-box,
+      linear-gradient(var(--amber),var(--amber)) 0 100%/var(--corner-w) var(--corner) no-repeat border-box,
+      linear-gradient(var(--amber),var(--amber)) 100% 100%/var(--corner) var(--corner-w) no-repeat border-box,
+      linear-gradient(var(--amber),var(--amber)) 100% 100%/var(--corner-w) var(--corner) no-repeat border-box;
+    --corner:18px; --corner-w:2px; }
+  .panel{ --corner:10px; }
+  /* U1.1 : ascenseurs thémés */
+  .panel, .help-panel, .board-panel, .audio-panel, .ms-panel, .ss-panel, .con-panel, .con-body,
+  .ss-strip, .ss-detail, .ss-body, #sttConsoleTabs{ scrollbar-width:thin; scrollbar-color:var(--line) transparent; }
+  .help-panel::-webkit-scrollbar, .board-panel::-webkit-scrollbar, .audio-panel::-webkit-scrollbar, .ms-panel::-webkit-scrollbar,
+  .ss-panel::-webkit-scrollbar, .con-panel::-webkit-scrollbar, .con-body::-webkit-scrollbar{ width:8px; height:8px; }
+  .help-panel::-webkit-scrollbar-thumb, .board-panel::-webkit-scrollbar-thumb, .audio-panel::-webkit-scrollbar-thumb,
+  .ms-panel::-webkit-scrollbar-thumb, .ss-panel::-webkit-scrollbar-thumb, .con-panel::-webkit-scrollbar-thumb,
+  .con-body::-webkit-scrollbar-thumb, #sttConsoleTabs::-webkit-scrollbar-thumb{ background:var(--line); border-radius:4px; }
   *{box-sizing:border-box;}
   html,body{
     margin:0; padding:0; width:100%; height:100%; overflow:hidden;
@@ -92,14 +130,9 @@
   .panel{
     position:absolute;
     border:1px solid var(--line);
-    background:linear-gradient(180deg, rgba(94,234,212,0.04), transparent 60%), rgba(15,26,48,0.72);
+    background:var(--stt-corners), linear-gradient(180deg, rgba(94,234,212,0.04), transparent 60%), rgba(15,26,48,0.72);
     backdrop-filter:blur(2px);
   }
-  .panel::before, .panel::after{
-    content:""; position:absolute; width:10px; height:10px; border:1.5px solid var(--amber);
-  }
-  .panel::before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }
-  .panel::after{ bottom:-1px; right:-1px; border-left:none; border-top:none; }
 
   .hud-top{
     position:absolute; top:0; left:0; right:0;
@@ -215,24 +248,21 @@
   #helpOverlay.visible{ opacity:1; pointer-events:auto; }
   .help-panel{
     position:relative; border:1px solid var(--line);
-    background:linear-gradient(180deg, rgba(94,234,212,0.05), transparent 60%), rgba(15,26,48,0.94);
+    background:var(--stt-corners), linear-gradient(180deg, rgba(94,234,212,0.05), transparent 60%), rgba(15,26,48,0.94);
     padding:26px 34px 20px; max-width:920px; width:92vw; max-height:82vh; overflow:auto;
   }
-  .help-panel::before, .help-panel::after{
-    content:""; position:absolute; width:14px; height:14px; border:1.5px solid var(--amber);
-  }
-  .help-panel::before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }
-  .help-panel::after{ bottom:-1px; right:-1px; border-left:none; border-top:none; }
-  .help-title{
-    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:15px;
-    letter-spacing:0.14em; color:var(--amber); margin-bottom:16px; text-align:center;
+  /* U1.4 (D17, D-C) : un seul style de titre interne pour Aide, Réglages, Missions, Chantier, Contrats et Port */
+  .con-h, .help-title, .board-title, .port-title, .audio-title{
+    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:var(--fs-lg); line-height:1.3;
+    letter-spacing:0.12em; text-transform:uppercase; color:var(--amber); text-align:left;
+    margin:0 0 12px; padding:0; border:none;
   }
   /* aide sur 2 colonnes (demande explicite) : répartition équilibrée en CSS
      pur (column-count), pas un découpage manuel du tableau en JS — chaque
      ligne [touche, description] reste un bloc insécable (break-inside:avoid)
      pour ne jamais couper une touche de sa description entre les deux
      colonnes. Gagne environ moitié moins de hauteur qu'une colonne unique. */
-  .help-grid{ column-count:2; column-gap:28px; font-size:12px; }
+  .help-grid{ column-count:2; column-gap:28px; font-size:var(--fs-md); }
   /* repli une colonne sous 680px : repéré sur émulation iPhone — de force,
      deux colonnes étroites font se chevaucher touche et description plutôt
      que de gagner de la place (texte plus long que la colonne, §17.2 pour
@@ -246,8 +276,8 @@
     font-family:'JetBrains Mono',monospace; color:var(--cyan); white-space:nowrap;
     border:1px solid var(--line); border-radius:3px; padding:1px 7px; text-align:center; height:fit-content;
   }
-  .help-grid .hv{ color:var(--ink); align-self:center; }
-  .help-foot{ margin-top:16px; text-align:center; font-size:10px; color:var(--muted-2); letter-spacing:0.05em; }
+  .help-grid .hv{ color:var(--ink); align-self:center; text-transform:uppercase; }
+  .help-foot{ margin-top:16px; text-align:center; font-size:var(--fs-xs); color:var(--muted-2); letter-spacing:0.05em; }
 
   /* ---------- carte stellaire (§23) — même famille visuelle que Pause/
      Aide (fond assombri, coins ambrés), plein écran plutôt qu'un panneau
@@ -278,35 +308,28 @@
   #shipyardOverlay.visible, #contractBoardOverlay.visible{ opacity:1; pointer-events:auto; }
   .board-panel{
     position:relative; border:1px solid var(--line);
-    background:linear-gradient(180deg, rgba(94,234,212,0.05), transparent 60%), rgba(15,26,48,0.94);
+    background:var(--stt-corners), linear-gradient(180deg, rgba(94,234,212,0.05), transparent 60%), rgba(15,26,48,0.94);
     padding:26px 30px 22px; width:min(560px, 92vw); max-height:82vh; overflow:auto;
   }
-  .board-panel::before, .board-panel::after{
-    content:""; position:absolute; width:14px; height:14px; border:1.5px solid var(--amber);
-  }
-  .board-panel::before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }
-  .board-panel::after{ bottom:-1px; right:-1px; border-left:none; border-top:none; }
-  .board-title{
-    font-weight:700; font-size:14px; letter-spacing:0.1em; color:var(--ink); text-align:center; margin-bottom:6px;
-  }
-  .board-sub{ font-size:11px; color:var(--muted-2); text-align:center; margin-bottom:16px; line-height:1.5; }
+  .board-panel.board-panel-wide{ max-width:760px; width:92vw; }   /* U1.3 : ex-style en ligne des Missions */
+  .board-sub{ font-size:var(--fs-sm); color:var(--muted-2); text-align:left; margin-bottom:16px; line-height:1.5; }
   .board-list{ display:flex; flex-direction:column; gap:10px; }
   .board-row{
     display:flex; justify-content:space-between; align-items:center; gap:12px;
     border:1px dashed var(--line); padding:10px 12px;
   }
   .board-row-info{ display:flex; flex-direction:column; gap:2px; min-width:0; }
-  .board-row-name{ font-size:12.5px; color:var(--ink); }
-  .board-row-meta{ font-size:10.5px; color:var(--muted-2); }
+  .board-row-name{ font-size:var(--fs-md); color:var(--ink); }
+  .board-row-meta{ font-size:var(--fs-sm); color:var(--muted-2); }
   .board-row-btn{
     flex:none; pointer-events:auto; cursor:pointer;
     background:none; border:1px solid var(--amber-dim); color:var(--amber);
-    font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.04em;
-    padding:8px 12px; white-space:nowrap; transition:border-color .15s ease, background .15s ease;
+    font-family:'JetBrains Mono',monospace; font-size:var(--fs-sm); letter-spacing:0.04em;
+    padding:0 12px; min-height:var(--ctl-h); white-space:nowrap; transition:border-color .15s ease, background .15s ease;
   }
   .board-row-btn:hover{ border-color:var(--amber); background:rgba(255,180,84,0.12); }
   .board-row-btn.port-disabled{ cursor:default; color:var(--muted-2); border-color:var(--line); background:none; }
-  .board-empty{ font-size:11.5px; color:var(--muted-2); text-align:center; padding:14px 0; }
+  .board-empty{ font-size:var(--fs-md); color:var(--muted-2); text-align:center; padding:14px 0; }
 
   
 
@@ -333,25 +356,22 @@
   #audioOverlay.visible{ opacity:1; pointer-events:auto; }
   .audio-panel{
     position:relative; border:1px solid var(--line);
-    background:rgba(15,26,48,0.96);
+    background:var(--stt-corners), rgba(15,26,48,0.96);
     padding:26px 30px 18px; width:340px;
+    /* U1.4 (D7, D-D) : grille libellé / curseur / valeur ; les rangées se fondent dans la grille (display:contents) */
+    display:grid; grid-template-columns:max-content 1fr auto; gap:14px 16px; align-items:center;
   }
-  .audio-panel::before, .audio-panel::after{
-    content:""; position:absolute; width:14px; height:14px; border:1.5px solid var(--amber);
-  }
-  .audio-panel::before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }
-  .audio-panel::after{ bottom:-1px; right:-1px; border-left:none; border-top:none; }
-  .audio-title{
-    font-weight:700; font-size:15px; letter-spacing:0.12em; color:var(--amber);
-    text-align:center; margin-bottom:20px;
-  }
-  .audio-row{ display:flex; align-items:center; gap:12px; margin-bottom:16px; }
-  .audio-label{ width:70px; font-size:12px; color:var(--ink); flex:none; }
-  .audio-pct{ width:38px; font-size:11px; color:var(--muted); text-align:right; flex:none; }
+  .audio-panel > .con-h, .audio-foot{ grid-column:1 / -1; }
+  .audio-panel > .con-h{ margin-bottom:0; }
+  .audio-row{ display:contents; }
+  .audio-label{ font-size:var(--fs-md); color:var(--ink); }
+  .audio-pct{ min-width:38px; font-size:var(--fs-sm); color:var(--muted); text-align:right; }
   .audio-row input[type="range"]{
-    flex:1; accent-color:var(--amber); height:4px; cursor:pointer;
+    width:100%; min-width:0; accent-color:var(--amber); height:4px; cursor:pointer;
   }
-  .audio-foot{ margin-top:8px; text-align:center; font-size:10px; color:var(--muted-2); letter-spacing:0.05em; }
+  /* hébergé dans la console : section pleine largeur, alignée sur l'aide (même boîte que .help-panel) */
+  #sttConsole .con-hosted#audioOverlay .audio-panel{ width:100%; padding:18px 0 0; box-sizing:border-box; background:none; }
+  .audio-foot{ margin-top:0; text-align:center; font-size:var(--fs-xs); color:var(--muted-2); letter-spacing:0.05em; }
   /* étiquettes de la carte stellaire : noms d'étoiles (discrets, la
      sphère+halo déjà colorée est le repère principal) et lettres de
      grille (repères de coordonnées, cf. demande utilisateur) */
@@ -482,13 +502,13 @@
   }
   .hud-radio.visible{ display:flex; opacity:1; }
   .radio-title{
-    font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted-2);
+    font-size:var(--fs-xs); letter-spacing:0.12em; text-transform:uppercase; color:var(--muted-2);
     border-bottom:1px solid var(--line); padding-bottom:6px; margin-bottom:6px;
     display:flex; justify-content:space-between; align-items:center;
   }
   .radio-title .dot{ color:var(--cyan); animation:blink 1.8s infinite; }
   .llm-indicator{
-    display:inline-block; position:relative; margin-right:7px; font-size:12px;
+    display:inline-block; position:relative; margin-right:7px; font-size:var(--fs-md);
     opacity:0.35; filter:grayscale(1); transition:opacity .3s ease, filter .3s ease;
     pointer-events:auto; cursor:default;
   }
@@ -503,13 +523,13 @@
   .radio-mute{
     pointer-events:auto; cursor:pointer;
     background:none; border:1px solid var(--line); color:var(--muted-2);
-    font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1;
+    font-family:'JetBrains Mono',monospace; font-size:var(--fs-sm); line-height:1;
     padding:3px 6px; margin-left:8px;
   }
   .radio-mute:hover{ border-color:var(--cyan); color:var(--cyan); }
   .radio-log{ display:flex; flex-direction:column; gap:7px; max-height:270px; overflow:hidden; }
   .radio-line{
-    font-size:10.5px; line-height:1.4;
+    font-size:var(--fs-sm); line-height:1.4;
     opacity:0; transform:translateY(4px);
     animation:radioIn .4s ease forwards;
     display:flex; align-items:flex-start; gap:6px;
@@ -532,21 +552,18 @@
   .hud-port{
     position:absolute; right:18px; top:230px; width:300px;
     padding:10px 12px 12px;
-    display:none; flex-direction:column; gap:9px;
-    opacity:0; transition:opacity .5s ease;
+    display:none; opacity:0; transition:opacity .5s ease;
   }
-  .hud-port.visible{ display:flex; opacity:1; }
-  .port-title{
-    font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted-2);
-    border-bottom:1px solid var(--line); padding-bottom:6px;
-  }
-  .port-row{ display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--ink); }
-  .port-dots{ color:var(--cyan); letter-spacing:0.12em; font-size:12px; }
+  /* U1.4 (D10) : grille 3 colonnes (service, état, bouton de largeur fixe) ; chaque rangée se fond dans la grille */
+  .hud-port.visible{ display:grid; opacity:1; grid-template-columns:max-content 1fr 180px; gap:12px 20px; align-items:center; align-content:start; }
+  .hud-port > .port-title{ grid-column:1 / -1; margin-bottom:0; }
+  .port-row{ display:contents; font-size:var(--fs-md); color:var(--ink); }
+  .port-dots{ color:var(--cyan); letter-spacing:0.12em; font-size:var(--fs-md); }
   .port-buy-btn{
-    pointer-events:auto; cursor:pointer; width:100%;
+    pointer-events:auto; cursor:pointer; width:100%; box-sizing:border-box;
     background:none; border:1px solid var(--amber-dim); color:var(--amber);
-    font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.05em;
-    padding:8px 6px; transition:border-color .15s ease, background .15s ease;
+    font-family:'JetBrains Mono',monospace; font-size:var(--fs-sm); letter-spacing:0.05em;
+    padding:0 6px; min-height:var(--ctl-h); transition:border-color .15s ease, background .15s ease;
   }
   .port-buy-btn:hover{ border-color:var(--amber); background:rgba(255,180,84,0.12); }
   .port-buy-btn.port-disabled{
@@ -579,7 +596,7 @@
   .star-label .star-text{
     position:absolute; left:0; top:-20px; transform:translate(-50%,-100%);
     font-family:'JetBrains Mono',monospace;
-    font-size:11px;
+    font-size:var(--fs-sm);
     letter-spacing:0.06em;
     text-transform:uppercase;
     color:var(--cyan);
@@ -726,27 +743,22 @@
   #pauseOverlay.visible{ opacity:1; pointer-events:auto; }
   .pause-panel{
     position:relative; border:1px solid var(--line);
-    background:linear-gradient(180deg, rgba(94,234,212,0.05), transparent 60%), rgba(15,26,48,0.92);
+    background:var(--stt-corners), linear-gradient(180deg, rgba(94,234,212,0.05), transparent 60%), rgba(15,26,48,0.92);
     padding:34px 46px; display:flex; flex-direction:column; align-items:center; gap:14px; min-width:300px;
   }
-  .pause-panel::before, .pause-panel::after{
-    content:""; position:absolute; width:14px; height:14px; border:1.5px solid var(--amber);
-  }
-  .pause-panel::before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }
-  .pause-panel::after{ bottom:-1px; right:-1px; border-left:none; border-top:none; }
   .pause-title{
     font-family:'JetBrains Mono',monospace; font-weight:700; font-size:26px;
     letter-spacing:0.16em; color:var(--amber);
   }
-  .pause-sub{ font-size:12px; color:var(--muted); letter-spacing:0.05em; margin-top:-8px; }
+  .pause-sub{ font-size:var(--fs-md); color:var(--muted); letter-spacing:0.05em; margin-top:-8px; }
   .pause-btn{
-    width:100%; padding:11px 20px; background:none; border:1px solid var(--line); color:var(--ink);
-    font-family:'JetBrains Mono',monospace; font-size:13px; letter-spacing:0.08em; cursor:pointer;
+    width:100%; height:var(--ctl-h-lg); box-sizing:border-box; padding:0 20px; background:none; border:1px solid var(--line); color:var(--ink);
+    font-family:'JetBrains Mono',monospace; font-size:var(--fs-lg); letter-spacing:0.08em; cursor:pointer;
     transition:border-color .15s ease, background .15s ease; text-align:center;
   }
   .pause-btn:hover{ border-color:var(--cyan); background:rgba(94,234,212,0.1); color:var(--cyan); }
   .pause-btn-quit:hover{ border-color:#ff6b57; background:rgba(255,107,87,0.1); color:#ff6b57; }
-  .pause-hint{ font-size:10px; color:var(--muted-2); letter-spacing:0.04em; margin-top:4px; }
+  .pause-hint{ font-size:var(--fs-xs); color:var(--muted-2); letter-spacing:0.04em; margin-top:4px; }
   .pause-save-msg{ margin-top:0; text-align:center; color:var(--cyan); }
   .pause-save-msg:empty{ display:none; }
 
@@ -826,13 +838,9 @@
   #shipSelect{ position:fixed; inset:0; z-index:9000; display:none; align-items:center; justify-content:center;
     background:rgba(5,8,14,0.55); font-family:'JetBrains Mono', monospace; color:var(--ink); }
   #shipSelect.open{ display:flex; }
-  .ss-panel{ position:relative; width:min(1120px, 94vw); height:min(660px, 90vh); background:rgba(11,18,32,0.94);
+  .ss-panel{ position:relative; width:min(1120px, 94vw); height:min(660px, 90vh); background:var(--stt-corners), rgba(11,18,32,0.94);
     border:1px solid var(--line); display:flex; flex-direction:column; padding:18px 20px; box-sizing:border-box; }
-  .ss-c{ position:absolute; width:18px; height:18px; border:0 solid var(--amber); pointer-events:none; }
-  .ss-c.tl{ top:-1px; left:-1px; border-top-width:2px; border-left-width:2px; }
-  .ss-c.tr{ top:-1px; right:-1px; border-top-width:2px; border-right-width:2px; }
-  .ss-c.bl{ bottom:-1px; left:-1px; border-bottom-width:2px; border-left-width:2px; }
-  .ss-c.br{ bottom:-1px; right:-1px; border-bottom-width:2px; border-right-width:2px; }
+  .ss-c{ display:none; }   /* U1.1 : coins désormais dessinés en fond (--stt-corners) */
   .ss-head h2{ margin:0; font:800 20px/1.2 'JetBrains Mono', monospace; color:var(--amber); }
   .ss-note{ margin:4px 0 0; font:12px/1.5 'JetBrains Mono', monospace; color:var(--muted); }
   .ss-body{ flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1.35fr) minmax(260px,1fr); gap:18px; margin-top:14px; }
@@ -889,25 +897,25 @@
   #modeSelect{ position:fixed; inset:0; z-index:9000; display:none; align-items:center; justify-content:center;
     background:rgba(5,8,14,0.55); font-family:'JetBrains Mono', monospace; color:var(--ink); }
   #modeSelect.open{ display:flex; }
-  .ms-panel{ position:relative; width:min(560px, 92vw); max-height:94vh; overflow:auto; background:rgba(11,18,32,0.94);
+  .ms-panel{ position:relative; width:min(560px, 92vw); max-height:94vh; overflow:auto; background:var(--stt-corners), rgba(11,18,32,0.94);
     border:1px solid var(--line); padding:26px 28px 24px; box-sizing:border-box; display:flex; flex-direction:column; gap:16px; }
   .ms-title{ margin:0; font:700 20px 'JetBrains Mono', monospace; letter-spacing:0.16em; color:var(--amber); }
   .ms-list{ display:flex; flex-direction:column; gap:10px; }
   .ms-opt{ display:flex; flex-direction:column; gap:4px; text-align:left; background:none; border:1px solid var(--line); color:var(--ink);
-    padding:12px 16px; font-family:'JetBrains Mono', monospace; cursor:pointer; transition:border-color .15s ease, background .15s ease; }
-  .ms-lbl{ font-size:14px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; }
-  .ms-sub{ font-size:11.5px; line-height:1.35; color:var(--muted); }
+    padding:12px 16px; font:inherit; cursor:pointer; transition:border-color .15s ease, background .15s ease; }
+  .ms-lbl{ font-size:var(--fs-lg); font-weight:700; letter-spacing:0.08em; text-transform:uppercase; }
+  .ms-sub{ font-size:var(--fs-md); line-height:1.35; color:var(--muted); }
   .ms-opt:hover:not(:disabled), .ms-opt:focus{ outline:none; border-color:var(--cyan); background:rgba(94,234,212,0.1); }
   .ms-opt:hover:not(:disabled) .ms-lbl, .ms-opt:focus .ms-lbl{ color:var(--cyan); }
   .ms-opt:disabled{ opacity:0.4; cursor:not-allowed; }
-  .ms-msg{ font-size:11.5px; color:#ff6b57; }
+  .ms-msg{ font-size:var(--fs-md); color:#ff6b57; }
   .ms-msg:empty{ display:none; }
   .ms-row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-  .ms-btn{ font:700 13px 'JetBrains Mono', monospace; letter-spacing:0.08em; text-transform:uppercase; background:none; border:1px solid var(--line); color:var(--ink);
+  .ms-btn{ font:700 var(--fs-md) 'JetBrains Mono', monospace; letter-spacing:0.08em; text-transform:uppercase; background:none; border:1px solid var(--line); color:var(--ink);
     padding:9px 18px; cursor:pointer; transition:border-color .15s ease, background .15s ease; }
   .ms-btn.ms-go{ border-color:var(--amber); color:var(--amber); }
   .ms-btn:hover, .ms-btn:focus{ outline:none; border-color:var(--cyan); background:rgba(94,234,212,0.1); color:var(--cyan); }
-  .ms-link{ font:500 11.5px 'JetBrains Mono', monospace; background:none; border:0; padding:4px 2px; color:var(--muted); text-decoration:underline; cursor:pointer; }
+  .ms-link{ font:500 var(--fs-sm) 'JetBrains Mono', monospace; background:none; border:0; padding:4px 2px; color:var(--muted); text-decoration:underline; cursor:pointer; }
   .ms-link:hover, .ms-link:focus{ outline:none; color:var(--cyan); }
   #modeSelect:not(.confirming) .ms-confirm{ display:none; }
   #modeSelect.confirming .ms-foot{ display:none; }
@@ -969,7 +977,7 @@
   <div id="helpOverlay" class="mono">
     <div class="help-panel">
       <button class="panel-close-btn" data-panel-cls="__help__" title="Fermer">×</button>
-      <div class="help-title" id="lblHelpTitle">AIDE — COMMANDES</div>
+      <div class="help-title con-h" id="lblHelpTitle">AIDE — COMMANDES</div>
       <div class="help-grid" id="helpGrid"></div>
       <div class="help-foot" id="lblHelpFoot">H — masquer cette aide</div>
     </div>
@@ -1009,7 +1017,7 @@
        propulseurs, seul débouché actuel pour les crédits accumulés. -->
   <div class="panel hud-port mono" id="portPanel">
     <button class="panel-close-btn" data-panel-cls="__port__" title="Fermer">×</button>
-    <div class="port-title"><span id="lblPortServices">SERVICES PORTUAIRES</span></div>
+    <div class="port-title con-h"><span id="lblPortServices">SERVICES PORTUAIRES</span></div>
     <div class="port-row">
       <span id="lblSpeedUpgrade">Propulseurs</span>
       <span class="port-dots" id="portLevelDots"></span>
@@ -1037,7 +1045,7 @@
   <div id="shipyardOverlay" class="mono">
     <div class="board-panel">
       <button class="panel-close-btn" data-panel-cls="__shipyard__" title="Fermer">×</button>
-      <div class="board-title" id="lblShipyardTitle">CHANTIER NAVAL</div>
+      <div class="board-title con-h" id="lblShipyardTitle">CHANTIER NAVAL</div>
       <div class="board-sub" id="lblShipyardSub">Un vaisseau équipé de saut ou de distorsion peut franchir les distances interstellaires.</div>
       <div class="board-list" id="shipyardList"></div>
     </div>
@@ -1049,7 +1057,7 @@
     <div class="board-panel">
       <!-- pas de bouton de fermeture ici (volontaire) : sans générateur de saut ni anneaux de
            distorsion, une destination doit être choisie pour reprendre le vol — cf. §L3. -->
-      <div class="board-title" id="lblContractsTitle">PROCHAINE LIVRAISON — SYSTÈME LOCAL</div>
+      <div class="board-title con-h" id="lblContractsTitle">PROCHAINE LIVRAISON — SYSTÈME LOCAL</div>
       <div class="board-sub" id="lblContractsSub">Pas de générateur de saut ni d'anneaux de distorsion à bord : livraisons dans ce système en attendant.</div>
       <div class="board-list" id="contractList"></div>
     </div>
@@ -1104,7 +1112,7 @@
 <div id="audioOverlay" class="mono">
   <div class="audio-panel">
     <button class="panel-close-btn" data-panel-cls="__audio__" title="Fermer">×</button>
-    <div class="audio-title" id="lblAudioTitle">SON</div>
+    <div class="audio-title con-h" id="lblAudioTitle">SON</div>
     <div class="audio-row">
       <span class="audio-label" id="lblMusicVolume">Musique</span>
       <input type="range" id="musicVolumeSlider" min="0" max="100" value="40">
@@ -1353,7 +1361,7 @@ const I18N = {
     modeTitle:'MODE DE JEU', modeNew:'Nouvelle campagne', modeNewSub:'Dirigez STT : un cargo Courlis, un capital de départ, une compagnie à bâtir.', modeContinue:'Continuer', modeContinueSub:'Reprendre la sauvegarde de ce navigateur.', modeFree:'Partie libre', modeFreeSub:'Choisir un vaisseau et voyager librement, sans campagne.',
     saveExport:'Exporter la sauvegarde', saveImport:'Importer…', saveDone:'Sauvegarde terminée.', saveError:'Sauvegarde impossible : fichier invalide ou trop récent.',
     modeReplace:'Une campagne existe : la remplacer ?', modeConfirm:'Confirmer', modeCancel:'Annuler', modeExportFirst:'Exporter d\u2019abord',
-    conTitle:'Console de bord', conClose:'Fermer la console', conTabNav:'Navigation', conTabMissions:'Missions', conTabPort:'Port', conTabYard:'Chantier naval', conTabHelp:'Aide · Réglages', conEmptyMissions:'Aucune mission à afficher.', hk_console:'TAB', hlp_console:'Ouvre/ferme la console de bord (dernier onglet)', hlp_hudAlt:'Touches 1 à 8 : bascule les éléments du HUD (barre d\u2019icônes, dans l\u2019ordre ; radio sur 7)', conTabJournal:'Journal', jrnAll:'Tout', jrnRadio:'Radio', jrnFin:'Finances', jrnEvt:'Événements', jrnEmpty:'Aucune entrée pour le moment.', jrnBalance:'Solde', jrnFreeNote:'Partie libre : rien n’est sauvegardé, le solde part de la partie en cours.', jrnR_jeu:'Opération', jrnR_delivery:'Livraison', jrnR_yard:'Chantier naval', jrnR_speed:'Vitesse', jrnR_fuel:'Carburant', jrnR_jump:'Saut quantique', jrnE_msnAccept:'Mission acceptée : {a} (prime {b})', jrnE_msnDone:'Mission livrée : {a} (prime {b})', jrnE_jump:'Saut vers {a}', jrnE_arrive:'Arrivée : {a}', jrnE_orbit:'Mise en orbite : {a}', jrnE_dock:'Arrimage : {a}', jrnE_fuelLow:'Carburant bas : {b} %', jrnE_fuelCrit:'Carburant critique : {b} %', jrnE_incident:'Incident : {a}', hlp_journal:'Ouvre/ferme le journal de bord (radio, finances, événements) ; ← → rubrique, ↑ ↓ ligne, PgUp/PgDn défilement'
+    conTitle:'Console de bord', conClose:'Fermer la console', conTabNav:'Navigation', conTabMissions:'Missions', conTabPort:'Port', conTabYard:'Chantier naval', conTabHelp:'Aide · Réglages', conEmptyMissions:'Aucune mission à afficher.', hk_console:'TAB', hk_skip:'ESPACE / ENTRÉE', hk_pause:'ÉCHAP / P', lblStarMapTitle:'Carte stellaire', hlp_console:'Ouvre/ferme la console de bord (dernier onglet)', hlp_hudAlt:'Touches 1 à 8 : bascule les éléments du HUD (barre d\u2019icônes, dans l\u2019ordre ; radio sur 7)', conTabJournal:'Journal', jrnAll:'Tout', jrnRadio:'Radio', jrnFin:'Finances', jrnEvt:'Événements', jrnEmpty:'Aucune entrée pour le moment.', jrnBalance:'Solde', jrnFreeNote:'Partie libre : rien n’est sauvegardé, le solde part de la partie en cours.', jrnR_jeu:'Opération', jrnR_delivery:'Livraison', jrnR_yard:'Chantier naval', jrnR_speed:'Vitesse', jrnR_fuel:'Carburant', jrnR_jump:'Saut quantique', jrnE_msnAccept:'Mission acceptée : {a} (prime {b})', jrnE_msnDone:'Mission livrée : {a} (prime {b})', jrnE_jump:'Saut vers {a}', jrnE_arrive:'Arrivée : {a}', jrnE_orbit:'Mise en orbite : {a}', jrnE_dock:'Arrimage : {a}', jrnE_fuelLow:'Carburant bas : {b} %', jrnE_fuelCrit:'Carburant critique : {b} %', jrnE_incident:'Incident : {a}', hlp_journal:'Ouvre/ferme le journal de bord (radio, finances, événements) ; ← → rubrique, ↑ ↓ ligne, PgUp/PgDn défilement'
   },
   en: {
     title_sub: 'Choose a language',
@@ -1388,7 +1396,7 @@ const I18N = {
     modeTitle:'GAME MODE', modeNew:'New campaign', modeNewSub:'Run STT: a Courlis freighter, starting capital, a company to build.', modeContinue:'Continue', modeContinueSub:'Resume the save stored in this browser.', modeFree:'Free play', modeFreeSub:'Pick a ship and fly freely, no campaign.',
     saveExport:'Export save', saveImport:'Import…', saveDone:'Save complete.', saveError:'Save failed: invalid or too recent a file.',
     modeReplace:'A campaign exists: replace it?', modeConfirm:'Confirm', modeCancel:'Cancel', modeExportFirst:'Export first',
-    conTitle:'Ship console', conClose:'Close console', conTabNav:'Navigation', conTabMissions:'Missions', conTabPort:'Port', conTabYard:'Shipyard', conTabHelp:'Help · Settings', conEmptyMissions:'No mission to display.', hk_console:'TAB', hlp_console:'Open/close the ship console (last tab)', hlp_hudAlt:'Keys 1 to 8: toggle HUD elements (icon bar, in order; radio on 7)', conTabJournal:'Log', jrnAll:'All', jrnRadio:'Radio', jrnFin:'Finance', jrnEvt:'Events', jrnEmpty:'No entries yet.', jrnBalance:'Balance', jrnFreeNote:'Free play: nothing is saved; the balance starts from the current game.', jrnR_jeu:'Transaction', jrnR_delivery:'Delivery', jrnR_yard:'Shipyard', jrnR_speed:'Speed', jrnR_fuel:'Fuel', jrnR_jump:'Quantum jump', jrnE_msnAccept:'Mission accepted: {a} (bonus {b})', jrnE_msnDone:'Mission delivered: {a} (bonus {b})', jrnE_jump:'Jump to {a}', jrnE_arrive:'Arrival: {a}', jrnE_orbit:'Orbit insertion: {a}', jrnE_dock:'Docking: {a}', jrnE_fuelLow:'Fuel low: {b}%', jrnE_fuelCrit:'Fuel critical: {b}%', jrnE_incident:'Incident: {a}', hlp_journal:'Open/close the ship log (radio, finance, events); ← → section, ↑ ↓ line, PgUp/PgDn scroll'
+    conTitle:'Ship console', conClose:'Close console', conTabNav:'Navigation', conTabMissions:'Missions', conTabPort:'Port', conTabYard:'Shipyard', conTabHelp:'Help · Settings', conEmptyMissions:'No mission to display.', hk_console:'TAB', hk_skip:'SPACE / ENTER', hk_pause:'ESC / P', lblStarMapTitle:'Star map', hlp_console:'Open/close the ship console (last tab)', hlp_hudAlt:'Keys 1 to 8: toggle HUD elements (icon bar, in order; radio on 7)', conTabJournal:'Log', jrnAll:'All', jrnRadio:'Radio', jrnFin:'Finance', jrnEvt:'Events', jrnEmpty:'No entries yet.', jrnBalance:'Balance', jrnFreeNote:'Free play: nothing is saved; the balance starts from the current game.', jrnR_jeu:'Transaction', jrnR_delivery:'Delivery', jrnR_yard:'Shipyard', jrnR_speed:'Speed', jrnR_fuel:'Fuel', jrnR_jump:'Quantum jump', jrnE_msnAccept:'Mission accepted: {a} (bonus {b})', jrnE_msnDone:'Mission delivered: {a} (bonus {b})', jrnE_jump:'Jump to {a}', jrnE_arrive:'Arrival: {a}', jrnE_orbit:'Orbit insertion: {a}', jrnE_dock:'Docking: {a}', jrnE_fuelLow:'Fuel low: {b}%', jrnE_fuelCrit:'Fuel critical: {b}%', jrnE_incident:'Incident: {a}', hlp_journal:'Open/close the ship log (radio, finance, events); ← → section, ↑ ↓ line, PgUp/PgDn scroll'
   },
   de: {
     title_sub: 'Sprache wählen',
@@ -1423,7 +1431,7 @@ const I18N = {
     modeTitle:'SPIELMODUS', modeNew:'Neue Kampagne', modeNewSub:'Führen Sie STT: ein Frachter Courlis, Startkapital, eine Firma zum Aufbauen.', modeContinue:'Fortsetzen', modeContinueSub:'Den in diesem Browser gespeicherten Spielstand laden.', modeFree:'Freies Spiel', modeFreeSub:'Ein Schiff wählen und frei fliegen, ohne Kampagne.',
     saveExport:'Spielstand exportieren', saveImport:'Importieren…', saveDone:'Speichern abgeschlossen.', saveError:'Speichern fehlgeschlagen: ungültige oder zu neue Datei.',
     modeReplace:'Es gibt bereits eine Kampagne: ersetzen?', modeConfirm:'Bestätigen', modeCancel:'Abbrechen', modeExportFirst:'Zuerst exportieren',
-    conTitle:'Bordkonsole', conClose:'Konsole schließen', conTabNav:'Navigation', conTabMissions:'Aufträge', conTabPort:'Hafen', conTabYard:'Werft', conTabHelp:'Hilfe · Einstellungen', conEmptyMissions:'Keine Aufträge anzuzeigen.', hk_console:'TAB', hlp_console:'Bordkonsole öffnen/schließen (letzter Reiter)', hlp_hudAlt:'Tasten 1 bis 8: HUD-Elemente umschalten (Symbolleiste, in Reihenfolge; Funk auf 7)', conTabJournal:'Logbuch', jrnAll:'Alle', jrnRadio:'Funk', jrnFin:'Finanzen', jrnEvt:'Ereignisse', jrnEmpty:'Noch keine Einträge.', jrnBalance:'Saldo', jrnFreeNote:'Freies Spiel: nichts wird gespeichert; der Saldo beginnt mit dem laufenden Spiel.', jrnR_jeu:'Vorgang', jrnR_delivery:'Lieferung', jrnR_yard:'Werft', jrnR_speed:'Geschwindigkeit', jrnR_fuel:'Treibstoff', jrnR_jump:'Quantensprung', jrnE_msnAccept:'Auftrag angenommen: {a} (Prämie {b})', jrnE_msnDone:'Auftrag geliefert: {a} (Prämie {b})', jrnE_jump:'Sprung nach {a}', jrnE_arrive:'Ankunft: {a}', jrnE_orbit:'Orbit erreicht: {a}', jrnE_dock:'Andocken: {a}', jrnE_fuelLow:'Treibstoff niedrig: {b} %', jrnE_fuelCrit:'Treibstoff kritisch: {b} %', jrnE_incident:'Zwischenfall: {a}', hlp_journal:'Logbuch öffnen/schließen (Funk, Finanzen, Ereignisse); ← → Rubrik, ↑ ↓ Zeile, Bild↑/Bild↓ Scrollen'
+    conTitle:'Bordkonsole', conClose:'Konsole schließen', conTabNav:'Navigation', conTabMissions:'Aufträge', conTabPort:'Hafen', conTabYard:'Werft', conTabHelp:'Hilfe · Einstellungen', conEmptyMissions:'Keine Aufträge anzuzeigen.', hk_console:'TAB', hk_skip:'LEERTASTE / EINGABE', hk_pause:'ESC / P', lblStarMapTitle:'Sternkarte', hlp_console:'Bordkonsole öffnen/schließen (letzter Reiter)', hlp_hudAlt:'Tasten 1 bis 8: HUD-Elemente umschalten (Symbolleiste, in Reihenfolge; Funk auf 7)', conTabJournal:'Logbuch', jrnAll:'Alle', jrnRadio:'Funk', jrnFin:'Finanzen', jrnEvt:'Ereignisse', jrnEmpty:'Noch keine Einträge.', jrnBalance:'Saldo', jrnFreeNote:'Freies Spiel: nichts wird gespeichert; der Saldo beginnt mit dem laufenden Spiel.', jrnR_jeu:'Vorgang', jrnR_delivery:'Lieferung', jrnR_yard:'Werft', jrnR_speed:'Geschwindigkeit', jrnR_fuel:'Treibstoff', jrnR_jump:'Quantensprung', jrnE_msnAccept:'Auftrag angenommen: {a} (Prämie {b})', jrnE_msnDone:'Auftrag geliefert: {a} (Prämie {b})', jrnE_jump:'Sprung nach {a}', jrnE_arrive:'Ankunft: {a}', jrnE_orbit:'Orbit erreicht: {a}', jrnE_dock:'Andocken: {a}', jrnE_fuelLow:'Treibstoff niedrig: {b} %', jrnE_fuelCrit:'Treibstoff kritisch: {b} %', jrnE_incident:'Zwischenfall: {a}', hlp_journal:'Logbuch öffnen/schließen (Funk, Finanzen, Ereignisse); ← → Rubrik, ↑ ↓ Zeile, Bild↑/Bild↓ Scrollen'
   },
   es: {
     title_sub: 'Elige un idioma',
@@ -1458,7 +1466,7 @@ const I18N = {
     modeTitle:'MODO DE JUEGO', modeNew:'Nueva campaña', modeNewSub:'Dirige STT: un carguero Courlis, capital inicial, una compañía por construir.', modeContinue:'Continuar', modeContinueSub:'Retomar la partida guardada en este navegador.', modeFree:'Partida libre', modeFreeSub:'Elegir una nave y volar libremente, sin campaña.',
     saveExport:'Exportar partida', saveImport:'Importar…', saveDone:'Guardado completado.', saveError:'Error al guardar: archivo inválido o demasiado reciente.',
     modeReplace:'Ya existe una campaña: ¿reemplazarla?', modeConfirm:'Confirmar', modeCancel:'Cancelar', modeExportFirst:'Exportar primero',
-    conTitle:'Consola de a bordo', conClose:'Cerrar la consola', conTabNav:'Navegación', conTabMissions:'Misiones', conTabPort:'Puerto', conTabYard:'Astillero', conTabHelp:'Ayuda · Ajustes', conEmptyMissions:'Ninguna misión que mostrar.', hk_console:'TAB', hlp_console:'Abre/cierra la consola de a bordo (última pestaña)', hlp_hudAlt:'Teclas 1 a 8: alterna elementos del HUD (barra de iconos, en orden; radio en 7)', conTabJournal:'Diario', jrnAll:'Todo', jrnRadio:'Radio', jrnFin:'Finanzas', jrnEvt:'Eventos', jrnEmpty:'Aún no hay entradas.', jrnBalance:'Saldo', jrnFreeNote:'Partida libre: no se guarda nada; el saldo parte de la partida en curso.', jrnR_jeu:'Operación', jrnR_delivery:'Entrega', jrnR_yard:'Astillero', jrnR_speed:'Velocidad', jrnR_fuel:'Combustible', jrnR_jump:'Salto cuántico', jrnE_msnAccept:'Misión aceptada: {a} (prima {b})', jrnE_msnDone:'Misión entregada: {a} (prima {b})', jrnE_jump:'Salto a {a}', jrnE_arrive:'Llegada: {a}', jrnE_orbit:'Puesta en órbita: {a}', jrnE_dock:'Atraque: {a}', jrnE_fuelLow:'Combustible bajo: {b} %', jrnE_fuelCrit:'Combustible crítico: {b} %', jrnE_incident:'Incidente: {a}', hlp_journal:'Abre/cierra el diario de a bordo (radio, finanzas, eventos); ← → sección, ↑ ↓ línea, RePág/AvPág desplazar'
+    conTitle:'Consola de a bordo', conClose:'Cerrar la consola', conTabNav:'Navegación', conTabMissions:'Misiones', conTabPort:'Puerto', conTabYard:'Astillero', conTabHelp:'Ayuda · Ajustes', conEmptyMissions:'Ninguna misión que mostrar.', hk_console:'TAB', hk_skip:'ESPACIO / INTRO', hk_pause:'ESC / P', lblStarMapTitle:'Mapa estelar', hlp_console:'Abre/cierra la consola de a bordo (última pestaña)', hlp_hudAlt:'Teclas 1 a 8: alterna elementos del HUD (barra de iconos, en orden; radio en 7)', conTabJournal:'Diario', jrnAll:'Todo', jrnRadio:'Radio', jrnFin:'Finanzas', jrnEvt:'Eventos', jrnEmpty:'Aún no hay entradas.', jrnBalance:'Saldo', jrnFreeNote:'Partida libre: no se guarda nada; el saldo parte de la partida en curso.', jrnR_jeu:'Operación', jrnR_delivery:'Entrega', jrnR_yard:'Astillero', jrnR_speed:'Velocidad', jrnR_fuel:'Combustible', jrnR_jump:'Salto cuántico', jrnE_msnAccept:'Misión aceptada: {a} (prima {b})', jrnE_msnDone:'Misión entregada: {a} (prima {b})', jrnE_jump:'Salto a {a}', jrnE_arrive:'Llegada: {a}', jrnE_orbit:'Puesta en órbita: {a}', jrnE_dock:'Atraque: {a}', jrnE_fuelLow:'Combustible bajo: {b} %', jrnE_fuelCrit:'Combustible crítico: {b} %', jrnE_incident:'Incidente: {a}', hlp_journal:'Abre/cierra el diario de a bordo (radio, finanzas, eventos); ← → sección, ↑ ↓ línea, RePág/AvPág desplazar'
   }
 };
 function t(key){
@@ -1622,7 +1630,7 @@ function applyLanguage(){
     lblRadioChannel:'lblRadioChannel', creditsLabel:'creditsLabel',
     lblPortServices:'lblPortServices', lblSpeedUpgrade:'lblSpeedUpgrade', lblFuelService:'lblFuelService', lblFuel:'lblFuel',
     lblJumpService:'lblJumpService',
-    lblAudioTitle:'lblAudioTitle', lblMusicVolume:'lblMusicVolume', lblVoiceVolume:'lblVoiceVolume', lblAudioFoot:'lblAudioFoot',
+    lblHelpTitle:'lblHelpTitle', lblHelpFoot:'lblHelpFoot', lblAudioTitle:'lblAudioTitle', lblMusicVolume:'lblMusicVolume', lblVoiceVolume:'lblVoiceVolume', lblAudioFoot:'lblAudioFoot',
     lblShipyardService:'lblShipyardService', lblShipyardTitle:'lblShipyardTitle', lblShipyardSub:'lblShipyardSub',
     lblContractsTitle:'lblContractsTitle', lblContractsSub:'lblContractsSub'
   };
@@ -12106,14 +12114,14 @@ function ensureDom(){
   if(S.el) return;
   const el = document.createElement('div'); el.id = 'missionBoardOverlay'; el.className = 'mono';
   el.style.cssText = 'position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:6;background:rgba(2,5,12,.45)';
-  el.innerHTML = "<div class='board-panel' style='max-width:760px;width:92vw'><button class='panel-close-btn' data-panel-cls='__missions__' title='' id='missionClose'>×</button><div class='board-title' id='missionTitle'></div><div class='board-sub' id='missionSub'></div><div class='board-list' id='missionList'></div></div>";
+  el.innerHTML = "<div class='board-panel board-panel-wide'><button class='panel-close-btn' data-panel-cls='__missions__' title='' id='missionClose'>×</button><div class='board-title' id='missionTitle'></div><div class='board-sub' id='missionSub'></div><div class='board-list' id='missionList'></div></div>";
   document.body.appendChild(el); S.el = el;
   el.querySelector('#missionList').addEventListener('click', e => { const b = e.target.closest('button[data-i]'); if(b && b.dataset.act === 'accept') accept(+b.dataset.i); });
   const h = document.createElement('div'); h.id = 'missionHud'; h.className = 'mono';
   h.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);top:10px;z-index:6;display:none;font-size:11px;letter-spacing:.06em;padding:6px 12px;border:1px solid #25375c;background:rgba(15,26,48,.88);color:#e8edf5;pointer-events:none';
   document.body.appendChild(h); S.hud = h;
 }
-function riskTag(l){ const c = ['#5eead4', '#ffb454', '#ff6b57', '#ff2d55'][l]; return "<span style='font-size:9.5px;padding:2px 6px;border:1px solid " + c + ";color:" + c + "'>" + tx().risk[l] + '</span>'; }
+function riskTag(l){ const c = ['#5eead4', '#ffb454', '#ff6b57', '#ff2d55'][l]; return "<span style='font-size:var(--fs-xs);padding:2px 6px;border:1px solid " + c + ";color:" + c + "'>" + tx().risk[l] + '</span>'; }
 function openBoard(recall){
   ensureDom(); const T = tx(), leg = REAL.leg;
   if(!recall || !S.offers.length) S.offers = generate();   /* rappel (touche J) : mêmes offres, pas un nouveau tirage */
@@ -12124,7 +12132,7 @@ function openBoard(recall){
   S.el.querySelector('#missionList').innerHTML = S.offers.length ? S.offers.map((o, i) =>
     "<div class='board-row' data-mission='" + i + "'><div class='board-row-info'><div class='board-row-name'>" + o.dest.name + (o.inter ? ' (' + o.dest.name + ')' : '') + "</div>" +
     "<div class='board-row-meta'>" + swatches(o) + ' ' + cargoLabel(o) + ' · ' + distLabel(o) + '</div></div>' +
-    "<div style='text-align:right;min-width:190px'><div style='color:#ffb454;font-size:12px'>" + o.reward.toLocaleString('fr-FR') + " CR</div><div style='margin:5px 0'>" + riskTag(o.risk) + '</div>' +
+    "<div style='text-align:right;min-width:190px'><div style='color:#ffb454;font-size:var(--fs-md)'>" + o.reward.toLocaleString('fr-FR') + " CR</div><div style='margin:5px 0'>" + riskTag(o.risk) + '</div>' +
     "<button class='board-row-btn' data-act='accept' data-i='" + i + "'>" + T.accept + "</button> <button class='board-row-btn' disabled title='" + T.negoSoon + "' style='opacity:.45'>" + T.negotiate + '</button></div></div>').join('')
     : "<div class='board-empty'>" + T.empty + '</div>';
   S.el.style.display = 'flex'; S.shownKey = keyNow();
@@ -14007,8 +14015,8 @@ function buildHelpGrid(){
   rows.push(['1 \u2013 8', t('hlp_hudAlt')]);
   rows.push(['X', t('hlp_brake')]);
   rows.push(['F10', t('hlp_voice')]);
-  rows.push(['ESPACE / ENTR\u00c9E', t('hlp_skip')]);
-  rows.push(['\u00c9CHAP / P', t('hlp_pause')]);
+  rows.push([t('hk_skip'), t('hlp_skip')]);
+  rows.push([t('hk_pause'), t('hlp_pause')]);
   rows.push(['H', t('hlp_help')]);
   grid.innerHTML = rows.map(function(r){
     return '<div class="help-row"><div class="hk">'+r[0]+'</div><div class="hv">'+r[1]+'</div></div>';
@@ -17580,45 +17588,61 @@ const CONSOLE = (function(){
 /* @provides CONSOLE.view @requires CONSOLE @requires-engine t, gameStarted, gamePaused, activateHudBarItem, HUD_BAR_ITEMS */
 (function(){
   const CSS = [
-    '#sttConsole{ position:fixed; inset:0; z-index:6; display:flex; align-items:center; justify-content:center; pointer-events:none; font-family:"JetBrains Mono",monospace; }',
+    '#sttConsole{ position:fixed; inset:0; z-index:6; display:flex; align-items:center; justify-content:center; box-sizing:border-box; padding:var(--hud-top) 0 var(--hud-bottom); pointer-events:none; font-family:"JetBrains Mono",monospace; }',
     '#sttConsole[hidden]{ display:none; }',
-    '#sttConsole .con-frame{ position:relative; pointer-events:auto; display:flex; flex-direction:column; width:min(1100px,96vw); height:min(760px,90vh); border:1px solid var(--line);',
+    '#sttConsole .con-frame{ position:relative; pointer-events:auto; display:flex; flex-direction:column; box-sizing:border-box; width:var(--con-max-w);',
+    '  height:var(--con-max-h); border:1px solid var(--line);',
     '  background:linear-gradient(180deg, rgba(94,234,212,0.05), transparent 60%), rgba(11,18,32,0.96); backdrop-filter:blur(2px); color:var(--ink); }',
     '#sttConsole .con-frame::before, #sttConsole .con-frame::after{ content:""; position:absolute; width:14px; height:14px; border:1.5px solid var(--amber); pointer-events:none; }',
     '#sttConsole .con-frame::before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }',
     '#sttConsole .con-frame::after{ bottom:-1px; right:-1px; border-left:none; border-top:none; }',
-    '#sttConsole .con-head{ display:flex; align-items:center; gap:14px; padding:8px 12px; border-bottom:1px solid var(--line); }',
-    '#sttConsole .con-title{ font-weight:700; font-size:13px; letter-spacing:0.14em; text-transform:uppercase; color:var(--amber); white-space:nowrap; }',
+    '#sttConsole .con-head{ flex:none; display:flex; align-items:center; gap:14px; padding:8px 12px; border-bottom:1px solid var(--line); }',
+    '#sttConsole .con-title{ font-weight:700; font-size:var(--fs-lg); letter-spacing:0.14em; text-transform:uppercase; color:var(--amber); white-space:nowrap; }',
     '#sttConsoleTabs{ display:flex; gap:4px; flex:1; min-width:0; overflow-x:auto; }',
-    '#sttConsoleTabs button{ position:relative; flex:none; padding:5px 12px; background:none; border:1px solid transparent; color:var(--muted); font:inherit; font-size:12px;',
+    '#sttConsoleTabs button{ position:relative; flex:none; min-height:var(--ctl-h); padding:0 12px; background:none; border:1px solid transparent; color:var(--muted); font:inherit; font-size:var(--fs-md);',
     '  letter-spacing:0.08em; text-transform:uppercase; cursor:pointer; }',
     '#sttConsoleTabs button:hover{ color:var(--ink); border-color:var(--line); }',
     '#sttConsoleTabs button.on{ color:var(--amber); border-color:var(--amber-dim); }',
     '#sttConsoleTabs button[hidden]{ display:none; }',
-    '#sttConsole .con-badge{ display:inline-block; min-width:14px; margin-left:6px; padding:0 4px; border-radius:7px; background:var(--amber); color:var(--bg); font-size:10px; line-height:14px; text-align:center; }',
+    '#sttConsole .con-badge{ display:inline-block; min-width:14px; margin-left:6px; padding:0 4px; border-radius:7px; background:var(--amber); color:var(--bg); font-size:var(--fs-xs); line-height:14px; text-align:center; }',
     '#sttConsole .con-badge[hidden]{ display:none; }',
-    '#sttConsole .con-close{ flex:none; width:24px; height:24px; padding:0; background:none; border:none; color:var(--muted-2); font:inherit; font-size:16px; line-height:1; cursor:pointer; }',
+    '#sttConsole .con-close{ flex:none; width:var(--ctl-h); height:var(--ctl-h); padding:0; background:none; border:none; color:var(--muted-2); font:inherit; font-size:var(--fs-xl); line-height:1; cursor:pointer; }',
     '#sttConsole .con-close:hover{ color:#ff6b57; }',
-    '#sttConsole .con-body{ position:relative; flex:1; min-height:0; overflow:auto; }',
-    '#sttConsole .con-panel{ padding:10px 14px; }',
+    /* un seul défileur par onglet : le panneau ; le corps ne défile jamais */
+    '#sttConsole .con-body{ position:relative; flex:1 1 auto; display:flex; flex-direction:column; min-height:0; overflow:hidden; }',
+    '#sttConsole .con-panel{ flex:1 1 auto; min-height:0; overflow:auto; overflow-x:hidden; padding:var(--con-pad-y) var(--con-pad-x); }',
     '#sttConsole .con-panel[hidden]{ display:none; }',
     /* neutralisation des overlays hébergés : plus de plein écran, de voile ni de position propre */
     '#sttConsole .con-hosted{ position:static !important; inset:auto !important; top:auto !important; left:auto !important; right:auto !important; bottom:auto !important;',
     '  transform:none !important; z-index:auto !important; width:auto !important; max-width:none !important; height:auto !important; max-height:none !important; margin:0 !important;',
     '  background:none !important; backdrop-filter:none !important; box-shadow:none !important; opacity:1 !important; pointer-events:auto !important; transition:none !important; }',
     '#sttConsole .con-hosted:not([data-con-shown]){ display:none !important; }',
-    '#sttConsole .con-hosted .help-panel{ width:auto; max-width:none; max-height:none; border:none; background:none; padding:0; }',
+    '#sttConsole .con-hosted .help-panel{ flex:1 1 auto; width:auto; max-width:none; max-height:none; border:none; background:none; padding:0; }',
+    /* U1.3 : tout panneau hébergé est neutralisé (largeur, hauteur, bordure, coins, croix) ; les mêmes panneaux hors console gardent leur aspect */
+    '#sttConsole .con-hosted .board-panel, #sttConsole .con-hosted .audio-panel, #sttConsole .con-hosted .help-panel, #sttConsole .con-hosted.panel, #sttConsole #portPanel{',
+    '  --stt-corners:none; width:auto; max-width:none; max-height:none; overflow:visible; border:none; }',
+    '#sttConsole .con-hosted .board-panel::before, #sttConsole .con-hosted .board-panel::after, #sttConsole .con-hosted .audio-panel::before, #sttConsole .con-hosted .audio-panel::after,',
+    '  #sttConsole .con-hosted .help-panel::before, #sttConsole .con-hosted .help-panel::after, #sttConsole #portPanel::before, #sttConsole #portPanel::after{ content:none; display:none; }',
+    '#sttConsole .con-hosted .board-panel{ width:100%; }',   /* l'hôte est un conteneur flex centré : width:auto réduirait le tableau à son contenu */
+    '#sttConsole .con-hosted .panel-close-btn{ display:none; }',
+    /* ≤ 900 px de large : titre masqué, onglets compacts, la barre tient sans ascenseur horizontal */
+    '@media (max-width:900px){',
+    '  #sttConsole .con-head{ gap:8px; padding:6px 8px; }',
+    '  #sttConsole .con-title{ display:none; }',
+    '  #sttConsoleTabs{ gap:2px; }',
+    '  #sttConsoleTabs button{ padding:5px 7px; letter-spacing:0.02em; }',
+    '}',
     /* Tactile et écran étroit : ≤760px de large ou pointeur tactile */
     '@media (max-width:760px), (pointer:coarse){',
-    '  #sttConsole{ position:fixed; inset:0; width:100%; height:100%; max-width:100%; max-height:100%;',
+    '  #sttConsole{ position:fixed; inset:0; width:100%; height:100%; max-width:100%; max-height:100%; padding:0;',
     '    inset:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }',
     '  #sttConsole .con-frame{ width:100%; height:100%; border:none; border-radius:0;',
     '    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }',
     '  #sttConsole .con-frame::before, #sttConsole .con-frame::after{ display:none; }',
     '  #sttConsoleTabs{ overflow-x:auto; white-space:nowrap; -webkit-overflow-scrolling:touch; flex-wrap:nowrap; }',
-    '  #sttConsoleTabs button{ min-height:44px; flex-shrink:0; }',
-    '  #sttConsole .con-close{ min-width:44px; min-height:44px; width:44px; height:44px; }',
-    '  #sttConsole .con-body{ overflow:auto; -webkit-overflow-scrolling:touch; }',
+    '  #sttConsoleTabs button{ flex-shrink:0; }',
+    '  #sttConsole .con-close{ min-width:var(--ctl-h); min-height:var(--ctl-h); }',
+    '  #sttConsole .con-panel{ -webkit-overflow-scrolling:touch; }',
     '  #sttConsole .con-hosted{ box-sizing:border-box; max-width:100%; }',
     '  #helpOverlay{ max-width:100%; box-sizing:border-box; }',
     '  #audioOverlay{ max-width:100%; box-sizing:border-box; }',
@@ -17871,10 +17895,13 @@ const CONSOLE = (function(){
      sur la fenêtre : 95vw × 92vh) ; son canevas mesure .view, d'où le resize après ouverture. */
   const st = document.createElement('style');
   st.textContent = [
-    '#sttConsole .con-panel[data-tab="nav"]{ padding:0; height:100%; }',
+    '#sttConsole .con-panel[data-tab="nav"]{ padding:0; overflow:hidden; }',
     '#sttConsole #stmMap.con-hosted{ height:100% !important; }',
     '#sttConsole #stmMap.con-hosted.on{ display:block; }',
     '#sttConsole #stmMap .p{ width:100%; height:100%; border:0; }',
+    '#sttConsole #stmMap .zm button{ width:var(--ctl-h); height:var(--ctl-h); font-size:var(--fs-lg); }',
+    /* coins du module partagé posés à -1px : ils débordaient d'1 px (D4) ; le cadre de la console porte déjà les siens */
+    '#sttConsole #stmMap .p::before, #sttConsole #stmMap .p::after{ display:none; }',
     '#sttConsole #stmMap .x{ display:none; }'
   ].join('\n');
   document.head.appendChild(st);
@@ -18058,17 +18085,19 @@ const CONSOLE = (function(){
   'use strict';
 
   const CSS = [
-    '#sttConsole .jrn-bar{ position:sticky; top:-10px; z-index:2; display:flex; flex-wrap:wrap; gap:6px; margin:-10px -14px 8px; padding:10px 14px 8px; background:rgba(11,18,32,0.98); border-bottom:1px solid var(--line); }',
-    '#sttConsole .jrn-chip{ min-height:36px; padding:4px 14px; background:none; border:1px solid var(--line); color:var(--muted); font:inherit; font-size:12px; letter-spacing:0.06em; text-transform:uppercase; cursor:pointer; }',
+    /* collée au bord haut du défileur (.con-panel) : décalages = rembourrage du panneau */
+    '#sttConsole .jrn-bar{ position:sticky; top:calc(-1 * var(--con-pad-y)); z-index:2; display:flex; flex-wrap:wrap; gap:6px;',
+    '  margin:calc(-1 * var(--con-pad-y)) calc(-1 * var(--con-pad-x)) 8px; padding:var(--con-pad-y) var(--con-pad-x) 8px; background:rgba(11,18,32,0.98); border-bottom:1px solid var(--line); }',
+    '#sttConsole .jrn-chip{ min-height:var(--ctl-h); padding:0 14px; background:none; border:1px solid var(--line); color:var(--muted); font:inherit; font-size:var(--fs-md); letter-spacing:0.06em; text-transform:uppercase; cursor:pointer; }',
     '#sttConsole .jrn-chip:hover{ color:var(--ink); }',
     '#sttConsole .jrn-chip[aria-pressed="true"]{ color:var(--amber); border-color:var(--amber); background:rgba(255,180,84,0.08); }',
-    '#sttConsole .jrn-note{ margin:0 0 8px; padding:6px 10px; border-left:2px solid var(--amber-dim); color:var(--muted); font-size:12px; }',
+    '#sttConsole .jrn-note{ margin:0 0 8px; padding:6px 10px; border-left:2px solid var(--amber-dim); color:var(--muted); font-size:var(--fs-md); }',
     '#sttConsole .jrn-empty{ padding:18px; text-align:center; color:var(--muted-2); }',
     '#sttConsole .jrn-list{ list-style:none; margin:0; padding:0; }',
-    '#sttConsole .jrn-row{ display:flex; flex-wrap:wrap; align-items:center; gap:2px 10px; min-height:36px; padding:6px 8px; border-bottom:1px dashed var(--line); font-size:12.5px; cursor:pointer; scroll-margin-top:56px; }',
+    '#sttConsole .jrn-row{ display:flex; flex-wrap:wrap; align-items:center; gap:2px 10px; min-height:36px; padding:6px 8px; border-bottom:1px dashed var(--line); font-size:var(--fs-md); cursor:pointer; scroll-margin-top:56px; }',
     '#sttConsole .jrn-row:hover{ background:rgba(94,234,212,0.05); }',
     '#sttConsole .jrn-row.cur{ background:rgba(255,180,84,0.10); box-shadow:inset 2px 0 0 var(--amber); }',
-    '#sttConsole .jrn-t{ flex:none; color:var(--muted-2); font-size:11px; letter-spacing:0.04em; }',
+    '#sttConsole .jrn-t{ flex:none; color:var(--muted-2); font-size:var(--fs-sm); letter-spacing:0.04em; }',
     '#sttConsole .jrn-ic{ flex:none; width:16px; text-align:center; color:var(--cyan); }',
     '#sttConsole .jrn-row[data-kind="fin"] .jrn-ic{ color:var(--amber); }',
     '#sttConsole .jrn-row[data-kind="evt"] .jrn-ic{ color:var(--nav-done); }',
@@ -18079,9 +18108,9 @@ const CONSOLE = (function(){
     '#sttConsole .jrn-amt{ flex:none; font-weight:700; }',
     '#sttConsole .jrn-amt.pos{ color:var(--nav-upcoming); }',
     '#sttConsole .jrn-amt.neg{ color:#ff6b57; }',
-    '#sttConsole .jrn-bal{ flex:none; color:var(--muted-2); font-size:11px; }',
+    '#sttConsole .jrn-bal{ flex:none; color:var(--muted-2); font-size:var(--fs-sm); }',
     '@media (max-width:760px), (pointer:coarse){',
-    '  #sttConsole .jrn-chip{ min-height:44px; flex:1 1 auto; padding:4px 10px; }',
+    '  #sttConsole .jrn-chip{ flex:1 1 auto; padding:0 10px; }',
     '  #sttConsole .jrn-row{ min-height:44px; }',
     '  #sttConsole .jrn-bal{ display:none; }',
     '  #sttConsole .jrn-row.open .jrn-bal{ display:inline; }',
@@ -18242,7 +18271,7 @@ const CONSOLE = (function(){
     render();
   }
 
-  function scroller(){ return root ? root.parentNode.parentNode : null; }   // .con-body
+  function scroller(){ return root ? root.parentNode : null; }   // .con-panel : seul défileur de l'onglet
 
   function onKey(code){
     if(!root) return;
