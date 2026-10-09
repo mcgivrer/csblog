@@ -163,8 +163,11 @@ class FakeAgentTests(unittest.TestCase):
         session_id = 'test-session-006'
         proc = self._run_agent(session_id, prompt='IGNORE_TERM SLEEP 2')
 
-        # Send SIGTERM - should be ignored
-        time.sleep(0.1)
+        # Le transcript est ecrit APRES signal.signal(SIGTERM, SIG_IGN) : on l'attend avant d'envoyer SIGTERM
+        end = time.time() + 15
+        while not self._get_transcript(session_id) and time.time() < end:
+            time.sleep(0.05)
+        self.assertTrue(self._get_transcript(session_id), 'transcript jamais ecrit')
         proc.terminate()
 
         try:

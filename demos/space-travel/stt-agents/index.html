@@ -121,6 +121,9 @@
   .agent-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .pill{display:inline-flex;align-items:center;gap:7px;font:700 11px 'JetBrains Mono',monospace;letter-spacing:.08em;text-transform:uppercase;padding:4px 9px;border:1px solid var(--line);color:var(--ink)}
   .pill i{width:8px;height:8px;border-radius:50%;background:var(--st-idle);flex:none}
+  .pill-link{cursor:pointer;background:transparent;border-radius:0}
+  .pill-link .pl-go{margin-left:2px;color:var(--amber);font-weight:700}
+  .pill-link:hover,.pill-link:focus-visible{background:rgba(255,180,84,.18);outline:none;box-shadow:0 0 0 1px var(--amber)}
   .pill.s-run i{background:var(--st-run);animation:pulse 1.6s infinite}
   .pill.s-wait i{background:var(--st-wait);animation:pulseAmber 1.4s infinite}
   .pill.s-perm i{background:var(--st-perm);animation:blink 1s infinite}
@@ -223,12 +226,19 @@
   .toast .t-meta{font:700 10.5px 'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;color:var(--acc)}
   .toast .t-title{font-weight:700;font-size:13.5px;margin-top:2px;overflow-wrap:anywhere}
   .toast .t-body{color:var(--muted);font-size:12.5px;margin-top:2px;overflow-wrap:anywhere}
+  .toast .t-who{display:flex;flex-wrap:wrap;align-items:center;gap:3px 6px;margin-top:3px;font:11.5px 'JetBrains Mono',monospace;color:var(--muted);min-width:0}
+  .toast .t-who .role{font-size:10px;padding:1px 5px}
+  .toast .t-who .t-ag,.toast .t-who .t-tk{overflow-wrap:anywhere;min-width:0}
+  .toast .t-who .t-tk b{color:var(--ink);font-weight:700}
   .toast .t-close{position:absolute;top:4px;right:4px;width:24px;height:24px;border:1px solid transparent;background:none;color:var(--muted);cursor:pointer;font:16px/1 'JetBrains Mono',monospace}
   .toast .t-close:hover{color:var(--amber);border-color:var(--line)}
   @keyframes toastIn{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:none}}
   @media (prefers-reduced-motion:reduce){.toast{animation:none}}
 
   /* ---------- lanceur : contrôles et terminal (T1.6) ---------- */
+  .tk{font:10.5px 'JetBrains Mono',monospace;color:var(--muted-2)}
+  a.tk-link{color:var(--amber);text-decoration:underline dotted;text-underline-offset:2px;cursor:pointer}
+  a.tk-link:hover,a.tk-link:focus-visible{text-decoration:underline;outline:none;box-shadow:0 0 0 1px var(--amber)}
   .rctl{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font:11.5px 'JetBrains Mono',monospace}
   .rctl.tree{padding:6px 14px;border-bottom:1px solid #1a2844;background:var(--panel-2)}
   article.agent>.rctl{margin-top:8px}
@@ -364,6 +374,27 @@
   .badge.merged{color:#7ee787;border-color:#1f5a2a} .badge.open{color:var(--amber);border-color:var(--amber-dim)} .badge.closed{color:var(--muted-2)}
   .box-head{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line);font:11px 'JetBrains Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2)}
   .box-head .ok{color:#7ee787} .box-head .ko{color:var(--st-perm)} .box-head .run{color:var(--amber)}
+
+
+  /* ---------- carte flottante de la dernière tâche d'un worktree (T3.9) ---------- */
+  button.wt-task{font:inherit;font-family:'JetBrains Mono',monospace;background:none;border:0;padding:0;color:var(--amber);text-decoration:underline dotted;text-underline-offset:2px;cursor:pointer}
+  button.wt-task:hover,button.wt-task:focus-visible,button.wt-task[aria-expanded="true"]{text-decoration:underline;outline:none;box-shadow:0 0 0 1px var(--amber)}
+  #wtPop{position:fixed;z-index:60;width:min(460px,calc(100vw - 16px));max-height:min(70vh,520px);overflow:auto;background:var(--panel);color:var(--ink);border:1px solid var(--line);box-shadow:0 8px 28px rgba(0,0,0,.45);padding:12px 14px;font-size:12.5px;line-height:1.45;animation:wtPopIn .12s ease-out}
+  #wtPop[hidden]{display:none}
+  #wtPop.pinned{border-color:var(--amber)}
+  #wtPop h4{margin:0 0 6px;font:600 13.5px 'Space Grotesk',sans-serif;color:var(--ink)}
+  #wtPop h4 .id{font:700 12px 'JetBrains Mono',monospace;color:var(--amber);margin-right:6px}
+  #wtPop .pm{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;font:11.5px 'JetBrains Mono',monospace;color:var(--muted);margin-bottom:8px}
+  #wtPop .pm b{color:var(--ink);font-weight:600}
+  #wtPop .sec{font:10px 'JetBrains Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2);margin:8px 0 3px}
+  #wtPop .note{white-space:pre-wrap;word-break:break-word;color:var(--muted)}
+  #wtPop pre{margin:0;white-space:pre-wrap;word-break:break-word;font:11px 'JetBrains Mono',monospace;color:var(--muted);background:var(--panel-2);padding:6px 8px;max-height:140px;overflow:auto}
+  #wtPop ul{margin:0;padding:0;list-style:none} #wtPop li{font:11.5px 'JetBrains Mono',monospace;word-break:break-all}
+  #wtPop a{color:var(--amber)} #wtPop .acts{margin-top:10px;display:flex;gap:8px}
+  #wtPop .btn{font:11.5px 'JetBrains Mono',monospace;padding:5px 10px;color:var(--amber);border:1px solid var(--amber-dim);background:none;cursor:pointer}
+  #wtPop .dim{color:var(--muted-2)}
+  @keyframes wtPopIn{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){#wtPop{animation:none}}
 
   /* ---------- worktrees ---------- */
   table{width:100%;border-collapse:collapse;font-size:12.5px}
@@ -514,7 +545,7 @@ const STATE = {
   done:['s-done','Terminé'], error:['s-perm','Erreur'],
   review:['s-wait','PR ouverte'], pushed:['s-run','Branche poussée'], delivered:['s-done','Livré'], closed:['s-idle','Fermée'], stale:['s-idle','Inactive']
 };
-const GROUP = s => ['running','tool','thinking','pushed'].includes(s) ? 'run' : ['waiting','permission'].includes(s) ? 'you' : s === 'review' ? 'review' : ['delivered', 'done'].includes(s) ? 'done' : 'idle';
+const GROUP = s => ['running','tool','thinking','pushed'].includes(s) ? 'run' : ['waiting','permission'].includes(s) ? 'you' : s === 'review' ? 'review' : ['delivered', 'done', 'error'].includes(s) ? 'done' : 'idle';
 const store = { get(k, d){ try { const v = localStorage.getItem('stt-agents:' + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
                 set(k, v){ try { localStorage.setItem('stt-agents:' + k, JSON.stringify(v)); } catch {} } };
 
@@ -567,7 +598,7 @@ function deriveBranches(gh){
 }
 
 // ------------------------------------------------------------------ état & rendu
-let S = null, mode = null, filter = store.get('filter', 'all'), view = store.get('view', 'tree');
+let S = null, mode = null, filter = store.get('filter2', 'live'), view = store.get('view', 'tree');
 const openDetails = new Set();
 let lastTopFeed = null, lastFeedKeys = new Set(), prevNeedYou = new Set(), firstRender = true;
 
@@ -575,11 +606,18 @@ let lastTopFeed = null, lastFeedKeys = new Set(), prevNeedYou = new Set(), first
 // (son dernier message est du texte, ce que la lecture du transcript prend pour une attente).
 function withRunStates(list){
   const runs = (S.runner && S.runner.enabled && S.runner.runs) || [];
-  const lab = { done: ['done', 'Terminé · lancé par le serveur'], stopped: ['done', 'Arrêté · lancé par le serveur'], failed: ['error', 'Échec · lancé par le serveur'], killed: ['error', 'Tué · lancé par le serveur'] };
+  const lab = { done: ['done', 'Terminé · lancé par le serveur', 'Terminé'], stopped: ['done', 'Arrêté · lancé par le serveur', 'Arrêté'], failed: ['error', 'Échec · lancé par le serveur', 'Échec'], killed: ['error', 'Tué · lancé par le serveur', 'Tué'] };
   const m = new Map(runs.filter(r => lab[r.state] && r.session).map(r => [r.session, r]));
+  // une session « Livrée » (PR fusionnée) est classée Livrée, pas Inactive
+  list = list.map(a => a.state === 'idle' && a.pr && a.pr.merged ? Object.assign({}, a, { state: 'delivered' }) : a);
   if (!m.size) return list;
   return list.map(a => { const r = m.get(a.id); if (!r || !['waiting', 'permission', 'thinking', 'idle'].includes(a.state)) return a;
-    const [st, label] = lab[r.state]; return Object.assign({}, a, { state: st, state_label: label + (r.state === 'failed' && r.exit != null ? ' (code ' + r.exit + ')' : '') }); });
+    const [st, label, pill] = lab[r.state];
+    // étape : « Livré » seulement pour un run terminé dont la tâche est faite (ou une PR fusionnée) ; arrêté / échec / tué : l'étape atteinte
+    const phase = r.state === 'done' ? (a.task_status === 'done' ? 6 : a.phase) : (a.pr && a.pr.merged ? a.phase : Math.min(a.phase_raw ?? a.phase ?? -1, 5));
+    // le processus est fini : plus aucun sous-agent n'est « actif » ni « silencieux »
+    const subagents = (a.subagents || []).map(x => x.status === 'running' ? Object.assign({}, x, { status: 'stopped', state: 'stopped', lifecycle: 'arrêté', silent: false, state_label: 'Arrêté (session terminée)', ended: x.ended || a.last_activity }) : x);
+    return Object.assign({}, a, { state: st, pill, phase, subagents, task: a.task || r.task, stopped: r.state === 'stopped', state_label: label + (r.state === 'failed' && r.exit != null ? ' (code ' + r.exit + ')' : '') }); });
 }
 function agentsView(){
   if (!S) return [];
@@ -642,10 +680,14 @@ function renderKpis(agents){
   ].join('');
 }
 
+// Groupe effectif : un agent piloté par le serveur dont le processus vit est « en action », même si son transcript est silencieux
+const effGroup = a => { const g = GROUP(a.state); if (g !== 'idle' && g !== 'done') return g; const r = runOf(a); return r && RUN_ALIVE.includes(r.state) ? 'run' : g; };
+// « Actifs » (défaut) = attend, en action, en revue ; « Terminés » et « Inactifs » ne l'encombrent pas ; « Tous » montre tout
+const inFilter = (a, f) => f === 'all' ? true : f === 'live' ? ['run', 'you', 'review'].includes(effGroup(a)) : effGroup(a) === f;
 function renderFilters(agents){
-  const defs = [['all','Tous'],['you','T’attendent'],['run','En action'],['review','En revue'],['done','Livrés'],['idle','Inactifs']];
-  const n = g => g === 'all' ? agents.length : agents.filter(a => GROUP(a.state) === g).length;
-  $('#filters').innerHTML = defs.filter(([g]) => g === 'all' || n(g) || g === filter)
+  const defs = [['live','Actifs'],['you','T’attendent'],['run','En action'],['review','En revue'],['done','Terminés'],['idle','Inactifs'],['all','Tous']];
+  const n = g => agents.filter(a => inFilter(a, g)).length;
+  $('#filters').innerHTML = defs.filter(([g]) => g === 'live' || g === 'all' || n(g) || g === filter)
     .map(([g, l]) => `<button type="button" class="chip ${filter === g ? 'on' : ''}" data-f="${g}" aria-pressed="${filter === g}">${l}<span class="n">${n(g)}</span></button>`).join('');
   renderSubFilters(agents);
 }
@@ -665,8 +707,8 @@ function renderSubFilters(agents){
 
 const ORDER = {you:0, run:1, review:2, done:3, idle:4};
 function renderAgents(agents){
-  const list = agents.filter(a => filter === 'all' || GROUP(a.state) === filter)
-    .sort((a, b) => (ORDER[GROUP(a.state)] - ORDER[GROUP(b.state)]) || (ms(b.last_activity) - ms(a.last_activity)));
+  const list = agents.filter(a => inFilter(a, filter))
+    .sort((a, b) => (ORDER[effGroup(a)] - ORDER[effGroup(b)]) || (ms(b.last_activity) - ms(a.last_activity)));
   const g = $('#agentGrid');
   g.className = view === 'tree' ? 'tree' : 'grid';
   document.querySelectorAll('#views [data-v]').forEach(b => { b.classList.toggle('on', b.dataset.v === view); b.setAttribute('aria-pressed', b.dataset.v === view); });
@@ -674,7 +716,7 @@ function renderAgents(agents){
   $('#treeAside').textContent = mode === 'github' ? 'agents : serveur local requis' : `${agents.length} session${agents.length > 1 ? 's' : ''} · ${nSubs} agent${nSubs > 1 ? 's' : ''} créé${nSubs > 1 ? 's' : ''} (${nRun} actif${nRun > 1 ? 's' : ''}) · ${agents.reduce((n, a) => n + visibleSubs(a).length, 0)} affiché${agents.reduce((n, a) => n + visibleSubs(a).length, 0) > 1 ? 's' : ''}`;
   if (!list.length) {
     g.className = 'grid';
-    g.innerHTML = `<div class="empty">${agents.length ? 'Aucun agent dans ce filtre.' : mode === 'github'
+    g.innerHTML = `<div class="empty">${agents.length ? (filter === 'live' ? 'Aucun agent actif.<br>Les agents terminés et inactifs sont dans « Terminés » et « Inactifs » (ou « Tous »).' : 'Aucun agent dans ce filtre.') : mode === 'github'
       ? 'Aucune branche d’agent active sur GitHub depuis 24 h.<br>Dernières livraisons ci-dessous.'
       : `Aucune session Claude Code sur ce dépôt depuis ${esc(S.sources?.claude?.error ? '' : '24 h')}.<br>${S.sources?.claude?.error ? '<b>' + esc(S.sources.claude.error) + '</b>' : 'Lancez un agent : il apparaîtra ici en moins de 2 secondes.'}`}</div>`;
     return;
@@ -707,13 +749,19 @@ function detailBlock(x){
     <div>${x.last_text ? `<h4>Dernier message</h4><p>${esc(x.last_text)}</p>` : ''}${todos.length ? `<h4>Tâches</h4><ul class="todolist">${todos.map(t => `<li class="${esc(t.status)}">${esc(t.content)}</li>`).join('')}</ul>` : ''}
     <h4>Identité</h4><p style="color:var(--muted);font:11.5px 'JetBrains Mono',monospace">${esc([x.type && x.type !== '?' ? 'type ' + x.type : '', x.agent_id ? 'agent ' + x.agent_id : '', x.bg ? 'arrière-plan' : '', x.model ? modelShort(x.model) : '', x.started ? 'lancé ' + hhmm(x.started, true) : '', observedNote(x)].filter(Boolean).join(' · ') || '—')}</p></div></div>`;
 }
+// Pastille d'état : pour un agent qui attend (« T'attend », « Validation ? ») et piloté par le serveur, elle devient un lien qui ouvre son terminal
+function statePill(a, cls, short){
+  const run = ['waiting', 'permission'].includes(a.state) ? runOf(a) : null;
+  if (run && RUN_ALIVE.includes(run.state)) return `<button type="button" class="pill pill-link ${cls}" data-ra="terminal" data-task="${esc(run.task)}" title="Ouvrir le terminal de ${esc(run.task)} pour répondre"><i></i>${esc(short)}<span class="pl-go" aria-hidden="true">▸_</span></button>`;
+  return `<span class="pill ${cls}"><i></i>${esc(short)}</span>`;
+}
 function treeNode(a){
-  const [cls, short] = STATE[a.state] || STATE.idle;
+  const [cls, short0] = STATE[a.state] || STATE.idle, short = a.pill || short0;
   const subs = visibleSubs(a);
   const key = 'n:' + a.id;
   let h = `<details data-k="${esc(key)}" ${openDetails.has(key) ? 'open' : ''}><summary class="node main ${cls}" title="Cliquer pour le détail">
-    <span class="g">${subs.length ? '▾' : '●'}</span><span class="pill ${cls}"><i></i>${esc(short)}</span>${role(a.role) || '<span class="role-x"></span>'}
-    <span class="nm"><b>${esc(a.branch && a.branch !== (S.repo?.main || MAIN) ? shortBranch(a.branch) : (a.branch || 'session'))}</b><small>${esc(a.state_label)}${a.title ? ' — ' + esc(a.title) : ''}</small></span>
+    <span class="g">${subs.length ? '▾' : '●'}</span>${statePill(a, cls, short)}${role(a.role) || '<span class="role-x"></span>'}
+    <span class="nm"><b>${esc(a.branch && a.branch !== (S.repo?.main || MAIN) ? shortBranch(a.branch) : (a.branch || 'session'))}</b><small>${esc(a.state_label)}${taskTag(a)}${a.title ? ' — ' + esc(a.title) : ''}</small></span>
     ${actCell(a)}${timeCell(a)}${a.kind === 'branch' ? '<span class="st"></span>' : statCell(a)}${spark(a.spark) || '<span class="sp-x"></span>'}</summary>${a.kind === 'branch' ? '' : detailBlock(a)}</details>${runCtl(a, 'tree')}`;
   subs.forEach((x, i) => {
     const [c2, s2] = STATE[x.state] || STATE.idle, k2 = 's:' + a.id + ':' + x.id;
@@ -800,6 +848,22 @@ document.addEventListener('click', e => {
   const b = e.target.closest('button[data-ra]'); if (!b || b.disabled) return;
   const task = b.dataset.task, act = b.dataset.ra;
   if (act === 'terminal') openTty(task, b); else runAction(task, act);
+});
+// Double-clic n'importe où sur la carte (ou le nœud d'arbre) d'un agent piloté par le serveur : ouvre son terminal
+$('#agentGrid').addEventListener('dblclick', e => {
+  if (e.target.closest('button, a, input, select, textarea, label')) return;
+  const bar = e.target.closest('.rctl[data-task]');
+  let task = bar ? bar.dataset.task : null;
+  if (!task) {
+    const el = e.target.closest('article.agent[data-id], details[data-k^="n:"]');
+    const id = el && (el.dataset.id || String(el.dataset.k || '').replace(/^n:/, ''));
+    const a = id && agentsView().find(x => x.id === id);
+    const run = a && runOf(a);
+    task = run ? run.task : null;
+  }
+  if (!task) return;
+  try { getSelection().removeAllRanges(); } catch {}
+  openTty(task, e.target.closest('article.agent, details') || null);
 });
 
 // ---- terminal (dialogue plein écran partiel ; xterm.js 5 + addon fit, repli <pre> sans CDN)
@@ -947,6 +1011,7 @@ $('#ttyClose').addEventListener('click', () => ttyClose());
 dlg.addEventListener('close', () => { if (tty.task) ttyClose(true); });
 if (P.get('debug') === '1') window.sttTty = tty;
 
+const taskTag = a => a.task ? ` <a class="tk tk-link" href="#kanban" data-task-link="${esc(a.task)}" data-task-id="${esc(a.task)}" title="Voir la tâche ${esc(a.task)} dans le Kanban">· ${esc(a.task)}</a>` : '';
 function steps(phase){
   return `<ol class="steps" aria-label="Étape du flux PM → Archi → Dév">${STEPS.map(([l, who], i) =>
     `<li class="${i < phase ? 'done' : i === phase ? 'cur' : ''}${i === 6 ? ' last' : ''}" title="${esc(l + ' · ' + who)}">${esc(l)}</li>`).join('')}</ol>`;
@@ -962,7 +1027,7 @@ function spark(vals){
 }
 
 function agentCard(a){
-  const [cls, short] = STATE[a.state] || STATE.idle;
+  const [cls, short0] = STATE[a.state] || STATE.idle, short = a.pill || short0;
   const key = esc(a.id);
   let body = '';
   if (a.kind === 'branch') {
@@ -995,8 +1060,8 @@ function agentCard(a){
   const tok = a.tokens ? `<span title="contexte courant / tokens produits">ctx <b>${kfmt(a.tokens.context)}</b> · sortie <b>${kfmt(a.tokens.output)}</b></span>` : '';
   const title = a.kind === 'branch' ? `<span class="wt">${esc(shortBranch(a.branch))}</span>` : `${a.branch && a.branch !== (S.repo?.main || MAIN) ? `<span class="wt">${esc(shortBranch(a.branch))}</span>` : esc(a.branch || 'session')}`;
   return `<article class="agent ${cls}" data-id="${key}">
-    <div class="agent-top"><span class="pill ${cls}"><i></i>${esc(short)}</span>${role(a.role)}<span class="since" data-since="${esc(a.since)}" data-prefix="depuis ">${ago(a.since, 'depuis ')}</span>${a.model ? `<span class="model">${esc(modelShort(a.model))}</span>` : ''}</div>
-    <h3>${title}<small>${esc(a.state_label)}${a.title && a.kind !== 'branch' ? ' — ' + esc(a.title) : a.kind === 'branch' ? ' — ' + esc(a.title) : ''}</small></h3>
+    <div class="agent-top">${statePill(a, cls, short)}${role(a.role)}<span class="since" data-since="${esc(a.since)}" data-prefix="depuis ">${ago(a.since, 'depuis ')}</span>${a.model ? `<span class="model">${esc(modelShort(a.model))}</span>` : ''}</div>
+    <h3>${title}<small>${esc(a.state_label)}${taskTag(a)}${a.title && a.kind !== 'branch' ? ' — ' + esc(a.title) : a.kind === 'branch' ? ' — ' + esc(a.title) : ''}</small></h3>
     ${steps(a.phase ?? -1)}
     ${body}
     ${runCtl(a)}
@@ -1116,14 +1181,85 @@ function renderWorktrees(){
   $('#wtTitle').textContent = 'Worktrees';
   const wts = S.worktrees || [];
   $('#wtAside').textContent = S.sources?.git?.ok ? `${wts.length} worktree${wts.length > 1 ? 's' : ''} · git local` : (S.sources?.git?.error || '');
-  box.innerHTML = wts.length ? `<table><thead><tr><th>Worktree</th><th>Branche</th><th>Avance / retard</th><th>Modifs</th><th>Dernier commit</th><th>Session</th></tr></thead><tbody>${wts.map(w => `<tr>
+  box.innerHTML = wts.length ? `<table><thead><tr><th>Worktree</th><th>Branche</th><th>Avance / retard</th><th>Modifs</th><th>Dernier commit</th><th>Dernière tâche</th><th>Session</th></tr></thead><tbody>${wts.map(w => `<tr>
       <td class="m">${esc(w.is_main ? '(dépôt principal)' : w.name)}</td><td class="m">${esc(w.branch || 'détachée')}</td>
       <td class="m">${w.ahead == null ? '—' : `<span class="pos">+${w.ahead}</span> / <span class="neg">−${w.behind}</span>`}</td>
       <td class="m" title="${esc((w.files || []).join('\n'))}">${w.dirty || '—'}</td>
       <td>${esc(w.last_commit?.subject || '')} <span style="color:var(--muted-2)">${w.last_commit?.ts ? '· ' + ago(w.last_commit.ts) : ''}</span></td>
+      <td class="m">${w.last_task ? `<button type="button" class="wt-task" data-wt-task="${esc(w.last_task)}" aria-haspopup="dialog" aria-expanded="false" title="Détails de la tâche ${esc(w.last_task)}">${esc(w.last_task)}</button>` : '—'}</td>
       <td class="m">${(w.session_ids || []).length ? '● ' + w.session_ids.length : '—'}</td></tr>`).join('')}</tbody></table>`
     : '<div class="empty">Aucun worktree.</div>';
+  wtPopSync();
 }
+
+// --- carte flottante d'une tâche (survol 200 ms / focus clavier ; le clic l'épingle ; Échap ferme)
+const wtCache = new Map(), WT_TTL = 30000;
+let wtAnchor = null, wtPinned = false, wtTimer = 0, wtCloseTimer = 0, wtSeq = 0;
+const wtPopEl = () => document.getElementById('wtPop') || (() => {
+  const d = document.createElement('div'); d.id = 'wtPop'; d.hidden = true; d.setAttribute('role', 'dialog'); d.setAttribute('aria-label', 'Détails de la tâche'); document.body.appendChild(d);
+  d.addEventListener('mouseenter', () => clearTimeout(wtCloseTimer));
+  d.addEventListener('mouseleave', () => { if (!wtPinned) wtCloseTimer = setTimeout(wtClose, 150); });
+  d.addEventListener('click', e => { const b = e.target.closest('button[data-wt-goto]'); if (b) { const id = b.dataset.wtGoto; wtClose(); gotoKanbanTask(id); } });
+  return d; })();
+async function wtLoad(id){
+  const c = wtCache.get(id); if (c && Date.now() - c.at < WT_TTL) return c.data;
+  const r = await fetch('api/tasks/' + encodeURIComponent(id), {headers: {'X-STT-Token': tok()}});
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const data = await r.json(); wtCache.set(id, {at: Date.now(), data}); return data;
+}
+const wtRole = a => a === 'dev' ? '<span class="role DEV">DÉV</span>' : a === 'archi' ? '<span class="role ARCH">ARCHI</span>' : a ? `<span class="role EXPLORE">${esc(String(a).toUpperCase())}</span>` : '';
+const wtDocHref = f => 'kanban/doc/' + ('demos/space-travel/' + String(f)).split('/').reduce((o, x) => (x === '..' ? o.pop() : x && x !== '.' && o.push(x), o), []).map(encodeURIComponent).join('/');
+function wtCard(t){
+  const dur = t.ms ? (t.ms >= 60000 ? Math.round(t.ms / 60000) + ' min' : Math.round(t.ms / 1000) + ' s') : '—';
+  const docs = (t.docs || []).map(d => `<li><span class="dim">${esc(d.r)}</span> <a href="${esc(wtDocHref(d.f))}" target="_blank" rel="noopener">${esc(d.f)}</a></li>`).join('');
+  return `<h4><span class="id">${esc(t.id)}</span>${esc(t.title || '')}</h4>
+    <div class="pm">${wtRole(t.agent)}<span>${esc(t.agent || '—')} · ${esc(t.model || '—')}</span><span>statut <b>${esc(t.status || '—')}</b></span><span>lot <b>${esc(t.lot || '—')}</b></span>
+      <span>budget <b>${kfmt(t.budget)}</b></span><span>consommé <b>${kfmt(t.used)}</b></span><span>durée <b>${esc(dur)}</b></span></div>
+    ${t.note ? `<div class="sec">Description</div><div class="note">${esc(t.note)}</div>` : ''}
+    ${t.prompt_excerpt ? `<div class="sec">Prompt</div><pre>${esc(t.prompt_excerpt)}</pre>${t.prompt ? `<a href="${esc(wtDocHref(t.prompt.replace(/^\/+/, '')))}" target="_blank" rel="noopener">voir le prompt complet</a>` : ''}` : ''}
+    ${docs ? `<div class="sec">Documents liés</div><ul>${docs}</ul>` : ''}
+    <div class="acts"><button type="button" class="btn" data-wt-goto="${esc(t.id)}">Ouvrir dans le Kanban</button></div>`;
+}
+function wtPlace(){
+  const pop = wtPopEl(); if (!wtAnchor || pop.hidden) return;
+  const a = wtAnchor.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight, vw = innerWidth, vh = innerHeight;
+  let left = Math.max(8, Math.min(a.left, vw - w - 8)), top = a.bottom + 6;
+  if (top + h > vh - 8) top = a.top - h - 6 >= 8 ? a.top - h - 6 : Math.max(8, vh - h - 8);
+  pop.style.left = left + 'px'; pop.style.top = top + 'px';
+}
+async function wtOpen(btn){
+  clearTimeout(wtTimer); clearTimeout(wtCloseTimer);
+  if (wtAnchor && wtAnchor !== btn) wtAnchor.setAttribute('aria-expanded', 'false');
+  wtAnchor = btn; btn.setAttribute('aria-expanded', 'true');
+  const pop = wtPopEl(), id = btn.dataset.wtTask, seq = ++wtSeq;
+  pop.hidden = false; pop.classList.toggle('pinned', wtPinned);
+  pop.innerHTML = `<span class="dim">Chargement de ${esc(id)}…</span>`; wtPlace();
+  try { const t = await wtLoad(id); if (seq !== wtSeq) return; pop.innerHTML = wtCard(t); }
+  catch { if (seq !== wtSeq) return; pop.innerHTML = `<span class="dim">Détails de ${esc(id)} indisponibles pour le moment.</span>`; }
+  wtPlace();
+}
+function wtClose(){
+  clearTimeout(wtTimer); clearTimeout(wtCloseTimer); wtPinned = false; wtSeq++;
+  const pop = document.getElementById('wtPop'); if (pop) { pop.hidden = true; pop.classList.remove('pinned'); }
+  if (wtAnchor) wtAnchor.setAttribute('aria-expanded', 'false'); wtAnchor = null;
+}
+function wtPopSync(){
+  if (!wtAnchor) return;
+  const id = wtAnchor.dataset.wtTask, nb = [...document.querySelectorAll('button.wt-task')].find(b => b.dataset.wtTask === id);
+  if (nb && wtAnchor.isConnected === false) { wtAnchor = nb; nb.setAttribute('aria-expanded', 'true'); wtPlace(); } else if (!nb) wtClose();
+}
+const wtBtn = e => e.target.closest && e.target.closest('button.wt-task');
+document.addEventListener('mouseover', e => { const b = wtBtn(e); if (!b) return; clearTimeout(wtCloseTimer); if (wtPinned && wtAnchor !== b) return; clearTimeout(wtTimer); wtTimer = setTimeout(() => wtOpen(b), 200); });
+document.addEventListener('mouseout', e => { const b = wtBtn(e); if (!b) return; clearTimeout(wtTimer); if (!wtPinned) wtCloseTimer = setTimeout(() => { if (!wtPopEl().matches(':hover') && document.activeElement !== b) wtClose(); }, 150); });
+document.addEventListener('focusin', e => { const b = wtBtn(e); if (b && !wtPinned) wtOpen(b); });
+document.addEventListener('focusout', e => { const b = wtBtn(e); if (b && !wtPinned) wtCloseTimer = setTimeout(() => { const p = document.getElementById('wtPop'); if (!(p && p.contains(document.activeElement)) && !(p && p.matches(':hover'))) wtClose(); }, 150); });
+document.addEventListener('click', e => {
+  const b = wtBtn(e);
+  if (b) { wtPinned = true; wtOpen(b); return; }
+  const p = document.getElementById('wtPop'); if (p && !p.hidden && !p.contains(e.target)) wtClose();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && wtAnchor) wtClose(); });
+addEventListener('resize', wtPlace);
 
 function renderFooter(){
   const s = S.sources || {};
@@ -1169,6 +1305,13 @@ function noticeIcon(){
 }
 
 function goTab(name){ const b = document.getElementById('tabBtn' + name); if (b) b.click(); }
+// Ouvre l'onglet Kanban et met en évidence la carte de la tâche (le cadre peut ne pas être encore chargé : on renvoie le message)
+function gotoKanbanTask(id){
+  goTab('Kanban');
+  const send = () => { const f = document.getElementById('kanbanFrame'); if (f && f.contentWindow) f.contentWindow.postMessage({type: 'stt-goto-task', id: String(id)}, location.origin); };
+  [60, 500, 1400].forEach(ms => setTimeout(send, ms));
+}
+document.addEventListener('click', e => { const a = e.target.closest && e.target.closest('a[data-task-link]'); if (!a) return; e.preventDefault(); e.stopPropagation(); gotoKanbanTask(a.dataset.taskLink); }, true);
 function navigate(t){
   if (!t) return;
   if (t.type === 'agent') {
@@ -1178,7 +1321,7 @@ function navigate(t){
       if (!el) return;
       el.scrollIntoView({block:'center', behavior:'smooth'}); el.classList.add('hl'); setTimeout(() => el.classList.remove('hl'), 3000);
     }, 50);
-  } else if (t.type === 'task') goTab('Kanban');
+  } else if (t.type === 'task') gotoKanbanTask(t.id);
   else if (t.type === 'pr') {
     const pr = (S?.github?.prs || []).find(p => String(p.number) === String(t.id));
     if (pr && pr.url) window.open(pr.url, '_blank', 'noopener'); else goTab('Delivery');
@@ -1187,11 +1330,26 @@ function navigate(t){
 
 const toastsEl = $('#toasts');
 function closeToast(el){ if (!el || !el.isConnected) return; clearTimeout(el._t); el.remove(); }
+const TASK_CLIP = 48;
+function noticeWho(n){   // « agent · tâche » : HTML échappé (titre complet en infobulle)
+  const a = n.agent, t = n.task; if (!a && !t) return '';
+  const parts = [];
+  if (a) parts.push(`<span class="t-ag">${role(a.role)} ${esc([a.model, a.label].filter(Boolean).join(' '))}</span>`);
+  if (t) { const ti = t.title ? (t.title.length > TASK_CLIP ? t.title.slice(0, TASK_CLIP - 1) + '…' : t.title) : '';
+    parts.push(`<span class="t-tk" title="${esc(t.id + (t.title ? ' — ' + t.title : '') + (t.status ? ' [' + t.status + ']' : ''))}">Tâche <b>${esc(t.id)}</b>${ti ? ' — ' + esc(ti) : ''}</span>`); }
+  return `<div class="t-who">${parts.join('<span aria-hidden="true">·</span>')}</div>`;
+}
+function noticeWhoText(n){
+  const a = n.agent, t = n.task, out = [];
+  if (a) out.push([ROLE_TXT[a.role] || a.role, a.model, a.label].filter(Boolean).join(' '));
+  if (t) out.push('Tâche ' + t.id + (t.title ? ' — ' + (t.title.length > TASK_CLIP ? t.title.slice(0, TASK_CLIP - 1) + '…' : t.title) : ''));
+  return out.filter(Boolean).join(' · ');
+}
 function showToast(n){
   const el = document.createElement('div');
   el.className = 'toast sev-' + (n.severity || 'info'); el.dataset.sev = n.severity || 'info'; el.dataset.cat = n.cat || ''; el.dataset.kind = n.kind || '';
   el.tabIndex = 0;
-  el.innerHTML = `<div class="t-meta">${esc(CAT_LABEL[n.cat] || String(n.cat || '').toUpperCase())} · ${hhmm(n.ts)}</div><div class="t-title">${esc(n.title)}</div>${n.body ? `<div class="t-body">${esc(n.body)}</div>` : ''}<button type="button" class="t-close" aria-label="Fermer la notification">×</button>`;
+  el.innerHTML = `<div class="t-meta">${esc(CAT_LABEL[n.cat] || String(n.cat || '').toUpperCase())} · ${hhmm(n.ts)}</div><div class="t-title">${esc(n.title)}</div>${noticeWho(n)}${n.body ? `<div class="t-body">${esc(n.body)}</div>` : ''}<button type="button" class="t-close" aria-label="Fermer la notification">×</button>`;
   el.addEventListener('click', e => { if (e.target.closest('.t-close')) { closeToast(el); return; } closeToast(el); navigate(n.target); });
   el.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target === el) { closeToast(el); navigate(n.target); } });
   const sticky = n.severity === 'attention' || n.severity === 'error';
@@ -1211,7 +1369,7 @@ function desktopNotice(n){
   if (!cfg.desktop || permState() !== 'granted') return;
   if (!document.hidden && !cfg.always) return;
   try {
-    const x = new Notification('STT · ' + n.title, {body:n.body || '', tag:n.key || ('stt-' + n.id), icon:noticeIcon() || undefined, requireInteraction:n.severity === 'attention' || n.severity === 'error'});
+    const x = new Notification('STT · ' + n.title, {body:[noticeWhoText(n), n.body].filter(Boolean).join('\n'), tag:n.key || ('stt-' + n.id), icon:noticeIcon() || undefined, requireInteraction:n.severity === 'attention' || n.severity === 'error'});
     x.onclick = () => { try { window.focus(); } catch {} navigate(n.target); x.close(); };
   } catch {}
 }
@@ -1236,7 +1394,7 @@ function focusAgentFor(task, session){
   if (session) { const a = agents.find(x => x.id === session); if (a) key = parent = 'n:' + a.id; }   // tâche lancée par le serveur : session = carte
   if (!key) for (const a of agents) { const x = (a.subagents || []).find(s => s.status === 'running' && re.test(s.description || '')); if (x) { key = 's:' + a.id + ':' + x.id; parent = 'n:' + a.id; break; } }
   if (!key) { present({ id: 'goto-' + task + '-' + Date.now(), ts: new Date().toISOString(), kind: 'agent_notfound', cat: 'agents', severity: 'info', title: 'Agent introuvable', body: 'Aucun agent actif ne traite ' + task + ' (le suivi se fait par l’identifiant dans la description de l’agent).', target: {type: 'task', id: task}, key: 'goto:' + task }); return false; }
-  if (filter !== 'all') { filter = 'all'; store.set('filter', 'all'); }
+  if (filter !== 'all') { filter = 'all'; store.set('filter2', 'all'); }
   ['actif', 'silencieux'].forEach(k => subFilter.add(k)); store.set('subfilter', [...subFilter]);
   render();
   requestAnimationFrame(() => {
@@ -1304,7 +1462,7 @@ $('#subfilters').addEventListener('click', e => {
   subFilter.has(b.dataset.sf) ? subFilter.delete(b.dataset.sf) : subFilter.add(b.dataset.sf);
   store.set('subfilter', [...subFilter]); render();
 });
-$('#filters').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; filter = b.dataset.f; store.set('filter', filter); render(); });
+$('#filters').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; filter = b.dataset.f; store.set('filter2', filter); render(); });
 document.addEventListener('toggle', e => { const d = e.target; if (d.matches && d.matches('details[data-k]')) d.open ? openDetails.add(d.dataset.k) : openDetails.delete(d.dataset.k); }, true);
 let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => S && renderTimeline(agentsView()), 150); });
 addEventListener('stt-tab', e => { if (e.detail === 'timeline' && S) requestAnimationFrame(() => renderTimeline(agentsView())); });

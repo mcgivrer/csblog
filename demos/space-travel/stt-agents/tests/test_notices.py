@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import helpers
-from stt_notices import NoticeEngine
+from stt_notices import NoticeEngine, agent_ref
 
 ROOT = Path(__file__).resolve().parents[4]
 
@@ -135,6 +135,48 @@ class EngineTests(unittest.TestCase):
         self.clk.t += 2   # 31 s après la première publication de x
         self.assertIsNotNone(self.e.emit("k", "runner", "info", "t", key="x"))
         self.assertEqual(self.e.seq, 3)
+
+    def test_champs_agent_et_task(self):
+        rows = {"T3.4": {"id": "T3.4", "title": "T" * 300, "status": "doing"}}
+        e = NoticeEngine(clock=self.clk, task_info=rows.get)
+        a = dict(agent("s1"), role="DEV", model="claude-sonnet-4-6", branch="worktree-stt-agents", task="T3.4", task_status="doing")
+        e.observe([a])
+        e.observe([dict(a, state="waiting")])
+        n = e.recent()[-1]
+        self.assertEqual(n["agent"], {"id": "s1", "role": "DEV", "model": "sonnet 4.6", "label": "stt-agents"})
+        self.assertEqual((n["task"]["id"], n["task"]["status"], len(n["task"]["title"])), ("T3.4", "doing", 120))
+        # sous-agent : l'agent est le sous-agent, la tâche celle de la session
+        e.observe([dict(a, state="waiting", subagents=[{"id": "x", "lifecycle": "actif", "description": "revue", "role": "ARCH"}])])
+        self.clk.t += 1
+        e.observe([dict(a, state="waiting", subagents=[{"id": "x", "lifecycle": "rapport rendu", "description": "revue", "role": "ARCH"}])])
+        n = e.recent()[-1]
+        self.assertEqual((n["kind"], n["agent"], n["task"]["id"]), ("agent_report", {"id": "x", "role": "ARCH", "label": "revue"}, "T3.4"))
+        # tâche du Kanban : tâche connue, pas d'agent sans session
+        e.kanban_changes([{"op": "task", "id": "T3.4", "avant": {"status": "doing"}, "status": "review"}])
+        n = e.recent()[-1]
+        self.assertEqual(n["task"]["status"], "review")
+        self.assertNotIn("agent", n)
+        # tâche inconnue du plan : id seul ; JSON sérialisable, jamais de None
+        e.kanban_changes([{"op": "task_add", "id": "Z9.9"}])
+        self.assertEqual(e.recent()[-1]["task"], {"id": "Z9.9", "status": "todo"})
+        self.assertNotIn(None, json.dumps(e.recent()).split())
+        # lanceur : champs explicites
+        n = e.emit("runner_done", "runner", "success", "t", "b", {"type": "task", "id": "T3.4"}, "r1",
+                   agent_ref("sess", "DEV", "sonnet", "T3.4"), e.task_ref("T3.4"))
+        self.assertEqual(n["agent"], {"id": "sess", "role": "DEV", "model": "sonnet", "label": "T3.4"})
+
+    def test_pr_sans_agent_ni_task(self):
+        self.e.observe([], [pr(1)])
+        self.e.observe([], [pr(1), pr(2)])
+        n = self.e.recent()[-1]
+        self.assertEqual(n["kind"], "pr_opened")
+        self.assertNotIn("agent", n)
+        self.assertNotIn("task", n)
+
+    def test_deduplication_inchangee_avec_champs(self):
+        ag = agent_ref("s", "DEV")
+        self.assertIsNotNone(self.e.emit("k", "runner", "info", "t", key="x", agent=ag))
+        self.assertIsNone(self.e.emit("k", "runner", "info", "t", key="x", agent=ag, task={"id": "A"}))
 
     def test_anneau_et_ids(self):
         e = NoticeEngine(max_items=200, clock=self.clk)

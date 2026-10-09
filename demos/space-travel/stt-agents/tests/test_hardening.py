@@ -169,7 +169,7 @@ class PermissionTests(unittest.TestCase):
         old = os.umask(0o022)
         try:
             r = stt_runner.Runner(sd, root, command=[sys.executable, str(HERE / 'fake_agent.py')]
-                                  + stt_runner.RUNNER_COMMAND[1:], stop_grace_s=0.3,
+                                  + stt_runner.RUNNER_COMMAND[1:], stop_grace_s=0.3, prompts_dir=tmp,
                                   env={'CLAUDE_CONFIG_DIR': os.path.join(tmp, 'cfg')})
             r.enqueue('L2a.1')
             end = time.time() + 10

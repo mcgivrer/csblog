@@ -194,5 +194,41 @@ class UiNotices(unittest.TestCase):
         self.assertEqual(self.errors, [])
 
 
+    def test_07_ligne_agent_et_tache(self):
+        page = self.open(theme='light')
+        n = notice(980, 'attention', cat='runner', target={'type': 'task', 'id': 'T3.4'})
+        n['agent'] = {'id': 's9', 'role': 'DEV', 'model': 'sonnet 4.6', 'label': 'stt-agents'}
+        n['task'] = {'id': 'T3.4', 'title': 'Titre <b>gras</b> ' + 'long ' * 30, 'status': 'doing'}
+        n2 = notice(981, 'attention', cat='kanban', target={'type': 'task', 'id': 'C0.1'})
+        n2['task'] = {'id': 'C0.1', 'title': 'Seule la tâche', 'status': 'review'}
+        page.evaluate("[%s, %s].forEach(sttNotify.push)" % (json.dumps(n), json.dumps(n2)))
+        page.locator('.toast').nth(1).wait_for()
+        w = page.locator('.toast').nth(0).locator('.t-who')
+        self.assertEqual(w.locator('.role.DEV').count(), 1)
+        txt = w.inner_text()
+        self.assertIn('sonnet 4.6 stt-agents', txt)
+        self.assertIn('Tâche T3.4 — Titre <b>gras</b>', txt)        # échappé : texte littéral, pas de balise
+        self.assertEqual(w.locator('b').count(), 1)                 # seul le <b> de l'identifiant
+        self.assertIn('…', txt)
+        tip = w.locator('.t-tk').get_attribute('title')
+        self.assertIn('long long long long long long long long long long long long long long long', tip)
+        self.assertIn('[doing]', tip)
+        w2 = page.locator('.toast').nth(1).locator('.t-who')
+        self.assertEqual(w2.locator('.role').count(), 0)            # tâche seule : pas d'agent
+        self.assertIn('Tâche C0.1 — Seule la tâche', w2.inner_text())
+        self.assertEqual(page.locator('.toast').first.locator('.t-who').evaluate("e => e.scrollWidth <= e.clientWidth + 1"), True)
+        bg = page.evaluate("getComputedStyle(document.querySelector('.toast')).backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)")
+        fg = page.evaluate("getComputedStyle(document.querySelector('.toast .t-who')).color.match(/[\\d.]+/g).slice(0,3).map(Number)")
+        self.assertGreaterEqual(contrast(fg, bg), 4.5)
+        page.screenshot(path=str(SHOTS / 'toast-agent-tache.png'))
+        self.assertEqual(self.errors, [])
+
+    def test_08_notice_sans_agent_ni_tache(self):
+        page = self.open()
+        page.evaluate("sttNotify.push(%s)" % json.dumps(notice(990)))
+        page.locator('.toast').wait_for()
+        self.assertEqual(page.locator('.toast .t-who').count(), 0)
+
+
 if __name__ == '__main__':
     unittest.main()

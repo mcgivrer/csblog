@@ -64,8 +64,10 @@ class UiAgentsControl(unittest.TestCase):
         self.srv.end_all()
         self.assertEqual(self.errors, [])
 
-    def open(self, srv=None, block_cdn=True, query='', live=True):
+    def open(self, srv=None, block_cdn=True, query='', live=True, flt='all'):
         srv = srv or self.srv
+        if flt:  # les tests de contrôle des runs travaillent sur « Tous » : un run arrêté ou terminé quitte « Actifs »
+            self.page.add_init_script(f"try{{localStorage.setItem('stt-agents:filter2', JSON.stringify('{flt}'))}}catch(e){{}}")
         if block_cdn:
             self.page.route(CDN, lambda r: r.abort())
         self.page.goto(f'http://127.0.0.1:{srv.port}/?{query}#agents')
@@ -102,6 +104,69 @@ class UiAgentsControl(unittest.TestCase):
         self.assertTrue(btn(self.page, 'retry', task, c).is_disabled())
         self.assertTrue(btn(self.page, 'pause', task, c).get_attribute('aria-label'))
         self.assertNotIn('non pilotable', c.inner_text())
+
+    def test_waiting_pill_opens_terminal(self):
+        """La pastille « T'attend » d'un agent piloté par le serveur est un lien vers son terminal ; sinon une simple pastille."""
+        task, sid = self.start()
+        self.open()
+        self.view_cards()
+        c = card(self.page, sid)
+        c.wait_for(timeout=15000)
+        pill = c.locator('.agent-top .pill-link')
+        pill.wait_for(timeout=20000)
+        self.assertEqual(pill.get_attribute('data-ra'), 'terminal')
+        self.assertEqual(pill.get_attribute('data-task'), task)
+        self.assertIn('terminal', (pill.get_attribute('title') or '').lower())
+        pill.click()
+        self.page.wait_for_selector('#ttyDlg[open]')
+        self.assertTrue(self.page.evaluate("document.querySelector('#ttyDlg').open"))
+
+    def test_default_filter_hides_finished_and_inactive(self):
+        """« Actifs » (défaut) ne garde que les agents qui travaillent ou attendent ; un run arrêté passe dans « Terminés », « Tous » montre tout."""
+        task, sid = self.start()
+        self.open(flt=None)
+        self.page.wait_for_selector(f'.rctl[data-task="{task}"]', timeout=15000)
+        self.assertEqual(self.page.locator('#filters .chip.on').get_attribute('data-f'), 'live')
+        btn(self.page, 'stop', task, self.page.locator(f'.rctl[data-task="{task}"]').first).click()
+        self.page.wait_for_selector(f'.rctl[data-task="{task}"]', state='detached', timeout=20000)   # a quitté « Actifs »
+        self.assertEqual(self.srv.run(task)['state'], 'stopped')
+        self.page.click('#filters [data-f="done"]')
+        self.page.wait_for_selector(f'.rctl[data-task="{task}"]', timeout=10000)
+        self.page.click('#filters [data-f="live"]')
+        self.assertEqual(self.page.locator(f'.rctl[data-task="{task}"]').count(), 0)
+        self.page.click('#filters [data-f="all"]')
+        self.page.wait_for_selector(f'.rctl[data-task="{task}"]', timeout=10000)
+        self.assertEqual(self.page.locator('#filters [data-f="all"]').get_attribute('aria-pressed'), 'true')
+
+    def test_task_link_opens_kanban_card(self):
+        """Le numéro de tâche d'une carte d'agent est un lien : il ouvre l'onglet Kanban et met la carte de la tâche en évidence."""
+        task, sid = self.start()
+        self.open()
+        self.view_cards()
+        c = card(self.page, sid)
+        c.wait_for(timeout=15000)
+        link = c.locator('a.tk-link')
+        link.wait_for(timeout=15000)
+        self.assertEqual(link.get_attribute('data-task-link'), task)
+        link.click()
+        self.page.wait_for_selector('#tabBtnKanban[aria-selected="true"], #tabBtnKanban.on', timeout=10000)
+        fr = self.page.frame_locator('#kanbanFrame')
+        fr.locator(f'#board .card[data-id="{task}"].flash').wait_for(timeout=15000)
+
+    def test_double_click_card_opens_terminal(self):
+        """Un double-clic n'importe où sur la carte (ou le nœud d'arbre) d'un agent piloté par le serveur ouvre son terminal ; sur un bouton, non."""
+        task, sid = self.start()
+        self.open()
+        self.page.wait_for_selector(f'.rctl.tree[data-task="{task}"]', timeout=15000)
+        self.page.locator(f'details[data-k="n:{sid}"] summary .nm').first.dblclick()   # vue Arbre : sur le nom de l'agent
+        self.page.wait_for_selector('#ttyDlg[open]', timeout=10000)
+        self.page.keyboard.press('Control+Alt+KeyW')
+        self.page.wait_for_function("() => !document.querySelector('#ttyDlg').open")
+        self.view_cards()
+        c = card(self.page, sid)
+        c.wait_for(timeout=15000)
+        c.locator('.agent-top .since').first.dblclick()                                # vue Cartes : sur l'ancienneté
+        self.page.wait_for_selector('#ttyDlg[open]', timeout=10000)
 
     def test_pause_resume_stop_retry_kill_tree(self):
         task, sid = self.start()

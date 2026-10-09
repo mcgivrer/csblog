@@ -5,10 +5,13 @@ Module pur (stdlib), sans serveur ni E/S : le serveur y envoie ses instantanés
 propres notices (`emit`). Les notices sont lues par `recent()` et exposées dans
 /api/state (`notices`, `notice_seq`).
 
-Notice : {id, ts, kind, cat, severity, title, body, target:{type,id}, key}
+Notice : {id, ts, kind, cat, severity, title, body, target:{type,id}, key[, agent][, task]}
+  agent    : {id, role, model, label} (facultatif : absent pour les PR)
+  task     : {id, title, status}      (facultatif ; titre borné à TASK_TITLE_MAX)
   cat      : attention | agents | kanban | pr | runner
   severity : info | attention | error | success
 """
+import re
 import threading
 import time
 from collections import deque
@@ -16,6 +19,7 @@ from collections import deque
 CATS = ("attention", "agents", "kanban", "pr", "runner")
 SEVERITIES = ("info", "attention", "error", "success")
 BODY_MAX = 140
+TASK_TITLE_MAX = 120
 
 # lifecycle d'un sous-agent -> (kind, severity, titre)
 SUB_EVENTS = {
@@ -31,15 +35,34 @@ def _clip(text, n=BODY_MAX):
     return text if len(text) <= n else text[: n - 1] + "…"
 
 
+def model_short(m):
+    """Nom court d'un modèle, comme `modelShort` de l'interface (claude-opus-4-7 -> « opus 4.7 »)."""
+    m = str(m or "")
+    x = re.match(r"^claude-([a-z]+)-(\d+)-(\d+)", m)
+    return f"{x.group(1)} {x.group(2)}.{x.group(3)}" if x else re.sub(r"^claude-", "", m)
+
+
+def agent_ref(id, role=None, model=None, label=None):
+    """Champ `agent` d'une notice : seulement les valeurs connues ; None si rien (ou pas d'id)."""
+    if id in (None, ""):
+        return None
+    out = {"id": str(id)}
+    for k, v in (("role", role), ("model", model_short(model) if model else None), ("label", _clip(label, 60) if label else None)):
+        if v:
+            out[k] = str(v)
+    return out
+
+
 def _iso(ts):
     return time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(ts))
 
 
 class NoticeEngine:
-    def __init__(self, max_items=200, dedupe_s=30, clock=time.time):
+    def __init__(self, max_items=200, dedupe_s=30, clock=time.time, task_info=None):
         self.max_items = max_items
         self.dedupe_s = dedupe_s
         self.clock = clock
+        self.task_info = task_info   # id de tâche -> ligne du plan (dict) ou None ; fournie par le serveur
         self._buf = deque(maxlen=max_items)
         self._seq = 0
         self._last_key = {}   # key -> instant de la dernière publication
@@ -53,7 +76,25 @@ class NoticeEngine:
         """Dernier id attribué (0 si aucune notice) ; les ids ne sont jamais réutilisés."""
         return self._seq
 
-    def emit(self, kind, cat, severity, title, body="", target=None, key=None):
+    def task_ref(self, tid, status=None):
+        """Champ `task` : {id, title, status} d'après le plan (titre et statut seulement s'ils sont connus)."""
+        if tid in (None, ""):
+            return None
+        row = None
+        try:
+            row = self.task_info(tid) if self.task_info else None
+        except Exception:
+            row = None
+        out = {"id": str(tid)}
+        title = (row or {}).get("title")
+        if title:
+            out["title"] = _clip(title, TASK_TITLE_MAX)
+        st = status or (row or {}).get("status")
+        if st:
+            out["status"] = str(st)
+        return out
+
+    def emit(self, kind, cat, severity, title, body="", target=None, key=None, agent=None, task=None):
         """Publie une notice ; renvoie la notice, ou None si la même `key` l'a été il y a moins de dedupe_s."""
         if cat not in CATS:
             raise ValueError(f"catégorie inconnue : {cat!r}")
@@ -73,6 +114,10 @@ class NoticeEngine:
             n = {"id": self._seq, "ts": _iso(now), "kind": kind, "cat": cat, "severity": severity,
                  "title": _clip(title, 60), "body": _clip(body),
                  "target": {"type": target.get("type"), "id": target.get("id")}, "key": key}
+            if agent:
+                n["agent"] = dict(agent)
+            if task:
+                n["task"] = dict(task)
             self._buf.append(n)
             return n
 
@@ -94,14 +139,18 @@ class NoticeEngine:
                 cur_agents[aid] = (state, label)
                 title = a.get("title") or a.get("branch") or "Session"
                 tgt = {"type": "agent", "id": aid}
+                branch = a.get("branch")
+                ag = agent_ref(aid, a.get("role"), a.get("model"),
+                               (branch or "").replace("worktree-", "") or a.get("title"))
+                tk = self.task_ref(a.get("task"), a.get("task_status"))
                 prev = (self._agents or {}).get(aid, (None, None))
                 if not first:
                     if state == "waiting" and prev[0] != "waiting":
-                        self.emit("agent_waiting", "attention", "attention", "T'attend", title, tgt, f"agent_waiting:{aid}")
+                        self.emit("agent_waiting", "attention", "attention", "T'attend", title, tgt, f"agent_waiting:{aid}", ag, tk)
                     elif state == "permission" and prev[0] != "permission":
-                        self.emit("agent_permission", "attention", "attention", "Validation ?", title, tgt, f"agent_permission:{aid}")
+                        self.emit("agent_permission", "attention", "attention", "Validation ?", title, tgt, f"agent_permission:{aid}", ag, tk)
                     if label == "Livré" and prev[1] != "Livré":
-                        self.emit("agent_delivered", "agents", "success", "Livré", title, tgt, f"agent_delivered:{aid}")
+                        self.emit("agent_delivered", "agents", "success", "Livré", title, tgt, f"agent_delivered:{aid}", ag, tk)
                 for sp in a.get("subagents") or []:
                     sk = (aid, sp.get("id"))
                     life = sp.get("lifecycle")
@@ -109,7 +158,8 @@ class NoticeEngine:
                     if not first and life != self._subs.get(sk) and life in SUB_EVENTS:
                         kind, sev, ttl = SUB_EVENTS[life]
                         self.emit(kind, "agents", sev, ttl, f"{sp.get('description') or sp.get('type') or 'agent'} ({title})",
-                                  tgt, f"{kind}:{aid}:{sp.get('id')}")
+                                  tgt, f"{kind}:{aid}:{sp.get('id')}",
+                                  agent_ref(sp.get("id"), sp.get("role"), sp.get("model"), sp.get("description") or sp.get("type")), tk)
             self._agents, self._subs = cur_agents, cur_subs
             if prs is not None:
                 cur = {}
@@ -138,16 +188,23 @@ class NoticeEngine:
                 continue
             tid = c.get("id")
             tgt = {"type": "task", "id": tid}
+            row = None
+            try:
+                row = self.task_info(tid) if self.task_info else None
+            except Exception:
+                row = None
+            ag = agent_ref((row or {}).get("session"), (row or {}).get("agent"), (row or {}).get("model"), tid) if (row or {}).get("session") else None
+            tk = self.task_ref(tid, c.get("status") if c.get("op") == "task" else "todo")
             if c.get("op") == "task_add":
-                self.emit("task_created", "kanban", "info", "Nouvelle tâche", f"{tid} créée", tgt, f"task_created:{tid}")
+                self.emit("task_created", "kanban", "info", "Nouvelle tâche", f"{tid} créée", tgt, f"task_created:{tid}", ag, tk)
             elif c.get("op") == "task":
                 new = c.get("status")
                 old = (c.get("avant") or {}).get("status")
                 if not new or new == old:
                     continue
                 if new == "review":
-                    self.emit("task_review", "kanban", "attention", "À relire", f"{tid} attend ta relecture", tgt, f"task_review:{tid}")
+                    self.emit("task_review", "kanban", "attention", "À relire", f"{tid} attend ta relecture", tgt, f"task_review:{tid}", ag, tk)
                 elif new == "done":
-                    self.emit("task_done", "kanban", "success", "Tâche terminée", f"{tid} est faite", tgt, f"task_done:{tid}")
+                    self.emit("task_done", "kanban", "success", "Tâche terminée", f"{tid} est faite", tgt, f"task_done:{tid}", ag, tk)
                 elif new == "blocked":
-                    self.emit("task_blocked", "kanban", "error", "Tâche bloquée", f"{tid} est bloquée", tgt, f"task_blocked:{tid}")
+                    self.emit("task_blocked", "kanban", "error", "Tâche bloquée", f"{tid} est bloquée", tgt, f"task_blocked:{tid}", ag, tk)

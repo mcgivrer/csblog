@@ -1211,6 +1211,7 @@ html.embed-board #topbar>.meta span{display:none}
       c.scrollIntoView({ block:'nearest', behavior:RM ? 'auto' : 'smooth' });
       c.classList.add('flash'); setTimeout(() => { const n = find(); if(n) n.classList.remove('flash'); }, 1800);
     }
+    window.sttHighlightTask = highlight;
     function reloadThen(fn){ if(busy){ setTimeout(() => reloadThen(fn), 150); return; } afterReload = fn; reload(); }
     async function submit(e){
       e.preventDefault(); if(sending) return;
@@ -1265,6 +1266,7 @@ html.embed-board #topbar>.meta span{display:none}
   syncThemeBtns();
   // intégré dans stt-agents/index.html : la page hôte pilote le thème et reçoit la hauteur des indicateurs
   addEventListener('message', e => { if(e.origin === location.origin && e.data && e.data.type === 'stt-theme' && e.data.theme !== themeNow()) setTheme(e.data.theme); });
+  addEventListener('message', e => { if(e.origin === location.origin && e.data && e.data.type === 'stt-goto-task' && typeof e.data.id === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/.test(e.data.id) && window.sttHighlightTask) window.sttHighlightTask(e.data.id); });
   const EMB = document.documentElement.classList.contains('embed-kpis') ? 'kpis' : document.documentElement.classList.contains('embed-board') ? 'board' : '';
   if(window.parent !== window && EMB){
     const root = document.documentElement, wrap = document.querySelector('.wrap');

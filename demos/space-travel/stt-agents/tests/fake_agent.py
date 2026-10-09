@@ -3,6 +3,19 @@
 Fake agent for testing stt-agents infrastructure.
 Mimics 'claude' command: reads --agent, --model, --session-id or --resume options,
 writes minimal JSONL transcript, echoes stdin, and responds to prompt commands.
+
+Consignes (dans le prompt) :
+  EXIT n, SLEEP s, IGNORE_TERM, SPAM, TOKENS n, ENV/TTY/HUP <fichier>   (voir plus bas)
+  WAIT        ecrit son rapport puis attend l'entree sans sortir (comportement par defaut, explicite)
+  EXITCMD     sort avec le code 0 quand il lit `/exit`
+  IGNOREEXIT  ignore `/exit` (il continue d'attendre)
+  WRITEONEXIT avec IGNOREEXIT : a la lecture de `/exit`, ecrit au transcript (nouveau texte) puis ignore la commande
+  PENDINGTEXT ecrit un tool_use Bash SANS tool_result, puis le texte final (le transcript finit sur un texte)
+  QUESTION    ecrit un tool_use AskUserQuestion SANS tool_result, puis attend
+  EDIT <chemin>  ecrit un tool_use Edit (+ son tool_result) avant le rapport
+  CACHE n     usage : cache_creation_input_tokens n, cache_read_input_tokens 2n
+  ARGV <fichier>  ecrit son argv (JSON) dans le fichier
+Variable d'environnement FAKE_ARGV_FILE : meme effet que ARGV.
 """
 
 import argparse
@@ -48,6 +61,8 @@ def main():
     parser.add_argument('--model', required=True, help='Model name')
     parser.add_argument('--session-id', help='Session ID')
     parser.add_argument('--resume', help='Resume session ID')
+    parser.add_argument('--add-dir', action='append', default=[], help='Dossier supplementaire autorise')
+    parser.add_argument('--settings', help='Fichier de reglages supplementaire (T3.8)')
     parser.add_argument('--permission-mode', required=True, help='Permission mode')
     parser.add_argument('-n', '--task', required=True, help='Task name')
     parser.add_argument('prompt', nargs='?', help='Optional prompt')
@@ -86,6 +101,21 @@ def main():
             m = re.search(r'TOKENS\s+(\d+)', prompt)
             if m:
                 tokens = int(m.group(1))
+
+    m = re.search(r'\bARGV\s+(\S+)', prompt)
+    argv_file = (m.group(1) if m else None) or os.environ.get('FAKE_ARGV_FILE')
+    if argv_file:
+        with open(argv_file, 'w') as f:
+            json.dump(sys.argv[1:], f)
+    exit_on_cmd = bool(re.search(r'\bEXITCMD\b', prompt))
+    ignore_exit = bool(re.search(r'\bIGNOREEXIT\b', prompt))
+    question = bool(re.search(r'\bQUESTION\b', prompt))
+    pending_text = bool(re.search(r'\bPENDINGTEXT\b', prompt))
+    write_on_exit = bool(re.search(r'\bWRITEONEXIT\b', prompt))
+    m = re.search(r'\bEDIT\s+(\S+)', prompt)
+    edit_path = m.group(1).replace('CWD/', os.getcwd() + '/') if m else None   # CWD/ : le worktree du run
+    m = re.search(r'\bCACHE\s+(\d+)', prompt)
+    cache = int(m.group(1)) if m else 0
 
     # Consignes de durcissement : ENV <fichier>, TTY <fichier>, HUP <fichier>
     m = re.search(r'\bENV\s+(\S+)', prompt)
@@ -130,6 +160,7 @@ def main():
         'type': 'user',
         'timestamp': timestamp_iso(),
         'sessionId': session_id,
+        'cwd': os.getcwd(),
         'message': {
             'content': [
                 {'type': 'text', 'text': prompt or '(no prompt)'}
@@ -138,7 +169,26 @@ def main():
     }
     write_transcript_entry(transcript_path, user_entry)
 
+    if edit_path:
+        write_transcript_entry(transcript_path, {
+            'type': 'assistant', 'timestamp': timestamp_iso(), 'sessionId': session_id,
+            'message': {'id': 'm-edit', 'content': [
+                {'type': 'tool_use', 'id': 'tu-edit', 'name': 'Edit',
+                 'input': {'file_path': edit_path, 'old_string': 'a', 'new_string': 'b'}}]}})
+        write_transcript_entry(transcript_path, {
+            'type': 'user', 'timestamp': timestamp_iso(), 'sessionId': session_id,
+            'message': {'content': [{'type': 'tool_result', 'tool_use_id': 'tu-edit', 'content': 'ok'}]}})
+
+    if pending_text:
+        write_transcript_entry(transcript_path, {
+            'type': 'assistant', 'timestamp': timestamp_iso(), 'sessionId': session_id,
+            'message': {'id': 'm-pend', 'content': [
+                {'type': 'tool_use', 'id': 'tu-pend', 'name': 'Bash', 'input': {'command': 'sleep 99'}}]}})
+
     # Write assistant response to transcript
+    usage = {'input_tokens': 10, 'output_tokens': tokens}
+    if cache:
+        usage.update(cache_creation_input_tokens=cache, cache_read_input_tokens=cache * 2)
     assistant_entry = {
         'type': 'assistant',
         'timestamp': timestamp_iso(),
@@ -146,13 +196,16 @@ def main():
             'content': [
                 {'type': 'text', 'text': 'Task completed.'}
             ],
-            'usage': {
-                'input_tokens': 10,
-                'output_tokens': tokens
-            }
+            'usage': usage
         }
     }
     write_transcript_entry(transcript_path, assistant_entry)
+    if question:
+        write_transcript_entry(transcript_path, {
+            'type': 'assistant', 'timestamp': timestamp_iso(), 'sessionId': session_id,
+            'message': {'id': 'm-q', 'content': [
+                {'type': 'tool_use', 'id': 'tu-question', 'name': 'AskUserQuestion',
+                 'input': {'questions': [{'question': 'Continuer ?'}]}}]}})
 
     # Echo stdin to stdout (simulate terminal interaction)
     print(f'[fake-agent] session={session_id} task={args.task}')
@@ -166,6 +219,13 @@ def main():
                 # Echo the input
                 sys.stdout.write(line)
                 sys.stdout.flush()
+                if write_on_exit and line.strip() == '/exit':
+                    write_transcript_entry(transcript_path, {
+                        'type': 'assistant', 'timestamp': timestamp_iso(), 'sessionId': session_id,
+                        'message': {'id': 'm-exit', 'content': [{'type': 'text', 'text': 'Je continue.'},
+                                    {'type': 'tool_use', 'id': 'tu-exit', 'name': 'Bash', 'input': {'command': 'true'}}]}})
+                if exit_on_cmd and not ignore_exit and line.strip() == '/exit':
+                    sys.exit(0)
             except (KeyboardInterrupt, BrokenPipeError):
                 break
     except Exception:

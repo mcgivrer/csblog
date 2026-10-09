@@ -35,17 +35,40 @@ import uuid
 # Constantes (surchargeables par l'appelant via le constructeur)
 # --------------------------------------------------------------------------
 
+# `--add-dir {prompts_dir}` autorise l'agent a lire SON fichier de prompt (checkout principal, hors de son
+# worktree) sans validation manuelle ; il vient AVANT --permission-mode car l'option est variadique et
+# avalerait sinon le prompt positionnel, qui doit rester le DERNIER argument. Jamais le checkout entier.
 RUNNER_COMMAND = [
     "claude", "--agent", "stt-{agent}", "--model", "{model}",
-    "--session-id", "{session}", "--permission-mode", "{perm}",
+    "--session-id", "{session}", "--add-dir", "{prompts_dir}", "--permission-mode", "{perm}",
     "-n", "{task}", "{prompt}",
 ]
-PROFILE_CAP = {"dev": 3, "archi": 1, "revue": 1, "cp": 0}
-GLOBAL_CAP = 4
+
+
+def default_command(with_settings=False):
+    """Commande par defaut ; `--settings {settings}` (fichier effectif des autorisations, T3.8) s'insere
+    avant `-n`, donc le prompt reste le dernier argument."""
+    cmd = list(RUNNER_COMMAND)
+    if with_settings:
+        cmd[cmd.index("-n"):cmd.index("-n")] = ["--settings", "{settings}"]
+    return cmd
+
+
+PROFILE_CAP = {"dev": 3, "archi": 1, "revue": 2, "cp": 0}   # repli herite (T4.3/T4.5 le retirent)
+GLOBAL_CAP = 4                                              # repli herite
+PROFILES = ("cp", "archi", "dev", "revue")
+DEFAULT_TEAM = {"cp": 1, "archi": 1, "dev": 3, "revue": 2}
+TEAM_BOUNDS = {"cp": (0, 1), "archi": (0, 2), "dev": (0, 5), "revue": (0, 3)}
+TEAM_MAX = 8                 # somme des emplacements lances (CP exclu)
+QUEUE_MAX_PROFILE = 50
+QUEUE_MAX_TOTAL = 150
+STATE_VERSION = 2
 START_TIMEOUT_S = 60
 STOP_GRACE_S = 10
 BUDGET_PAUSE_FACTOR = 2.0
 WAITING_SILENCE_S = 20
+AUTOEXIT_GRACE_S = 45        # waiting continu avant d'ecrire /exit (runs autoexit)
+AUTOEXIT_KILL_AFTER_S = 20   # delai apres /exit avant stop() si le processus n'est pas sorti
 OUT_BUFFER_MAX = 256 * 1024
 LOG_MAX = 5 * 1024 * 1024
 INPUT_MAX = 64 * 1024
@@ -85,6 +108,10 @@ class RunnerError(Exception):
 
 class TransitionError(RunnerError):
     """Transition ou action interdite dans l'etat courant."""
+
+
+class QueueFullError(TransitionError):
+    """File pleine (50 par profil, 150 au total) : 409 cote serveur."""
 
 
 class ValidationError(RunnerError, ValueError):
@@ -210,8 +237,19 @@ def validate_worktree(rel):
     return rel
 
 
+def validate_prompts_dir(path):
+    """Dossier des prompts autorise a l'agent (--add-dir) : absolu, existant, sans caractere de
+    controle, ne commence pas par « - ». Retourne le chemin ou leve ValidationError."""
+    if (not isinstance(path, str) or not path or not os.path.isabs(path) or path.startswith("-")
+            or any(ord(c) < 32 or ord(c) == 127 for c in path)):
+        raise ValidationError("prompts_dir invalide: %r" % (path,))
+    if not os.path.isdir(path):
+        raise ValidationError("prompts_dir inexistant: %s" % path)
+    return path
+
+
 def substitute_command(template, values, resume=False):
-    """Substitue {agent} {model} {session} {perm} {task} {prompt} dans argv.
+    """Substitue {agent} {model} {session} {perm} {task} {prompt} {prompts_dir} {settings} dans argv.
     Reprise : `--session-id` devient `--resume` et {prompt} est retire."""
     out = []
     for el in template:
@@ -234,7 +272,8 @@ class Run:
     PERSISTED = ("task", "agent", "model", "perm", "prio", "session", "worktree",
                  "lot", "state", "pid", "pgid", "proc_start", "inst", "enqueued",
                  "started", "ended", "exit", "note", "budget", "prompt",
-                 "resumed", "paused_s", "paused_at", "budget_ack", "order", "base")
+                 "resumed", "paused_s", "paused_at", "budget_ack", "order", "base", "autoexit",
+                 "slot", "attempts", "t_assign", "sessions", "interrupted", "keep")
 
     def __init__(self, task, agent, model, perm, prio, session, worktree, lot):
         self.task = task
@@ -263,8 +302,16 @@ class Run:
         self.budget_ack = False
         self.order = 0
         self.base = None           # branche de depart du worktree (si a creer)
+        self.autoexit = False      # /exit automatique apres le rapport (fin de tour)
+        self.slot = None           # emplacement d'equipe porteur (ex. "dev-2")
+        self.attempts = 0
+        self.t_assign = None       # instant de la derniere attribution a un emplacement
+        self.sessions = []         # reserve T4.3/T4.4
+        self.interrupted = False   # reserve T4.3
+        self.keep = False          # reserve T4.3
         self.tokens = None
         # non persistes
+        self.exit_sent = None      # instant d'ecriture de /exit (une fois par fin de tour)
         self.master = None
         self.proc = None
         self.reader = None
@@ -307,6 +354,73 @@ class Run:
 
 
 # --------------------------------------------------------------------------
+# Equipe : configuration et emplacements
+# --------------------------------------------------------------------------
+
+def validate_team(cfg, base=None):
+    """Retourne une equipe complete {cp, archi, dev, revue} validee (entiers
+    seulement, bornes par profil, somme hors CP <= TEAM_MAX). Les cles absentes
+    viennent de `base` (ou du defaut). ValidationError sinon."""
+    if not isinstance(cfg, dict):
+        raise ValidationError("equipe invalide")
+    out = dict(base or DEFAULT_TEAM)
+    for k, v in cfg.items():
+        if k not in TEAM_BOUNDS:
+            raise ValidationError("profil inconnu: %r" % (k,))
+        if isinstance(v, bool) or not isinstance(v, int):
+            raise ValidationError("%s: entier attendu" % k)
+        lo, hi = TEAM_BOUNDS[k]
+        if not lo <= v <= hi:
+            raise ValidationError("%s: %d hors bornes %d-%d" % (k, v, lo, hi))
+        out[k] = v
+    if sum(v for k, v in out.items() if k != "cp") > TEAM_MAX:
+        raise ValidationError("plus de %d agents lances" % TEAM_MAX)
+    return out
+
+
+def parse_team(text):
+    """`cp=1,archi=1,dev=3,revue=2` -> equipe validee (option --team)."""
+    cfg = {}
+    for part in str(text).split(","):
+        k, sep, v = part.strip().partition("=")
+        if not sep:
+            raise ValidationError("equipe: %r attendu sous la forme profil=n" % part)
+        try:
+            cfg[k.strip()] = int(v)
+        except ValueError:
+            raise ValidationError("equipe: entier attendu pour %s" % k)
+    return validate_team(cfg)
+
+
+class Slot:
+    """Emplacement d'equipe persistant. L'etat `draining` (retire de la
+    configuration, finit sa tache) masque l'etat derive de la tache."""
+    def __init__(self, profile, n, now):
+        self.profile = profile
+        self.n = n
+        self.id = "%s-%d" % (profile, n)
+        self.state = "idle"
+        self.task = None
+        self.since = now
+        self.errors = 0
+        self.done_count = 0
+        self.draining = False
+
+    def to_dict(self, run=None):
+        d = {"id": self.id, "profile": self.profile, "n": self.n, "state": self.state,
+             "task": self.task, "since": self.since, "errors": self.errors,
+             "done_count": self.done_count}
+        if run is not None:
+            d["pid"], d["pgid"], d["proc_start"] = run.pid, run.pgid, run.proc_start
+        return d
+
+
+_SLOT_OF_RUN = {"starting": "starting", "running": "busy", "waiting": "busy",
+                "stopping": "busy", "paused": "paused", "orphan": "orphan",
+                "queued": "starting"}
+
+
+# --------------------------------------------------------------------------
 # Runner
 # --------------------------------------------------------------------------
 
@@ -315,12 +429,16 @@ class Runner:
                  global_cap=None, start_timeout_s=None, stop_grace_s=None,
                  budget_pause_factor=None, on_change=None, tokens_of=None,
                  turn_ended_of=None, now=None, env=None,
-                 worktree_factory=None, waiting_silence_s=None):
+                 worktree_factory=None, waiting_silence_s=None, prompts_dir=None,
+                 autoexit_grace_s=None, autoexit_kill_after_s=None,
+                 tool_pending_of=None, on_autoexit=None, settings_path=None,
+                 team=None):
+        self.settings_path = settings_path   # fichier effectif des autorisations ({settings}), jamais expose
         self.state_dir = state_dir
         self.root = root
         self.command = list(command or RUNNER_COMMAND)
-        self.profile_cap = dict(profile_cap or PROFILE_CAP)
-        self.global_cap = GLOBAL_CAP if global_cap is None else global_cap
+        # `profile_cap`/`global_cap` : repli herite ; `team` (ou team.json) fait foi
+        self.global_cap = TEAM_MAX if global_cap is None else min(global_cap, TEAM_MAX)
         self.start_timeout_s = (START_TIMEOUT_S if start_timeout_s is None
                                 else start_timeout_s)
         self.stop_grace_s = STOP_GRACE_S if stop_grace_s is None else stop_grace_s
@@ -328,6 +446,13 @@ class Runner:
                                     else budget_pause_factor)
         self.waiting_silence_s = (WAITING_SILENCE_S if waiting_silence_s is None
                                   else waiting_silence_s)
+        self.autoexit_grace_s = (AUTOEXIT_GRACE_S if autoexit_grace_s is None
+                                 else autoexit_grace_s)
+        self.autoexit_kill_after_s = (AUTOEXIT_KILL_AFTER_S if autoexit_kill_after_s is None
+                                      else autoexit_kill_after_s)
+        self.prompts_dir = prompts_dir
+        self.tool_pending_of = tool_pending_of   # run -> bool : un tool_use attend son tool_result
+        self.on_autoexit = on_autoexit
         self.on_change = on_change
         self.tokens_of = tokens_of
         self.turn_ended_of = turn_ended_of
@@ -337,6 +462,15 @@ class Runner:
         self.runs = {}
         self._order = 0
         self._lock = threading.RLock()
+        self.slots = []
+        self.team_error = None
+        if team is not None:
+            self.team = validate_team(team, base={p: 0 for p in PROFILES})
+        elif profile_cap is not None:
+            self.team = validate_team(profile_cap, base={p: 0 for p in PROFILES})
+        else:
+            self.team = self._read_team_file()
+        self._apply_team(self.team)
         self._thread = None
         self._thread_stop = threading.Event()
 
@@ -349,8 +483,10 @@ class Runner:
     def _save(self):
         with self._lock:
             ensure_private_dir(self.state_dir)
-            data = {"version": 1,
-                    "runs": [r.to_dict() for r in self.runs.values()]}
+            self._sync_slots()
+            data = {"v": STATE_VERSION,
+                    "runs": [r.to_dict() for r in self.runs.values()],
+                    "slots": [s.to_dict(self.runs.get(s.task)) for s in self.slots]}
             tmp = self.state_path + ".tmp"
             with os.fdopen(private_fd(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC), "w") as f:
                 json.dump(data, f, indent=1)
@@ -375,10 +511,13 @@ class Runner:
                     continue
                 self.runs[r.task] = r
                 self._order = max(self._order, r.order)
+                if r.slot is None and r.agent == "dev" and r.inst:   # migration v1 : inst => slot
+                    r.slot = "dev-%d" % r.inst
                 if r.state in LIVE_STATES:
                     if r.pid and r.proc_start and process_start_tag(r.pid) == r.proc_start:
                         r.state = "orphan"
                         r.note = "orphelin apres redemarrage"
+                        self._hold_slot(r)
                     else:
                         r.state = "stopped"
                         r.ended = r.ended or self.now()
@@ -390,6 +529,148 @@ class Runner:
             self._save()
             for r in self.runs.values():
                 self._notify(r)
+
+    # ---- equipe : configuration ------------------------------------------
+
+    @property
+    def team_path(self):
+        return os.path.join(self.state_dir, "team.json")
+
+    def _read_team_file(self):
+        """team.json -> equipe ; absent ou invalide => defaut (sans exception,
+        motif dans `team_error`)."""
+        try:
+            with open(self.team_path) as f:
+                data = json.load(f)
+            cfg = data["team"]
+            if not isinstance(cfg, dict) or set(cfg) != set(PROFILES):
+                raise ValidationError("team.json: les 4 profils sont requis")
+            return validate_team(cfg, base={p: 0 for p in PROFILES})
+        except FileNotFoundError:
+            return dict(DEFAULT_TEAM)
+        except (OSError, ValueError, KeyError, TypeError, AttributeError) as e:
+            self.team_error = "team.json invalide (%s) : equipe par defaut" % (e,)
+            return dict(DEFAULT_TEAM)
+
+    def _apply_team(self, team):
+        """Aligne les emplacements sur `team`. Retourne les ids en `draining`."""
+        with self._lock:
+            now = self.now()
+            have = {s.id: s for s in self.slots}
+            for prof in PROFILES:
+                for n in range(1, team[prof] + 1):
+                    sid = "%s-%d" % (prof, n)
+                    if sid not in have:
+                        have[sid] = Slot(prof, n, now)
+                    have[sid].draining = False
+            draining = []
+            for s in list(have.values()):
+                if s.n > team[s.profile]:
+                    if s.task is None:
+                        del have[s.id]
+                    else:
+                        s.draining = True
+                        s.state = "draining"
+                        draining.append(s.id)
+            order = {p: i for i, p in enumerate(PROFILES)}
+            self.slots = sorted(have.values(), key=lambda s: (order[s.profile], s.n))
+            return draining
+
+    def set_team(self, cfg, by=None):
+        """Valide (bornes, entiers) puis applique, ecrit team.json (0600,
+        atomique) et journalise team.log. Aucune tache n'est tuee."""
+        with self._lock:
+            new = validate_team(cfg, base=self.team)
+            old = dict(self.team)
+            self.team = new
+            draining = self._apply_team(new)
+            self.team_error = None
+            ensure_private_dir(self.state_dir)
+            tmp = self.team_path + ".tmp"
+            with os.fdopen(private_fd(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC), "w") as f:
+                json.dump({"v": 1, "team": new, "warm": False,
+                           "updated": self.now(), "by": by}, f, indent=1)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, self.team_path)
+            line = json.dumps({"at": self.now(), "avant": old, "après": new, "by": by},
+                              ensure_ascii=False)
+            with os.fdopen(private_fd(os.path.join(self.state_dir, "team.log"),
+                                      os.O_WRONLY | os.O_CREAT | os.O_APPEND), "a",
+                           encoding="utf-8") as f:
+                f.write(line + "\n")
+            self._save()
+            return {"config": dict(new), "draining": draining}
+
+    # ---- equipe : emplacements -------------------------------------------
+
+    def _hold_slot(self, run):
+        """Un orphelin recharge reprend son emplacement (cree en draining s'il
+        n'existe plus dans la configuration)."""
+        sid = run.slot
+        if sid is None:
+            for s in self.slots:
+                if s.profile == run.agent and s.task is None:
+                    sid = s.id
+                    break
+        if sid is None:
+            return
+        slot = next((s for s in self.slots if s.id == sid), None)
+        if slot is None:
+            prof, _, n = sid.rpartition("-")
+            if prof not in PROFILES or not n.isdigit():
+                return
+            slot = Slot(prof, int(n), self.now())
+            slot.draining = True
+            self.slots.append(slot)
+        if slot.task is None or slot.task == run.task:
+            slot.task = run.task
+            run.slot = slot.id
+
+    def _sync_slots(self):
+        """Etat des emplacements derive de leur tache ; libere ceux dont la
+        tache n'est plus vivante ; retire les `draining` vides."""
+        now = self.now()
+        keep = []
+        for s in self.slots:
+            run = self.runs.get(s.task) if s.task else None
+            if run is not None and (run.state in SLOT_STATES or
+                                    (run.state == "queued" and run.slot == s.id)):
+                new = "draining" if s.draining else _SLOT_OF_RUN[run.state]
+            else:
+                if run is not None and run.state == "done":
+                    s.done_count += 1
+                s.task = None
+                if s.draining:
+                    continue                    # retire apres sa tache
+                new = "idle"
+            if new != s.state:
+                s.state = new
+                s.since = now
+            keep.append(s)
+        self.slots = keep
+
+    def team_snapshot(self):
+        """Emplacements et files par profil (sans sortie pty)."""
+        with self._lock:
+            self._sync_slots()
+            queues = {}
+            for prof in PROFILES:
+                q = self._queue(prof)
+                queues[prof] = [{"task": r.task, "prio": r.prio, "rank": i + 1,
+                                 "attempts": r.attempts, "enqueued": r.enqueued}
+                                for i, r in enumerate(q)]
+            return {"config": dict(self.team),
+                    "bounds": {k: list(v) for k, v in TEAM_BOUNDS.items()},
+                    "max": TEAM_MAX,
+                    "slots": [s.to_dict() for s in self.slots],
+                    "queues": queues}
+
+    def _queue(self, agent):
+        """File d'un profil : (prio, order), prio 1 > 2 > 3, FIFO dans la classe."""
+        return sorted((r for r in self.runs.values()
+                       if r.state == "queued" and r.agent == agent),
+                      key=lambda r: (r.prio, r.order))
 
     # ---- notification / transitions -------------------------------------
 
@@ -409,6 +690,8 @@ class Runner:
             if note is not None:
                 run.note = note
             t = self.now()
+            if new != "waiting":
+                run.waiting_since = None
             if new == "paused":
                 run.paused_at = t
             elif old == "paused" and run.paused_at is not None:
@@ -434,7 +717,7 @@ class Runner:
     def _validate(self, task, agent, model, perm, prio, worktree, lot, prompt, base=None):
         if not isinstance(task, str) or not _TASK_RE.match(task) or ".." in task:
             raise ValidationError("tache invalide: %r" % (task,))
-        if agent not in self.profile_cap:
+        if agent not in PROFILES:
             raise ValidationError("profil inconnu: %r" % (agent,))
         if not isinstance(model, str) or not _MODEL_RE.match(model):
             raise ValidationError("modele invalide: %r" % (model,))
@@ -461,7 +744,8 @@ class Runner:
     # ---- API : file ------------------------------------------------------
 
     def enqueue(self, task, agent="dev", model="sonnet", perm="acceptEdits",
-                prio=None, worktree=None, lot=None, prompt=None, budget=None, base=None):
+                prio=None, worktree=None, lot=None, prompt=None, budget=None, base=None,
+                autoexit=None):
         """Met en file un nouveau run, ou relance un run stopped|killed|failed
         (reprise par --resume, parametres d'origine conserves)."""
         with self._lock:
@@ -470,6 +754,7 @@ class Runner:
                 if old.state not in RELAUNCHABLE:
                     raise TransitionError("%s: enqueue interdit depuis %s"
                                           % (task, old.state))
+                self._check_queue_room(old.agent)
                 if prio is not None:
                     self._validate(task, old.agent, old.model, old.perm,
                                    prio, old.worktree, old.lot, None)
@@ -480,13 +765,18 @@ class Runner:
                 old.ended = None
                 old.exit = None
                 old.pid = old.pgid = old.proc_start = None
+                old.slot = None
                 old.note = None
+                if autoexit is not None:
+                    old.autoexit = bool(autoexit)
+                old.exit_sent = None
                 old.budget_ack = False
                 old.paused_s = 0.0      # le temps actif (ms Kanban) se mesure par lancement
                 old.paused_at = None
                 self._set_state(old, "queued")
                 return old
             prio = 2 if prio is None else prio
+            self._check_queue_room(agent)
             lot = lot or str(task).split(".")[0]
             wt = worktree or (WORKTREE_PREFIX + "stt-%s" % lot)
             wt = self._validate(task, agent, model, perm, prio, wt, lot, prompt, base)
@@ -497,10 +787,18 @@ class Runner:
             r.budget = budget
             r.prompt = prompt
             r.base = base or None
+            r.autoexit = bool(autoexit)
             self.runs[task] = r
             self._save()
             self._notify(r)
             return r
+
+    def _check_queue_room(self, agent):
+        queued = [r for r in self.runs.values() if r.state == "queued"]
+        if len(queued) >= QUEUE_MAX_TOTAL:
+            raise QueueFullError("file pleine: %d taches en file" % QUEUE_MAX_TOTAL)
+        if sum(1 for r in queued if r.agent == agent) >= QUEUE_MAX_PROFILE:
+            raise QueueFullError("file %s pleine: %d taches" % (agent, QUEUE_MAX_PROFILE))
 
     def cancel(self, task):
         with self._lock:
@@ -631,23 +929,26 @@ class Runner:
 
     def snapshot(self):
         with self._lock:
-            queued = sorted((r for r in self.runs.values() if r.state == "queued"),
-                            key=lambda r: (r.prio, r.enqueued, r.order))
-            rank = {r.task: i + 1 for i, r in enumerate(queued)}
+            self._sync_slots()
+            rank = {}
+            for prof in PROFILES:
+                for i, r in enumerate(self._queue(prof)):
+                    rank[r.task] = i + 1
             runs = []
             for r in self.runs.values():
                 runs.append({
                     "task": r.task, "agent": r.agent, "model": r.model,
                     "state": r.state, "session": r.session, "pid": r.pid,
-                    "worktree": r.worktree, "inst": r.inst, "prio": r.prio,
+                    "worktree": r.worktree, "inst": r.inst, "slot": r.slot, "prio": r.prio,
                     "perm": r.perm, "enqueued": r.enqueued, "started": r.started,
                     "ended": r.ended, "exit": r.exit, "tokens": r.tokens,
-                    "note": r.note, "rank": rank.get(r.task),
+                    "note": r.note, "rank": rank.get(r.task), "autoexit": bool(r.autoexit),
                     "active_s": r.active_seconds(self.now()),
                     "controllable": r.state != "orphan",
                 })
-            return {"caps": {"profile": dict(self.profile_cap),
-                             "global": self.global_cap},
+            return {"caps": {"profile": dict(self.team),
+                             "global": self.global_cap,
+                             "settings": bool(self.settings_path)},
                     "runs": runs}
 
     def get(self, task):
@@ -656,32 +957,34 @@ class Runner:
 
     # ---- lancement -------------------------------------------------------
 
-    def _count(self, agent=None):
-        return sum(1 for r in self.runs.values()
-                   if r.state in SLOT_STATES and (agent is None or r.agent == agent))
-
-    def _free_inst(self):
-        used = {r.inst for r in self.runs.values()
-                if r.agent == "dev" and r.state in SLOT_STATES}
-        for i in DEV_INSTANCES:
-            if i not in used:
-                return i
-        return None
-
-    def _schedule(self):
-        queued = sorted((r for r in self.runs.values() if r.state == "queued"),
-                        key=lambda r: (r.prio, r.enqueued, r.order))
-        for r in queued:
-            if self._count() >= self.global_cap:
-                break
-            if self._count(r.agent) >= self.profile_cap.get(r.agent, 0):
-                continue
-            if r.agent == "dev":
-                inst = self._free_inst()
-                if inst is None:
+    def _dispatch(self):
+        """Alimentation : pour chaque profil, tant qu'un emplacement est `idle`
+        et qu'une tache est `queued`, la TETE de file (jamais de saut) part dans
+        un nouveau processus. Entre profils, la tete (prio, order) la plus
+        ancienne passe d'abord quand le plafond global est atteint. Le CP n'est
+        jamais alimente (session humaine)."""
+        self._sync_slots()
+        while True:
+            if sum(1 for s in self.slots if s.profile != "cp" and s.task) >= self.global_cap:
+                return
+            best = None
+            for prof in PROFILES:
+                if prof == "cp":
                     continue
-                r.inst = inst
-            self._launch(r)
+                slot = next((s for s in self.slots if s.profile == prof
+                             and s.task is None and not s.draining), None)
+                q = self._queue(prof) if slot else None
+                if q and (best is None or (q[0].prio, q[0].order) < (best[1].prio, best[1].order)):
+                    best = (slot, q[0])
+            if best is None:
+                return
+            slot, run = best
+            slot.task = run.task
+            run.slot = slot.id
+            run.inst = slot.n if run.agent == "dev" else None
+            run.t_assign = self.now()
+            self._launch(run)
+            self._sync_slots()
 
     def _launch(self, run):
         try:
@@ -690,9 +993,15 @@ class Runner:
             else:
                 cwd = self.worktree_factory(self.root, run.worktree, run.lot)
             prompt = run.prompt or DEFAULT_PROMPT.format(task=run.task)
-            argv = substitute_command(self.command, {
-                "agent": run.agent, "model": run.model, "session": run.session,
-                "perm": run.perm, "task": run.task, "prompt": prompt},
+            values = {"agent": run.agent, "model": run.model, "session": run.session,
+                      "perm": run.perm, "task": run.task, "prompt": prompt}
+            if any("{prompts_dir}" in el for el in self.command):
+                values["prompts_dir"] = validate_prompts_dir(self.prompts_dir)
+            if any("{settings}" in el for el in self.command):
+                if not self.settings_path or not os.path.isfile(self.settings_path):
+                    raise ValidationError("{settings} sans fichier d'autorisations effectif")
+                values["settings"] = self.settings_path
+            argv = substitute_command(self.command, values,
                 resume=run.resumed)
             env = agent_environment(os.environ)
             env.update(self.env)
@@ -734,6 +1043,7 @@ class Runner:
         run.paused_at = None
         run.last_output = self.now()
         run.waiting_since = None
+        run.exit_sent = None
         run.stop_deadline = None
         run.reader_stop = False
         run.budget_ack = False
@@ -886,11 +1196,43 @@ class Runner:
                             ended = False
                         silent = t - (r.last_output or t) >= self.waiting_silence_s
                         if st == "running" and ended and silent:
-                            r.waiting_since = t
                             self._set_state(r, "waiting")
+                            r.waiting_since = t
                         elif st == "waiting" and not ended:
                             self._set_state(r, "running")
-            self._schedule()
+                        # exit_sent n'est JAMAIS remis a None ici : si claude ecrit au transcript en traitant
+                        # /exit sans sortir, l'arret dur (SIGTERM puis SIGKILL) doit rester arme.
+                    if r.autoexit and r.state in ("running", "waiting"):
+                        self._autoexit(r, t)
+            self._dispatch()
+
+    def _autoexit(self, r, t):
+        """Fin de tour d'un run autoexit : /exit apres AUTOEXIT_GRACE_S de waiting continu (sans outil
+        en attente de resultat), puis stop() si le processus ne sort pas dans AUTOEXIT_KILL_AFTER_S."""
+        if r.exit_sent is not None:
+            if t - r.exit_sent >= self.autoexit_kill_after_s:
+                self._terminate(r)
+            return
+        if r.state != "waiting" or r.waiting_since is None:
+            return
+        if t - r.waiting_since < self.autoexit_grace_s or r.master is None:
+            return
+        if self.tool_pending_of:
+            try:
+                if self.tool_pending_of(r):
+                    return          # question, permission ou outil en cours : on ne touche a rien
+            except Exception:
+                return
+        try:
+            os.write(r.master, b"/exit\r")
+        except OSError:
+            return
+        r.exit_sent = t
+        if self.on_autoexit:
+            try:
+                self.on_autoexit(r)
+            except Exception as e:
+                print("stt_runner: on_autoexit a echoue: %r" % (e,), file=sys.stderr)
 
     def start_thread(self):
         with self._lock:

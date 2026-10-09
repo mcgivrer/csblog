@@ -59,8 +59,9 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from stt_notices import NoticeEngine
+from stt_notices import NoticeEngine, agent_ref
 import stt_runner
+import stt_agent_settings
 
 VERSION = "1.0.0"
 HERE = Path(__file__).resolve().parent
@@ -245,6 +246,22 @@ def is_noise_prompt(txt):
     )
 
 
+def _report_path(fp, cwd, limit=300):
+    """Chemin d'un fichier modifié pour le rapport : relatif au worktree du run s'il y est, sinon « …/nom »."""
+    fp = str(fp)
+    if cwd and not os.path.isabs(fp):
+        fp = os.path.join(str(cwd), fp)
+    if cwd:
+        try:
+            rel = os.path.relpath(fp, str(cwd))
+        except ValueError:
+            rel = None
+        if rel and rel != os.pardir and not rel.startswith(os.pardir + os.sep) and not os.path.isabs(rel):
+            return rel[:limit]
+    base = os.path.basename(fp.rstrip("/\\")) or "?"
+    return ("…/" + base)[:limit]
+
+
 # ---------------------------------------------------------------------------
 # Transcript Claude Code (lecture incrémentale d'un .jsonl)
 # ---------------------------------------------------------------------------
@@ -271,12 +288,14 @@ class Transcript:
         self.spawns, self.spawn_order = {}, []
         self.side = {}  # anciens formats : sous-agents inline (isSidechain)
         self.usage, self.last_usage = {}, None
+        self.usage_ts = {}        # message -> (horodatage ou None, usage) : base de tokens_since
         self.events = deque(maxlen=3000)  # (ts, kind, text)
         self.roles = []  # (ts, role, source)
         self.phase_start = 0
         self.errors = 0
         self.agent_id = None      # identifiant de sous-agent (agentId)
         self.tool_count = 0
+        self.files_modified = []  # chemins uniques des Edit/Write/NotebookEdit (≤ 100)
         self.ended_turn = False   # dernier message = texte final (rapport rendu)
 
     # -- lecture -----------------------------------------------------------
@@ -453,7 +472,9 @@ class Transcript:
             self.model = model
         usage, mid = msg.get("usage"), msg.get("id")
         if isinstance(usage, dict):
-            self.usage[mid or len(self.usage)] = usage
+            key = mid or len(self.usage)
+            self.usage[key] = usage
+            self.usage_ts[key] = ((self.usage_ts.get(key) or (ts,))[0], usage)
             self.last_usage = usage
         for b in msg.get("content") or []:
             if not isinstance(b, dict):
@@ -475,6 +496,10 @@ class Transcript:
                 summ = summarize_tool(name, inp)
                 self.pending[tid] = {"name": name, "summary": summ, "ts": ts}
                 self.tool_count += 1
+                if name in ("Edit", "Write", "NotebookEdit") and isinstance(inp, dict):
+                    fp = inp.get("file_path") or inp.get("notebook_path")
+                    if isinstance(fp, str) and fp and fp not in self.files_modified and len(self.files_modified) < 100:
+                        self.files_modified.append(fp)
                 self.ended_turn = False
                 self.tool_names[tid] = name
                 self.last_tool = {"name": name, "summary": summ, "ts": ts}
@@ -535,8 +560,17 @@ class Transcript:
         return self.last_ts or self.mtime or 0
 
     def tokens(self):
+        return self._sum_usage(self.usage.values())
+
+    def tokens_since(self, ts):
+        """Jetons des enregistrements assistant d'horodatage >= ts (ts vide : tout ; sans horodatage : compté)."""
+        if not ts:
+            return self.tokens()
+        return self._sum_usage(u for t, u in self.usage_ts.values() if t is None or t >= ts)
+
+    def _sum_usage(self, usages):
         tot = {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0}
-        for u in self.usage.values():
+        for u in usages:
             tot["input"] += int(u.get("input_tokens") or 0)
             tot["output"] += int(u.get("output_tokens") or 0)
             tot["cache_read"] += int(u.get("cache_read_input_tokens") or 0)
@@ -967,6 +1001,127 @@ def recent_events(tr, n):
 # ---------------------------------------------------------------------------
 # Assemblage de l'état
 # ---------------------------------------------------------------------------
+def reconcile_phase(phase, task_status=None, pr=None):
+    """Étape affichée d'un agent (0 Brief … 6 Livré) : la phase déduite du transcript, corrigée par le statut de sa tâche
+    au plan (« done » → 6, « review » → au moins 3) et par sa PR (fusionnée → 6, ouverte → au moins 5). Ne recule jamais."""
+    phase = -1 if phase is None else phase
+    if pr:
+        phase = 6 if pr.get("merged") else max(phase, 5) if pr.get("state") == "open" else phase
+    if task_status == "done":
+        phase = 6
+    elif task_status == "review":
+        phase = max(phase, 3)
+    return phase
+
+
+class PlanIndex:
+    """Lignes du plan indexées par tâche et par session, relues seulement quand plan-status.js change (mtime, taille).
+    Une erreur de lecture garde l'ancien contenu (ou rien) : elle ne bloque jamais la construction de l'état."""
+
+    def __init__(self, path):
+        self.path, self.key, self.by_id, self.by_session = path, None, {}, {}
+
+    def refresh(self):
+        if not self.path:
+            return
+        try:
+            st = os.stat(self.path)
+            key = (st.st_mtime_ns, st.st_size)
+            if key == self.key:
+                return
+            rows = [r for r in read_plan(self.path).get("tasks", []) if isinstance(r, dict) and r.get("id")]
+        except (OSError, KanbanError, AttributeError, TypeError):
+            return
+        self.key = key
+        self.by_id = {r["id"]: r for r in rows}
+        self.by_session = {r["session"]: r for r in rows if r.get("session")}
+
+    def task_of(self, session, runs=()):
+        """(id de tâche, statut) de la session : run du lanceur d'abord, sinon ligne du plan portant ce session."""
+        tid = next((r.task for r in runs if r.session == session), None)
+        row = self.by_id.get(tid) if tid else self.by_session.get(session)
+        if row:
+            return row["id"], row.get("status")
+        return tid, None
+
+
+_SUBJECT_TASK_RE = re.compile(r"^([A-Z]+[0-9]*[a-z]?\.[A-Za-z0-9]+)\b")
+
+
+def _real(p):
+    try:
+        return os.path.normcase(os.path.realpath(str(p))) if p else ""
+    except (OSError, ValueError):
+        return ""
+
+
+def last_task_of(wt, root, runs, rows, subject=""):
+    """Identifiant de la dernière tâche exécutée dans le worktree `wt` (chemin absolu), ou None :
+    (a) run du lanceur le plus récent ; (b) ligne du plan portant ce worktree, la plus récemment mise à jour ;
+    (c) identifiant lu au début du sujet du dernier commit, s'il existe au plan. `root` : racine du dépôt principal."""
+    target = _real(wt)
+    if not target:
+        return None
+
+    def same(w):
+        return isinstance(w, str) and bool(w) and _real(w if os.path.isabs(w) else os.path.join(root, w)) == target
+    try:
+        mine = [r for r in runs if same(getattr(r, "worktree", None)) and getattr(r, "task", None)]
+        if mine:
+            return max(mine, key=lambda r: getattr(r, "started", None) or 0).task
+        rows = [r for r in rows if isinstance(r, dict) and r.get("id")]
+        cand = [r for r in rows if same(r.get("worktree"))]
+        if cand:
+            return max(cand, key=lambda r: str(r.get("updated") or "")).get("id")
+        m = _SUBJECT_TASK_RE.match(subject or "")
+        if m and any(r.get("id") == m.group(1) for r in rows):
+            return m.group(1)
+    except (TypeError, ValueError, AttributeError, OSError):
+        return None
+    return None
+
+
+PROMPT_EXCERPT = 800
+TASK_NOTE_MAX = 2000
+
+
+def task_card(main_root, kanban, row):
+    """Sous-ensemble sûr d'une ligne du plan pour GET /api/tasks/<id> (aucun chemin absolu, aucun jeton)."""
+    tid = row["id"]
+
+    def num(k):
+        v = row.get(k)
+        return v if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+
+    def txt(k, n=500):
+        v = row.get(k)
+        return v[:n] if isinstance(v, str) else None
+    docs = []
+    for d in row.get("docs") or []:
+        if isinstance(d, dict) and isinstance(d.get("f"), str) and ".." not in d["f"].split("/") \
+                and not d["f"].startswith("/") and ":" not in d["f"]:
+            docs.append({"f": d["f"][:300], "r": d.get("r") if d.get("r") in ("lu", "modifié", "créé") else "lu"})
+    excerpt = None
+    try:
+        base = Path(os.path.dirname(kanban), "prompts").resolve()
+        f = base.joinpath(tid + ".md").resolve()
+        f.relative_to(base)
+        if f.is_file():
+            with open(f, "r", encoding="utf-8", errors="replace") as fh:
+                excerpt = fh.read(PROMPT_EXCERPT)
+    except (OSError, ValueError, TypeError):
+        excerpt = None
+    pr = row.get("prompt")
+    pr = pr if isinstance(pr, str) and not os.path.isabs(pr) and ".." not in pr.replace("\\", "/").split("/") and ":" not in pr else None
+    deps = row.get("deps")
+    return {"id": tid, "lot": txt("lot", 64), "title": txt("title", 300), "agent": txt("agent", 40), "model": txt("model", 40),
+            "status": txt("status", 40), "cx": txt("cx", 8), "budget": num("budget"), "used": num("used"), "ms": num("ms"),
+            "note": txt("note", TASK_NOTE_MAX), "prompt": pr, "prompt_excerpt": excerpt, "docs": docs,
+            "worktree": txt("worktree", 300) if not os.path.isabs(row.get("worktree") or "") else None,
+            "base": txt("base", 100),
+            "deps": [d for d in deps if isinstance(d, str)][:30] if isinstance(deps, list) else None}
+
+
 class Hub:
     def __init__(self, args):
         self.args = args
@@ -981,10 +1136,15 @@ class Hub:
         self.runner = None   # RunnerGlue si --runner
         self.tty_lock = threading.Lock()
         self.tty_open = {}   # tâche -> nombre de flux tty ouverts
+        self.plan = PlanIndex(getattr(args, "kanban", None))
+        self.notices.task_info = lambda tid: self.plan.by_id.get(tid)
         self.tasks = None    # TaskService (création de tâches), RunnerGlue si --runner
 
     def build(self):
         now = time.time()
+        self.plan.refresh()
+        rn = getattr(self.runner, "runner", None)
+        runs = list(rn.runs.values()) if rn is not None else []
         prs = self.gh.data.get("prs", [])
         agents, feed = [], []
         tl_start = now - TIMELINE_S
@@ -998,9 +1158,10 @@ class Hub:
             wt = self.git.worktree_for(tr.cwd) if tr.cwd else None
             branch = (wt or {}).get("branch") or tr.branch
             pr = next((p for p in prs if p["head"] == branch and branch and branch != self.git.main), None)
-            phase = tr.phase()
-            if pr:
-                phase = 6 if pr["merged"] else max(phase, 5) if pr["state"] == "open" else phase
+            phase_raw = tr.phase()
+            aid = tr.session_id or Path(tr.path).stem
+            task, task_status = self.plan.task_of(aid, runs)
+            phase = reconcile_phase(phase_raw, task_status, pr)
             if code == "idle" and pr and pr["merged"]:
                 label = "Livré"
             subs = [self.sub_view(sp, st, now, sp_start) for sp, st in pairs]
@@ -1025,6 +1186,7 @@ class Hub:
                 "state": code, "state_label": label, "since": iso(since),
                 "last_activity": iso(tr.activity()), "started": iso(tr.first_ts), "model": tr.model, "version": tr.version,
                 "role": tr.current_role(), "roles_seen": tr.roles_seen(), "phase": phase,
+                "phase_raw": reconcile_phase(phase_raw, None, pr), "task": task, "task_status": task_status,
                 "current": cur, "last_text": shorten(plain(tr.last_text), 320) if tr.last_text else None,
                 "last_prompt": shorten(tr.last_prompt, 200) if tr.last_prompt else None,
                 "todos": tr.todo_list()[:30], "subagents": subs, "registry": registry, "tokens": tr.tokens(), "errors": tr.errors,
@@ -1060,7 +1222,11 @@ class Hub:
         sess_by_wt = {}
         for a in agents:
             sess_by_wt.setdefault(a["branch"], []).append(a["id"])
-        worktrees = [dict(w, session_ids=sess_by_wt.get(w["branch"], [])) for w in self.git.worktrees]
+        root = self.args.main_root or self.args.repo or ""
+        rows = list(self.plan.by_id.values())
+        worktrees = [dict(w, session_ids=sess_by_wt.get(w["branch"], []),
+                          last_task=last_task_of(w["path"], root, runs, rows, (w.get("last_commit") or {}).get("subject", "")))
+                     for w in self.git.worktrees]
         return {
             "mode": "live", "version": VERSION, "generated_at": iso(now),
             "repo": {"path": self.args.repo, "name": Path(self.args.repo).name if self.args.repo else None, "main": self.git.main,
@@ -1703,6 +1869,9 @@ class TaskService:
         prio = body.get("prio", 2)
         worktree = body.get("worktree") or None
         base = body.get("base") or None
+        autoexit = body.get("autoexit", False)
+        if not isinstance(autoexit, bool):
+            raise HttpError(400, "autoexit : booléen attendu")
         if not isinstance(title, str) or not title.strip() or len(title) > 200:
             raise HttpError(400, "title : texte de 1 à 200 caractères")
         if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 200 * 1024:
@@ -1740,7 +1909,7 @@ class TaskService:
         except (stt_runner.ValidationError, TypeError) as exc:
             raise HttpError(400, str(exc))
         return {"title": title.strip(), "agent": agent, "model": model, "cx": cx, "prio": prio,
-                "perm": perm, "wt": wt, "prompt": prompt, "docs": docs, "base": base}
+                "perm": perm, "wt": wt, "prompt": prompt, "docs": docs, "base": base, "autoexit": autoexit}
 
     def create_task(self, body):
         if not isinstance(body, dict):
@@ -1780,6 +1949,8 @@ class TaskService:
                     row["perm"] = perm
                 if docs:
                     row["docs"] = docs
+                if f["autoexit"]:
+                    row["autoexit"] = True
                 if autostart:
                     row["runner"] = "auto"
                 ppath = os.path.join(self.prompts_dir, tid + ".md")
@@ -1794,7 +1965,7 @@ class TaskService:
         self.hub.notices.kanban_changes(out.get("changes"))
         if autostart:
             try:
-                self.runner.enqueue(tid, agent, model, perm, prio, wt, lot, self.prompt_phrase(tid), budget, base)
+                self.runner.enqueue(tid, agent, model, perm, prio, wt, lot, self.prompt_phrase(tid), budget, base, f["autoexit"])
             except stt_runner.RunnerError as exc:
                 raise HttpError(409, f"tâche {tid} créée mais non mise en file : {exc}")
         return {"ok": True, "id": tid, "budget": budget, "prompt": rel}
@@ -1825,7 +1996,7 @@ class TaskService:
                 sets = {"title": f["title"], "agent": f["agent"], "model": f["model"], "cx": f["cx"],
                         "budget": budget, "est0": budget, "prompt": rel}
                 unset = []
-                for key, val, default in (("prio", f["prio"], 2), ("perm", f["perm"], "acceptEdits"), ("worktree", f["wt"], None), ("base", f["base"], None)):
+                for key, val, default in (("prio", f["prio"], 2), ("perm", f["perm"], "acceptEdits"), ("worktree", f["wt"], None), ("base", f["base"], None), ("autoexit", f["autoexit"] or None, None)):
                     if val is None or val == default:
                         unset.append(key)
                     else:
@@ -1857,10 +2028,17 @@ class TaskService:
 class RunnerGlue(TaskService):
     """Un Runner + écriture Kanban (file sérialisée, hors du verrou du lanceur) + notices."""
 
-    def __init__(self, hub, args, command=None, **runner_kw):
+    def __init__(self, hub, args, command=None, settings_path=None, **runner_kw):
         super().__init__(hub, args)
+        if command is None:
+            command = stt_runner.default_command(bool(settings_path))
+        runner_kw["settings_path"] = settings_path
+        os.makedirs(self.prompts_dir, exist_ok=True)
         self.runner = stt_runner.Runner(self.state_dir, self.root, command=command, on_change=self.on_change,
-                                        tokens_of=self.tokens_of, turn_ended_of=self.turn_ended_of, **runner_kw)
+                                        tokens_of=self.tokens_of, turn_ended_of=self.turn_ended_of,
+                                        prompts_dir=os.path.abspath(self.prompts_dir),
+                                        tool_pending_of=self.tool_pending_of, on_autoexit=self.on_autoexit,
+                                        **runner_kw)
         self._validator = self.runner
         self._last = {}            # tâche -> dernier état vu (détecte les vrais changements)
         self._priming = False
@@ -1890,24 +2068,104 @@ class RunnerGlue(TaskService):
             self._writer.join(10)
 
     # -- transcripts ------------------------------------------------------------
-    def _transcript(self, run):
+    def _transcript(self, run, session=None):
+        sid = session or run.session
         for tr in list(self.hub.claude.files.values()):
             if tr.is_sub:
                 continue
-            if tr.session_id == run.session or Path(tr.path).stem == run.session:
+            if tr.session_id == sid or Path(tr.path).stem == sid:
                 return tr
         return None
 
-    def tokens_of(self, run):
-        tr = self._transcript(run)
+    @staticmethod
+    def _sessions_of(run):
+        """Sessions de la tâche, dans l'ordre : tentatives précédentes puis session courante."""
+        out = [x for x in (getattr(run, "sessions", None) or []) if x]
+        if run.session and run.session not in out:
+            out.append(run.session)
+        return out
+
+    def _task_tokens(self, run, sid, last):
+        """Jetons d'une session de la tâche : les tentatives précédentes en entier, la session courante
+        (peut être partagée en mode chaud) depuis t_assign."""
+        tr = self._transcript(run, sid)
         if tr is None:
-            return 0
-        t = tr.tokens()
-        return int(t["input"] + t["output"] + t["cache_write"])
+            return None, {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0, "context": 0}
+        return tr, tr.tokens_since(run.t_assign) if (last and getattr(run, "t_assign", None)) else tr.tokens()
+
+    def tokens_of(self, run):
+        sids = self._sessions_of(run)
+        n = 0
+        for i, sid in enumerate(sids):
+            t = self._task_tokens(run, sid, i == len(sids) - 1)[1]
+            n += int(t["input"] + t["output"] + t["cache_write"])
+        return n
+
+    def duration_ms_of(self, run):
+        """Durée active (hors pauses) depuis l'attribution : tâche chaude démarrée avant t_assign."""
+        sec = run.active_seconds(self.runner.now())
+        ta = getattr(run, "t_assign", None)
+        if ta and run.started and ta > run.started:
+            sec = max(0.0, sec - (ta - run.started))
+        return int(sec * 1000)
 
     def turn_ended_of(self, run):
         tr = self._transcript(run)
         return bool(tr is not None and tr.ended_turn and tr.last_kind == "text")
+
+    def tool_pending_of(self, run):
+        """Vrai si le transcript contient un tool_use sans tool_result (question, permission, outil en cours)."""
+        tr = self._transcript(run)
+        return bool(tr is not None and tr.pending)
+
+    def on_autoexit(self, run):
+        ne = self.hub.notices
+        self.hub.notices.emit("runner_autoexit", "runner", "info", "Fin de tour : arrêt automatique",
+                              f"{run.task} ({run.agent} {run.model}) : /exit envoyé", {"type": "task", "id": run.task},
+                              f"runner_autoexit:{run.task}:{int(run.started or 0)}:{int(self.runner.now())}",
+                              self._run_agent(run), ne.task_ref(run.task))
+
+    @staticmethod
+    def _run_agent(run):
+        role = role_from_agent(run.agent, "") or str(run.agent or "").upper() or None
+        return agent_ref(run.session or run.task, role, run.model, run.task)
+
+    def report(self, task):
+        """Contenu de GET /api/runner/<tâche>/report (lecteur de transcripts existant, aucune seconde analyse)."""
+        run = self.runner.runs.get(task)
+        if run is None:
+            raise KeyError(task)
+        if run.state == "orphan":
+            raise HttpError(409, f"{task} : processus orphelin (lancé avant un redémarrage du serveur) : pas de rapport")
+        out = {"task": task, "state": run.state, "exit": run.exit, "session": run.session,
+               "started": run.started, "ended": run.ended, "final_text": None,
+               "usage": {"input_tokens": 0, "output_tokens": 0, "cache_creation_input_tokens": 0,
+                         "cache_read_input_tokens": 0, "total_tokens": 0},
+               "duration_ms": self.duration_ms_of(run),
+               "tool_calls": 0, "files_modified": [], "last_activity": None, "sessions": []}
+        sids = self._sessions_of(run)
+        tot = {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0}
+        for i, sid in enumerate(sids):
+            tr, t = self._task_tokens(run, sid, i == len(sids) - 1)
+            for k in tot:
+                tot[k] += t[k]
+            out["sessions"].append({"session": sid, "usage": {
+                "input_tokens": t["input"], "output_tokens": t["output"],
+                "cache_creation_input_tokens": t["cache_write"], "cache_read_input_tokens": t["cache_read"],
+                "total_tokens": int(t["input"] + t["output"] + t["cache_write"])}})
+            if tr is None:
+                continue
+            out["final_text"] = (tr.last_text or None) and tr.last_text[:20000] or out["final_text"]
+            out["tool_calls"] += tr.tool_count
+            for fp in tr.files_modified:
+                rp = _report_path(fp, tr.cwd)
+                if rp not in out["files_modified"] and len(out["files_modified"]) < 100:
+                    out["files_modified"].append(rp)
+            out["last_activity"] = max(out["last_activity"] or 0, tr.activity() or 0) or None
+        out["usage"] = {"input_tokens": tot["input"], "output_tokens": tot["output"],
+                        "cache_creation_input_tokens": tot["cache_write"], "cache_read_input_tokens": tot["cache_read"],
+                        "total_tokens": int(tot["input"] + tot["output"] + tot["cache_write"])}
+        return out
 
     # -- crochet on_change : appelé sous le verrou du Runner, donc rapide et sans E/S ------------
     def on_change(self, run):
@@ -1922,7 +2180,11 @@ class RunnerGlue(TaskService):
         task, st = run.task, run.state
         tgt = {"type": "task", "id": task}
         who = f"{task} ({run.agent} {run.model})"
-        emit = self.hub.notices.emit
+        ne = self.hub.notices
+        ag, tk = self._run_agent(run), ne.task_ref(task)
+
+        def emit(kind, cat, sev, title, body, tgt, key):
+            return ne.emit(kind, cat, sev, title, body, tgt, key, ag, tk)
         kr = int(run.started or 0)
         if st == "starting":
             emit("runner_started", "runner", "info", "Agent lancé", who, tgt, f"runner_started:{task}:{kr}")
@@ -1965,7 +2227,7 @@ class RunnerGlue(TaskService):
             job["note"] = run.note or ("tué par l'utilisateur" if st == "killed" else "échec")
         if st in ENDED_STATES:
             s["ended"] = local_iso(run.ended or time.time())
-            ms = int(run.active_seconds(self.runner.now()) * 1000)
+            ms = self.duration_ms_of(run)
             if ms > 0:
                 job["add"]["ms"] = ms
         return job
@@ -2040,11 +2302,17 @@ class RunnerGlue(TaskService):
             try:
               with self._create_lock:      # même verrou que edit_task : lecture du plan + création du run indivisibles
                 run = r.runs.get(task)
-                if run is not None:
-                    r.enqueue(task, prio=prio)
-                else:
+                try:
                     plan = read_plan(self.args.kanban)
-                    row = next((t for t in plan["tasks"] if t.get("id") == task), None)
+                except KanbanError:
+                    if run is None:
+                        raise
+                    plan = {"tasks": []}      # run connu : la relance ne dépend pas du plan
+                row = next((t for t in plan["tasks"] if t.get("id") == task), None)
+                ax = (row.get("autoexit") is True) if row is not None else None   # relu du plan à chaque mise en file
+                if run is not None:
+                    r.enqueue(task, prio=prio, autoexit=ax)
+                else:
                     if row is None:
                         raise KeyError(task)
                     if row.get("agent") not in ("dev", "archi", "revue"):
@@ -2053,7 +2321,7 @@ class RunnerGlue(TaskService):
                         raise HttpError(409, f"{task} : tâche inconnue du lanceur et sans prompt (data/prompts/{task}.md absent) : créez-la par le formulaire « Nouvelle tâche »")
                     r.enqueue(task, row.get("agent"), row.get("model") or "sonnet", row.get("perm") or "acceptEdits",
                               prio if prio is not None else row.get("prio", 2), row.get("worktree") or None, row.get("lot"),
-                              self.prompt_phrase(task), row.get("budget") or row.get("est0"), row.get("base") or None)
+                              self.prompt_phrase(task), row.get("budget") or row.get("est0"), row.get("base") or None, ax)
             except KanbanError as exc:
                 raise HttpError(400, str(exc))
         else:
@@ -2200,10 +2468,14 @@ def make_handler(hub, allowed_hosts):
                 return self._stream()
             if path == "/api/runner":
                 return self._json(200, runner_payload(hub.runner))
+            if path.startswith("/api/tasks/"):
+                return self._task_card(path)
             if path == "/api/worktrees":
                 return self._json(200, list_worktrees(hub.args.main_root or hub.args.repo))
             if path.startswith("/api/runner/") and path.endswith("/tty"):
                 return self._tty(path)
+            if path.startswith("/api/runner/") and path.endswith("/report"):
+                return self._report(path)
             if path == "/api/kanban":
                 try:
                     out = kanban_summary(hub.args.kanban)
@@ -2309,6 +2581,35 @@ def make_handler(hub, allowed_hosts):
                 self._json(404, {"ok": False, "error": f"tâche inconnue : {exc.args[0] if exc.args else ''}"})
             except stt_runner.RunnerError as exc:
                 self._json(500, {"ok": False, "error": str(exc)})
+
+        def _report(self, path):
+            """GET /api/runner/<tâche>/report : rapport final et consommation (jeton + Origin ; extraits sensibles)."""
+            if not check_control(self):
+                return self._send(403, b"403", "text/plain; charset=utf-8")
+            try:
+                parts = [urllib.parse.unquote(x) for x in path.split("/")]
+                if len(parts) != 5 or not stt_runner._TASK_RE.match(parts[3]):
+                    raise HttpError(404, "route inconnue")
+                if hub.runner is None:
+                    raise HttpError(409, RUNNER_OFF_REASON)
+                self._json(200, hub.runner.report(parts[3]))
+            except HttpError as exc:
+                self._json(exc.code, {"ok": False, "error": exc.message})
+            except KeyError as exc:
+                self._json(404, {"ok": False, "error": f"tâche inconnue du lanceur : {exc.args[0] if exc.args else ''}"})
+
+        def _task_card(self, path):
+            """GET /api/tasks/<id> : carte d'une tâche du plan (jeton + Origin, lecture seule)."""
+            if not check_control(self, same_origin_get=True):
+                return self._send(403, b"403", "text/plain; charset=utf-8")
+            tid = urllib.parse.unquote(path[len("/api/tasks/"):])
+            if not stt_runner._TASK_RE.match(tid) or ".." in tid:
+                return self._json(404, {"ok": False, "error": "identifiant de tâche invalide"})
+            hub.plan.refresh()
+            row = hub.plan.by_id.get(tid)
+            if row is None:
+                return self._json(404, {"ok": False, "error": "tâche inconnue"})
+            self._json(200, task_card(hub.args.main_root or hub.args.repo, hub.args.kanban, row))
 
         def _tty(self, path):
             """GET /api/runner/<tâche>/tty?since=N : flux SSE du terminal (event: out {seq,b64}, event: state {state})."""
@@ -2432,6 +2733,25 @@ def detect_github(repo):
     return m.group(1) if m else None
 
 
+def prepare_agent_settings(value, lock_dir):
+    """Valide la liste d'autorisations des agents et écrit le fichier effectif (relu à chaque démarrage).
+    value : None (défaut agent-permissions.json à côté du script, ignoré s'il manque), « none », ou chemin
+    explicite (invalide ⇒ erreur). Retourne le chemin du fichier effectif, ou None."""
+    if value is not None and value.strip().lower() == "none":
+        return None
+    if value is None:
+        source = str(HERE / "agent-permissions.json")
+        if not os.path.lexists(source):
+            return None
+    else:
+        source = os.path.abspath(os.path.expanduser(value))
+    if not lock_dir:
+        raise stt_agent_settings.SettingsError("dossier privé du lanceur introuvable")
+    allow, deny = stt_agent_settings.validate_settings_file(source)
+    ensure_lock_dir(lock_dir)
+    return stt_agent_settings.write_effective(lock_dir, allow, deny)
+
+
 def main():
     global DEFAULT_LOCK_DIR
     ap = argparse.ArgumentParser(description="Tableau de bord temps réel des agents Claude Code (STT).")
@@ -2450,7 +2770,12 @@ def main():
     ap.add_argument("--kanban", help="plan-status.js du Kanban (défaut : %s dans le checkout principal)" % KANBAN_REL)
     ap.add_argument("--kanban-apply", metavar="OPS.json", help="applique des opérations au Kanban (fichier JSON ou - pour stdin) puis quitte ; --dry-run pour contrôler seulement")
     ap.add_argument("--runner", action="store_true", help="active le lanceur d'agents (opt-in ; boucle locale uniquement, hors Windows)")
-    ap.add_argument("--runner-cmd", metavar="JSON", help="avec --runner : commande du lanceur, liste argv JSON (défaut : claude interactif) ; {agent} {model} {session} {perm} {task} {prompt} substitués")
+    ap.add_argument("--runner-cmd", metavar="JSON", help="avec --runner : commande du lanceur, liste argv JSON (défaut : claude interactif) ; {agent} {model} {session} {perm} {task} {prompt} {prompts_dir} substitués")
+    ap.add_argument("--agent-settings", metavar="CHEMIN|none", help="avec --runner : liste d'autorisations des agents, passée à claude --settings après validation (défaut : agent-permissions.json à côté du script s'il existe ; none = désactivée)")
+    ap.add_argument("--autoexit-grace", type=float, help=argparse.SUPPRESS)       # tests : AUTOEXIT_GRACE_S
+    ap.add_argument("--autoexit-kill-after", type=float, help=argparse.SUPPRESS)  # tests : AUTOEXIT_KILL_AFTER_S
+    ap.add_argument("--waiting-silence", type=float, help=argparse.SUPPRESS)      # tests : WAITING_SILENCE_S
+    ap.add_argument("--stop-grace", type=float, help=argparse.SUPPRESS)           # tests : STOP_GRACE_S
     ap.add_argument("--dry-run", action="store_true", help="avec --kanban-apply : valide sans écrire")
     args = ap.parse_args()
     if args.runner:
@@ -2468,6 +2793,9 @@ def main():
             runner_cmd = None
         if not (isinstance(runner_cmd, list) and runner_cmd and all(isinstance(x, str) for x in runner_cmd)):
             ap.exit(2, "--runner-cmd : liste JSON non vide de chaînes attendue.\n")
+
+    if args.agent_settings is not None and not args.runner:
+        ap.exit(2, "--agent-settings exige --runner.\n")
 
     args.repo = os.path.abspath(os.path.expanduser(args.repo)) if args.repo else detect_repo(HERE)
     if args.repo:  # racine réelle du dépôt (et non un sous-dossier)
@@ -2489,6 +2817,12 @@ def main():
         return
     if not args.github and not args.no_github:
         args.github = detect_github(args.repo)
+    agent_settings = None
+    if args.runner and not args.once:
+        try:
+            agent_settings = prepare_agent_settings(args.agent_settings, DEFAULT_LOCK_DIR)
+        except (stt_agent_settings.SettingsError, KanbanError, OSError) as exc:
+            ap.exit(2, f"--agent-settings refusé : {exc}\n")
     hub = Hub(args)
     hub.token = secrets.token_urlsafe(32)  # en mémoire seulement
 
@@ -2503,7 +2837,9 @@ def main():
 
     hub.tasks = TaskService(hub, args)
     if args.runner:
-        hub.runner = RunnerGlue(hub, args, command=runner_cmd)
+        timing = {k: v for k, v in (("autoexit_grace_s", args.autoexit_grace), ("autoexit_kill_after_s", args.autoexit_kill_after),
+                                    ("waiting_silence_s", args.waiting_silence), ("stop_grace_s", args.stop_grace)) if v is not None}
+        hub.runner = RunnerGlue(hub, args, command=runner_cmd, settings_path=agent_settings, **timing)
         hub.tasks = hub.runner
         hub.runner.start()
     hub.run_loops()
@@ -2520,7 +2856,8 @@ def main():
     print(f"  Kanban  : {url}kanban/  ·  données {args.kanban or '?'}  (POST /api/kanban, X-STT-Kanban: 1)")
     print(f"  Documents du Kanban : {', '.join(repr(r) for r in KANBAN_DOC_ROOTS)} (KANBAN_DOC_ROOTS)")
     if args.runner:
-        print(f"  Lanceur : actif · état {hub.runner.state_dir} · commande {(runner_cmd or stt_runner.RUNNER_COMMAND)[0]}")
+        print(f"  Lanceur : actif · état {hub.runner.state_dir} · commande {(runner_cmd or stt_runner.RUNNER_COMMAND)[0]}"
+              f" · autorisations des agents {'actives' if agent_settings else 'désactivées'}")
         for _sig in (signal.SIGTERM, signal.SIGHUP):
             signal.signal(_sig, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
     if not local:

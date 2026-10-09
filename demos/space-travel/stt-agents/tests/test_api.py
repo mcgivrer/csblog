@@ -77,7 +77,7 @@ def git(*a, cwd):
 class Server:
     """Un serveur stt-agents sur depot temporaire."""
 
-    def __init__(self, runner=True):
+    def __init__(self, runner=True, extra=None):
         self.tmp = tempfile.mkdtemp(prefix='stt-api-test-')
         self.repo = os.path.join(self.tmp, 'repo')
         os.makedirs(self.repo)
@@ -102,7 +102,7 @@ class Server:
                         '--agent', 'stt-{agent}', '--model', '{model}', '--session-id', '{session}',
                         '--permission-mode', '{perm}', '-n', '{task}', '{prompt}']
             helpers.assert_not_real_claude(fake_cmd)
-            cmd += ['--runner', '--runner-cmd', json.dumps(fake_cmd)]
+            cmd += ['--runner', '--runner-cmd', json.dumps(fake_cmd)] + list(extra or [])
         env = dict(os.environ, CLAUDE_CONFIG_DIR=self.cfg)
         self.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, cwd=self.repo)
         for _ in range(100):
@@ -488,7 +488,9 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(fourth['rank'], 1)
         self.assertEqual(sorted(s.run(t)['inst'] for t in ids[:3]), [1, 2, 3])
         rn = s.runner()
-        self.assertEqual(rn['caps'], {'profile': {'dev': 3, 'archi': 1, 'revue': 1, 'cp': 0}, 'global': 4})
+        # équipe permanente (décision 65) : départ 1 CP, 1 ARCHI, 3 DEV, 2 REVUE ; plafond global TEAM_MAX = 8
+        self.assertEqual(rn['caps']['profile'], {'cp': 1, 'archi': 1, 'dev': 3, 'revue': 2})
+        self.assertEqual(rn['caps']['global'], 8)
         # annulation de la 4e (queued -> stopped), puis liberation d'une place
         self.assertEqual(s.call('POST', f'/api/runner/{ids[3]}/cancel', {})[1]['state'], 'stopped')
         s.call('POST', f'/api/runner/{ids[0]}/kill', {})

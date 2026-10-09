@@ -70,6 +70,7 @@ class RunnerTestBase(unittest.TestCase):
     def make(self, **kw):
         kw.setdefault('command', FAKE_CMD)
         kw.setdefault('stop_grace_s', 0.4)
+        kw.setdefault('prompts_dir', self.tmp)
         kw.setdefault('env', {'CLAUDE_CONFIG_DIR': self.cfg})
         helpers.assert_not_real_claude(kw['command'])
         r = Runner(self.state_dir, self.root, **kw)
@@ -300,7 +301,7 @@ class TestTransitions(RunnerTestBase):
 
 class TestPool(RunnerTestBase):
     def test_caps_inst_and_global(self):
-        r = self.make()
+        r = self.make(global_cap=4)   # T4.2 : le plafond global est la somme des emplacements (TEAM_MAX)
         for i in range(1, 5):
             r.enqueue('L2a.%d' % i)
         r.enqueue('A.1', agent='archi', lot='L2a')
@@ -367,7 +368,7 @@ class TestPool(RunnerTestBase):
         by = {x['task']: x for x in snap['runs']}
         self.assertEqual(by['L2a.2']['rank'], 1)
         self.assertEqual(by['L2a.1']['rank'], 2)
-        self.assertEqual(snap['caps']['global'], 4)
+        self.assertEqual(snap['caps']['global'], stt_runner.TEAM_MAX)  # T4.2 : plafond = somme des emplacements
         self.assertTrue(by['L2a.1']['controllable'])
         json.dumps(snap)
 
@@ -636,10 +637,10 @@ class TestValidation(RunnerTestBase):
 
     def test_substitute_command(self):
         vals = {'agent': 'dev', 'model': 'sonnet', 'session': 'S', 'perm': 'plan',
-                'task': 'T.1', 'prompt': 'P x'}
+                'task': 'T.1', 'prompt': 'P x', 'prompts_dir': '/p/d'}
         argv = stt_runner.substitute_command(stt_runner.RUNNER_COMMAND, vals)
         self.assertEqual(argv, ['claude', '--agent', 'stt-dev', '--model', 'sonnet',
-                                '--session-id', 'S', '--permission-mode', 'plan',
+                                '--session-id', 'S', '--add-dir', '/p/d', '--permission-mode', 'plan',
                                 '-n', 'T.1', 'P x'])
         res = stt_runner.substitute_command(stt_runner.RUNNER_COMMAND, vals, resume=True)
         self.assertEqual(res[5:7], ['--resume', 'S'])
@@ -694,7 +695,7 @@ class TestEnsureWorktree(unittest.TestCase):
     def test_runner_creates_worktree_on_launch(self):
         cfg = os.path.join(self.tmp, 'cfg')
         r = Runner(os.path.join(self.repo, '.claude', 'stt-runner'), self.repo,
-                   command=FAKE_CMD, stop_grace_s=0.4, env={'CLAUDE_CONFIG_DIR': cfg})
+                   command=FAKE_CMD, stop_grace_s=0.4, prompts_dir=self.tmp, env={'CLAUDE_CONFIG_DIR': cfg})
         try:
             run = r.enqueue('L7.1')
             end = time.monotonic() + 10
